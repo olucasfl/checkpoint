@@ -131,9 +131,11 @@ todos opcionais; ao menos um campo é obrigatório. **Só `nota` e `plataforma` 
   - **413** — arquivo maior que 2 MB. Mensagem: `"A capa deve ter no máximo 2 MB"`.
   - **404** — UUID válido sem jogo correspondente (`"Jogo não encontrado"`).
   - **502** — falha do storage. Mensagem: `"Falha ao acessar o armazenamento de capas"`. Nunca 500.
-- **Ordem das checagens:** `id` (400) → limite de tamanho e campo no parse do multipart (413/400) →
-  jogo existe (404) → assinatura do arquivo (400) → storage (502). Portanto um arquivo grande enviado
-  para um id inexistente retorna 413, e um arquivo inválido para um id inexistente retorna 404.
+- **Ordem das checagens** (a real do Nest, em que o interceptor lê o multipart **antes** dos
+  pipes): limite de tamanho e campo no parse do multipart (413/400) → `id` (400) → jogo existe (404)
+  → assinatura do arquivo (400) → storage (502). Portanto um arquivo grande enviado para um id
+  inexistente retorna 413, um arquivo inválido para um id inexistente retorna 404, e um arquivo
+  grande enviado para um id que nem é UUID retorna 413 (não 400).
 - Objeto no bucket: `<gameId>/<uuid>.<ext>`, com `<ext>` = `jpg`, `png` ou `webp` conforme a
   assinatura detectada, e `Content-Type` gravado = o tipo detectado. O `<uuid>` novo a cada envio
   evita problema de cache.
@@ -416,11 +418,11 @@ Três etapas. **Cada uma termina com `typecheck`, `lint`, `build` e testes verde
 seguinte só começa com um "ok" explícito do humano depois de validar. Cada etapa é um ou mais
 commits na branch `feat/catalogo-jogos`, com `ARCHITECTURE.md` atualizado junto do que ela criar.
 
-| Etapa | Entrega                                                                                                                                                                                                                | Critérios de aceite                                 |
-| ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
-| 1     | Commit 1 `chore(test)` (runners, Node, docs) · `packages/shared` sem capa · schema do `Game` + migration 1 · API CRUD sem capa · testes da API                                                                         | CA-01 a CA-40 e CA-52                               |
-| 2     | `@types/multer` (dev) · migration 2 (`capaPath`) · `StorageService` · envs `SUPABASE_*` · rotas `PUT`/`DELETE /capa` · limpeza da capa ao remover o jogo · `capaUrl` no contrato · testes com `StorageService` mockado | CA-53 a CA-71 (e CA-40 de novo, para a migration 2) |
-| 3     | Web completo "Neon arcade": tokens, fontes, ícones, catálogo em `/`, diagnóstico em `/status`, painéis, filtros, formulário com capa, capa gerada, movimento e acessibilidade · testes do web                          | CA-41 a CA-51 e CA-72 a CA-89                       |
+| Etapa | Entrega                                                                                                                                                                                                                | Critérios de aceite                                         |
+| ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| 1     | Commit 1 `chore(test)` (runners, Node, docs) · `packages/shared` sem capa · schema do `Game` + migration 1 · API CRUD sem capa · testes da API                                                                         | CA-01 a CA-40 e CA-52                                       |
+| 2     | `@types/multer` (dev) · migration 2 (`capaPath`) · `StorageService` · envs `SUPABASE_*` · rotas `PUT`/`DELETE /capa` · limpeza da capa ao remover o jogo · `capaUrl` no contrato · testes com `StorageService` mockado | CA-53 a CA-71 e CA-90 (e CA-40 de novo, para a migration 2) |
+| 3     | Web completo "Neon arcade": tokens, fontes, ícones, catálogo em `/`, diagnóstico em `/status`, painéis, filtros, formulário com capa, capa gerada, movimento e acessibilidade · testes do web                          | CA-41 a CA-51 e CA-72 a CA-89                               |
 
 Antes de **verificar** a etapa 2 são necessários dois passos humanos (registrados em "Pendências de
 execução humana" no `INDEX.md`): criar o bucket `capas` no Supabase e preencher as três variáveis
@@ -500,17 +502,18 @@ Os que dependem do Supabase real são verificação manual; os demais têm teste
 - [ ] **CA-58** — **Dado** `PUT /capa` sem o campo `arquivo`, com o arquivo em outro campo (ex.: `file`) ou com um arquivo vazio, **quando** enviado, **então** 400 com `fields.arquivo` presente.
 - [ ] **CA-59** — **Dado** `PUT /api/games/abc/capa` (id que não é UUID), **então** 400. **Dado** um UUID válido sem jogo e um PNG válido, **então** 404 com `message` = `"Jogo não encontrado"`. **Dado** o mesmo UUID e um arquivo de 2 MB + 1 byte, **então** 413 (o limite de tamanho vem antes da checagem do jogo).
 - [ ] **CA-60** — **Dado** um jogo com capa, **quando** `GET /api/games` e `PATCH /api/games/:id` (ex.: `{"nota":8}`), **então** os dois trazem o mesmo `capaUrl` e **nenhum** response contém `capaPath`; **e** `POST /api/games` devolve `capaUrl: null`.
-- [ ] **CA-61** — **Dado** um jogo com capa, **quando** `PUT /capa` com outra imagem, **então** 200, o novo `capaUrl` tem `<uuid>` diferente, `GET` na URL antiga deixa de devolver a imagem (status ≠ 200), e `atualizadoEm` avança. _Manual (bucket real)._
+- [ ] **CA-61** — **Dado** um jogo com capa, **quando** `PUT /capa` com outra imagem, **então** 200, o novo `capaUrl` tem `<uuid>` diferente, o objeto antigo não está mais no bucket (listagem do bucket para o prefixo `<gameId>/` mostra só o novo; ou `GET` na URL antiga **com um parâmetro de query novo** dá status ≠ 200; a URL original pode continuar respondendo 200 por até ~1 min por causa do CDN), e `atualizadoEm` avança. _Manual (bucket real)._
 - [ ] **CA-62** — **Dado** um jogo com capa e o `StorageService` mockado falhando ao remover o objeto antigo, **quando** `PUT /capa` com imagem válida, **então** 200 com a capa nova ativa, e o log registra um aviso (sem segredos).
 - [ ] **CA-63** — **Dado** o `StorageService` falhando no upload, **quando** `PUT /capa`, **então** 502 com `fields.arquivo` = `"Falha ao acessar o armazenamento de capas"`, o `capaPath` do jogo fica como estava, e **nunca** 500. _Manual: com o nome do bucket errado no `.env`._
-- [ ] **CA-64** — **Dado** um jogo com capa, **quando** `DELETE /api/games/:id/capa`, **então** 200 com `capaUrl: null` e o objeto some do bucket; **quando** repito, **então** 200 de novo (sem chamada ao storage). **Dado** id inexistente, **então** 404; id não UUID, **então** 400.
+- [ ] **CA-64** — **Dado** um jogo com capa, **quando** `DELETE /api/games/:id/capa`, **então** 200 com `capaUrl: null` e o objeto some do bucket (prova: listagem do bucket para o prefixo `<gameId>/` vazia; a URL original pode servir a imagem em cache por até ~1 min); **quando** repito, **então** 200 de novo (sem chamada ao storage). **Dado** id inexistente, **então** 404; id não UUID, **então** 400.
 - [ ] **CA-65** — **Dado** o `StorageService` falhando na remoção, **quando** `DELETE /capa`, **então** 502 com `fields.arquivo` presente e a capa continua associada ao jogo.
-- [ ] **CA-66** — **Dado** um jogo com capa, **quando** `DELETE /api/games/:id`, **então** 204 e o objeto some do bucket. **Dado** o `StorageService` falhando na remoção, **então** ainda 204, o jogo some da lista e o log registra um aviso sem segredos.
+- [ ] **CA-66** — **Dado** um jogo com capa, **quando** `DELETE /api/games/:id`, **então** 204 e o objeto some do bucket (prova: listagem do bucket para o prefixo `<gameId>/` vazia; a URL original pode servir a imagem em cache por até ~1 min). **Dado** o `StorageService` falhando na remoção, **então** ainda 204, o jogo some da lista e o log registra um aviso sem segredos.
 - [ ] **CA-67** — **Dado** `POST` ou `PATCH /api/games` com `capaUrl` ou `capaPath` no body, **quando** enviado, **então** 400 (campo desconhecido).
 - [ ] **CA-68** — **Dado** `apps/api/.env` sem `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` ou `SUPABASE_STORAGE_BUCKET`, **quando** a API sobe, **então** ela falha listando a variável ausente; e `apps/api/.env.example` lista as três **sem valor real**.
 - [ ] **CA-69** — **Dado** o código e o build, **quando** procuro `SUPABASE_SERVICE_ROLE_KEY` e `service_role` em `apps/web/src` e `apps/web/dist`, **então** não há ocorrência, não existe nenhuma variável `VITE_SUPABASE_*`, e nenhum response ou linha de log da API contém o valor da chave.
 - [ ] **CA-70** — **Dado** a migration 2, **quando** aplicada, **então** `Game` ganha `capaPath` nulável, as linhas existentes ficam com `capaPath = NULL`, a migration só adiciona (nada é removido ou alterado), e um segundo `db:migrate` não gera migration nova.
 - [ ] **CA-71** — **Dado** `SUPABASE_*` ausentes no ambiente e sem rede, **quando** `npm test -w @checkpoint/api`, **então** a suíte passa (nenhum teste fala com o Supabase real).
+- [ ] **CA-90** — **Dado** `SUPABASE_SERVICE_ROLE_KEY` começando com `sb_publishable_`, **quando** a API sobe (ou a validação de ambiente roda), **então** ela falha com a mensagem `"SUPABASE_SERVICE_ROLE_KEY parece a chave publishable; use a secret key (sb_secret_…) ou a service_role legada"`; **e** uma chave `sb_secret_…` (ou um JWT legado) passa na validação.
 
 ### Web
 
@@ -572,12 +575,14 @@ Os que dependem do Supabase real são verificação manual; os demais têm teste
       (CA-66); o response nunca contém `capaPath` (CA-60).
     - `storage.service.spec.ts`: com `global.fetch` substituído por `jest.fn()` (nenhuma request
       real), confere: o upload é um `POST` em `{SUPABASE_URL}/storage/v1/object/{bucket}/{path}`,
-      com `Authorization: Bearer <chave>`, `content-type` do tipo detectado e o buffer como corpo;
+      com o cabeçalho `apikey: <chave>` (e **sem** `Authorization`), `content-type` do tipo detectado
+      e o buffer como corpo;
       a remoção é um `DELETE` em `.../object/{bucket}` com `{"prefixes":[path]}`; resposta
       não-2xx, erro de rede e timeout viram `BadGatewayException`; `publicUrl` monta
       `{SUPABASE_URL}/storage/v1/object/public/{bucket}/{path}`; a chave nunca aparece em mensagem
       de erro nem em log.
-    - DTO/env: `env.validation` rejeita ausência das três variáveis `SUPABASE_*` (CA-68).
+    - DTO/env: `env.validation` rejeita ausência das três variáveis `SUPABASE_*` (CA-68) e uma
+      `SUPABASE_SERVICE_ROLE_KEY` que comece com `sb_publishable_` (CA-90).
     - `games.controller` (ou teste equivalente com `ValidationPipe` e `FileInterceptor`): limite de
       2 MB → 413, campo ausente ou com outro nome → 400 (CA-57, CA-58).
 - **Unitário — web (Vitest + React Testing Library, `apiClient` mockado; escopo enxuto, só o que tem
@@ -627,13 +632,18 @@ Loop de verificação por tarefa:
 `apps/api/src/config/env.validation.ts` (senão o `ConfigService` não a expõe) e uma linha em
 `apps/api/.env.example`, **sem valor real**:
 
-| Variável                    | Validação              | Exemplo no `.env.example`               |
-| --------------------------- | ---------------------- | --------------------------------------- |
-| `SUPABASE_URL`              | obrigatória, URL       | `https://<project-ref>.supabase.co`     |
-| `SUPABASE_SERVICE_ROLE_KEY` | obrigatória, não vazia | vazio (o valor real só no `.env` local) |
-| `SUPABASE_STORAGE_BUCKET`   | obrigatória, não vazia | `capas`                                 |
+| Variável                    | Validação                                                          | Exemplo no `.env.example`               |
+| --------------------------- | ------------------------------------------------------------------ | --------------------------------------- |
+| `SUPABASE_URL`              | obrigatória, URL                                                   | `https://<project-ref>.supabase.co`     |
+| `SUPABASE_SERVICE_ROLE_KEY` | obrigatória, não vazia, **não pode começar com `sb_publishable_`** | vazio (o valor real só no `.env` local) |
+| `SUPABASE_STORAGE_BUCKET`   | obrigatória, não vazia                                             | `capas`                                 |
 
-Como as demais, faltar uma derruba o boot com a lista de erros. Consequência: depois da etapa 2, a
+O nome `SUPABASE_SERVICE_ROLE_KEY` é mantido, mas o valor esperado é a **secret key** nova
+(`sb_secret_…`, opaca, não é JWT), não a `service_role` JWT legada. A chave **publishable**
+(`sb_publishable_…`) é a pública, sujeita a RLS: com um bucket sem policies todo upload falharia com
+403, então o boot a recusa com a mensagem `"SUPABASE_SERVICE_ROLE_KEY parece a chave publishable; use
+a secret key (sb_secret_…) ou a service_role legada"` (CA-90). Como as demais, faltar uma derruba o
+boot com a lista de erros. Consequência: depois da etapa 2, a
 API só sobe com as três preenchidas, mesmo para quem só quer mexer no CRUD. `apps/web/.env` **não**
 ganha nenhuma variável do Supabase.
 
@@ -703,9 +713,30 @@ aprovada pelo humano. Versão consultada no registry em 2026-09-23:**
   - **Remoção:** `DELETE {base}/object/{bucket}` com JSON `{"prefixes":["<path>"]}`. Objeto que não
     existe simplesmente não aparece na resposta, então remover de novo não é erro.
   - **URL pública:** `{base}/object/public/{bucket}/{path}` (montada localmente, sem chamada).
-  - **Autenticação** nas chamadas de escrita: `Authorization: Bearer <service role key>` e
-    `apikey: <service role key>`. Os nomes dos cabeçalhos de autenticação são os que o Supabase
-    documenta para o Storage e **são confirmados no CA-53 contra o bucket real**.
+  - **Autenticação** nas chamadas de escrita: **só o cabeçalho `apikey: <secret key>`**, sem
+    `Authorization`. Fonte oficial ([API keys | Supabase Docs](https://supabase.com/docs/guides/getting-started/api-keys)):
+    _"Send publishable and secret keys on the `apikey` header, not on `Authorization: Bearer`."_;
+    _"Publishable and secret keys aren't JWTs"_; e a secret key _"doesn't work in a browser"_
+    (o Supabase olha o `User-Agent` e devolve 401; uma chamada do Node não é afetada). Ver também
+    [Migrating to publishable and secret API keys](https://supabase.com/docs/guides/getting-started/migrating-to-new-api-keys).
+  - **Ressalva (não é documentação oficial):** a issue
+    [supabase/agent-skills#576](https://github.com/supabase/agent-skills/issues/576) relata que, na
+    REST do Storage chamada direto, `Bearer` sozinho dá `Invalid Compact JWS` e `apikey` sozinho pode
+    dar `headers must have required property 'authorization'`, ou seja, o Storage pode exigir um
+    `Authorization` que a documentação não menciona. **Regra:** implementar como a documentação
+    manda (só `apikey`) e confirmar no CA-53 contra o bucket real. Se o Storage recusar, **parar e
+    apresentar opções ao humano**; a chave `service_role` legada **não** é usada sem perguntar.
+  - **Confirmado no bucket real (2026-09-23):** com uma secret key `sb_secret_…`, o upload só com
+    `apikey` funcionou (200), assim como a listagem e a remoção. A ressalva da issue não se
+    aplica a este projeto hospedado; nenhuma chave legada foi necessária.
+  - **CDN (observado no bucket real):** o objeto é servido por CDN com
+    `cache-control: public, max-age=3600`. Depois de apagar o objeto, a URL pública original ainda
+    respondeu **200 (`cf-cache-status: HIT`)** por ~30 s, e passou a **400** quando o Supabase
+    invalidou o cache; a mesma URL com outro parâmetro de query (outra chave de cache) já dava 400
+    de imediato. Portanto "o objeto some" se prova **pela listagem do bucket** (ou pela URL com um
+    parâmetro novo), e **não** por um `GET` imediato na URL original. A URL antiga de uma capa
+    trocada não é mais referenciada por nada (cada envio gera `<uuid>` novo), então o cache
+    residual é inofensivo.
 - **Regras do `StorageService`:** `AbortSignal.timeout(10_000)` em toda chamada; caminho codificado
   por segmento; resposta não-2xx, erro de rede e timeout viram `BadGatewayException` com a
   mensagem fixa do 502 (sem repassar o corpo da resposta do Supabase); nunca loga cabeçalhos nem a
@@ -757,6 +788,15 @@ tudo que veio com a capa e o visual) entra na reaprovação desta spec.
   errada até alguém tentar enviar uma capa.
 - O `StorageService` usa `fetch` nativo contra a API REST (decisão do humano). O timeout de 10 s
   por chamada e o `cache-control: max-age=3600` do upload são padrões meus.
+- **Revisão da etapa 2 (aprovada pelo humano, reaprovada junto do commit da etapa):** a
+  autenticação passou de `Authorization: Bearer` + `apikey` para **só `apikey`**, conforme a
+  documentação oficial de API keys (links em "Notas de ambiente"); a ordem real das checagens do
+  `PUT /capa` põe o multipart antes do `id`; e o boot passou a recusar `sb_publishable_` (CA-90).
+- O `StorageService` **não** cai para a `service_role` legada se o Storage recusar só o `apikey`:
+  nesse caso a implementação para e pergunta.
+- Os erros do multer (413, campo errado) são convertidos para `ApiErrorResponse` com `fields.arquivo`
+  por um interceptor que embrulha o `FileInterceptor` do Nest, sem importar `multer` diretamente
+  (ele segue sendo dependência transitiva do Nest).
 
 **Visual (etapa 3):**
 
