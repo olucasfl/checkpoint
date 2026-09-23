@@ -1,7 +1,8 @@
 # ARCHITECTURE.md — checkpoint
 
 Guia técnico do monorepo. Descreve o que **existe de fato** hoje — o projeto é um esqueleto
-recém-criado, sem entidades de domínio, sem auth, sem tela além de uma home de diagnóstico. Leia
+recém-criado: uma única entidade de domínio (`Game`, catálogo de jogos, só no backend por ora), sem
+auth e sem tela além de uma home de diagnóstico. Leia
 isto antes de tocar em qualquer workspace; atualize a seção afetada no mesmo commit que muda o
 comportamento que ela descreve.
 
@@ -73,13 +74,15 @@ checkpoint/
 ├── apps/
 │   ├── api/                          # @checkpoint/api
 │   │   ├── prisma/
-│   │   │   └── schema.prisma         # datasource + generator, ainda sem nenhum model
+│   │   │   ├── schema.prisma         # datasource + generator + enum GameStatus + model Game
+│   │   │   └── migrations/           # migrations versionadas (commitadas)
 │   │   └── src/
-│   │       ├── common/                # filters/, interceptors/, decorators/ — pastas vazias (.gitkeep)
+│   │       ├── common/                # errors/ (ApiErrorResponse), pipes/ (ValidationPipe global); filters/, interceptors/, decorators/ vazias (.gitkeep)
 │   │       ├── config/                 # app.config.ts, env.validation.ts, index.ts
 │   │       ├── database/               # PrismaModule (@Global) + PrismaService
-│   │       ├── modules/                # um módulo por domínio — hoje só health/
-│   │       │   └── health/             # GET /api/health → status da API + do banco
+│   │       ├── modules/                # um módulo por domínio — hoje health/ e games/
+│   │       │   ├── health/             # GET /api/health → status da API + do banco
+│   │       │   └── games/              # catálogo de jogos: GET/POST/PATCH/DELETE /api/games
 │   │       ├── app.module.ts
 │   │       └── main.ts                 # bootstrap: prefixo /api, CORS, ValidationPipe, Swagger
 │   │
@@ -108,7 +111,8 @@ checkpoint/
 ```
 
 Módulos/páginas além dos citados acima **ainda não existem** — não documente domínio que não foi
-implementado.
+implementado. No web, o catálogo de jogos (etapa 3 da spec) ainda não foi feito: `features/` segue
+vazia e `/` segue sendo a home de diagnóstico.
 
 ---
 
@@ -124,7 +128,14 @@ implementado.
 3. **`ValidationPipe` global**: `whitelist: true`, `forbidNonWhitelisted: true`, `transform: true`,
    `enableImplicitConversion: true`. Todo DTO precisa declarar exatamente os campos que aceita —
    campo não declarado é removido (`whitelist`) ou rejeita a request com 400
-   (`forbidNonWhitelisted`), dependendo de onde a validação pega primeiro.
+   (`forbidNonWhitelisted`), dependendo de onde a validação pega primeiro. O pipe é montado por
+   `createValidationPipe()` (`src/common/pipes/app-validation.pipe.ts`, o mesmo que os testes de
+   DTO usam) e seu `exceptionFactory` devolve os erros no formato `ApiErrorResponse` de
+   `@checkpoint/shared`: `{ statusCode, message, fields? }`, com uma mensagem por campo em `fields`
+   (o web a mostra junto do campo). Os erros de negócio (409, 400 da regra da nota) usam o mesmo
+   formato, via `badRequestError`/`conflictError` (`src/common/errors/api-error.ts`).
+   Como `enableImplicitConversion` converte por tipo antes de validar (`["a"]` viraria `"a"`), os
+   DTOs de `games` leem o valor cru com `TrimString`/`RawValue` (`modules/games/dto/transforms.ts`).
 4. **Swagger** servido em `/api/docs` (`SWAGGER_PATH`), montado a partir do `DocumentBuilder` em
    `main.ts`. Todo controller novo deve usar `@ApiTags`/`@ApiOperation` como `HealthController` já
    faz — é a única documentação viva das rotas hoje.
@@ -144,7 +155,14 @@ implementado.
   `PrismaModule` de novo.
 - `PrismaService extends PrismaClient`, conecta em `onModuleInit`, desconecta em
   `onModuleDestroy`, expõe `isHealthy()` (usado só pelo health check hoje — `SELECT 1`).
-- `prisma/schema.prisma` **ainda não tem nenhum model**. Este projeto usa **migrations versionadas**
+- `prisma/schema.prisma` tem o enum `GameStatus` (`ZERADO`, `JOGANDO`, `QUERO_JOGAR`) e o model
+  `Game`: `titulo`, `plataforma` (`""` = sem plataforma; a API expõe `null`), `status`, `nota`
+  (`Int?`), `criadoEm`/`atualizadoEm` e as colunas `tituloNormalizado`/`plataformaNormalizada`,
+  preenchidas pelo `GamesService` (aparadas e em minúsculas) e cobertas por
+  `@@unique([tituloNormalizado, plataformaNormalizada])`. É assim, e não com um índice `lower()`
+  escrito à mão, para o Prisma enxergar toda a estrutura e o `migrate dev` não acusar drift. A
+  migration também tem dois `CHECK` escritos à mão (nota entre 0 e 10; nota nula com
+  `QUERO_JOGAR`), que o Prisma não modela e não vê como drift. Este projeto usa **migrations versionadas**
   (`prisma migrate dev`/`prisma migrate deploy`), diferente de um fluxo baseado em `db push` sem
   histórico — toda mudança de schema gera um arquivo em `prisma/migrations/` que fica commitado.
   Ver §7 e `.claude/rules/RULES.md`.
@@ -152,15 +170,30 @@ implementado.
 ### 4.4 Módulo por domínio (`src/modules/`)
 
 Convenção NestJS padrão, um módulo por domínio, cada um com `*.module.ts` + `*.controller.ts` +
-`*.service.ts` (+ `dto/` quando a rota aceitar body). `health/` é o único hoje e serve de modelo de
-forma — não de conteúdo, já que não fala com domínio nenhum.
+`*.service.ts` (+ `dto/` quando a rota aceitar body). Hoje há dois:
 
-```ts
-// padrão a seguir para um módulo novo, ex. apps/api/src/modules/games/
-games / games.module.ts; // @Module({ controllers: [...], providers: [...] })
-games.controller.ts; // rotas, DTOs de entrada/saída, @ApiTags
-games.service.ts; // regra de negócio, injeta PrismaService
-dto / create - game.dto.ts; // class-validator
+- `health/` — `GET /api/health`, sem domínio; serve de modelo de forma.
+- `games/` — o catálogo de jogos (spec `docs/specs/catalogo-jogos.md`, etapa 1, ainda sem capa):
+  - `GET /api/games[?status=]` (ordenado por `atualizadoEm` desc, desempate `criadoEm` desc),
+    `POST /api/games`, `PATCH /api/games/:id` (parcial; só `plataforma` e `nota` aceitam `null`) e
+    `DELETE /api/games/:id` (204).
+  - **Regra da nota:** validada no service sobre o **estado final** (registro atual + body), porque
+    o DTO só enxerga o body: `{ status: "QUERO_JOGAR" }` num jogo com nota é 400, a menos que o
+    mesmo body traga `nota: null`. A API nunca apaga a nota por conta própria.
+  - **Duplicidade** (mesmo título e plataforma, sem diferenciar caixa nem espaços nas pontas): checagem
+    prévia para dar um 409 claro; a garantia real é o `@@unique` do banco, e o `P2002` da corrida
+    também vira 409. Ao editar, o próprio jogo não conta como duplicata.
+  - `id` que não é UUID → 400 (`ParseUUIDPipe`); UUID sem jogo → 404.
+  - Testes ao lado do código: `games.service.spec.ts` (regra de negócio, Prisma mockado),
+    `dto/*.spec.ts` (validação pelo pipe do `main.ts`) e `games.http.spec.ts` (status e corpo por
+    HTTP, numa porta local, sem banco).
+
+```
+apps/api/src/modules/games/
+├── games.module.ts       # @Module({ controllers, providers }), registrado em app.module.ts
+├── games.controller.ts   # rotas, @ApiTags/@Api*Response
+├── games.service.ts      # regra de negócio, injeta PrismaService
+└── dto/                  # class-validator + Swagger; transforms.ts lê o valor cru
 ```
 
 Registre o módulo novo em `app.module.ts` (`imports: [...]`).
@@ -282,11 +315,12 @@ Isto amarra com a seção "Próximos passos sugeridos" do `README.md` — não a
 4. **Contratos compartilhados em `packages/shared/src`** — o shape de request/response de cada rota
    nova, consumido pelos dois lados (como `HealthCheckResponse` já faz para `/health`).
 
-Nenhuma dessas entidades existe ainda — este arquivo não deve ser editado para "prever" um design
-de domínio que ainda não foi decidido. Quando a primeira feature de verdade for especificada
-(`docs/specs/`) e implementada, **esta seção e as anteriores devem ser atualizadas no mesmo
-commit** para refletir o que passou a existir (novo módulo em §4.4, nova feature em §5.4, novo
-model em §7).
+O primeiro ciclo (jogo e seu status) está especificado em `docs/specs/catalogo-jogos.md` e em
+implementação por etapas: os passos 1, 2 e 4 já existem para o catálogo (schema, `modules/games/` e
+`packages/shared/src/games.ts`); o passo 3 (`features/games/` no web) é a etapa 3 da spec. Este
+arquivo não deve ser editado para "prever" um design de domínio que ainda não foi decidido: cada
+feature nova atualiza as seções que ela toca **no mesmo commit** (novo módulo em §4.4, nova feature
+em §5.4, novo model em §4.3).
 
 Quando o projeto ganhar auth, testes automatizados, PWA ou pipeline de deploy, as linhas
 correspondentes em §1 deixam de dizer "não existe" e passam a descrever o mecanismo real — até lá,

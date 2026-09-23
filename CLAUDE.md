@@ -14,8 +14,8 @@ aponta para onde cada tipo de contexto vive e não deve repetir o que já está 
    workspaces, convenções de backend/frontend, fluxo de Prisma. Leia antes de qualquer mudança de
    código.
 3. **`docs/specs/`** — especificação de feature, quando existir uma para o que você está fazendo
-   (`docs/specs/INDEX.md` é o mapa). checkpoint é um esqueleto sem entidades de domínio ainda —
-   não há spec nenhuma escrita no momento.
+   (`docs/specs/INDEX.md` é o mapa). A primeira é `catalogo-jogos.md` (jogos em três status),
+   implementada por etapas.
 
 ## Stack (resumo — `README.md` e `ARCHITECTURE.md` §1 têm o detalhe)
 
@@ -54,6 +54,6 @@ Definições em `.claude/commands/`; agentes em `.claude/agents/`; skills em `.c
 
 ## O que este projeto ainda não tem
 
-Sem auth, sem entidade de domínio, sem PWA, sem pipeline de deploy
-(`ARCHITECTURE.md` §1). Não assuma nenhum desses como implícito — cada um é uma decisão de
+Sem auth, sem PWA, sem pipeline de deploy (`ARCHITECTURE.md` §1). A única entidade de domínio é o
+`Game` do catálogo de jogos. Não assuma nenhum desses como implícito — cada um é uma decisão de
 arquitetura própria, com spec, quando chegar a hora.

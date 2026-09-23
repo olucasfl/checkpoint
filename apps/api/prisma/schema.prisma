@@ -1,6 +1,5 @@
-// Schema do Prisma.
-// Ainda sem models de dominio: adicione-os conforme as entidades forem criadas
-// e gere uma migration com `npm run db:migrate`.
+// Schema do Prisma. Toda alteracao aqui termina em `npm run db:migrate`, que gera uma migration
+// versionada em prisma/migrations/ (commitada).
 
 generator client {
   provider = "prisma-client-js"
@@ -10,4 +9,35 @@ datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
+}
+
+// Codigos sem espaco e sem acento; o texto de tela ("Quero jogar") vive so no web.
+enum GameStatus {
+  ZERADO
+  JOGANDO
+  QUERO_JOGAR
+}
+
+model Game {
+  id         String     @id @default(uuid())
+  // Gravados ja aparados (trim) pelo GamesService.
+  titulo     String     @db.VarChar(120)
+  // "" significa "sem plataforma" (a API expoe null). Guardar "" em vez de NULL faz o par de
+  // unicidade abaixo tratar jogo sem plataforma como uma plataforma "vazia": no Postgres,
+  // NULL nunca conflita com NULL.
+  plataforma String     @default("") @db.VarChar(60)
+  status     GameStatus
+  nota       Int?
+
+  // Chaves de comparacao da unicidade (titulo/plataforma em minusculas), preenchidas pelo
+  // GamesService a partir do estado final. Colunas normalizadas em vez de um indice com lower()
+  // escrito a mao: o Prisma nao modela indice por expressao e o `migrate dev` acusaria drift.
+  tituloNormalizado     String @db.VarChar(120)
+  plataformaNormalizada String @default("") @db.VarChar(60)
+
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  @@unique([tituloNormalizado, plataformaNormalizada])
+  @@index([status])
 }
