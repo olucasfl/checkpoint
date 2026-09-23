@@ -4,12 +4,9 @@ Mapa único de `spec ↔ status`. **Este arquivo é a fonte da verdade sobre o q
 confie em adivinhar nome de arquivo. Quem cria ou fecha uma spec atualiza esta tabela no mesmo
 commit — `/docs-sync` confere se ela bate com a realidade.
 
-Nenhuma spec foi escrita ainda — checkpoint é um esqueleto sem entidades de domínio
-(`ARCHITECTURE.md` §1). A primeira linha desta tabela nasce com a primeira feature real.
-
-| Feature | Spec | Status |
-| ------- | ---- | ------ |
-| —       | —    | —      |
+| Feature           | Spec                                   | Status      |
+| ----------------- | -------------------------------------- | ----------- |
+| Catálogo de jogos | [catalogo-jogos.md](catalogo-jogos.md) | ✅ aprovada |
 
 ## Legenda de status
 
