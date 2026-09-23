@@ -97,7 +97,9 @@ checkpoint/
 │
 ├── packages/
 │   └── shared/
-│       └── src/index.ts               # HealthCheckResponse, APP_NAME — exemplos, substituir ao crescer
+│       └── src/
+│           ├── games.ts               # contrato do catálogo de jogos (tipos, constantes, regra da nota)
+│           └── index.ts               # reexporta games; HealthCheckResponse, APP_NAME — exemplos
 │
 ├── eslint.config.mjs                   # config compartilhada por todos os workspaces
 ├── tsconfig.base.json                  # tsconfig base estendido pelos apps
@@ -208,8 +210,14 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
 ## 6. `packages/shared`
 
 Consumido como dependência normal de workspace (`"@checkpoint/shared": "*"`), sempre buildado
-antes de `api`/`web` (§2). Hoje só tem dois exemplos (`HealthCheckResponse`, `APP_NAME`) — devem
-ser substituídos pelos contratos reais assim que a primeira entidade de domínio existir.
+antes de `api`/`web` (§2). Hoje tem:
+
+- `games.ts` — contrato do catálogo de jogos: `GAME_STATUS`/`GameStatus` (códigos `ZERADO`,
+  `JOGANDO`, `QUERO_JOGAR`, sem rótulo de tela), `Game`, `CreateGameRequest`, `UpdateGameRequest`,
+  `ListGamesQuery`, `ApiErrorResponse` (formato dos erros 400/409, com `fields` por campo), as
+  constantes de limite e `statusAllowsRating` (regra da nota, usada pela API e pelo formulário).
+- `index.ts` — reexporta `games` e mantém dois exemplos herdados do esqueleto
+  (`HealthCheckResponse`, `APP_NAME`).
 
 O que entra aqui: tipos de request/response compartilhados entre API e web, enums de domínio,
 funções puras (formatação, validação simples) sem dependência de `window`/Node/Prisma. O que **não**

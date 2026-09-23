@@ -7,6 +7,8 @@
  * Nada que dependa de `window`, do Node ou do Prisma.
  */
 
+export * from './games';
+
 /** Exemplo de contrato compartilhado — substitua quando as entidades existirem. */
 export interface HealthCheckResponse {
   status: 'ok' | 'error';
