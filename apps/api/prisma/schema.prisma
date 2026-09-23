@@ -1,0 +1,12 @@
+// Schema do Prisma.
+// Ainda sem models de dominio: adicione-os conforme as entidades forem criadas
+// e gere uma migration com `npm run db:migrate`.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
