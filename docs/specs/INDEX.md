@@ -39,5 +39,13 @@ commit — `/docs-sync` confere se ela bate com a realidade.
 - [x] Preencher `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` e `SUPABASE_STORAGE_BUCKET` em
       `apps/api/.env` (nunca commitar; a chave nunca vai para o web).
 
+**`catalogo-jogos` — verificação real pendente (etapa 3):**
+
+- [ ] **CA-84** (`prefers-reduced-motion`): hoje só está verificado por teste (a regra CSS existe, conferida no
+      Vitest). Falta a verificação real: ligar a preferência do sistema (Windows: Configurações →
+      Acessibilidade → Efeitos visuais → "Efeitos de animação" desligado), abrir `/` e conferir que o
+      pulso do botão, as _scanlines_, os orbes, o ponto piscando e o tremer do campo com erro estão
+      parados. Só depois a spec pode virar ✅ implementada.
+
 Mudanças destrutivas de schema (`/db-change`) e outras aprovações explícitas exigidas por
 `.claude/rules/RULES.md` entram aqui quando existirem.

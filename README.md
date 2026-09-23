@@ -3,7 +3,7 @@
 App para registrar jogos **zerados**, **jogando** e **que quero jogar**.
 
 > O catálogo de jogos está sendo implementado por etapas (spec em `docs/specs/catalogo-jogos.md`):
-> a **API** (jogos em três status, com capa) já existe; o **web** ainda é só o esqueleto.
+> a **API** e o **web** (catálogo de jogos em três status, com capa e visual "Neon arcade") já existem.
 
 ---
 
@@ -41,8 +41,8 @@ checkpoint/
 │   └── web/                      # @checkpoint/web — frontend React
 │       └── src/
 │           ├── app/              # providers e router da aplicação
-│           ├── features/         # uma pasta por feature (vazio por enquanto)
-│           ├── pages/            # páginas de rota
+│           ├── features/         # uma pasta por feature (hoje games/)
+│           ├── pages/            # páginas de rota (/ catálogo, /status diagnóstico)
 │           ├── shared/
 │           │   ├── components/   # componentes reutilizáveis
 │           │   ├── hooks/        # hooks reutilizáveis
@@ -135,7 +135,8 @@ npm run dev
 | Swagger  | http://localhost:3333/api/docs   |
 | Health   | http://localhost:3333/api/health |
 
-A página inicial da web consulta o `/api/health` e mostra o status da API e do banco.
+A página inicial (`/`) é o catálogo de jogos. O diagnóstico, que consulta o `/api/health` e mostra o
+status da API e do banco, fica em `/status`.
 
 ---
 

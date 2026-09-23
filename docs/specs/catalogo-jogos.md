@@ -201,11 +201,11 @@ ou remover a capa atualiza `atualizadoEm` do jogo (o `@updatedAt` do Prisma) e o
   query e continuam corretas depois de criar, editar ou remover, sem endpoint novo. O filtro
   `?status=` da API continua existindo (para `curl` e usos futuros), mas o web não o envia.
 - **Cada item da lista:** capa 52×52 (a imagem enviada ou a capa gerada), título, plataforma
-  (omitida se vazia), selo do status, nota como barra + número ("SEM NOTA" se vazia) e as ações
+  (omitida se vazia), selo do status, nota (legenda "NOTA", barra de 10 segmentos, estrela, número e "/10"; "SEM NOTA" se vazia) e as ações
   Editar e Remover. O detalhe visual está em "Diretrizes visuais".
 - **Adicionar jogo:** botão que abre um `<dialog>` com o formulário. Editar abre o **mesmo**
   formulário preenchido.
-- **Formulário:** campos Título, Plataforma, Status (três botões de opção), Nota (número, 0 a 10) e
+- **Formulário:** campos Título, Plataforma (**seleção** das plataformas mais usadas, ver abaixo), Status (três botões de opção), Nota (número, 0 a 10) e
   Capa (arquivo).
   - **Capa:** escolher um arquivo mostra um **preview** antes de salvar; nada é enviado até
     Salvar. "Remover capa" descarta o arquivo escolhido e, num jogo que já tem capa, marca a capa
@@ -220,6 +220,7 @@ ou remover a capa atualiza `atualizadoEm` do jogo (o `@updatedAt` do Prisma) e o
     `nota: null`.
   - Erros 400 e 409 aparecem junto do campo indicado em `fields`; sem `fields`, aparecem como
     mensagem geral no formulário. O diálogo permanece aberto com os dados digitados.
+- **Plataformas oferecidas** (a maioria dos locais onde mais se joga, sem os raros): **Computador:** PC, Steam Deck · **PlayStation:** PS1, PS2, PS3, PS4, PS5, PSP · **Xbox:** Xbox, Xbox 360, Xbox One, Xbox Series X|S · **Nintendo:** NES, Super Nintendo, Nintendo 64, GameCube, Wii, Wii U, Nintendo Switch, Game Boy Advance, Nintendo DS, Nintendo 3DS · **Celular:** Android, iOS · **Outros:** Mega Drive. A API **continua aceitando texto livre** (até 60 caracteres): a lista é só do web, o texto escolhido é o que vai para a API, e a regra de duplicidade (mesmo título e plataforma) usa esses nomes.
 - **Remover:** pede confirmação; ao confirmar, o item some da lista.
 - **Estados da lista:** carregando; erro de API (com opção de tentar de novo); vazio sem nenhum jogo
   ("nenhum jogo cadastrado"); vazio com filtro ativo ("nenhum jogo neste status").
@@ -352,9 +353,9 @@ usam só as classes/variáveis dos tokens.
 | `apagado-2`      | `#6e6194` | só controle e ícone **desabilitados**                                                 | 3,68 / 3,49                                     |
 | `borda-controle` | `#796ca0` | contorno de inputs, botões de status, área da capa, botões de ação e **anel de foco** | 4,32 / 4,10 (`painel-2`: 4,13)                  |
 | `magenta`        | `#ff3ea5` | acento primário (logo, botão principal)                                               | 6,28 / 5,96                                     |
-| `ciano`          | `#22d3ee` | status Jogando, filtro ativo                                                          | 11,25 / 10,68                                   |
-| `lima`           | `#a3e635` | status Zerado                                                                         | 13,48 / 12,80                                   |
-| `ambar`          | `#fbbf24` | status Quero jogar                                                                    | 12,17 / 11,56                                   |
+| `ciano`          | `#22d3ee` | status **Jogando** (o azul neon), filtro ativo e brilhos decorativos                  | 11,25 / 10,68                                   |
+| `ouro`           | `#ffd000` | status **Zerado** (amarelo/dourado forte de conquista)                                | 13,81 / 13,12                                   |
+| `vermelho-neon`  | `#ff3040` | status **Quero jogar** (vermelho neon forte)                                          | 5,56 / 5,28                                     |
 | `erro`           | `#ff4d6d` | erro (borda do campo, mensagem)                                                       | 6,32 / 6,01                                     |
 
 **Paleta da capa gerada** (`capa-1` a `capa-6`, valores fixados na etapa 3, a partir da sugestão da
@@ -378,7 +379,7 @@ sobre o mínimo de 3:1 e abaixo de `texto-suave` na hierarquia visual. (O `apaga
 
 ### Fontes e ícones
 
-- `--font-display`: **Orbitron** (títulos, números, botões). `--font-corpo`: **Rajdhani** (texto).
+- `--font-display`: **Orbitron** (títulos, botões e os números dos painéis e filtros; o número da **nota** usa Rajdhani). `--font-corpo`: **Rajdhani** (texto).
   Carregadas por `<link>` do Google Fonts em `apps/web/index.html` (`display=swap`, com `system-ui`
   de reserva). Sem pacote npm.
 - Ícones: **Material Symbols Rounded**, também por `<link>` do Google Fonts. Ícone decorativo leva
@@ -389,12 +390,12 @@ sobre o mínimo de 3:1 e abaixo de `texto-suave` na hierarquia visual. (O `apaga
 - **Fundo:** _scanlines_ e orbes de brilho, decorativos, só em CSS.
 - **Topo:** logo "CHECKPOINT" (Orbitron) com ícone de bandeira; botão "Adicionar jogo" (preenchimento
   `magenta`, texto `fundo`) com brilho pulsando.
-- **Painéis de contagem:** três, "Zerados" (`lima`), "Jogando" (`ciano`) e "Quero jogar" (`ambar`),
+- **Painéis de contagem:** três, "Zerados" (`ouro`), "Jogando" (`ciano`) e "Quero jogar" (`vermelho-neon`),
   com o número em Orbitron. Contagens derivadas da lista completa no web (ver "Requisitos de saída").
 - **Filtros:** botões com ícone, rótulo e contagem: Todos (total), Jogando, Quero jogar, Zerado. O
   ativo fica `ciano` com brilho e `aria-pressed="true"`.
 - **Linha do jogo:** capa 52×52; título; plataforma com ícone; selo de status com ícone (Jogando com
-  um ponto piscando); nota como **barra de 10 segmentos + número** (`role="img"` com
+  um ponto piscando); nota como **legenda "NOTA" + barra de 10 segmentos + estrela, número e "/10"** (o número em Rajdhani, legível; na Orbitron o 0 tem barra e o 8 fica ambíguo) (`role="img"` com
   `aria-label="Nota 8 de 10"`; nota 0 = nenhum segmento preenchido e "0"; "SEM NOTA" quando vazia);
   ações editar e remover (ícone + `aria-label`). Hover da linha com destaque.
 - **Capa gerada** (jogo sem imagem): quadrado 52×52 com cor escolhida de uma **paleta fixa de 6
@@ -432,7 +433,7 @@ commits na branch `feat/catalogo-jogos`, com `ARCHITECTURE.md` atualizado junto 
 | ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
 | 1     | Commit 1 `chore(test)` (runners, Node, docs) · `packages/shared` sem capa · schema do `Game` + migration 1 · API CRUD sem capa · testes da API                                                                         | CA-01 a CA-40 e CA-52                                       |
 | 2     | `@types/multer` (dev) · migration 2 (`capaPath`) · `StorageService` · envs `SUPABASE_*` · rotas `PUT`/`DELETE /capa` · limpeza da capa ao remover o jogo · `capaUrl` no contrato · testes com `StorageService` mockado | CA-53 a CA-71 e CA-90 (e CA-40 de novo, para a migration 2) |
-| 3     | Web completo "Neon arcade": tokens, fontes, ícones, catálogo em `/`, diagnóstico em `/status`, painéis, filtros, formulário com capa, capa gerada, movimento e acessibilidade · testes do web                          | CA-41 a CA-51 e CA-72 a CA-89                               |
+| 3     | Web completo "Neon arcade": tokens, fontes, ícones, catálogo em `/`, diagnóstico em `/status`, painéis, filtros, formulário com capa, capa gerada, movimento e acessibilidade · testes do web                          | CA-41 a CA-51 e CA-72 a CA-89 e CA-91 a CA-94               |
 
 Antes de **verificar** a etapa 2 são necessários dois passos humanos (registrados em "Pendências de
 execução humana" no `INDEX.md`): criar o bucket `capas` no Supabase e preencher as três variáveis
@@ -548,17 +549,21 @@ Os que dependem do Supabase real são verificação manual; os demais têm teste
 - [ ] **CA-76** — **Dado** que o `POST` do jogo deu certo e o `PUT` da capa falhou (ex.: 502), **quando** o formulário reage, **então** o jogo aparece na lista, o diálogo continua aberto, a mensagem de erro aparece no campo da capa, e ao salvar de novo o web faz `PATCH` (não `POST`) e a operação não retorna 409.
 - [ ] **CA-77** — **Dado** o formulário aberto, **quando** escolho um GIF ou um PNG de 3 MB, **então** a área da capa mostra a mensagem de erro correspondente e **nenhuma** request é enviada.
 - [ ] **CA-78** — **Dado** um jogo com capa, **quando** edito, clico "Remover capa" e salvo, **então** o web faz `DELETE /api/games/:id/capa` e a linha volta à capa gerada; **e** se eu cancelo o diálogo em vez de salvar, a capa continua.
-- [ ] **CA-79** — **Dado** 2 jogos Jogando, 1 Zerado e 0 Quero jogar, **quando** abro `/`, **então** os painéis mostram Zerados 1, Jogando 2, Quero jogar 0; **quando** crio um jogo Jogando → Jogando 3; **quando** o edito para Zerado → Jogando 2 e Zerados 2; **quando** o removo → Zerados 1. Tudo sem recarregar a página.
+- [ ] **CA-79** — **Dado** 2 jogos Jogando, 1 Zerado e 0 Quero jogar, **quando** abro `/`, **então** os painéis mostram **Zerados 01, Jogando 02, Quero jogar 00** (dois dígitos, com zero à esquerda; o `aria-label` de cada número é o número simples, "1", "2" e "0"); **quando** crio um jogo Jogando → Jogando 03; **quando** o edito para Zerado → Jogando 02 e Zerados 02; **quando** o removo → Zerados 01. Tudo sem recarregar a página.
 - [ ] **CA-80** — **Dado** a lista com jogos, **quando** olho os filtros, **então** cada um mostra ícone, rótulo e contagem ("Todos" = total), e exatamente o ativo tem `aria-pressed="true"` e a cor `ciano` com brilho.
-- [ ] **CA-81** — **Dado** jogos com nota 8, nota 0 e sem nota, **quando** a lista carrega, **então** a barra mostra 8 segmentos preenchidos e "8"; 0 segmentos e "0"; e "SEM NOTA" sem segmentos preenchidos. Cada barra tem `aria-label` "Nota N de 10" (quando há nota).
+- [ ] **CA-81** — **Dado** jogos com nota 8, nota 0 e sem nota, **quando** a lista carrega, **então** a barra mostra 8 segmentos preenchidos, com a legenda "NOTA" e o número "8" seguido de "/10" e de uma estrela; 0 segmentos e "0"; e "SEM NOTA" (com a estrela vazia) sem segmentos preenchidos. Cada barra tem `aria-label` "Nota N de 10" (quando há nota).
 - [ ] **CA-82** — **Dado** o formulário aberto, **quando** olho o status, **então** há três botões com ícone e `aria-pressed`, exatamente um verdadeiro; **quando** escolho "Quero jogar", o campo Nota fica bloqueado com um ícone de cadeado visível.
 - [ ] **CA-83** — **Dado** um campo com erro (ex.: título duplicado), **quando** o erro aparece, **então** o campo tem borda `erro` e a mensagem, e faz uma animação curta de tremer; **e** com `prefers-reduced-motion: reduce` a borda e a mensagem aparecem, mas **sem** tremer.
-- [ ] **CA-84** — **Dado** `prefers-reduced-motion: reduce` (emulado no DevTools), **quando** a página está aberta, **então** nenhuma destas animações roda: _scanlines_, orbes de fundo, pulso do botão "Adicionar jogo", ponto piscando do "Jogando", tremer do campo e transição de hover das linhas (`animation-name: none`, sem `transition` de movimento).
+- [ ] **CA-84** — **Dado** `prefers-reduced-motion: reduce` (emulado no DevTools), **quando** a página está aberta, **então** nenhuma destas animações roda: _scanlines_, orbes de fundo, pulso do botão "Adicionar jogo", ponto piscando do "Jogando", tremer do campo e transição de hover das linhas (`animation-name: none`, sem `transition` de movimento). _Estado: **verificado só por teste** (a regra `@media (prefers-reduced-motion: reduce)` existe no CSS, conferida no Vitest); **falta a verificação real** no navegador com a preferência ligada._
 - [ ] **CA-85** — **Dado** o diálogo aberto, **quando** aperto Esc, **então** ele fecha e o foco volta ao botão que o abriu; **e** navegando só por Tab, todo elemento clicável mostra o anel de foco; **e** botões, filtros e ações da linha medem ≥ 44 × 44 px; **e** todo botão só com ícone tem `aria-label` e todo ícone decorativo tem `aria-hidden="true"`.
 - [ ] **CA-86** — **Dado** os tokens da tabela de "Diretrizes visuais", **quando** confiro os pares reais usados na tela com um verificador de contraste, **então** todo texto tem ≥ 4,5:1; todo contorno de controle e anel de foco (inputs, botões de status, área da capa, botões de ação) usa `borda-controle` (`#796ca0`) e tem ≥ 3:1 contra o fundo em que está (`painel`, `painel-2` ou `fundo`); `borda` não é usada em nenhum controle; e `apagado`/`apagado-2` não são a cor de nenhum texto (`apagado-2` só aparece em controle desabilitado).
 - [ ] **CA-87** — **Dado** `apps/web/src`, **quando** procuro literais de cor hexadecimal (`#[0-9a-fA-F]{3,8}`) fora do bloco `@theme` de `styles/index.css`, **então** não há nenhuma.
 - [ ] **CA-88** — **Dado** `apps/web/index.html`, **quando** o leio, **então** ele carrega Orbitron, Rajdhani e Material Symbols Rounded por `<link>` do Google Fonts; **e** o `package.json` do web não ganhou nenhuma dependência de runtime, de fonte, de ícone, de UI, de formulário, de modal ou de animação.
 - [ ] **CA-89** — **Dado** a página `/`, **quando** ela abre, **então** o topo mostra o logo "CHECKPOINT" com o ícone de bandeira e o botão "Adicionar jogo" com brilho pulsando (estático com `prefers-reduced-motion: reduce`).
+- [ ] **CA-91** — **Dado** o formulário aberto, **quando** olho a Plataforma, **então** é uma **seleção** (não texto livre) cuja primeira opção é "Sem plataforma" (o padrão), com as opções agrupadas por família (Computador, PlayStation, Xbox, Nintendo, Celular, Outros) e incluindo pelo menos PC, PS1 a PS5, PSP, Xbox, Xbox 360, Xbox One, Xbox Series X|S, NES, Super Nintendo, Nintendo 64, GameCube, Wii, Wii U, Nintendo Switch, Nintendo DS, Nintendo 3DS, Android e iOS; **quando** escolho "Nintendo Switch" e salvo, **então** a API recebe `plataforma: "Nintendo Switch"`; **e** um jogo cadastrado antes com uma plataforma fora da lista (ex.: "Atari 2600") a mantém selecionada ao editar, sem apagá-la.
+- [ ] **CA-92** — **Dado** a lista com um jogo de cada status, **quando** olho o selo da linha, o painel de contagem e o botão de status do formulário, **então** Zerado usa `ouro` (amarelo/dourado forte), Jogando usa `ciano` (azul neon) e Quero jogar usa `vermelho-neon`, e cada um passa em AA (≥ 4,5:1) sobre `painel`.
+- [ ] **CA-93** — **Dado** que abro o diálogo de criar ou editar (com o mouse ou com Enter no botão), **quando** ele abre, **então** o foco está no campo Título (na confirmação de remoção, em "Cancelar"); **e** digitar um texto com espaço (ex.: "Hollow Knight") **não** fecha o diálogo. _Achado na verificação real: o `autoFocus` do React roda com o `<dialog>` ainda fechado; o foco caía em "Fechar" e o espaço o clicava._
+- [ ] **CA-94** — **Dado** o código, **quando** rodo `npm run build`, **então** o build do web conclui, e o envio da capa (`PUT /capa`, `multipart/form-data`, campo `arquivo`) chega à API como arquivo e responde 200 (o `apiClient` manda JSON por padrão e o axios converteria o `FormData` em JSON: a API receberia 400). _Achados na verificação real: o build de produção falhava com o pacote `shared` em CommonJS, e o upload chegava vazio._
 
 ## Plano de testes
 
@@ -606,7 +611,7 @@ Os que dependem do Supabase real são verificação manual; os demais têm teste
   de snapshot nem de estilo.
 - **Manual (`curl`/UI, via `/qa-verify`):** CA-36, CA-37, CA-39, CA-40, CA-70 (banco e migration, que
   o mock não alcança), CA-38 (corrida real), CA-53, CA-54, CA-61, CA-63 a CA-66 (bucket real),
-  CA-69, CA-71, CA-41 a CA-51 e CA-72 a CA-89 (UI de ponta a ponta, acessibilidade e movimento;
+  CA-69, CA-71, CA-41 a CA-51 e CA-72 a CA-89 e CA-91 a CA-94 (UI de ponta a ponta, acessibilidade e movimento;
   contraste e `prefers-reduced-motion` com as ferramentas do DevTools).
 
 Loop de verificação por tarefa:
@@ -809,6 +814,9 @@ tudo que veio com a capa e o visual) entra na reaprovação desta spec.
   (ele segue sendo dependência transitiva do Nest).
 
 **Visual (etapa 3):**
+
+- **Cores de status (decisão do humano, após a referência visual):** Zerado = ouro `#ffd000` (amarelo/dourado forte, de conquista), Jogando = ciano `#22d3ee` (o azul neon original) e Quero jogar = vermelho neon `#ff3040`; `lima` e `ambar` saem do `@theme`. A referência `docs/specs/assets/catalogo-jogos-neon.html` mostra as cores antigas (lima, ciano, âmbar): nesse ponto a spec prevalece. O `ciano` segue no filtro ativo. O vermelho neon fica perto do `erro` (`#ff4d6d`): erros sempre vêm com ícone, texto e borda de campo, então não se confundem com o status.
+- **Lista de plataformas (decisão do humano):** seleção com as plataformas mais usadas (a lista está em "Requisitos de saída"); sem opção de texto livre no formulário, para não ter "PS5" e "Playstation 5" como jogos diferentes na regra de duplicidade. Uma plataforma antiga fora da lista aparece como opção extra ("Cadastrada antes") na edição.
 
 - O web busca a lista completa e deriva filtro e contagens no cliente (alternativas descartadas: um
   endpoint de contagens, que o humano não quer, e duas queries, que duplicariam a busca).

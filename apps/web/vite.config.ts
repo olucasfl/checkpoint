@@ -15,6 +15,13 @@ export default defineConfig({
   optimizeDeps: {
     include: ['@checkpoint/shared'],
   },
+  // No build de producao o Rollup so converte CommonJS que esta em node_modules; o shared e linkado
+  // (o caminho real fica em packages/), entao sem isto ele nao enxerga os exports do dist/.
+  build: {
+    commonjsOptions: {
+      include: [/node_modules/, /packages[\\/]shared[\\/]dist/],
+    },
+  },
   server: {
     port: 5173,
   },

@@ -1,8 +1,7 @@
 # ARCHITECTURE.md — checkpoint
 
 Guia técnico do monorepo. Descreve o que **existe de fato** hoje — o projeto é um esqueleto
-recém-criado: uma única entidade de domínio (`Game`, catálogo de jogos, só no backend por ora), sem
-auth e sem tela além de uma home de diagnóstico. Leia
+recém-criado: uma única entidade de domínio (`Game`, catálogo de jogos, com API e tela) e sem auth. Leia
 isto antes de tocar em qualquer workspace; atualize a seção afetada no mesmo commit que muda o
 comportamento que ela descreve.
 
@@ -90,10 +89,10 @@ checkpoint/
 │   └── web/                           # @checkpoint/web
 │       └── src/
 │           ├── app/                    # providers.tsx (AppProviders) + router.tsx (AppRouter)
-│           ├── features/               # uma pasta por feature — vazio (.gitkeep)
-│           ├── pages/                  # páginas de rota — hoje só HomePage.tsx
+│           ├── features/               # uma pasta por feature — hoje games/ (api/, lib/, components/)
+│           ├── pages/                  # páginas de rota — GamesPage (/) e StatusPage (/status)
 │           ├── shared/
-│           │   ├── components/         # vazio (.gitkeep)
+│           │   ├── components/         # Icon (Material Symbols) e ModalDialog (<dialog> nativo)
 │           │   ├── hooks/              # vazio (.gitkeep)
 │           │   └── lib/                # api-client.ts (axios), query-client.ts, env.ts
 │           ├── styles/                 # index.css — entrada do Tailwind
@@ -112,8 +111,7 @@ checkpoint/
 ```
 
 Módulos/páginas além dos citados acima **ainda não existem** — não documente domínio que não foi
-implementado. No web, o catálogo de jogos (etapa 3 da spec) ainda não foi feito: `features/` segue
-vazia e `/` segue sendo a home de diagnóstico.
+implementado.
 
 ---
 
@@ -176,7 +174,7 @@ Convenção NestJS padrão, um módulo por domínio, cada um com `*.module.ts` +
 `*.service.ts` (+ `dto/` quando a rota aceitar body). Hoje há dois:
 
 - `health/` — `GET /api/health`, sem domínio; serve de modelo de forma.
-- `games/` — o catálogo de jogos (spec `docs/specs/catalogo-jogos.md`, etapas 1 e 2; o web é a etapa 3):
+- `games/` — o catálogo de jogos (spec `docs/specs/catalogo-jogos.md`, etapas 1 e 2; o web está em §5.5):
   - `GET /api/games[?status=]` (ordenado por `atualizadoEm` desc, desempate `criadoEm` desc),
     `POST /api/games`, `PATCH /api/games/:id` (parcial; só `plataforma` e `nota` aceitam `null`) e
     `DELETE /api/games/:id` (204).
@@ -229,8 +227,9 @@ Registre o módulo novo em `app.module.ts` (`imports: [...]`).
 - `src/main.tsx` monta `<AppProviders><AppRouter/></AppProviders>`.
 - `src/app/providers.tsx` — ponto único para providers globais. Hoje só `QueryClientProvider`
   (`shared/lib/query-client.ts`); tema, auth etc. entram aqui quando existirem.
-- `src/app/router.tsx` — `createBrowserRouter` com a lista de rotas. Hoje só `/` → `HomePage`.
-  Registre rotas novas aqui conforme cada feature ganha uma página.
+- `src/app/router.tsx` — `createBrowserRouter` com a lista de rotas: `/` → `GamesPage` (o catálogo) e
+  `/status` → `StatusPage` (o diagnóstico de health que antes era a home). Registre rotas novas aqui
+  conforme cada feature ganha uma página.
 
 ### 5.2 Alias de import
 
@@ -247,18 +246,50 @@ essa instância — não crie um segundo `axios.create()`. Cache/estado de servi
 
 ### 5.4 Onde as coisas vão
 
-| Pasta                    | Para quê                                                                                                                                                          |
-| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/features/<nome>/`   | Uma feature de domínio (componentes, hooks, chamadas de API específicas dela). Vazio hoje — nasce quando a primeira feature real (ex. lista de jogos) for criada. |
-| `src/pages/`             | Componentes de página, um por rota, registrados em `app/router.tsx`.                                                                                              |
-| `src/shared/components/` | Componentes de UI reutilizáveis entre features.                                                                                                                   |
-| `src/shared/hooks/`      | Hooks reutilizáveis entre features.                                                                                                                               |
-| `src/shared/lib/`        | Infra transversal: cliente HTTP, query client, acesso a env.                                                                                                      |
-| `src/styles/`            | Entrada do Tailwind (`index.css`) e qualquer CSS global.                                                                                                          |
+| Pasta                    | Para quê                                                                                                   |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------- |
+| `src/features/<nome>/`   | Uma feature de domínio (componentes, hooks, chamadas de API específicas dela). Hoje só `games/`: ver §5.5. |
+| `src/pages/`             | Componentes de página, um por rota, registrados em `app/router.tsx`.                                       |
+| `src/shared/components/` | Componentes de UI reutilizáveis entre features.                                                            |
+| `src/shared/hooks/`      | Hooks reutilizáveis entre features.                                                                        |
+| `src/shared/lib/`        | Infra transversal: cliente HTTP, query client, acesso a env.                                               |
+| `src/styles/`            | Entrada do Tailwind (`index.css`) e qualquer CSS global.                                                   |
 
 Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
 `features/<nome>/`; se é usado por duas ou mais features (ou não pertence a nenhuma), vai em
 `shared/`.
+
+### 5.5 Catálogo de jogos (`features/games/`, spec `docs/specs/catalogo-jogos.md`, etapa 3)
+
+- **Dados:** o web busca a lista **completa** uma vez (`GET /api/games`, query `['games']`); o filtro
+  (`/?status=`, na URL) e as contagens dos painéis e botões saem dela, no cliente. Toda mutação invalida
+  essa query. Chamadas só pelo `apiClient`, tipos de `@checkpoint/shared`. O upload da capa manda
+  `multipart/form-data` **explícito**: o `apiClient` tem `Content-Type: application/json` por padrão e,
+  nesse caso, o axios converte o `FormData` em JSON (a API recebia o arquivo vazio: 400).
+- **`lib/`** (lógica pura, com teste ao lado): `count-by-status`, `status-filter`, `game-cover` (cor da
+  capa gerada por hash FNV-1a do título + iniciais), `api-error` (mapeia o `fields` da
+  `ApiErrorResponse` para os campos do formulário), `cover-file` (pré-checagem de tipo e tamanho),
+  `form-values` (`nota: null` explícito em "Quero jogar"), `platforms` (lista de plataformas) e
+  `save-game` (salva o jogo e SÓ DEPOIS a capa; se a capa falha, devolve o jogo salvo + o erro da capa e
+  o formulário passa a editar aquele jogo, para o próximo Salvar ser `PATCH`, não `POST`/409).
+- **Plataforma** é uma seleção das plataformas mais usadas, agrupadas por família; a API continua
+  aceitando texto livre, e uma plataforma antiga fora da lista vira opção extra na edição.
+- **Diálogos** são `<dialog>` nativo com `showModal()` (`shared/components/ModalDialog`): Esc fecha, o
+  foco fica preso e volta ao botão que abriu. O `autoFocus` do React não funciona com o diálogo
+  fechado; o foco inicial vai para o elemento com `data-autofocus`.
+- **Tema Neon arcade:** todos os tokens de cor (e os únicos hex do web) ficam no `@theme` de
+  `src/styles/index.css`; componentes usam só as classes (`bg-fundo`, `text-ouro`...) e os brilhos são
+  `color-mix()` dos tokens. Status: Zerado = `ouro`, Jogando = `ciano`, Quero jogar = `vermelho-neon`.
+  `prefers-reduced-motion: reduce` desliga todas as animações e transições. Fontes (Orbitron, Rajdhani)
+  e ícones (Material Symbols Rounded) vêm por `<link>` no `index.html`, sem pacote npm. O número da nota
+  usa Rajdhani (a Orbitron deixa o 0 e o 8 ambíguos).
+- **Build de produção:** o `@checkpoint/shared/dist` é CommonJS e linkado; o `vite.config.ts` libera
+  esse caminho em `build.commonjsOptions`, senão o Rollup não enxerga os valores exportados (o `dev`
+  esconde o problema).
+- **Testes** (Vitest + Testing Library, `apiClient`/`gamesApi` mockados; o `jsdom` não tem
+  `showModal()`, então `src/test/setup.ts` tem um polyfill mínimo): `lib/*.test.ts`,
+  `GameForm.test.tsx`, `GamesPage.test.tsx`, `api/games-api.test.ts` e `styles/tokens.test.ts` (sem hex
+  fora do `@theme`, regra de movimento reduzido no CSS, links de fontes).
 
 ---
 
@@ -342,7 +373,7 @@ Isto amarra com a seção "Próximos passos sugeridos" do `README.md` — não a
 
 O primeiro ciclo (jogo e seu status) está especificado em `docs/specs/catalogo-jogos.md` e em
 implementação por etapas: os passos 1, 2 e 4 já existem para o catálogo (schema, `modules/games/` e
-`packages/shared/src/games.ts`); o passo 3 (`features/games/` no web) é a etapa 3 da spec. Este
+`packages/shared/src/games.ts`); o passo 3 (`features/games/` no web) existe desde a etapa 3 da spec. Este
 arquivo não deve ser editado para "prever" um design de domínio que ainda não foi decidido: cada
 feature nova atualiza as seções que ela toca **no mesmo commit** (novo módulo em §4.4, nova feature
 em §5.4, novo model em §4.3).
