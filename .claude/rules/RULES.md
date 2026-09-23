@@ -79,8 +79,8 @@ em vez de assumir um design.
 
 ## 5. Testes
 
-- **Nenhum framework de teste está configurado ainda** — nem Jest na API, nem Vitest na web
-  (`ARCHITECTURE.md` §1). Antes de escrever o primeiro teste de um workspace, configure o runner
+- **Jest (API) e Vitest (web) já estão configurados** (`ARCHITECTURE.md` §1); `packages/shared` não
+  tem runner. Antes de escrever o primeiro teste de um workspace, configure o runner
   (ver `.claude/skills/checkpoint-testing/SKILL.md`) e registre isso na spec/PR — não é um detalhe
   implícito.
 - Lógica nova com ramificação (validação, regra de negócio, transformação de dado) **pede teste no

@@ -6,7 +6,7 @@
   "license": "UNLICENSED",
   "type": "module",
   "engines": {
-    "node": ">=22"
+    "node": ">=20.19"
   },
   "workspaces": [
     "apps/*",
@@ -27,7 +27,9 @@
     "db:generate": "npm run db:generate -w @checkpoint/api",
     "db:migrate": "npm run db:migrate -w @checkpoint/api",
     "db:studio": "npm run db:studio -w @checkpoint/api",
-    "prepare": "husky"
+    "prepare": "husky",
+    "pretest": "npm run build -w @checkpoint/shared",
+    "test": "npm test --workspaces --if-present"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.6.1",

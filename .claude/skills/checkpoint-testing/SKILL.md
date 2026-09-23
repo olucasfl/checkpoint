@@ -5,9 +5,9 @@ description: Convenções de teste do checkpoint (Jest no backend NestJS, Vitest
 
 # Testes no checkpoint
 
-**Nenhum dos dois workspaces tem runner de teste configurado hoje** (`ARCHITECTURE.md` §1) — nem
-Jest em `apps/api`, nem Vitest em `apps/web`. Isso não é uma lacuna a ignorar: é o primeiro passo
-antes do primeiro teste real de cada workspace.
+**Jest em `apps/api` e Vitest em `apps/web` já estão configurados** (`ARCHITECTURE.md` §1);
+`packages/shared` não tem runner. A seção abaixo vale para montar um runner num workspace que ainda
+não tem.
 
 ## Configurar o runner (uma vez por workspace, quando faltar)
 

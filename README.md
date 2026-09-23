@@ -70,7 +70,7 @@ puras. Nada que dependa de `window`, do Node ou do Prisma.
 
 ## Pré-requisitos
 
-- **Node.js 24** (ver `.nvmrc` — `nvm use` se você usa nvm)
+- **Node.js 20.19+** (ver `.nvmrc` — `nvm use` se você usa nvm)
 - **npm 10+** (o projeto usa npm workspaces; não use pnpm nem yarn)
 - **PostgreSQL 16** acessível (instância local ou gerenciada, ex.: Supabase)
 
@@ -141,6 +141,7 @@ A página inicial da web consulta o `/api/health` e mostra o status da API e do 
 | `npm run dev:web`      | sobe só o frontend                                                   |
 | `npm run build`        | build de produção de shared → api → web, nessa ordem                 |
 | `npm run typecheck`    | `tsc --noEmit` em todos os workspaces                                |
+| `npm test`             | compila o `shared` e roda os testes (Jest na api, Vitest no web)     |
 | `npm run lint`         | ESLint em todo o monorepo                                            |
 | `npm run lint:fix`     | ESLint com `--fix`                                                   |
 | `npm run format`       | Prettier em todo o repositório                                       |

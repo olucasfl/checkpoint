@@ -4,7 +4,7 @@
     "module": "CommonJS",
     "moduleResolution": "Node",
     "lib": ["ES2022"],
-    "types": ["node"],
+    "types": ["node", "jest"],
     "outDir": "./dist",
     "rootDir": "./src",
     "emitDecoratorMetadata": true,

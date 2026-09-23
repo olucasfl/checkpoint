@@ -12,20 +12,21 @@ comportamento que ela descreve.
 
 ## 1. Visão geral
 
-|                      |                                                                                                                                                                              |
-| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Tipo de repo         | Monorepo único, npm workspaces (`apps/*`, `packages/*`) — não é multi-repo                                                                                                   |
-| Gerenciador          | npm 10+ (workspaces). Não usar pnpm nem yarn                                                                                                                                 |
-| Linguagem            | TypeScript 5, strict, em todos os workspaces                                                                                                                                 |
-| `apps/api`           | `@checkpoint/api` — NestJS 11, Express, Prisma 6, PostgreSQL 16                                                                                                              |
-| `apps/web`           | `@checkpoint/web` — React 19, Vite 6, React Router 7, TanStack Query 5, Tailwind CSS 4, axios                                                                                |
-| `packages/shared`    | `@checkpoint/shared` — tipos/contratos/utils puros, compilado para `dist/` (CommonJS + `.d.ts`)                                                                              |
-| Banco                | PostgreSQL 16, instância local ou gerenciada (ex.: Supabase) — sem Docker no projeto                                                                                         |
-| Qualidade            | ESLint 9 (flat config, `eslint.config.mjs` na raiz), Prettier, Husky, lint-staged, commitlint (Conventional Commits)                                                         |
-| Testes               | **Ainda não configurado** em nenhum workspace — nem Jest na API, nem Vitest na web. Ver §7 e `.claude/skills/checkpoint-testing/SKILL.md` antes de escrever o primeiro teste |
-| Auth                 | Não existe                                                                                                                                                                   |
-| PWA / service worker | Não existe                                                                                                                                                                   |
-| Deploy / CI          | Não existe (sem Dockerfile de produção, sem workflow de CI, sem manifest de hospedagem)                                                                                      |
+|                      |                                                                                                                                                                                                                                                                 |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Tipo de repo         | Monorepo único, npm workspaces (`apps/*`, `packages/*`) — não é multi-repo                                                                                                                                                                                      |
+| Gerenciador          | npm 10+ (workspaces). Não usar pnpm nem yarn                                                                                                                                                                                                                    |
+| Node                 | 20.19+ (`engines` do `package.json` da raiz; `.nvmrc` = `20.19`). O piso vem do `jsdom@27`; as versões de teste do web foram escolhidas para rodar em Node 20.19                                                                                                |
+| Linguagem            | TypeScript 5, strict, em todos os workspaces                                                                                                                                                                                                                    |
+| `apps/api`           | `@checkpoint/api` — NestJS 11, Express, Prisma 6, PostgreSQL 16                                                                                                                                                                                                 |
+| `apps/web`           | `@checkpoint/web` — React 19, Vite 6, React Router 7, TanStack Query 5, Tailwind CSS 4, axios                                                                                                                                                                   |
+| `packages/shared`    | `@checkpoint/shared` — tipos/contratos/utils puros, compilado para `dist/` (CommonJS + `.d.ts`)                                                                                                                                                                 |
+| Banco                | PostgreSQL 16, instância local ou gerenciada (ex.: Supabase) — sem Docker no projeto                                                                                                                                                                            |
+| Qualidade            | ESLint 9 (flat config, `eslint.config.mjs` na raiz), Prettier, Husky, lint-staged, commitlint (Conventional Commits)                                                                                                                                            |
+| Testes               | Jest 30 + ts-jest na API e Vitest 4 + Testing Library + jsdom na web (`npm test -w <workspace>`); `packages/shared` não tem runner próprio. `npm test` na raiz compila o `shared` antes (`pretest`). Convenções em `.claude/skills/checkpoint-testing/SKILL.md` |
+| Auth                 | Não existe                                                                                                                                                                                                                                                      |
+| PWA / service worker | Não existe                                                                                                                                                                                                                                                      |
+| Deploy / CI          | Não existe (sem Dockerfile de produção, sem workflow de CI, sem manifest de hospedagem)                                                                                                                                                                         |
 
 Não assuma nenhuma dessas ausências como "esquecimento" a corrigir de lado — são decisões de
 escopo do esqueleto. Adicionar qualquer uma delas é uma feature própria, com spec (`docs/specs/`),
@@ -51,6 +52,7 @@ vice-versa. Qualquer coisa que os dois precisem compartilhar entra em `packages/
 ```
 npm run build      →  build -w shared  →  build -w api  →  build -w web
 npm run typecheck   →  build -w shared  →  typecheck --workspaces
+npm test            →  pretest builda shared  →  test em cada workspace que tiver (--if-present)
 npm run dev         →  predev builda shared uma vez, depois shared/api/web sobem em paralelo com watch
 ```
 

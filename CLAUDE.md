@@ -29,6 +29,7 @@ Tailwind CSS 4 no frontend · ESLint 9 + Prettier + Husky + lint-staged + commit
 npm run dev            # sobe shared (watch) + api + web
 npm run build           # shared → api → web, nessa ordem
 npm run typecheck       # tsc --noEmit em todos os workspaces
+npm test                # compila o shared e roda os testes (Jest na api, Vitest no web)
 npm run lint             # ESLint no monorepo inteiro
 npm run db:migrate         # prisma migrate dev (gera migration versionada)
 ```
@@ -53,6 +54,6 @@ Definições em `.claude/commands/`; agentes em `.claude/agents/`; skills em `.c
 
 ## O que este projeto ainda não tem
 
-Sem auth, sem entidade de domínio, sem testes configurados, sem PWA, sem pipeline de deploy
+Sem auth, sem entidade de domínio, sem PWA, sem pipeline de deploy
 (`ARCHITECTURE.md` §1). Não assuma nenhum desses como implícito — cada um é uma decisão de
 arquitetura própria, com spec, quando chegar a hora.
