@@ -31,5 +31,13 @@ commit — `/docs-sync` confere se ela bate com a realidade.
 
 ## Pendências de execução humana
 
-Nenhuma no momento. Mudanças destrutivas de schema (`/db-change`) e outras aprovações explícitas
-exigidas por `.claude/rules/RULES.md` entram aqui quando existirem.
+**`catalogo-jogos` — capa (etapa 2):**
+
+- [ ] Criar o bucket **público** `capas` no painel do Supabase (mesmo projeto do banco). Leitura
+      pública; escrita só pelo backend (service role key). Recomendado: limite de 2 MB e tipos
+      `image/jpeg`, `image/png`, `image/webp` configurados no próprio bucket, como segunda barreira.
+- [ ] Preencher `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` e `SUPABASE_STORAGE_BUCKET` em
+      `apps/api/.env` (nunca commitar; a chave nunca vai para o web).
+
+Mudanças destrutivas de schema (`/db-change`) e outras aprovações explícitas exigidas por
+`.claude/rules/RULES.md` entram aqui quando existirem.

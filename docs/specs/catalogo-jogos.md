@@ -5,18 +5,36 @@
 ## Objetivo
 
 Permitir registrar jogos manualmente e classificá-los em três status (zerado, jogando, quero jogar),
-com plataforma e nota opcionais, e listar, filtrar, editar e remover esse catálogo pessoal.
+com plataforma, nota e capa (imagem enviada por upload) opcionais, e listar, filtrar, editar e
+remover esse catálogo pessoal, numa interface escura "Neon arcade".
 
-Esta é a primeira feature de domínio do checkpoint. Toca `apps/api`, `apps/web`, `packages/shared`
-e `apps/api/prisma/schema.prisma`.
+Esta é a primeira feature de domínio do checkpoint. Toca `apps/api`, `apps/web`, `packages/shared`,
+`apps/api/prisma/schema.prisma` e o Supabase Storage (bucket de capas). É implementada em **três
+etapas**, cada uma parando para validação (ver "Ordem de implementação").
 
 > **Aviso de segurança:** o catálogo é único e sem dono, e a API fica **sem autenticação nem
 > proteção**. Até existir uma spec de auth, a aplicação só deve rodar local ou em rede confiável.
+>
+> Com a capa, o risco cresce: a API passa a **escrever no Supabase Storage** em nome de qualquer
+> requisição (o backend usa a service role key). Quem alcançar a API consegue enviar arquivos ao
+> bucket (até 2 MB cada) e apagar capas existentes. O limite de tamanho, a lista de tipos aceitos e
+> a regra "uma capa por jogo" reduzem o dano, mas **não** substituem autenticação. A service role
+> key vive só em `apps/api/.env`: nunca vai para o web (nem como `VITE_*`), nunca para log, spec,
+> teste ou commit (`RULES.md` §8).
 
 ## Stack
 
-Padrão da casa (`ARCHITECTURE.md`), sem biblioteca de runtime nova. Diferenças:
+Padrão da casa (`ARCHITECTURE.md`). **Nenhuma dependência de runtime nova**; a única dependência
+nova é `@types/multer` (dev, `apps/api`, etapa 2). Diferenças:
 
+- **Supabase Storage** guarda as capas (mesmo projeto do banco), num bucket público `capas`: leitura
+  pública; escrita só pelo backend, com a service role key. O `StorageService` fala com a **API REST
+  do Storage pelo `fetch` nativo do Node 20**, sem `@supabase/supabase-js` (ver "Notas de
+  ambiente").
+- **`multer` já vem com `@nestjs/platform-express`** (`multer@2.4.0`, confirmado em
+  `node_modules`); não é adicionado. Só `@types/multer` entra, como devDependency.
+- **Fontes e ícones do Google Fonts** (Orbitron, Rajdhani, Material Symbols Rounded) por `<link>` em
+  `apps/web/index.html`, sem pacote npm.
 - **Runners de teste** (Jest na API, Vitest no web) entram como devDependencies, em **commit
   separado e anterior** ao da feature (ver "Notas de ambiente"). É a exceção prevista em
   `RULES.md` §9.
@@ -43,6 +61,17 @@ Padrão da casa (`ARCHITECTURE.md`), sem biblioteca de runtime nova. Diferenças
 - Remover apaga o jogo de forma definitiva (sem lixeira). A tela pede confirmação antes.
 - Recurso inexistente (`PATCH`/`DELETE` com id inexistente) → 404. Valor inválido de status, no body
   ou no filtro → 400.
+- **Capa (opcional, uma por jogo):** enviada por arquivo, em requisição separada do JSON do jogo.
+  Só JPEG, PNG e WebP, identificados pelo **conteúdo** do arquivo (assinatura/magic bytes) e não
+  pelo `Content-Type` nem pela extensão; até 2 MB. Trocar a capa apaga a imagem antiga do storage;
+  remover a capa, ou remover o jogo, também apaga o arquivo.
+- **Falha no envio da capa não desfaz o jogo:** no web, criar/editar primeiro salva o jogo e só
+  depois envia a capa. Se o envio falhar, o jogo continua salvo e o erro aparece no campo da capa.
+- **Falha do storage é 502, nunca 500.** Remover um jogo apaga a capa em _best effort_: se o storage
+  falhar, o jogo é removido mesmo assim e a falha vai para o log.
+- **Sem capa,** o web mostra uma capa gerada: cor derivada do título (paleta fixa) + iniciais.
+- **Painéis de contagem no web** mostram quantos jogos há em Zerado, Jogando e Quero jogar; as
+  contagens vêm da lista completa, sem endpoint novo.
 - Lista vazia (sem jogos, ou filtro sem resultados) → estado vazio na tela; a API devolve `[]`.
 
 ## Requisitos de saída
@@ -84,6 +113,40 @@ todos opcionais; ao menos um campo é obrigatório. **Só `nota` e `plataforma` 
 
 - Sucesso: **204**, sem corpo.
 - Erros: **400** (`id` que não é UUID), **404** (UUID válido sem jogo correspondente).
+- Se o jogo tinha capa, o arquivo é removido do storage depois de apagar a linha (_best effort_: se
+  falhar, ainda **204** e a falha vai para o log, sem segredos).
+
+**Capa (etapa 2)** — rotas separadas do JSON do jogo. `@ApiConsumes('multipart/form-data')` e
+`@ApiBody` documentam o upload no Swagger.
+
+**`PUT /api/games/:id/capa`** — `multipart/form-data` com **um** arquivo no campo `arquivo`.
+
+- Regras do arquivo: JPEG, PNG ou WebP, pela **assinatura** (JPEG `FF D8 FF`; PNG
+  `89 50 4E 47 0D 0A 1A 0A`; WebP `RIFF` + 4 bytes + `WEBP`); até 2 MB (2 × 1024 × 1024 bytes).
+  A checagem é feita sobre o buffer, sem confiar em `Content-Type` nem no nome do arquivo.
+- Sucesso: **200** + `Game` com `capaUrl` preenchida.
+- Erros (todos, exceto `id` e 404, trazem `fields.arquivo`):
+  - **400** — `id` que não é UUID; campo `arquivo` ausente, com outro nome ou arquivo vazio; tipo
+    fora de JPEG/PNG/WebP. Mensagem do tipo: `"A capa deve ser uma imagem JPEG, PNG ou WebP"`.
+  - **413** — arquivo maior que 2 MB. Mensagem: `"A capa deve ter no máximo 2 MB"`.
+  - **404** — UUID válido sem jogo correspondente (`"Jogo não encontrado"`).
+  - **502** — falha do storage. Mensagem: `"Falha ao acessar o armazenamento de capas"`. Nunca 500.
+- **Ordem das checagens:** `id` (400) → limite de tamanho e campo no parse do multipart (413/400) →
+  jogo existe (404) → assinatura do arquivo (400) → storage (502). Portanto um arquivo grande enviado
+  para um id inexistente retorna 413, e um arquivo inválido para um id inexistente retorna 404.
+- Objeto no bucket: `<gameId>/<uuid>.<ext>`, com `<ext>` = `jpg`, `png` ou `webp` conforme a
+  assinatura detectada, e `Content-Type` gravado = o tipo detectado. O `<uuid>` novo a cada envio
+  evita problema de cache.
+- Fluxo: envia o objeto novo → atualiza `capaPath` no banco → remove o objeto antigo, se houver
+  (_best effort_: se a remoção falhar, ainda **200** e a falha vai para o log).
+
+**`DELETE /api/games/:id/capa`**
+
+- Sucesso: **200** + `Game` com `capaUrl: null`. Idempotente: jogo sem capa também devolve 200, sem
+  chamar o storage.
+- Erros: **400** (`id` que não é UUID), **404** (jogo inexistente), **502** (falha do storage;
+  `fields.arquivo` presente; a capa continua associada ao jogo).
+- Fluxo: remove o objeto do storage → zera `capaPath` no banco.
 
 **`Game` (response):**
 
@@ -94,13 +157,17 @@ todos opcionais; ao menos um campo é obrigatório. **Só `nota` e `plataforma` 
   "plataforma": "PC",
   "status": "ZERADO",
   "nota": 9,
+  "capaUrl": "https://<ref>.supabase.co/storage/v1/object/public/capas/<gameId>/<uuid>.png",
   "criadoEm": "2026-09-23T12:00:00.000Z",
   "atualizadoEm": "2026-09-23T12:00:00.000Z"
 }
 ```
 
-`plataforma` e `nota` são `null` quando ausentes. As colunas normalizadas (ver "Modelo de dados")
-**não** aparecem no response.
+`plataforma`, `nota` e `capaUrl` são `null` quando ausentes. `capaUrl` (a partir da etapa 2) é a URL
+pública montada a partir de `SUPABASE_URL`, do bucket e do `capaPath`; o `capaPath` cru **nunca**
+aparece em response. As colunas normalizadas (ver "Modelo de dados") também **não** aparecem. Trocar
+ou remover a capa atualiza `atualizadoEm` do jogo (o `@updatedAt` do Prisma) e o reordena na lista.
+`POST` e `PATCH` do JSON **não** aceitam `capaUrl` nem `capaPath` (campo desconhecido → 400).
 
 **Formato de erro (400 e 409) — `ApiErrorResponse`:**
 
@@ -112,8 +179,8 @@ todos opcionais; ao menos um campo é obrigatório. **Só `nota` e `plataforma` 
 }
 ```
 
-- `fields` é opcional e mapeia o nome do campo (`titulo`, `plataforma`, `status`, `nota`) para uma
-  mensagem. Todo 400 de validação de campo traz `fields`; o 404 traz só `statusCode` e `message`.
+- `fields` é opcional e mapeia o nome do campo (`titulo`, `plataforma`, `status`, `nota`, e
+  `arquivo` para erros de capa) para uma mensagem. Todo 400 de validação de campo traz `fields`; o 404 traz só `statusCode` e `message`.
 - Mensagens literais (verificáveis):
   - 409 de duplicata: `fields.titulo` = `"Já existe esse jogo nesta plataforma"`.
   - 400 de nota incompatível: `fields.nota` = `"Nota só pode ser preenchida quando o status é Zerado ou Jogando"`.
@@ -126,12 +193,27 @@ todos opcionais; ao menos um campo é obrigatório. **Só `nota` e `plataforma` 
   diagnóstico de health que hoje é a `/` (`HomePage`), sem mudar o conteúdo dela.
 - **Filtro:** opções, nesta ordem, "Todos", "Jogando", "Quero jogar", "Zerado". Fica na URL
   (`/?status=JOGANDO`) e sobrevive a reload. "Todos" = sem parâmetro. Valor inválido em `?status=` é
-  tratado como "Todos" e não chega à API.
-- **Cada item da lista:** título, plataforma (omitida se vazia), selo do status ("Zerado",
-  "Jogando", "Quero jogar"), nota (omitida se vazia) e as ações Editar e Remover.
+  tratado como "Todos".
+- **Dados:** o web busca a lista **completa** uma única vez (`GET /api/games`, sem `status`) e
+  aplica o filtro e as contagens no cliente. Assim as contagens dos painéis e dos filtros vêm da mesma
+  query e continuam corretas depois de criar, editar ou remover, sem endpoint novo. O filtro
+  `?status=` da API continua existindo (para `curl` e usos futuros), mas o web não o envia.
+- **Cada item da lista:** capa 52×52 (a imagem enviada ou a capa gerada), título, plataforma
+  (omitida se vazia), selo do status, nota como barra + número ("SEM NOTA" se vazia) e as ações
+  Editar e Remover. O detalhe visual está em "Diretrizes visuais".
 - **Adicionar jogo:** botão que abre um `<dialog>` com o formulário. Editar abre o **mesmo**
   formulário preenchido.
-- **Formulário:** campos Título, Plataforma, Status (seleção) e Nota (número, 0 a 10).
+- **Formulário:** campos Título, Plataforma, Status (três botões de opção), Nota (número, 0 a 10) e
+  Capa (arquivo).
+  - **Capa:** escolher um arquivo mostra um **preview** antes de salvar; nada é enviado até
+    Salvar. "Remover capa" descarta o arquivo escolhido e, num jogo que já tem capa, marca a capa
+    para ser removida ao salvar. O web confere tipo e tamanho antes de enviar (comodidade; a API
+    continua sendo a autoridade) usando as constantes de `@checkpoint/shared`.
+  - **Salvar com capa:** `POST`/`PATCH` do jogo primeiro; depois `PUT /capa` (se há arquivo novo) ou
+    `DELETE /capa` (se marcada para remover). Se o jogo foi salvo e a capa falhou, o diálogo
+    **continua aberto**, o formulário passa a editar **aquele jogo** (o próximo Salvar é `PATCH`, não
+    `POST`, para não gerar 409 de duplicata) e o erro aparece no campo da capa. A lista já mostra o
+    jogo salvo.
   - Com status "Quero jogar", o campo Nota fica desabilitado e limpo, e o cliente envia
     `nota: null`.
   - Erros 400 e 409 aparecem junto do campo indicado em `fields`; sem `fields`, aparecem como
@@ -145,9 +227,12 @@ todos opcionais; ao menos um campo é obrigatório. **Só `nota` e `plataforma` 
 
 ## Modelo de dados
 
-**Classificação: aditivo.** Enum novo e model novo, sem linhas existentes. Nada removido, nada
-alterado. Não requer aprovação de mudança destrutiva (`RULES.md` §3), mas o `/db-change` ainda é o
-caminho da implementação.
+**Classificação: aditivo, em duas migrations.** Migration 1 (etapa 1): enum novo e model novo, sem
+linhas existentes. Migration 2 (etapa 2): um campo opcional novo (`capaPath`). Nada removido, nada
+alterado, nenhum campo obrigatório novo em tabela com linhas. Não requer aprovação de mudança
+destrutiva (`RULES.md` §3), mas o `/db-change` ainda é o caminho da implementação.
+
+O bloco abaixo é o schema da **migration 1**; a migration 2 está logo depois do bloco de `CHECK`.
 
 ```prisma
 enum GameStatus {
@@ -193,9 +278,21 @@ ALTER TABLE "Game" ADD CONSTRAINT "Game_nota_status_check"
   CHECK ("nota" IS NULL OR "status" <> 'QUERO_JOGAR');
 ```
 
-**Sem drift:** depois de gerar e aplicar a migration, um **segundo** `npm run db:migrate` **não pode
-gerar nenhuma migration nova** (deve informar que o schema já está em sincronia). Isso é critério de
-aceite (CA-40). A migration é commitada em `apps/api/prisma/migrations/`.
+**Migration 2 (etapa 2) — capa:** acrescenta ao model `Game`
+
+```prisma
+  capaPath String? @db.VarChar(120)   // caminho do objeto no bucket: "<gameId>/<uuid>.<ext>"
+```
+
+`VarChar(120)` cobre 36 (UUID do jogo) + 1 + 36 (UUID do arquivo) + até 5 (`.webp`). O campo guarda
+o **caminho**, não a URL: a URL pública (`capaUrl`) é montada em tempo de resposta a partir de
+`SUPABASE_URL` e do bucket, então trocar de projeto ou de bucket não exige migrar dados. Linhas
+existentes ficam com `capaPath = NULL`.
+
+**Sem drift:** depois de gerar e aplicar **cada** migration (a da etapa 1 e a da etapa 2), um
+**segundo** `npm run db:migrate` **não pode gerar nenhuma migration nova** (deve informar que o
+schema já está em sincronia). Isso é critério de aceite (CA-40 e CA-70). Cada migration é commitada
+em `apps/api/prisma/migrations/`.
 
 ## Contrato compartilhado
 
@@ -206,13 +303,129 @@ Vai para `packages/shared/src` (código puro, sem `window`/Node/`@prisma/client`
   **Sem rótulos de tela** — "Quero jogar" vive só no web.
 - `Game` (response; datas como string ISO), `CreateGameRequest`, `UpdateGameRequest` e
   `ListGamesQuery` (`{ status?: GameStatus }`).
-- `ApiErrorResponse` (`statusCode`, `message`, `fields?: Partial<Record<'titulo' | 'plataforma' | 'status' | 'nota', string>>`).
+- `ApiErrorResponse` (`statusCode`, `message`, `fields?: Partial<Record<'titulo' | 'plataforma' | 'status' | 'nota' | 'arquivo', string>>`).
 - Constantes: `GAME_TITLE_MAX_LENGTH` (120), `GAME_PLATFORM_MAX_LENGTH` (60), `GAME_RATING_MIN` (0),
   `GAME_RATING_MAX` (10).
+- **A partir da etapa 2:** `Game` ganha `capaUrl: string | null`; constantes
+  `GAME_COVER_MAX_BYTES` (`2 * 1024 * 1024`) e `GAME_COVER_MIME_TYPES`
+  (`['image/jpeg', 'image/png', 'image/webp']`), usadas pelo web para a pré-checagem e pela API
+  como fonte única do limite. O `PUT /capa` não tem DTO JSON (é multipart); o campo `arquivo` é o
+  nome do campo do formulário.
 - Função pura `statusAllowsRating(status: GameStatus): boolean` (`false` só para `QUERO_JOGAR`), usada
   pelo service e pelo formulário.
 
 As colunas `tituloNormalizado` e `plataformaNormalizada` **não** entram no contrato.
+
+## Diretrizes visuais
+
+Direção **"Neon arcade"**, baseada no mockup A aprovado pelo humano (lista + formulário). Vale para a
+etapa 3 (`apps/web`).
+
+Mockup visual (privado): https://claude.ai/artifact/McB5PwRtXHfp4eDFkoTwyW, direção A
+
+As diretrizes escritas abaixo continuam sendo a **referência verificável**; o mockup é só apoio
+visual e não está no repositório.
+
+### Tokens
+
+Tema escuro fixo (sem alternância claro/escuro). Os tokens são declarados no `@theme` do Tailwind 4,
+em `apps/web/src/styles/index.css`, **e esse é o único lugar onde um hex aparece**: os componentes
+usam só as classes/variáveis dos tokens.
+
+| Token            | Hex       | Uso                                                                                   | Contraste sobre `fundo` / `painel` |
+| ---------------- | --------- | ------------------------------------------------------------------------------------- | ---------------------------------- |
+| `fundo`          | `#07040f` | fundo da página                                                                       | n/a                                |
+| `painel`         | `#110a20` | painéis, linhas da lista, diálogo                                                     | n/a                                |
+| `painel-2`       | `#0f0a1c` | contêineres internos e campos                                                         | n/a                                |
+| `borda`          | `#2a1d45` | divisórias e contorno de painéis (decorativo)                                         | 1,32 / n/a                         |
+| `texto`          | `#ece6ff` | texto principal                                                                       | 16,77 / 15,93                      |
+| `texto-suave`    | `#9a8cc2` | texto secundário, placeholder, "SEM NOTA"                                             | 6,68 / 6,35                        |
+| `apagado`        | `#5d5080` | só decorativo: segmentos vazios da barra de nota                                      | 2,83 / 2,69                        |
+| `apagado-2`      | `#6e6194` | só controle e ícone **desabilitados**                                                 | 3,68 / 3,49                        |
+| `borda-controle` | `#796ca0` | contorno de inputs, botões de status, área da capa, botões de ação e **anel de foco** | 4,32 / 4,10 (`painel-2`: 4,13)     |
+| `magenta`        | `#ff3ea5` | acento primário (logo, botão principal)                                               | 6,28 / 5,96                        |
+| `ciano`          | `#22d3ee` | status Jogando, filtro ativo                                                          | 11,25 / 10,68                      |
+| `lima`           | `#a3e635` | status Zerado                                                                         | 13,48 / 12,80                      |
+| `ambar`          | `#fbbf24` | status Quero jogar                                                                    | 12,17 / 11,56                      |
+| `erro`           | `#ff4d6d` | erro (borda do campo, mensagem)                                                       | 6,32 / 6,01                        |
+
+Contrastes calculados pela fórmula WCAG 2.x. Consequências (regras, não sugestões):
+
+1. **Texto informativo** usa só `texto`, `texto-suave` ou um acento (todos ≥ 4,5:1). `apagado` e
+   `apagado-2` (2,7 a 3,7:1) **não** podem ser cor de texto: ficam abaixo de AA.
+2. **Contorno de controles e anel de foco** (inputs, botões de status, área da capa, botões de
+   ação) usam `borda-controle` (`#796ca0`): 4,32:1 sobre `fundo`, 4,10:1 sobre `painel` e 4,13:1
+   sobre `painel-2`, acima do mínimo de 3:1 (WCAG 1.4.11). `borda` (1,32:1) só serve de divisória e
+   contorno decorativo de painel, **nunca** de controle. `apagado-2` só aparece em controle
+   **desabilitado** (exceção da WCAG).
+3. **Texto sobre preenchimento `magenta`** usa `fundo` (6,28:1), não `texto` (2,67:1).
+
+`borda-controle` foi calculado por interpolação entre `apagado-2` e `texto-suave`: fica com margem
+sobre o mínimo de 3:1 e abaixo de `texto-suave` na hierarquia visual. (O `apagado-2` sozinho já dava
+3,49:1 sobre `painel`, mas com pouca folga e com o nome ligado a "apagado".)
+
+### Fontes e ícones
+
+- `--font-display`: **Orbitron** (títulos, números, botões). `--font-corpo`: **Rajdhani** (texto).
+  Carregadas por `<link>` do Google Fonts em `apps/web/index.html` (`display=swap`, com `system-ui`
+  de reserva). Sem pacote npm.
+- Ícones: **Material Symbols Rounded**, também por `<link>` do Google Fonts. Ícone decorativo leva
+  `aria-hidden="true"`; botão só com ícone leva `aria-label`.
+
+### Componentes
+
+- **Fundo:** _scanlines_ e orbes de brilho, decorativos, só em CSS.
+- **Topo:** logo "CHECKPOINT" (Orbitron) com ícone de bandeira; botão "Adicionar jogo" (preenchimento
+  `magenta`, texto `fundo`) com brilho pulsando.
+- **Painéis de contagem:** três, "Zerados" (`lima`), "Jogando" (`ciano`) e "Quero jogar" (`ambar`),
+  com o número em Orbitron. Contagens derivadas da lista completa no web (ver "Requisitos de saída").
+- **Filtros:** botões com ícone, rótulo e contagem: Todos (total), Jogando, Quero jogar, Zerado. O
+  ativo fica `ciano` com brilho e `aria-pressed="true"`.
+- **Linha do jogo:** capa 52×52; título; plataforma com ícone; selo de status com ícone (Jogando com
+  um ponto piscando); nota como **barra de 10 segmentos + número** (`role="img"` com
+  `aria-label="Nota 8 de 10"`; nota 0 = nenhum segmento preenchido e "0"; "SEM NOTA" quando vazia);
+  ações editar e remover (ícone + `aria-label`). Hover da linha com destaque.
+- **Capa gerada** (jogo sem imagem): quadrado 52×52 com cor escolhida de uma **paleta fixa de 6
+  tokens** (`capa-1` a `capa-6`) por hash determinístico do título normalizado (`trim` + minúsculas),
+  e as iniciais em Orbitron (primeira letra de cada uma das duas primeiras palavras, maiúsculas; uma
+  palavra só → uma letra). O texto das iniciais tem contraste ≥ 4,5:1 sobre a cor. O mesmo título
+  gera sempre a mesma capa.
+- **Formulário (`<dialog>`):** status como **3 botões com ícone** (`aria-pressed`; exatamente um
+  ativo); campo com erro ganha borda `erro`, mensagem e uma **animação curta de tremer**; Nota
+  **bloqueada com ícone de cadeado** quando o status é "Quero jogar"; área da capa com preview,
+  escolher arquivo e "Remover capa".
+
+### Movimento
+
+Todas as animações são só CSS/Tailwind, **sem biblioteca**: _scanlines_, orbes de fundo, pulso do
+botão, ponto piscando do "Jogando", tremer do campo com erro e o hover das linhas. Sob
+`prefers-reduced-motion: reduce` **todas ficam desligadas** e o estado estático equivalente
+permanece: ponto fixo, brilho do botão sem pulso, campo com erro só com a borda `erro` (sem tremer).
+
+### Acessibilidade
+
+- Contraste AA no texto (≥ 4,5:1) e ≥ 3:1 nos contornos de controles (regras acima).
+- **Foco visível** em tudo que é clicável (anel de 2 px em `borda-controle`, com _offset_ de 2 px, que o distingue do contorno de 1 px do
+  estado normal).
+- **Alvo de toque ≥ 44 × 44 px** em botões, filtros e ações da linha.
+- **Esc fecha o diálogo** (`<dialog>` aberto com `showModal()`), e o foco volta ao botão que o abriu.
+
+## Ordem de implementação
+
+Três etapas. **Cada uma termina com `typecheck`, `lint`, `build` e testes verdes e PARA**: a
+seguinte só começa com um "ok" explícito do humano depois de validar. Cada etapa é um ou mais
+commits na branch `feat/catalogo-jogos`, com `ARCHITECTURE.md` atualizado junto do que ela criar.
+
+| Etapa | Entrega                                                                                                                                                                                                                | Critérios de aceite                                 |
+| ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| 1     | Commit 1 `chore(test)` (runners, Node, docs) · `packages/shared` sem capa · schema do `Game` + migration 1 · API CRUD sem capa · testes da API                                                                         | CA-01 a CA-40 e CA-52                               |
+| 2     | `@types/multer` (dev) · migration 2 (`capaPath`) · `StorageService` · envs `SUPABASE_*` · rotas `PUT`/`DELETE /capa` · limpeza da capa ao remover o jogo · `capaUrl` no contrato · testes com `StorageService` mockado | CA-53 a CA-71 (e CA-40 de novo, para a migration 2) |
+| 3     | Web completo "Neon arcade": tokens, fontes, ícones, catálogo em `/`, diagnóstico em `/status`, painéis, filtros, formulário com capa, capa gerada, movimento e acessibilidade · testes do web                          | CA-41 a CA-51 e CA-72 a CA-89                       |
+
+Antes de **verificar** a etapa 2 são necessários dois passos humanos (registrados em "Pendências de
+execução humana" no `INDEX.md`): criar o bucket `capas` no Supabase e preencher as três variáveis
+`SUPABASE_*` em `apps/api/.env`. Os testes unitários da etapa 2 não dependem disso (nada fala com o
+Supabase real).
 
 ## Critérios de aceite (testáveis, em BDD)
 
@@ -240,7 +453,7 @@ As colunas `tituloNormalizado` e `plataformaNormalizada` **não** entram no cont
 - [ ] **CA-15** — **Dado** `POST` sem `status` ou com `status: "PAUSADO"`, **quando** enviado, **então** 400 e `fields.status` presente.
 - [ ] **CA-16** — **Dado** `POST` com `nota: 11`, `nota: -1` ou `nota: 7.5`, **quando** enviado, **então** 400 e `fields.nota` presente.
 - [ ] **CA-17** — **Dado** `POST` com `plataforma` de 61 caracteres, **quando** enviado, **então** 400 e `fields.plataforma` presente.
-- [ ] **CA-18** — **Dado** `POST` com um campo não declarado (ex.: `"capa":"x"`), **quando** enviado, **então** 400.
+- [ ] **CA-18** — **Dado** `POST` com um campo não declarado (ex.: `"cor":"x"`), **quando** enviado, **então** 400.
 - [ ] **CA-19** — **Dado** `POST` com `{"titulo":"Hades","status":"QUERO_JOGAR","nota":8}`, **quando** enviado, **então** 400 com `fields.nota` = `"Nota só pode ser preenchida quando o status é Zerado ou Jogando"`, e nenhum jogo é criado.
 - [ ] **CA-20** — **Dado** `GET /api/games?status=PAUSADO`, **quando** enviado, **então** 400 e `fields.status` presente.
 - [ ] **CA-21** — **Dado** um jogo `JOGANDO` com `nota: 7`, **quando** `PATCH` com **só** `{"status":"QUERO_JOGAR"}`, **então** 400 com a mesma mensagem de `fields.nota` do CA-19, e o jogo continua `JOGANDO` com `nota: 7` (validação sobre o estado final, não só o body).
@@ -271,8 +484,33 @@ As colunas `tituloNormalizado` e `plataformaNormalizada` **não** entram no cont
 - [ ] **CA-36** — **Dado** a migration aplicada, **quando** um `INSERT` direto em `"Game"` viola `nota BETWEEN 0 AND 10` ou combina `nota` com `status = 'QUERO_JOGAR'`, **então** o banco rejeita (`CHECK`). _Verificação manual; não coberta por teste unitário._
 - [ ] **CA-37** — **Dado** a migration aplicada, **quando** dois `INSERT` diretos usam o mesmo par (`tituloNormalizado`, `plataformaNormalizada`), **então** o segundo é rejeitado pelo `@@unique`. _Verificação manual._
 - [ ] **CA-38** — **Dado** duas requests `POST` simultâneas com o mesmo título e plataforma, **quando** ambas passam pela checagem prévia, **então** exatamente uma retorna 201 e a outra retorna 409 (não 500).
-- [ ] **CA-39** — **Dado** `apps/api/prisma/migrations/`, **quando** a migration do `Game` é gerada, **então** existe um diretório novo commitado e o SQL dos dois `CHECK` está nele.
-- [ ] **CA-40** — **Dado** a migration aplicada, **quando** `npm run db:migrate` roda uma segunda vez, **então** nenhuma migration nova é gerada (schema já em sincronia; sem drift).
+- [ ] **CA-39** — **Dado** `apps/api/prisma/migrations/`, **quando** a migration 1 do `Game` é gerada, **então** existe um diretório novo commitado e o SQL dos dois `CHECK` está nele.
+- [ ] **CA-40** — **Dado** cada migration aplicada (a da etapa 1 e a da etapa 2), **quando** `npm run db:migrate` roda uma segunda vez, **então** nenhuma migration nova é gerada (schema já em sincronia; sem drift).
+
+### API — capa (etapa 2)
+
+Os que dependem do Supabase real são verificação manual; os demais têm teste unitário com
+`StorageService` mockado.
+
+- [ ] **CA-53** — **Dado** um jogo sem capa, **quando** `PUT /api/games/:id/capa` com um PNG válido de 200 KB no campo `arquivo`, **então** 200, `capaUrl` não nula, cujo caminho termina em `/<gameId>/<uuid>.png`, e `GET` nessa URL devolve 200 com `Content-Type: image/png`. _Manual (bucket real)._
+- [ ] **CA-54** — **Dado** um jogo sem capa, **quando** envio um JPEG válido e depois (em outro jogo) um WebP válido, **então** as `capaUrl` terminam em `.jpg` e `.webp`, respectivamente.
+- [ ] **CA-55** — **Dado** um PNG válido enviado com `Content-Type: application/octet-stream` e nome `foto.bin`, **quando** `PUT /capa`, **então** 200 (a assinatura vale, não o cabeçalho nem o nome). **Dado** um arquivo de texto chamado `falso.png` enviado com `Content-Type: image/png`, **quando** `PUT /capa`, **então** 400 com `fields.arquivo` = `"A capa deve ser uma imagem JPEG, PNG ou WebP"` e nenhum objeto é criado no bucket.
+- [ ] **CA-56** — **Dado** um GIF, um SVG ou um PDF, **quando** `PUT /capa`, **então** 400 com a mesma mensagem de `fields.arquivo` do CA-55.
+- [ ] **CA-57** — **Dado** um PNG válido de 2 MB + 1 byte, **quando** `PUT /capa`, **então** 413 com `fields.arquivo` = `"A capa deve ter no máximo 2 MB"`, e o jogo (inclusive a capa antiga, se havia) não muda. **Dado** um PNG válido de ~1,9 MB, **então** 200.
+- [ ] **CA-58** — **Dado** `PUT /capa` sem o campo `arquivo`, com o arquivo em outro campo (ex.: `file`) ou com um arquivo vazio, **quando** enviado, **então** 400 com `fields.arquivo` presente.
+- [ ] **CA-59** — **Dado** `PUT /api/games/abc/capa` (id que não é UUID), **então** 400. **Dado** um UUID válido sem jogo e um PNG válido, **então** 404 com `message` = `"Jogo não encontrado"`. **Dado** o mesmo UUID e um arquivo de 2 MB + 1 byte, **então** 413 (o limite de tamanho vem antes da checagem do jogo).
+- [ ] **CA-60** — **Dado** um jogo com capa, **quando** `GET /api/games` e `PATCH /api/games/:id` (ex.: `{"nota":8}`), **então** os dois trazem o mesmo `capaUrl` e **nenhum** response contém `capaPath`; **e** `POST /api/games` devolve `capaUrl: null`.
+- [ ] **CA-61** — **Dado** um jogo com capa, **quando** `PUT /capa` com outra imagem, **então** 200, o novo `capaUrl` tem `<uuid>` diferente, `GET` na URL antiga deixa de devolver a imagem (status ≠ 200), e `atualizadoEm` avança. _Manual (bucket real)._
+- [ ] **CA-62** — **Dado** um jogo com capa e o `StorageService` mockado falhando ao remover o objeto antigo, **quando** `PUT /capa` com imagem válida, **então** 200 com a capa nova ativa, e o log registra um aviso (sem segredos).
+- [ ] **CA-63** — **Dado** o `StorageService` falhando no upload, **quando** `PUT /capa`, **então** 502 com `fields.arquivo` = `"Falha ao acessar o armazenamento de capas"`, o `capaPath` do jogo fica como estava, e **nunca** 500. _Manual: com o nome do bucket errado no `.env`._
+- [ ] **CA-64** — **Dado** um jogo com capa, **quando** `DELETE /api/games/:id/capa`, **então** 200 com `capaUrl: null` e o objeto some do bucket; **quando** repito, **então** 200 de novo (sem chamada ao storage). **Dado** id inexistente, **então** 404; id não UUID, **então** 400.
+- [ ] **CA-65** — **Dado** o `StorageService` falhando na remoção, **quando** `DELETE /capa`, **então** 502 com `fields.arquivo` presente e a capa continua associada ao jogo.
+- [ ] **CA-66** — **Dado** um jogo com capa, **quando** `DELETE /api/games/:id`, **então** 204 e o objeto some do bucket. **Dado** o `StorageService` falhando na remoção, **então** ainda 204, o jogo some da lista e o log registra um aviso sem segredos.
+- [ ] **CA-67** — **Dado** `POST` ou `PATCH /api/games` com `capaUrl` ou `capaPath` no body, **quando** enviado, **então** 400 (campo desconhecido).
+- [ ] **CA-68** — **Dado** `apps/api/.env` sem `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` ou `SUPABASE_STORAGE_BUCKET`, **quando** a API sobe, **então** ela falha listando a variável ausente; e `apps/api/.env.example` lista as três **sem valor real**.
+- [ ] **CA-69** — **Dado** o código e o build, **quando** procuro `SUPABASE_SERVICE_ROLE_KEY` e `service_role` em `apps/web/src` e `apps/web/dist`, **então** não há ocorrência, não existe nenhuma variável `VITE_SUPABASE_*`, e nenhum response ou linha de log da API contém o valor da chave.
+- [ ] **CA-70** — **Dado** a migration 2, **quando** aplicada, **então** `Game` ganha `capaPath` nulável, as linhas existentes ficam com `capaPath = NULL`, a migration só adiciona (nada é removido ou alterado), e um segundo `db:migrate` não gera migration nova.
+- [ ] **CA-71** — **Dado** `SUPABASE_*` ausentes no ambiente e sem rede, **quando** `npm test -w @checkpoint/api`, **então** a suíte passa (nenhum teste fala com o Supabase real).
 
 ### Web
 
@@ -288,6 +526,27 @@ As colunas `tituloNormalizado` e `plataformaNormalizada` **não** entram no cont
 - [ ] **CA-50** — **Dado** a API fora do ar, **quando** abro `/`, **então** vejo a mensagem de erro com a opção de tentar de novo.
 - [ ] **CA-51** — **Dado** o app rodando, **quando** abro `/status`, **então** vejo a página de diagnóstico de health (o conteúdo que antes era `/`).
 
+### Web — capa, painéis e visual (etapa 3)
+
+- [ ] **CA-72** — **Dado** um jogo sem capa, **quando** a lista carrega, **então** a linha mostra um quadrado 52×52 com as iniciais do título ("Hollow Knight" → "HK"; "Celeste" → "C") sobre uma cor da paleta fixa; **e** recarregar a página mantém a mesma cor, e outro jogo com o mesmo título (em outra plataforma) tem a mesma cor.
+- [ ] **CA-73** — **Dado** um jogo com `capaUrl`, **quando** a lista carrega, **então** a linha mostra a imagem 52×52 no lugar das iniciais; **e** se a imagem falhar ao carregar, a linha volta para a capa gerada.
+- [ ] **CA-74** — **Dado** o formulário aberto, **quando** escolho um PNG válido, **então** vejo o preview da imagem, e **nenhuma** request de upload sai antes de eu clicar em Salvar.
+- [ ] **CA-75** — **Dado** o formulário de novo jogo com título, status e um PNG válido escolhido, **quando** salvo, **então** o web faz `POST /api/games` e depois `PUT /api/games/:id/capa`, o diálogo fecha e a linha mostra a capa.
+- [ ] **CA-76** — **Dado** que o `POST` do jogo deu certo e o `PUT` da capa falhou (ex.: 502), **quando** o formulário reage, **então** o jogo aparece na lista, o diálogo continua aberto, a mensagem de erro aparece no campo da capa, e ao salvar de novo o web faz `PATCH` (não `POST`) e a operação não retorna 409.
+- [ ] **CA-77** — **Dado** o formulário aberto, **quando** escolho um GIF ou um PNG de 3 MB, **então** a área da capa mostra a mensagem de erro correspondente e **nenhuma** request é enviada.
+- [ ] **CA-78** — **Dado** um jogo com capa, **quando** edito, clico "Remover capa" e salvo, **então** o web faz `DELETE /api/games/:id/capa` e a linha volta à capa gerada; **e** se eu cancelo o diálogo em vez de salvar, a capa continua.
+- [ ] **CA-79** — **Dado** 2 jogos Jogando, 1 Zerado e 0 Quero jogar, **quando** abro `/`, **então** os painéis mostram Zerados 1, Jogando 2, Quero jogar 0; **quando** crio um jogo Jogando → Jogando 3; **quando** o edito para Zerado → Jogando 2 e Zerados 2; **quando** o removo → Zerados 1. Tudo sem recarregar a página.
+- [ ] **CA-80** — **Dado** a lista com jogos, **quando** olho os filtros, **então** cada um mostra ícone, rótulo e contagem ("Todos" = total), e exatamente o ativo tem `aria-pressed="true"` e a cor `ciano` com brilho.
+- [ ] **CA-81** — **Dado** jogos com nota 8, nota 0 e sem nota, **quando** a lista carrega, **então** a barra mostra 8 segmentos preenchidos e "8"; 0 segmentos e "0"; e "SEM NOTA" sem segmentos preenchidos. Cada barra tem `aria-label` "Nota N de 10" (quando há nota).
+- [ ] **CA-82** — **Dado** o formulário aberto, **quando** olho o status, **então** há três botões com ícone e `aria-pressed`, exatamente um verdadeiro; **quando** escolho "Quero jogar", o campo Nota fica bloqueado com um ícone de cadeado visível.
+- [ ] **CA-83** — **Dado** um campo com erro (ex.: título duplicado), **quando** o erro aparece, **então** o campo tem borda `erro` e a mensagem, e faz uma animação curta de tremer; **e** com `prefers-reduced-motion: reduce` a borda e a mensagem aparecem, mas **sem** tremer.
+- [ ] **CA-84** — **Dado** `prefers-reduced-motion: reduce` (emulado no DevTools), **quando** a página está aberta, **então** nenhuma destas animações roda: _scanlines_, orbes de fundo, pulso do botão "Adicionar jogo", ponto piscando do "Jogando", tremer do campo e transição de hover das linhas (`animation-name: none`, sem `transition` de movimento).
+- [ ] **CA-85** — **Dado** o diálogo aberto, **quando** aperto Esc, **então** ele fecha e o foco volta ao botão que o abriu; **e** navegando só por Tab, todo elemento clicável mostra o anel de foco; **e** botões, filtros e ações da linha medem ≥ 44 × 44 px; **e** todo botão só com ícone tem `aria-label` e todo ícone decorativo tem `aria-hidden="true"`.
+- [ ] **CA-86** — **Dado** os tokens da tabela de "Diretrizes visuais", **quando** confiro os pares reais usados na tela com um verificador de contraste, **então** todo texto tem ≥ 4,5:1; todo contorno de controle e anel de foco (inputs, botões de status, área da capa, botões de ação) usa `borda-controle` (`#796ca0`) e tem ≥ 3:1 contra o fundo em que está (`painel`, `painel-2` ou `fundo`); `borda` não é usada em nenhum controle; e `apagado`/`apagado-2` não são a cor de nenhum texto (`apagado-2` só aparece em controle desabilitado).
+- [ ] **CA-87** — **Dado** `apps/web/src`, **quando** procuro literais de cor hexadecimal (`#[0-9a-fA-F]{3,8}`) fora do bloco `@theme` de `styles/index.css`, **então** não há nenhuma.
+- [ ] **CA-88** — **Dado** `apps/web/index.html`, **quando** o leio, **então** ele carrega Orbitron, Rajdhani e Material Symbols Rounded por `<link>` do Google Fonts; **e** o `package.json` do web não ganhou nenhuma dependência de runtime, de fonte, de ícone, de UI, de formulário, de modal ou de animação.
+- [ ] **CA-89** — **Dado** a página `/`, **quando** ela abre, **então** o topo mostra o logo "CHECKPOINT" com o ícone de bandeira e o botão "Adicionar jogo" com brilho pulsando (estático com `prefers-reduced-motion: reduce`).
+
 ## Plano de testes
 
 - **Unitário — API (Jest, `PrismaService` mockado como objeto de `jest.fn()`; nenhum teste toca o Postgres de desenvolvimento):**
@@ -301,12 +560,39 @@ As colunas `tituloNormalizado` e `plataformaNormalizada` **não** entram no cont
     com as opções do `main.ts` e cobrem CA-13 a CA-18, CA-24 a CA-26 e CA-52.
   - `packages/shared`: `statusAllowsRating` (sem runner próprio; coberto pelos specs do service e
     do formulário).
+  - **Etapa 2 (nenhum teste fala com o Supabase real; `StorageService` é sempre um objeto simples
+    de `jest.fn()`):**
+    - `image-signature.spec.ts`: a função pura que detecta o tipo pelos magic bytes aceita PNG,
+      JPEG e WebP; rejeita GIF, texto, buffer vazio, buffer truncado e WebP sem o marcador `WEBP`
+      (CA-55, CA-56).
+    - `games.service.spec.ts` (casos de capa): troca de capa remove o objeto antigo depois de gravar
+      o novo (CA-61); falha ao remover o antigo ainda devolve sucesso e registra aviso (CA-62);
+      falha no upload → 502 e `capaPath` intacto (CA-63); `DELETE /capa` idempotente, e 502 mantém
+      a capa (CA-64, CA-65); remover o jogo apaga a capa, e a falha da remoção não impede o 204
+      (CA-66); o response nunca contém `capaPath` (CA-60).
+    - `storage.service.spec.ts`: com `global.fetch` substituído por `jest.fn()` (nenhuma request
+      real), confere: o upload é um `POST` em `{SUPABASE_URL}/storage/v1/object/{bucket}/{path}`,
+      com `Authorization: Bearer <chave>`, `content-type` do tipo detectado e o buffer como corpo;
+      a remoção é um `DELETE` em `.../object/{bucket}` com `{"prefixes":[path]}`; resposta
+      não-2xx, erro de rede e timeout viram `BadGatewayException`; `publicUrl` monta
+      `{SUPABASE_URL}/storage/v1/object/public/{bucket}/{path}`; a chave nunca aparece em mensagem
+      de erro nem em log.
+    - DTO/env: `env.validation` rejeita ausência das três variáveis `SUPABASE_*` (CA-68).
+    - `games.controller` (ou teste equivalente com `ValidationPipe` e `FileInterceptor`): limite de
+      2 MB → 413, campo ausente ou com outro nome → 400 (CA-57, CA-58).
 - **Unitário — web (Vitest + React Testing Library, `apiClient` mockado; escopo enxuto, só o que tem
   lógica):** `GameForm.test.tsx` — nota desabilitada e limpa em "Quero jogar" e envio de
   `nota: null` (CA-43); mapeamento de `fields` da `ApiErrorResponse` para o campo certo e mensagem
-  geral quando não há `fields` (CA-44). Sem teste de snapshot nem de estilo.
-- **Manual (`curl`/UI, via `/qa-verify`):** CA-36, CA-37, CA-39, CA-40 (banco e migration, que o mock
-  não alcança), CA-38 (corrida real) e CA-41 a CA-51 (UI de ponta a ponta).
+  geral quando não há `fields` (CA-44); fluxo da capa com `apiClient` mockado: nenhum `PUT` antes de
+  Salvar (CA-74), `POST` seguido de `PUT` (CA-75), falha do `PUT` mantém o diálogo aberto e o
+  próximo Salvar é `PATCH` (CA-76), pré-checagem de tipo e tamanho sem request (CA-77), remover capa
+  chama `DELETE` (CA-78). Funções puras da etapa 3: `game-cover` (iniciais e cor determinística do
+  título; CA-72) e `count-by-status` (contagens e filtro sobre a lista completa; CA-79). Sem teste
+  de snapshot nem de estilo.
+- **Manual (`curl`/UI, via `/qa-verify`):** CA-36, CA-37, CA-39, CA-40, CA-70 (banco e migration, que
+  o mock não alcança), CA-38 (corrida real), CA-53, CA-54, CA-61, CA-63 a CA-66 (bucket real),
+  CA-69, CA-71, CA-41 a CA-51 e CA-72 a CA-89 (UI de ponta a ponta, acessibilidade e movimento;
+  contraste e `prefers-reduced-motion` com as ferramentas do DevTools).
 
 Loop de verificação por tarefa:
 `npm run typecheck -w <workspace>` → `npm test -w <workspace>` → `npm run lint` → `npm run build`
@@ -316,9 +602,14 @@ Loop de verificação por tarefa:
 
 **Feature do produto (specs futuras):**
 
-- Busca externa de jogos (RAWG ou IGDB) para preencher título/plataforma, e tudo que ela traria:
-  capa e demais metadados.
-- Capa, datas de início e de zerado, horas jogadas.
+- Busca externa de jogos (RAWG ou IGDB) para preencher título, plataforma e **capa**, e demais
+  metadados.
+- Datas de início e de zerado, horas jogadas.
+- Recorte, redimensionamento, _thumbnails_ ou otimização das capas; formatos AVIF, GIF e **SVG**
+  (SVG pode carregar script); mais de uma imagem por jogo; bucket privado com URL assinada.
+- Rotina de limpeza de objetos órfãos no storage (sobras de uma remoção _best effort_ que falhou).
+- Tema claro ou seletor de tema; internacionalização; fontes e ícones hospedados localmente (uso
+  offline).
 - **Autenticação e multiusuário** (model `User`, sessão, `Game.userId`, proteção de rota). Adicionar
   `userId` depois exige migration com backfill.
 - Paginação, lixeira/soft-delete, `GET /api/games/:id` (sem tela que use), ordenação escolhida pelo
@@ -332,7 +623,24 @@ Loop de verificação por tarefa:
 
 ## Notas de ambiente
 
-**Nenhuma variável de ambiente nova** (`.env` e `.env.example` não mudam).
+**Variáveis de ambiente novas (etapa 2), só em `apps/api`.** Cada uma ganha um campo em
+`apps/api/src/config/env.validation.ts` (senão o `ConfigService` não a expõe) e uma linha em
+`apps/api/.env.example`, **sem valor real**:
+
+| Variável                    | Validação              | Exemplo no `.env.example`               |
+| --------------------------- | ---------------------- | --------------------------------------- |
+| `SUPABASE_URL`              | obrigatória, URL       | `https://<project-ref>.supabase.co`     |
+| `SUPABASE_SERVICE_ROLE_KEY` | obrigatória, não vazia | vazio (o valor real só no `.env` local) |
+| `SUPABASE_STORAGE_BUCKET`   | obrigatória, não vazia | `capas`                                 |
+
+Como as demais, faltar uma derruba o boot com a lista de erros. Consequência: depois da etapa 2, a
+API só sobe com as três preenchidas, mesmo para quem só quer mexer no CRUD. `apps/web/.env` **não**
+ganha nenhuma variável do Supabase.
+
+**Pendências humanas da capa** (também em `INDEX.md`): criar o bucket público `capas` no painel do
+Supabase (mesmo projeto do banco); recomendado configurar nele um limite de 2 MB e os tipos
+`image/jpeg`, `image/png`, `image/webp` como segunda barreira; preencher as três variáveis no
+`.env` local.
 
 **Banco:** `DATABASE_URL` aponta para um Postgres possivelmente compartilhado/remoto (`RULES.md`
 §3). A mudança é aditiva, mas confirmar qual banco é antes de rodar `db:migrate`. Se a conexão for
@@ -376,13 +684,42 @@ versões podem ser reavaliadas em spec própria. Node 20 já saiu da janela de m
   verdadeira, sem alterar nenhuma regra** — `RULES.md` §5 e `.claude/skills/checkpoint-testing/SKILL.md`.
   A aprovação do humano para essas duas edições foi dada na entrevista.
 
+**Etapa 2 — dependências (`RULES.md` §9): nenhuma de runtime; uma devDependency em `apps/api`,
+aprovada pelo humano. Versão consultada no registry em 2026-09-23:**
+
+| Tipo          | Pacote                 | Por quê                                                                    |
+| ------------- | ---------------------- | -------------------------------------------------------------------------- |
+| devDependency | `@types/multer@^2.2.0` | tipos de `Express.Multer.File`; casa com o `multer@2.x` que já vem no Nest |
+
+- **`multer` não é adicionado:** `@nestjs/platform-express@11.2.6` depende de `multer@2.4.0`
+  (confirmado no `node_modules`), e `FileInterceptor`/`limits` do Nest já o usam.
+- **`@supabase/supabase-js` não é usado (decisão do humano).** O `StorageService` chama a API REST do
+  Storage com o `fetch` nativo do Node 20. Isso também evita o problema de versão do SDK: da 2.110 em
+  diante ele exige Node ≥ 22. `@supabase/storage-js` isolado também foi descartado.
+- **Contrato REST** (conferido no código-fonte do cliente oficial `@supabase/storage-js@2.109.0`, sem
+  instalá-lo). Base: `{SUPABASE_URL}/storage/v1`.
+  - **Upload:** `POST {base}/object/{bucket}/{path}`; corpo = os bytes do arquivo; cabeçalhos
+    `content-type` = tipo detectado, `cache-control: max-age=3600` e `x-upsert: false`.
+  - **Remoção:** `DELETE {base}/object/{bucket}` com JSON `{"prefixes":["<path>"]}`. Objeto que não
+    existe simplesmente não aparece na resposta, então remover de novo não é erro.
+  - **URL pública:** `{base}/object/public/{bucket}/{path}` (montada localmente, sem chamada).
+  - **Autenticação** nas chamadas de escrita: `Authorization: Bearer <service role key>` e
+    `apikey: <service role key>`. Os nomes dos cabeçalhos de autenticação são os que o Supabase
+    documenta para o Storage e **são confirmados no CA-53 contra o bucket real**.
+- **Regras do `StorageService`:** `AbortSignal.timeout(10_000)` em toda chamada; caminho codificado
+  por segmento; resposta não-2xx, erro de rede e timeout viram `BadGatewayException` com a
+  mensagem fixa do 502 (sem repassar o corpo da resposta do Supabase); nunca loga cabeçalhos nem a
+  chave. `fetch` e `AbortSignal.timeout` são globais no Node 20 e tipados por `@types/node@22`.
+- **Isolamento:** o `StorageService` expõe só uma interface mínima (`upload`, `remove`,
+  `publicUrl`); service e controller dependem dela, e os testes a mockam.
+
 **Commit(s) da feature:** `ARCHITECTURE.md` atualizado no mesmo commit que cria cada peça (módulo
 `games` em §4.4, feature em §5.4, model em §7, rotas em §5.1/§3, `packages/shared` em §6).
 
 ## Suposições
 
-Marcadas explicitamente. As de A a E foram aprovadas pelo humano na entrevista; o restante entra na
-aprovação desta spec.
+Marcadas explicitamente. As de A a F foram aprovadas pelo humano na entrevista; o restante (inclusive
+tudo que veio com a capa e o visual) entra na reaprovação desta spec.
 
 - **A (aprovada)** — `CHECK` no banco: `nota` entre 0 e 10 e `nota` nula quando `status = QUERO_JOGAR`.
 - **B (aprovada)** — `id` que não é UUID retorna 400; UUID válido e inexistente retorna 404.
@@ -401,8 +738,42 @@ aprovação desta spec.
 - Desempate da ordenação: `criadoEm` decrescente.
 - `DELETE` devolve 204 sem corpo.
 - Valor inválido em `?status=` na URL do web é tratado como "Todos".
-- Nenhuma dependência de runtime nova; o formulário e o diálogo usam o que já existe.
+- Nenhuma dependência de runtime nova; só `@types/multer` (dev, etapa 2). O formulário e o diálogo
+  usam o que já existe.
+
+**Capa (etapa 2):**
+
+- `capaPath` é `VarChar(120)` e guarda o caminho, não a URL; a `capaUrl` é montada na resposta.
+- Upload em memória (`multer` com `memoryStorage`): 2 MB por request cabem sem gravar em disco.
+- Os textos de erro da capa (400 de tipo, 413, 502) e a ordem das checagens (400 `id` → 413/400 do
+  multipart → 404 → 400 de assinatura → 502) são propostos aqui; o humano pediu 400, 413, 404 e 502
+  sem fixar mensagens nem ordem.
+- `DELETE /capa` devolve 200 + `Game` (não 204) e é idempotente; remove do storage antes de zerar o
+  banco, para uma falha do storage não deixar o jogo apontando para nada.
+- Trocar ou remover a capa atualiza `atualizadoEm` do jogo e o reordena na lista.
+- "Remover capa" no formulário só vale ao Salvar (cancelar o diálogo descarta).
+- As três variáveis `SUPABASE_*` são **obrigatórias** no boot da API (falha rápida, como as
+  demais), em vez de opcionais com a capa desligada. A alternativa esconderia uma configuração
+  errada até alguém tentar enviar uma capa.
+- O `StorageService` usa `fetch` nativo contra a API REST (decisão do humano). O timeout de 10 s
+  por chamada e o `cache-control: max-age=3600` do upload são padrões meus.
+
+**Visual (etapa 3):**
+
+- O web busca a lista completa e deriva filtro e contagens no cliente (alternativas descartadas: um
+  endpoint de contagens, que o humano não quer, e duas queries, que duplicariam a busca).
+- O mockup A é privado (link em "Diretrizes visuais"); as diretrizes escritas são a referência
+  verificável.
+- Os tokens são os do humano, mais o `borda-controle` (`#796ca0`, calculado), com três regras de uso
+  derivadas do contraste (texto nunca em `apagado`/`apagado-2`; contorno de controles e foco em
+  `borda-controle`; texto sobre `magenta` em `fundo`). O `borda` fica só para divisórias decorativas.
+- Anel de foco de 2 px com _offset_ de 2 px em `borda-controle` (decisão do humano); o `ciano` fica
+  para o filtro ativo e o status Jogando.
+- A paleta da capa gerada tem 6 tokens (`capa-1` a `capa-6`), com valores definidos na
+  implementação e verificados contra o contraste das iniciais.
+- Sem tema claro e sem alternância de tema.
 
 ## Questões em aberto
 
-Nenhuma.
+Nenhuma. As duas que estavam abertas foram decididas pelo humano: Storage por `fetch` nativo, sem
+`@supabase/supabase-js`; e as regras de contraste aceitas, com o token novo `borda-controle`.
