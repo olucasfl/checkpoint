@@ -1,4 +1,5 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Prisma, type Game as GameRow } from '@prisma/client';
 import {
   statusAllowsRating,
@@ -9,24 +10,14 @@ import {
 } from '@checkpoint/shared';
 import { badRequestError, conflictError } from '../../common/errors/api-error';
 import { PrismaService } from '../../database/prisma.service';
+import { COVER_INVALID_TYPE, COVER_MISSING } from './cover/cover-messages';
+import { detectImageType } from './cover/image-signature';
+import { StorageService } from './cover/storage.service';
 
 const GAME_NOT_FOUND = 'Jogo não encontrado';
 const DUPLICATE_GAME = 'Já existe esse jogo nesta plataforma';
 const RATING_NOT_ALLOWED = 'Nota só pode ser preenchida quando o status é Zerado ou Jogando';
 const EMPTY_UPDATE = 'Informe ao menos um campo para atualizar';
-
-/** Sem plataforma = "" no banco (ver schema.prisma); a API expõe null. */
-function toGame(row: GameRow): Game {
-  return {
-    id: row.id,
-    titulo: row.titulo,
-    plataforma: row.plataforma === '' ? null : row.plataforma,
-    status: row.status,
-    nota: row.nota,
-    criadoEm: row.criadoEm.toISOString(),
-    atualizadoEm: row.atualizadoEm.toISOString(),
-  };
-}
 
 /** Gravados aparados; plataforma ausente, null ou só espaços vira "". */
 function cleanTitle(titulo: string): string {
@@ -54,7 +45,12 @@ function isKnownRequestError(error: unknown, code: string): boolean {
 
 @Injectable()
 export class GamesService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(GamesService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly storage: StorageService,
+  ) {}
 
   async list(status?: GameStatus): Promise<Game[]> {
     const rows = await this.prisma.game.findMany({
@@ -62,7 +58,7 @@ export class GamesService {
       orderBy: [{ atualizadoEm: 'desc' }, { criadoEm: 'desc' }],
     });
 
-    return rows.map(toGame);
+    return rows.map((row) => this.toGame(row));
   }
 
   async create(dto: CreateGameRequest): Promise<Game> {
@@ -83,7 +79,7 @@ export class GamesService {
           ...uniquenessKeys(titulo, plataforma),
         },
       });
-      return toGame(row);
+      return this.toGame(row);
     } catch (error) {
       throw this.translateDatabaseError(error);
     }
@@ -94,10 +90,7 @@ export class GamesService {
       throw badRequestError(EMPTY_UPDATE);
     }
 
-    const current = await this.prisma.game.findUnique({ where: { id } });
-    if (!current) {
-      throw new NotFoundException(GAME_NOT_FOUND);
-    }
+    const current = await this.findOrFail(id);
 
     // A validação olha o estado FINAL (registro atual + body), não só o body: um PATCH só com
     // { status: "QUERO_JOGAR" } num jogo que já tem nota tem de falhar.
@@ -115,17 +108,110 @@ export class GamesService {
         where: { id },
         data: { titulo, plataforma, status, nota, ...uniquenessKeys(titulo, plataforma) },
       });
-      return toGame(row);
+      return this.toGame(row);
     } catch (error) {
       throw this.translateDatabaseError(error);
     }
   }
 
   async remove(id: string): Promise<void> {
+    let removed: GameRow;
+
     try {
-      await this.prisma.game.delete({ where: { id } });
+      removed = await this.prisma.game.delete({ where: { id } });
     } catch (error) {
       throw this.translateDatabaseError(error);
+    }
+
+    // O jogo já foi removido: uma falha ao apagar a capa não pode desfazer isso (best effort).
+    if (removed.capaPath) {
+      await this.removeObjectQuietly(removed.capaPath);
+    }
+  }
+
+  /**
+   * Troca a capa: sobe o objeto novo, aponta o jogo para ele e só então apaga o antigo. Se o
+   * banco falhar depois do upload, o objeto novo é apagado para não ficar órfão.
+   */
+  async setCover(id: string, file: { buffer: Buffer } | undefined): Promise<Game> {
+    if (!file || file.buffer.length === 0) {
+      throw badRequestError(COVER_MISSING, { arquivo: COVER_MISSING });
+    }
+
+    const current = await this.findOrFail(id);
+
+    const image = detectImageType(file.buffer);
+    if (!image) {
+      throw badRequestError(COVER_INVALID_TYPE, { arquivo: COVER_INVALID_TYPE });
+    }
+
+    const capaPath = `${id}/${randomUUID()}.${image.extension}`;
+    await this.storage.upload(capaPath, file.buffer, image.mime);
+
+    let updated: GameRow;
+    try {
+      updated = await this.prisma.game.update({ where: { id }, data: { capaPath } });
+    } catch (error) {
+      await this.removeObjectQuietly(capaPath);
+      throw this.translateDatabaseError(error);
+    }
+
+    if (current.capaPath) {
+      await this.removeObjectQuietly(current.capaPath);
+    }
+
+    return this.toGame(updated);
+  }
+
+  /**
+   * Remove a capa: apaga o objeto ANTES de zerar o banco, para uma falha do storage (502) não
+   * deixar o jogo apontando para nada. Sem capa, devolve o jogo sem chamar o storage (idempotente).
+   */
+  async removeCover(id: string): Promise<Game> {
+    const current = await this.findOrFail(id);
+
+    if (!current.capaPath) {
+      return this.toGame(current);
+    }
+
+    await this.storage.remove(current.capaPath);
+
+    try {
+      const updated = await this.prisma.game.update({ where: { id }, data: { capaPath: null } });
+      return this.toGame(updated);
+    } catch (error) {
+      throw this.translateDatabaseError(error);
+    }
+  }
+
+  /** Sem plataforma = "" no banco (ver schema.prisma); a API expõe null. `capaPath` nunca sai. */
+  private toGame(row: GameRow): Game {
+    return {
+      id: row.id,
+      titulo: row.titulo,
+      plataforma: row.plataforma === '' ? null : row.plataforma,
+      status: row.status,
+      nota: row.nota,
+      capaUrl: row.capaPath ? this.storage.publicUrl(row.capaPath) : null,
+      criadoEm: row.criadoEm.toISOString(),
+      atualizadoEm: row.atualizadoEm.toISOString(),
+    };
+  }
+
+  private async findOrFail(id: string): Promise<GameRow> {
+    const game = await this.prisma.game.findUnique({ where: { id } });
+    if (!game) {
+      throw new NotFoundException(GAME_NOT_FOUND);
+    }
+    return game;
+  }
+
+  /** Best effort: a falha já foi registrada pelo StorageService (status e mensagem, sem segredos). */
+  private async removeObjectQuietly(path: string): Promise<void> {
+    try {
+      await this.storage.remove(path);
+    } catch {
+      this.logger.warn(`Objeto de capa não removido do storage (pode ter ficado órfão): ${path}`);
     }
   }
 

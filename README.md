@@ -2,8 +2,8 @@
 
 App para registrar jogos **zerados**, **jogando** e **que quero jogar**.
 
-> Este repositório contém apenas a **estrutura inicial** do projeto. Nenhuma entidade de
-> domínio, tela ou regra de negócio foi implementada — só o esqueleto pronto para escalar.
+> O catálogo de jogos está sendo implementado por etapas (spec em `docs/specs/catalogo-jogos.md`):
+> a **API** (jogos em três status, com capa) já existe; o **web** ainda é só o esqueleto.
 
 ---
 
@@ -26,13 +26,15 @@ checkpoint/
 ├── apps/
 │   ├── api/                      # @checkpoint/api — backend NestJS
 │   │   ├── prisma/
-│   │   │   └── schema.prisma     # datasource + generator (ainda sem models)
+│   │   │   ├── schema.prisma     # datasource + generator + enum GameStatus + model Game
+│   │   │   └── migrations/       # migrations versionadas
 │   │   └── src/
 │   │       ├── common/           # filters, interceptors, decorators (vazios)
 │   │       ├── config/           # validação de env, constantes e helpers de config
 │   │       ├── database/         # PrismaModule + PrismaService (globais)
 │   │       ├── modules/          # um módulo por domínio
-│   │       │   └── health/       # GET /api/health
+│   │       │   ├── health/       # GET /api/health
+│   │       │   └── games/        # catálogo de jogos: /api/games e /api/games/:id/capa
 │   │       ├── app.module.ts
 │   │       └── main.ts           # prefixo /api, CORS, ValidationPipe, Swagger
 │   │
@@ -93,10 +95,15 @@ cp apps/api/.env.example apps/api/.env
 cp apps/web/.env.example apps/web/.env
 ```
 
-| Arquivo         | Para quê                                          |
-| --------------- | ------------------------------------------------- |
-| `apps/api/.env` | `PORT`, `DATABASE_URL`, `CORS_ORIGIN`, `NODE_ENV` |
-| `apps/web/.env` | `VITE_API_URL`                                    |
+| Arquivo         | Para quê                                                                                                                  |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `apps/api/.env` | `PORT`, `DATABASE_URL`, `CORS_ORIGIN`, `NODE_ENV`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_STORAGE_BUCKET` |
+| `apps/web/.env` | `VITE_API_URL`                                                                                                            |
+
+> As variáveis `SUPABASE_*` são **obrigatórias** (a API não sobe sem elas) e servem só às capas dos
+> jogos: `SUPABASE_URL` é a URL do projeto, `SUPABASE_STORAGE_BUCKET` é o bucket público `capas`, e
+> `SUPABASE_SERVICE_ROLE_KEY` recebe a **secret key** (`sb_secret_…`, em Settings → API Keys →
+> Secret keys) — não a publishable. Ela só existe no backend: nunca no web, nunca em log ou commit.
 
 > `DATABASE_URL` deve apontar para um PostgreSQL 16 acessível (instância local instalada na
 > máquina ou um serviço gerenciado, ex.: Supabase). Este projeto não usa Docker.
@@ -112,8 +119,8 @@ gerenciada) antes de seguir para o próximo passo.
 npm run db:migrate
 ```
 
-> Ainda não existe nenhum model no `schema.prisma`, então nenhuma migration será gerada.
-> Rode este comando toda vez que adicionar ou alterar um model.
+> Rode este comando toda vez que adicionar ou alterar um model: ele aplica as migrations
+> pendentes (hoje, o model `Game`) e gera uma nova quando o schema mudou.
 
 ### 5. Suba a aplicação
 

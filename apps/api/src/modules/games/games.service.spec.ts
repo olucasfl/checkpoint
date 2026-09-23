@@ -1,6 +1,7 @@
 import { HttpException } from '@nestjs/common';
 import { Prisma, type Game as GameRow } from '@prisma/client';
 import { type PrismaService } from '../../database/prisma.service';
+import { type StorageService } from './cover/storage.service';
 import { GamesService } from './games.service';
 
 const ID = '3f2b8a52-9c1e-4d6a-8f31-0a7e5b2c9d44';
@@ -14,6 +15,7 @@ function row(overrides: Partial<GameRow> = {}): GameRow {
     plataforma: 'PC',
     status: 'ZERADO',
     nota: 9,
+    capaPath: null,
     tituloNormalizado: 'celeste',
     plataformaNormalizada: 'pc',
     criadoEm: new Date('2026-09-23T12:00:00.000Z'),
@@ -22,7 +24,8 @@ function row(overrides: Partial<GameRow> = {}): GameRow {
   };
 }
 
-// PrismaService e sempre um objeto simples de funcoes: nenhum teste toca o banco real.
+// PrismaService e StorageService sao sempre objetos simples de funcoes: nenhum teste toca o banco
+// nem o Supabase reais. Os casos de capa ficam em games.cover.service.spec.ts.
 function setup() {
   const game = {
     findMany: jest.fn(),
@@ -32,8 +35,16 @@ function setup() {
     update: jest.fn(),
     delete: jest.fn(),
   };
-  const service = new GamesService({ game } as unknown as PrismaService);
-  return { service, game };
+  const storage = {
+    upload: jest.fn().mockResolvedValue(undefined),
+    remove: jest.fn().mockResolvedValue(undefined),
+    publicUrl: jest.fn((path: string) => `https://storage.teste/capas/${path}`),
+  };
+  const service = new GamesService(
+    { game } as unknown as PrismaService,
+    storage as unknown as StorageService,
+  );
+  return { service, game, storage };
 }
 
 async function failure(promise: Promise<unknown>): Promise<HttpException> {
@@ -101,6 +112,7 @@ describe('GamesService', () => {
         plataforma: null,
         status: 'ZERADO',
         nota: null,
+        capaUrl: null,
         criadoEm: '2026-09-23T12:00:00.000Z',
         atualizadoEm: '2026-09-23T13:00:00.000Z',
       });

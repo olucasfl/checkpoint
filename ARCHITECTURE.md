@@ -22,6 +22,7 @@ comportamento que ela descreve.
 | `apps/api`           | `@checkpoint/api` — NestJS 11, Express, Prisma 6, PostgreSQL 16                                                                                                                                                                                                 |
 | `apps/web`           | `@checkpoint/web` — React 19, Vite 6, React Router 7, TanStack Query 5, Tailwind CSS 4, axios                                                                                                                                                                   |
 | `packages/shared`    | `@checkpoint/shared` — tipos/contratos/utils puros, compilado para `dist/` (CommonJS + `.d.ts`)                                                                                                                                                                 |
+| Storage de arquivos  | Supabase Storage (bucket público `capas`, mesmo projeto do banco), só para as capas dos jogos; acessado pelo backend pela REST com `fetch` (sem SDK). Leitura pública; escrita só pelo backend, com a secret key                                                |
 | Banco                | PostgreSQL 16, instância local ou gerenciada (ex.: Supabase) — sem Docker no projeto                                                                                                                                                                            |
 | Qualidade            | ESLint 9 (flat config, `eslint.config.mjs` na raiz), Prettier, Husky, lint-staged, commitlint (Conventional Commits)                                                                                                                                            |
 | Testes               | Jest 30 + ts-jest na API e Vitest 4 + Testing Library + jsdom na web (`npm test -w <workspace>`); `packages/shared` não tem runner próprio. `npm test` na raiz compila o `shared` antes (`pretest`). Convenções em `.claude/skills/checkpoint-testing/SKILL.md` |
@@ -143,8 +144,10 @@ vazia e `/` segue sendo a home de diagnóstico.
 ### 4.2 Configuração e ambiente (`src/config/`)
 
 - `env.validation.ts` — `EnvironmentVariables` (class-validator) valida `NODE_ENV`, `PORT`,
-  `DATABASE_URL`, `CORS_ORIGIN` no boot; falta ou valor inválido **derruba a aplicação** com a
-  lista de erros. Variável de ambiente nova em `apps/api/.env` **precisa** ganhar um campo aqui, ou
+  `DATABASE_URL`, `CORS_ORIGIN` e `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`,
+  `SUPABASE_STORAGE_BUCKET` (capas, §4.4) no boot; falta ou valor inválido **derruba a aplicação** com a
+  lista de erros. `SUPABASE_SERVICE_ROLE_KEY` também recusa uma chave que comece com
+  `sb_publishable_` (a chave pública, sujeita a RLS, com que todo upload falharia com 403). Variável de ambiente nova em `apps/api/.env` **precisa** ganhar um campo aqui, ou
   o `ConfigService` não a expõe (nem para leitura).
 - `ConfigModule.forRoot({ isGlobal: true, cache: true, validate: validateEnv })` — `ConfigService`
   fica disponível em qualquer módulo sem reimportar.
@@ -157,7 +160,7 @@ vazia e `/` segue sendo a home de diagnóstico.
   `onModuleDestroy`, expõe `isHealthy()` (usado só pelo health check hoje — `SELECT 1`).
 - `prisma/schema.prisma` tem o enum `GameStatus` (`ZERADO`, `JOGANDO`, `QUERO_JOGAR`) e o model
   `Game`: `titulo`, `plataforma` (`""` = sem plataforma; a API expõe `null`), `status`, `nota`
-  (`Int?`), `criadoEm`/`atualizadoEm` e as colunas `tituloNormalizado`/`plataformaNormalizada`,
+  (`Int?`), `capaPath` (`String?`: caminho do objeto da capa no bucket, não a URL), `criadoEm`/`atualizadoEm` e as colunas `tituloNormalizado`/`plataformaNormalizada`,
   preenchidas pelo `GamesService` (aparadas e em minúsculas) e cobertas por
   `@@unique([tituloNormalizado, plataformaNormalizada])`. É assim, e não com um índice `lower()`
   escrito à mão, para o Prisma enxergar toda a estrutura e o `migrate dev` não acusar drift. A
@@ -173,10 +176,26 @@ Convenção NestJS padrão, um módulo por domínio, cada um com `*.module.ts` +
 `*.service.ts` (+ `dto/` quando a rota aceitar body). Hoje há dois:
 
 - `health/` — `GET /api/health`, sem domínio; serve de modelo de forma.
-- `games/` — o catálogo de jogos (spec `docs/specs/catalogo-jogos.md`, etapa 1, ainda sem capa):
+- `games/` — o catálogo de jogos (spec `docs/specs/catalogo-jogos.md`, etapas 1 e 2; o web é a etapa 3):
   - `GET /api/games[?status=]` (ordenado por `atualizadoEm` desc, desempate `criadoEm` desc),
     `POST /api/games`, `PATCH /api/games/:id` (parcial; só `plataforma` e `nota` aceitam `null`) e
     `DELETE /api/games/:id` (204).
+  - **Capa** (uma por jogo, opcional): `PUT /api/games/:id/capa` (multipart, campo `arquivo`) e
+    `DELETE /api/games/:id/capa`. Só JPEG/PNG/WebP, identificados pela **assinatura do arquivo**
+    (`cover/image-signature.ts`) e não pelo `Content-Type`; até 2 MB (413). O objeto vai para o
+    bucket público `capas` do Supabase como `<gameId>/<uuid>.<ext>`; o banco guarda só o caminho
+    (`capaPath`) e a resposta expõe `capaUrl` (nunca o caminho). Trocar a capa envia o objeto novo,
+    grava e só então apaga o antigo; remover o jogo apaga a capa em _best effort_ (a falha vira log,
+    não erro). Falha do storage é **502** (`fields.arquivo`), nunca 500.
+  - **`StorageService`** (`cover/storage.service.ts`) fala com a REST do Supabase Storage pelo
+    `fetch` nativo, **sem `@supabase/supabase-js`**, autenticando **só com o cabeçalho `apikey`**
+    (a secret key `sb_secret_…` não é JWT e não vai em `Authorization: Bearer`; ver a spec). Fica
+    isolado atrás de `upload`/`remove`/`publicUrl` e é mockado nos testes; timeout de 10 s; o log
+    tem status HTTP e mensagem, nunca cabeçalhos nem a chave. O CDN do Supabase pode servir a URL
+    pública de um objeto apagado por até ~1 min (cache), embora ele já não exista no bucket.
+  - `cover/cover-upload.interceptor.ts` embrulha o `FileInterceptor` do Nest para converter os erros
+    do multer (413, campo errado) em `ApiErrorResponse`; o multipart é lido **antes** dos pipes, então
+    um arquivo grande para um id inválido dá 413, não 400.
   - **Regra da nota:** validada no service sobre o **estado final** (registro atual + body), porque
     o DTO só enxerga o body: `{ status: "QUERO_JOGAR" }` num jogo com nota é 400, a menos que o
     mesmo body traga `nota: null`. A API nunca apaga a nota por conta própria.
@@ -185,14 +204,17 @@ Convenção NestJS padrão, um módulo por domínio, cada um com `*.module.ts` +
     também vira 409. Ao editar, o próprio jogo não conta como duplicata.
   - `id` que não é UUID → 400 (`ParseUUIDPipe`); UUID sem jogo → 404.
   - Testes ao lado do código: `games.service.spec.ts` (regra de negócio, Prisma mockado),
-    `dto/*.spec.ts` (validação pelo pipe do `main.ts`) e `games.http.spec.ts` (status e corpo por
-    HTTP, numa porta local, sem banco).
+    `dto/*.spec.ts` (validação pelo pipe do `main.ts`), `games.http.spec.ts` e
+    `games.cover.http.spec.ts` (status e corpo por HTTP, numa porta local, com o multer real e sem
+    banco nem Supabase), `games.cover.service.spec.ts` e `cover/*.spec.ts` (assinatura de imagem e
+    `StorageService` com `fetch` mockado).
 
 ```
 apps/api/src/modules/games/
 ├── games.module.ts       # @Module({ controllers, providers }), registrado em app.module.ts
 ├── games.controller.ts   # rotas, @ApiTags/@Api*Response
-├── games.service.ts      # regra de negócio, injeta PrismaService
+├── games.service.ts      # regra de negócio, injeta PrismaService e StorageService
+├── cover/                # capa: StorageService (REST do Supabase), assinatura, interceptor
 └── dto/                  # class-validator + Swagger; transforms.ts lê o valor cru
 ```
 
@@ -249,6 +271,8 @@ antes de `api`/`web` (§2). Hoje tem:
   `JOGANDO`, `QUERO_JOGAR`, sem rótulo de tela), `Game`, `CreateGameRequest`, `UpdateGameRequest`,
   `ListGamesQuery`, `ApiErrorResponse` (formato dos erros 400/409, com `fields` por campo), as
   constantes de limite e `statusAllowsRating` (regra da nota, usada pela API e pelo formulário).
+  A capa entra como `Game.capaUrl` (URL pública ou `null`), `GAME_COVER_MAX_BYTES` (2 MB),
+  `GAME_COVER_MIME_TYPES`, `GAME_COVER_FIELD` (`arquivo`) e o campo `arquivo` em `ApiErrorField`.
 - `index.ts` — reexporta `games` e mantém dois exemplos herdados do esqueleto
   (`HealthCheckResponse`, `APP_NAME`).
 
@@ -291,11 +315,12 @@ mudanças de schema por um agente.
 
 ## 8. Variáveis de ambiente
 
-| Arquivo         | Variáveis                                         | Para quê                                                                                                             |
-| --------------- | ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `apps/api/.env` | `NODE_ENV`, `PORT`, `DATABASE_URL`, `CORS_ORIGIN` | Validadas em `src/config/env.validation.ts`; falta/erro derruba o boot                                               |
-| `apps/api/.env` | `DIRECT_URL`                                      | Só o Prisma CLI lê (via `schema.prisma`); necessária apenas se `DATABASE_URL` for uma conexão pooled (ex.: Supabase) |
-| `apps/web/.env` | `VITE_API_URL`                                    | Consumida em `src/shared/lib/env.ts`, `baseURL` do `apiClient`                                                       |
+| Arquivo         | Variáveis                                                              | Para quê                                                                                                                                                                        |
+| --------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/api/.env` | `NODE_ENV`, `PORT`, `DATABASE_URL`, `CORS_ORIGIN`                      | Validadas em `src/config/env.validation.ts`; falta/erro derruba o boot                                                                                                          |
+| `apps/api/.env` | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_STORAGE_BUCKET` | Storage das capas; validadas em `env.validation.ts` (obrigatórias). O valor da chave é a **secret key** (`sb_secret_…`) e só o backend a usa: nunca vai para o web nem para log |
+| `apps/api/.env` | `DIRECT_URL`                                                           | Só o Prisma CLI lê (via `schema.prisma`); necessária apenas se `DATABASE_URL` for uma conexão pooled (ex.: Supabase)                                                            |
+| `apps/web/.env` | `VITE_API_URL`                                                         | Consumida em `src/shared/lib/env.ts`, `baseURL` do `apiClient`                                                                                                                  |
 
 Cada arquivo tem um `.env.example` correspondente, versionado. Nunca commitar `.env` real nem
 colar valor real em spec, teste, commit ou log.

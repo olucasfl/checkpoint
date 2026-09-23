@@ -15,6 +15,14 @@ export const GAME_PLATFORM_MAX_LENGTH = 60;
 export const GAME_RATING_MIN = 0;
 export const GAME_RATING_MAX = 10;
 
+/** Capa: limite de tamanho (a API e o web usam a mesma fonte) e tipos aceitos. */
+export const GAME_COVER_MAX_BYTES = 2 * 1024 * 1024;
+export const GAME_COVER_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
+export type GameCoverMimeType = (typeof GAME_COVER_MIME_TYPES)[number];
+
+/** Nome do campo do formulario multipart de `PUT /api/games/:id/capa`. */
+export const GAME_COVER_FIELD = 'arquivo';
+
 /** Jogo como a API o devolve. `plataforma` e `nota` sao `null` quando ausentes. */
 export interface Game {
   id: string;
@@ -22,6 +30,8 @@ export interface Game {
   plataforma: string | null;
   status: GameStatus;
   nota: number | null;
+  /** URL publica da capa, ou `null` sem capa. O caminho cru do bucket nunca e exposto. */
+  capaUrl: string | null;
   /** ISO 8601. */
   criadoEm: string;
   /** ISO 8601. */
@@ -52,10 +62,13 @@ export interface ListGamesQuery {
   status?: GameStatus;
 }
 
-/** Campos de formulario que um erro 400/409 pode apontar. */
-export type ApiErrorField = 'titulo' | 'plataforma' | 'status' | 'nota';
+/** Campos de formulario que um erro pode apontar (`arquivo` = a capa). */
+export type ApiErrorField = 'titulo' | 'plataforma' | 'status' | 'nota' | 'arquivo';
 
-/** Formato dos erros 400 e 409 (o 404 traz so `statusCode` e `message`). */
+/**
+ * Formato dos erros 400, 409, 413 e 502 (o 404 traz so `statusCode` e `message`).
+ * `fields` diz em qual campo do formulario mostrar a mensagem.
+ */
 export interface ApiErrorResponse {
   statusCode: number;
   message: string;

@@ -18,6 +18,14 @@ export class GameResponseDto implements Game {
   @ApiProperty({ type: Number, nullable: true, example: 9 })
   nota!: number | null;
 
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'URL pública da capa, ou null sem capa.',
+    example: 'https://<ref>.supabase.co/storage/v1/object/public/capas/<gameId>/<uuid>.png',
+  })
+  capaUrl!: string | null;
+
   @ApiProperty({ format: 'date-time' })
   criadoEm!: string;
 

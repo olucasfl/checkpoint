@@ -1,5 +1,15 @@
 import { plainToInstance } from 'class-transformer';
-import { IsEnum, IsInt, IsNotEmpty, IsString, Max, Min, validateSync } from 'class-validator';
+import {
+  IsEnum,
+  IsInt,
+  IsNotEmpty,
+  IsString,
+  IsUrl,
+  Matches,
+  Max,
+  Min,
+  validateSync,
+} from 'class-validator';
 
 export enum Environment {
   Development = 'development',
@@ -23,6 +33,28 @@ export class EnvironmentVariables {
   @IsString()
   @IsNotEmpty()
   CORS_ORIGIN: string = '*';
+
+  /** Base do projeto Supabase (Storage das capas). */
+  @IsUrl({ require_tld: false, require_protocol: true, protocols: ['http', 'https'] })
+  SUPABASE_URL: string;
+
+  /**
+   * Chave usada SO pelo backend para escrever no Storage (nunca vai para o web nem para log).
+   * O nome e mantido, mas o valor esperado e a secret key nova (sb_secret_...) ou a service_role
+   * legada. A publishable (sb_publishable_...) e a chave publica, sujeita a RLS: com o bucket sem
+   * policies todo upload falharia com 403, entao o boot a recusa em vez de falhar so no upload.
+   */
+  @IsString()
+  @IsNotEmpty()
+  @Matches(/^(?!sb_publishable_)/, {
+    message:
+      'SUPABASE_SERVICE_ROLE_KEY parece a chave publishable; use a secret key (sb_secret_…) ou a service_role legada',
+  })
+  SUPABASE_SERVICE_ROLE_KEY: string;
+
+  @IsString()
+  @IsNotEmpty()
+  SUPABASE_STORAGE_BUCKET: string;
 }
 
 /**

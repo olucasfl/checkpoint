@@ -37,6 +37,7 @@
     "@nestjs/testing": "^11.2.6",
     "@types/express": "^5.0.0",
     "@types/jest": "^30.0.0",
+    "@types/multer": "^2.2.0",
     "@types/node": "^22.10.7",
     "jest": "^30.5.2",
     "prisma": "^6.3.0",

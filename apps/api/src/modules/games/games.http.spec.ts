@@ -5,13 +5,15 @@ import { type AddressInfo } from 'node:net';
 import { createValidationPipe } from '../../common/pipes/app-validation.pipe';
 import { API_GLOBAL_PREFIX } from '../../config/app.config';
 import { PrismaService } from '../../database/prisma.service';
+import { StorageService } from './cover/storage.service';
 import { GamesController } from './games.controller';
 import { GamesService } from './games.service';
 
 /**
  * Sobe o módulo de verdade (controller + pipe global + service) numa porta local efêmera e fala
- * HTTP com ele por `fetch`. O PrismaService é um objeto simples de funções: nenhum teste toca o
- * banco real. Cobre o que o teste de service não vê: código de status, corpo e o pipe ligado.
+ * HTTP com ele por `fetch`. PrismaService e StorageService são objetos simples de funções: nenhum
+ * teste toca o banco nem o Supabase reais. Cobre o que o teste de service não vê: código de status,
+ * corpo, o pipe ligado e a leitura real do multipart (limite de 2 MB, campo `arquivo`).
  */
 const ID = '3f2b8a52-9c1e-4d6a-8f31-0a7e5b2c9d44';
 const DUPLICATE = 'Já existe esse jogo nesta plataforma';
@@ -26,6 +28,12 @@ const game = {
   delete: jest.fn(),
 };
 
+const storage = {
+  upload: jest.fn(),
+  remove: jest.fn(),
+  publicUrl: jest.fn(),
+};
+
 function row(overrides: Partial<GameRow> = {}): GameRow {
   return {
     id: ID,
@@ -33,6 +41,7 @@ function row(overrides: Partial<GameRow> = {}): GameRow {
     plataforma: '',
     status: 'JOGANDO',
     nota: null,
+    capaPath: null,
     tituloNormalizado: 'hollow knight',
     plataformaNormalizada: '',
     criadoEm: new Date('2026-09-23T12:00:00.000Z'),
@@ -64,7 +73,11 @@ async function call(method: string, path: string, body?: unknown) {
 beforeAll(async () => {
   const moduleRef = await Test.createTestingModule({
     controllers: [GamesController],
-    providers: [GamesService, { provide: PrismaService, useValue: { game } }],
+    providers: [
+      GamesService,
+      { provide: PrismaService, useValue: { game } },
+      { provide: StorageService, useValue: storage },
+    ],
   }).compile();
 
   app = moduleRef.createNestApplication({ logger: false });
@@ -81,7 +94,8 @@ afterAll(async () => {
 });
 
 beforeEach(() => {
-  Object.values(game).forEach((fn) => fn.mockReset());
+  [...Object.values(game), ...Object.values(storage)].forEach((fn) => fn.mockReset());
+  storage.publicUrl.mockImplementation((path: string) => `https://storage.teste/capas/${path}`);
 });
 
 describe('GET /api/games', () => {
@@ -98,6 +112,7 @@ describe('GET /api/games', () => {
         plataforma: null,
         status: 'JOGANDO',
         nota: null,
+        capaUrl: null,
         criadoEm: '2026-09-23T12:00:00.000Z',
         atualizadoEm: '2026-09-23T12:00:00.000Z',
       },

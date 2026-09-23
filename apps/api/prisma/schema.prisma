@@ -35,6 +35,10 @@ model Game {
   tituloNormalizado     String @db.VarChar(120)
   plataformaNormalizada String @default("") @db.VarChar(60)
 
+  // Caminho do objeto no bucket de capas ("<gameId>/<uuid>.<ext>"), nao a URL: a capaUrl e montada
+  // na resposta a partir de SUPABASE_URL e do bucket, entao trocar de projeto nao exige migrar dados.
+  capaPath String? @db.VarChar(120)
+
   criadoEm     DateTime @default(now())
   atualizadoEm DateTime @updatedAt
 
