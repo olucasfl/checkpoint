@@ -14,8 +14,12 @@ não tem.
 **Backend (`apps/api`) — Jest**, é o padrão do `@nestjs/cli`:
 
 ```bash
-npm install -D jest @types/jest ts-jest @nestjs/testing -w @checkpoint/api
+npm install -D jest@^30.5.2 ts-jest@^29.4.13 @types/jest@^30.0.0 @nestjs/testing@^11.2.6 -w @checkpoint/api
 ```
+
+Versões fixadas de propósito: o projeto roda em **Node 20.19+** (`engines` da raiz) e `@nestjs/testing`
+tem de casar com `@nestjs/core@11` (a última do registry é a 12). Sem versão, o `npm` traz o que for
+mais novo, que pode exigir Node 22.
 
 Configuração mínima em `apps/api/package.json` (bloco `"jest"`) ou `jest.config.ts`: `preset:
 'ts-jest'`, `testEnvironment: 'node'`, `rootDir: 'src'`, `testRegex: '.*\\.spec\\.ts$'`. Adicione o
@@ -24,8 +28,19 @@ script `"test": "jest"` (e `"test:watch"`, `"test:cov"`) em `apps/api/package.js
 **Frontend (`apps/web`) — Vitest + React Testing Library**, é o que já combina com o Vite existente:
 
 ```bash
-npm install -D vitest @vitejs/plugin-react @testing-library/react @testing-library/jest-dom jsdom -w @checkpoint/web
+npm install -D vitest@^4.1.11 jsdom@^27.4.0 @testing-library/react@^16.3.3 @testing-library/dom@^10.4.2 @testing-library/jest-dom@~6.9.1 @testing-library/user-event@^14.6.7 -w @checkpoint/web
 ```
+
+Versões fixadas de propósito, todas compatíveis com **Node 20.19** (conferidas pelo `engines` de cada
+pacote no registry):
+
+- `@testing-library/jest-dom` usa `~6.9.1` (til), **não** `^6`: o `^6` resolve para a 6.10.0, que exige
+  Node ≥ 22.
+- Ficam de fora `vitest@5`, `jsdom@30` e `@testing-library/jest-dom@7`, que também exigem Node ≥ 22.
+  `jsdom@27` é a que fixa o piso 20.19.
+- `@testing-library/dom` é peer obrigatório do `@testing-library/react@16`; `user-event` serve para
+  digitar e selecionar em formulários.
+- `@vitejs/plugin-react` já existe em `apps/web`; não reinstale.
 
 Configuração em `vite.config.ts` (bloco `test`) ou `vitest.config.ts` separado: `environment:
 'jsdom'`, `globals: true`, `setupFiles` com o import de `@testing-library/jest-dom`. Adicione
