@@ -14,5 +14,7 @@ export default defineConfig({
     environment: 'jsdom',
     include: ['src/**/*.test.{ts,tsx}'],
     setupFiles: ['./src/test/setup.ts'],
+    // Por padrão o Vitest devolve string vazia para CSS; o tokens.test.ts precisa ler o index.css.
+    css: { include: [/styles[\\/]index\.css/] },
   },
 });

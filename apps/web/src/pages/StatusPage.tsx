@@ -2,8 +2,8 @@ import { useQuery } from '@tanstack/react-query';
 import { type HealthCheckResponse } from '@checkpoint/shared';
 import { apiClient } from '@/shared/lib/api-client';
 
-/** Pagina placeholder: existe apenas para validar a integracao web <-> api. */
-export function HomePage() {
+/** Diagnostico de saude (rota /status): valida a integracao web <-> api. Antes era a home. */
+export function StatusPage() {
   const { data, isPending, isError } = useQuery({
     queryKey: ['health'],
     queryFn: async () => {

@@ -1,11 +1,16 @@
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
-import { HomePage } from '@/pages/HomePage';
+import { StatusPage } from '@/pages/StatusPage';
 
 /** Registre aqui as rotas de cada feature conforme elas forem criadas. */
 const router = createBrowserRouter([
   {
+    // Provisório: vira o catálogo de jogos quando a lista existir.
     path: '/',
-    element: <HomePage />,
+    element: <StatusPage />,
+  },
+  {
+    path: '/status',
+    element: <StatusPage />,
   },
 ]);
 

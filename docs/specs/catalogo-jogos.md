@@ -337,22 +337,29 @@ Tema escuro fixo (sem alternância claro/escuro). Os tokens são declarados no `
 em `apps/web/src/styles/index.css`, **e esse é o único lugar onde um hex aparece**: os componentes
 usam só as classes/variáveis dos tokens.
 
-| Token            | Hex       | Uso                                                                                   | Contraste sobre `fundo` / `painel` |
-| ---------------- | --------- | ------------------------------------------------------------------------------------- | ---------------------------------- |
-| `fundo`          | `#07040f` | fundo da página                                                                       | n/a                                |
-| `painel`         | `#110a20` | painéis, linhas da lista, diálogo                                                     | n/a                                |
-| `painel-2`       | `#0f0a1c` | contêineres internos e campos                                                         | n/a                                |
-| `borda`          | `#2a1d45` | divisórias e contorno de painéis (decorativo)                                         | 1,32 / n/a                         |
-| `texto`          | `#ece6ff` | texto principal                                                                       | 16,77 / 15,93                      |
-| `texto-suave`    | `#9a8cc2` | texto secundário, placeholder, "SEM NOTA"                                             | 6,68 / 6,35                        |
-| `apagado`        | `#5d5080` | só decorativo: segmentos vazios da barra de nota                                      | 2,83 / 2,69                        |
-| `apagado-2`      | `#6e6194` | só controle e ícone **desabilitados**                                                 | 3,68 / 3,49                        |
-| `borda-controle` | `#796ca0` | contorno de inputs, botões de status, área da capa, botões de ação e **anel de foco** | 4,32 / 4,10 (`painel-2`: 4,13)     |
-| `magenta`        | `#ff3ea5` | acento primário (logo, botão principal)                                               | 6,28 / 5,96                        |
-| `ciano`          | `#22d3ee` | status Jogando, filtro ativo                                                          | 11,25 / 10,68                      |
-| `lima`           | `#a3e635` | status Zerado                                                                         | 13,48 / 12,80                      |
-| `ambar`          | `#fbbf24` | status Quero jogar                                                                    | 12,17 / 11,56                      |
-| `erro`           | `#ff4d6d` | erro (borda do campo, mensagem)                                                       | 6,32 / 6,01                        |
+| Token            | Hex       | Uso                                                                                   | Contraste sobre `fundo` / `painel`              |
+| ---------------- | --------- | ------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| `fundo`          | `#07040f` | fundo da página                                                                       | n/a                                             |
+| `painel`         | `#110a20` | painéis, linhas da lista, diálogo                                                     | n/a                                             |
+| `painel-2`       | `#0f0a1c` | contêineres internos e campos                                                         | n/a                                             |
+| `painel-hover`   | `#170e2b` | fundo da linha da lista em hover (e o `borda-controle` sobre ele dá 3,94:1)           | `texto-suave` sobre ele: 6,09                   |
+| `acao-hover`     | `#1f1535` | fundo do botão de ícone (editar, remover, fechar) em hover                            | `texto-suave` 5,67 · `ciano` 9,55 · `erro` 5,37 |
+| `esqueleto`      | `#1a1030` | só decorativo: brilho do estado "carregando" (_skeleton_)                             | n/a                                             |
+| `borda`          | `#2a1d45` | divisórias e contorno de painéis (decorativo)                                         | 1,32 / n/a                                      |
+| `texto`          | `#ece6ff` | texto principal                                                                       | 16,77 / 15,93                                   |
+| `texto-suave`    | `#9a8cc2` | texto secundário, placeholder, "SEM NOTA"                                             | 6,68 / 6,35                                     |
+| `apagado`        | `#5d5080` | só decorativo: segmentos vazios da barra de nota                                      | 2,83 / 2,69                                     |
+| `apagado-2`      | `#6e6194` | só controle e ícone **desabilitados**                                                 | 3,68 / 3,49                                     |
+| `borda-controle` | `#796ca0` | contorno de inputs, botões de status, área da capa, botões de ação e **anel de foco** | 4,32 / 4,10 (`painel-2`: 4,13)                  |
+| `magenta`        | `#ff3ea5` | acento primário (logo, botão principal)                                               | 6,28 / 5,96                                     |
+| `ciano`          | `#22d3ee` | status Jogando, filtro ativo                                                          | 11,25 / 10,68                                   |
+| `lima`           | `#a3e635` | status Zerado                                                                         | 13,48 / 12,80                                   |
+| `ambar`          | `#fbbf24` | status Quero jogar                                                                    | 12,17 / 11,56                                   |
+| `erro`           | `#ff4d6d` | erro (borda do campo, mensagem)                                                       | 6,32 / 6,01                                     |
+
+**Paleta da capa gerada** (`capa-1` a `capa-6`, valores fixados na etapa 3, a partir da sugestão da
+referência visual): `#8ab4f8`, `#f472b6`, `#fb923c`, `#f87171`, `#facc15`, `#a78bfa`. As iniciais
+usam `fundo` e têm 7,35 a 13,27:1 sobre cada uma.
 
 Contrastes calculados pela fórmula WCAG 2.x. Consequências (regras, não sugestões):
 
