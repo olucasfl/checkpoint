@@ -325,8 +325,11 @@ etapa 3 (`apps/web`).
 
 Mockup visual (privado): https://claude.ai/artifact/McB5PwRtXHfp4eDFkoTwyW, direção A
 
-As diretrizes escritas abaixo continuam sendo a **referência verificável**; o mockup é só apoio
-visual e não está no repositório.
+**Referência visual de implementação:** `docs/specs/assets/catalogo-jogos-neon.html` (HTML/CSS
+puro, abre direto no navegador; lista, painéis, filtros, estados da lista e o formulário com a área
+da capa). Em dúvida de espaçamento, tamanho ou efeito, siga esse arquivo. Em conflito com as
+diretrizes escritas abaixo, **as diretrizes prevalecem**: elas continuam sendo a referência
+verificável. Os hex da paleta `capa-1` a `capa-6` no arquivo são sugestão.
 
 ### Tokens
 
