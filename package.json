@@ -24,8 +24,6 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "npm run build -w @checkpoint/shared && npm run typecheck --workspaces --if-present",
-    "db:up": "docker compose up -d",
-    "db:down": "docker compose down",
     "db:generate": "npm run db:generate -w @checkpoint/api",
     "db:migrate": "npm run db:migrate -w @checkpoint/api",
     "db:studio": "npm run db:studio -w @checkpoint/api",

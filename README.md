@@ -14,7 +14,7 @@ App para registrar jogos **zerados**, **jogando** e **que quero jogar**.
 | Monorepo  | npm workspaces, TypeScript 5 (strict), concurrently                             |
 | Frontend  | React 19, Vite 6, React Router 7, TanStack Query 5, Tailwind CSS 4, axios       |
 | Backend   | NestJS 11, @nestjs/config, class-validator/class-transformer, Swagger, Prisma 6 |
-| Banco     | PostgreSQL 16 (docker compose, com volume persistente)                          |
+| Banco     | PostgreSQL 16 (instância local ou gerenciada, ex.: Supabase)                    |
 | Qualidade | ESLint 9 (flat config), Prettier, Husky, lint-staged, commitlint (Conventional) |
 
 ---
@@ -52,7 +52,6 @@ checkpoint/
 │   └── shared/                   # @checkpoint/shared — tipos/utils compartilhados
 │       └── src/index.ts
 │
-├── docker-compose.yml            # PostgreSQL com volume persistente
 ├── eslint.config.mjs             # ESLint compartilhado por todos os workspaces
 ├── tsconfig.base.json            # tsconfig base estendido pelos apps
 └── package.json                  # workspaces + scripts da raiz
@@ -73,7 +72,7 @@ puras. Nada que dependa de `window`, do Node ou do Prisma.
 
 - **Node.js 24** (ver `.nvmrc` — `nvm use` se você usa nvm)
 - **npm 10+** (o projeto usa npm workspaces; não use pnpm nem yarn)
-- **Docker** com Docker Compose, para subir o PostgreSQL
+- **PostgreSQL 16** acessível (instância local ou gerenciada, ex.: Supabase)
 
 ---
 
@@ -90,26 +89,22 @@ Isso instala todos os workspaces e roda `prisma generate` automaticamente.
 ### 2. Crie os arquivos de ambiente
 
 ```bash
-cp .env.example .env
 cp apps/api/.env.example apps/api/.env
 cp apps/web/.env.example apps/web/.env
 ```
 
-| Arquivo         | Para quê                                              |
-| --------------- | ----------------------------------------------------- |
-| `.env` (raiz)   | credenciais e porta do PostgreSQL do `docker-compose` |
-| `apps/api/.env` | `PORT`, `DATABASE_URL`, `CORS_ORIGIN`, `NODE_ENV`     |
-| `apps/web/.env` | `VITE_API_URL`                                        |
+| Arquivo         | Para quê                                          |
+| --------------- | ------------------------------------------------- |
+| `apps/api/.env` | `PORT`, `DATABASE_URL`, `CORS_ORIGIN`, `NODE_ENV` |
+| `apps/web/.env` | `VITE_API_URL`                                    |
 
-> Se a porta **5432** já estiver ocupada por um PostgreSQL instalado na sua máquina, mude
-> `POSTGRES_PORT` no `.env` da raiz (ex.: `5433`) e ajuste a porta no `DATABASE_URL` de
-> `apps/api/.env` para o mesmo valor.
+> `DATABASE_URL` deve apontar para um PostgreSQL 16 acessível (instância local instalada na
+> máquina ou um serviço gerenciado, ex.: Supabase). Este projeto não usa Docker.
 
-### 3. Suba o banco
+### 3. Garanta que o banco está acessível
 
-```bash
-npm run db:up
-```
+Confirme que a instância PostgreSQL referenciada em `DATABASE_URL` está no ar (local ou
+gerenciada) antes de seguir para o próximo passo.
 
 ### 4. Aplique as migrations
 
@@ -150,8 +145,6 @@ A página inicial da web consulta o `/api/health` e mostra o status da API e do 
 | `npm run lint:fix`     | ESLint com `--fix`                                                   |
 | `npm run format`       | Prettier em todo o repositório                                       |
 | `npm run format:check` | verifica formatação sem alterar arquivos                             |
-| `npm run db:up`        | sobe o PostgreSQL via docker compose                                 |
-| `npm run db:down`      | derruba o PostgreSQL (o volume de dados é preservado)                |
 | `npm run db:generate`  | regenera o Prisma Client                                             |
 | `npm run db:migrate`   | cria/aplica migrations em desenvolvimento                            |
 | `npm run db:studio`    | abre o Prisma Studio                                                 |
