@@ -1,6 +1,6 @@
 # Spec: PWA e mobile
 
-> Status: em andamento (aprovada em 2026-09-23; etapa 1 implementada)
+> Status: em andamento (aprovada em 2026-09-23; etapas 1 a 3 implementadas)
 
 ## Objetivo
 

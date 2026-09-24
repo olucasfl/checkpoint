@@ -2,6 +2,16 @@ import '@testing-library/jest-dom/vitest';
 import { cleanup } from '@testing-library/react';
 import { afterEach, vi } from 'vitest';
 
+// O módulo virtual do plugin de PWA só existe no build do Vite; os testes nunca registram um SW.
+// Cada teste que quer outro estado sobrescreve este mock (ver UpdatePrompt.test.tsx).
+vi.mock('@/shared/lib/pwa/use-app-update', () => ({
+  useAppUpdate: () => ({
+    precisaAtualizar: false,
+    atualizar: () => undefined,
+    adiar: () => undefined,
+  }),
+}));
+
 // Sem `globals: true`, o RTL nao registra o cleanup automatico: desmonta a arvore apos cada teste.
 afterEach(() => {
   cleanup();

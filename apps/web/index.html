@@ -11,6 +11,19 @@
       content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content"
     />
     <meta name="color-scheme" content="dark" />
+    <!-- PWA (spec pwa-e-mobile, etapa 3). O hex do theme-color repete o token `fundo`; um teste
+         confere. O link do manifest é injetado pelo plugin no build. "black" (não
+         "black-translucent"): a barra de status do iOS fica preta e o app começa abaixo dela. -->
+    <meta name="theme-color" content="#07040f" />
+    <meta name="description" content="Seu registro de jogos: zerados, jogando e quero jogar." />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+    <meta name="apple-mobile-web-app-title" content="checkpoint" />
+    <meta name="format-detection" content="telephone=no" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/icons/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon-180.png" />
     <title>checkpoint</title>
     <!-- Fontes e ícones por <link>, sem pacote npm (spec catalogo-jogos, "Fontes e ícones").
          Orbitron: títulos, números e botões. Rajdhani: texto. Material Symbols Rounded: ícones. -->

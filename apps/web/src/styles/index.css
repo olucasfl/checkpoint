@@ -133,6 +133,12 @@ button:disabled {
     padding-right: env(safe-area-inset-right);
   }
 
+  /* Aviso de versão nova: acima da barra inferior (64px + safe-area) no celular; no desktop, no canto. */
+  .update-prompt {
+    inset-inline: 16px;
+    bottom: calc(64px + env(safe-area-inset-bottom) + 8px);
+  }
+
   /* Fileira de filtros que rola na horizontal sem barra visível (o arrasto continua funcionando). */
   .scroll-row {
     scrollbar-width: none;
@@ -217,6 +223,12 @@ button:disabled {
 
     .nav-clearance {
       padding-bottom: 0;
+    }
+
+    .update-prompt {
+      inset-inline: auto 24px;
+      bottom: 24px;
+      width: 440px;
     }
 
     .game-row {
@@ -386,6 +398,10 @@ button:disabled {
     animation: shimmer 1.4s linear infinite;
   }
 
+  .update-in {
+    animation: update-in 0.2s ease-out;
+  }
+
   .banner-in {
     animation: banner-in 0.18s ease-out;
   }
@@ -411,6 +427,18 @@ button:disabled {
   from {
     opacity: 0;
     transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Nome próprio: `pulse`, `spin`, `ping` e `bounce` colidem com as animações do Tailwind. */
+@keyframes update-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
   }
   to {
     opacity: 1;

@@ -1,5 +1,6 @@
 import { Outlet } from 'react-router-dom';
 import { ConnectionBanner } from '@/shared/components/ConnectionBanner';
+import { UpdatePrompt } from '@/shared/components/UpdatePrompt';
 import { BottomNav } from './BottomNav';
 import { TopNav } from './TopNav';
 
@@ -27,6 +28,7 @@ export function AppLayout() {
 
       <BottomNav />
       <ConnectionBanner />
+      <UpdatePrompt />
     </div>
   );
 }

@@ -87,15 +87,16 @@ checkpoint/
 │   │       └── main.ts                 # bootstrap: prefixo /api, CORS, ValidationPipe, Swagger
 │   │
 │   └── web/                           # @checkpoint/web
+│       ├── pwa.config.ts               # manifest + plugin de PWA (Workbox); ver §5.8
 │       └── src/
 │           ├── app/                    # providers.tsx (AppProviders) + router.tsx (AppRouter)
 │           │   └── layout/             # AppLayout (fundo + navegação), BottomNav, TopNav, nav-items.ts
 │           ├── features/               # uma pasta por feature — hoje games/ (api/, lib/, components/)
 │           ├── pages/                  # páginas de rota — GamesPage (/) e StatusPage (/status)
 │           ├── shared/
-│           │   ├── components/         # Icon (Material Symbols), ModalDialog (<dialog> nativo), OverlayPortal, ConnectionBanner
-│           │   ├── hooks/              # use-typing-outside-dialog (esconde a barra com o teclado aberto), use-connectivity
-│           │   └── lib/                # api-client.ts (axios), query-client.ts, env.ts, connectivity.ts, storage/ (armazenamento local tipado)
+│           │   ├── components/         # Icon (Material Symbols), ModalDialog (<dialog> nativo), OverlayPortal, ConnectionBanner, UpdatePrompt
+│           │   ├── hooks/              # use-typing-outside-dialog (esconde a barra com o teclado aberto), use-connectivity, use-dialog-open
+│           │   └── lib/                # api-client.ts (axios), query-client.ts, env.ts, connectivity.ts, storage/ (armazenamento local tipado), pwa/ (use-app-update)
 │           ├── styles/                 # index.css — entrada do Tailwind
 │           └── main.tsx
 │
@@ -354,6 +355,36 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
   esgotado → "O servidor não respondeu a tempo…" (o servidor pode ter gravado). `ListError` recebe
   `offline` e mostra "Sem conexão. Seu catálogo aparece quando a conexão voltar.". Botões **não** são
   desabilitados por causa do estado da conexão.
+
+### 5.8 PWA base (`pwa.config.ts`, `shared/lib/pwa/`, spec `docs/specs/pwa-e-mobile.md`, etapa 3)
+
+- **`apps/web/pwa.config.ts`** (importado pelo `vite.config.ts` e pelos testes) exporta `MANIFEST`,
+  `pwaOptions` e `pwaPlugin` (`vite-plugin-pwa`, `generateSW`, `registerType: 'prompt'`,
+  `injectRegister: false`). O precache é o shell (js/css/html/svg/png/webp/woff2) com a revisão (hash)
+  de cada arquivo, gerada no build: **não há número de versão de cache no código**. `runtimeCaching`
+  é `[]` (nem API, nem fontes, nem capas: offline só o shell). `navigateFallback` é o `index.html`,
+  exceto `/api/`. O SW novo **não** se ativa sozinho: só quando o usuário clica em Atualizar.
+- **O SW só existe no build.** `devOptions.enabled` é `false`: no `npm run dev` não há SW. Verifique
+  com `npm run build` + `npm run preview -w @checkpoint/web` (:4173). O Vitest tem config própria,
+  sem o plugin: nenhum teste registra SW.
+- **Manifest** (`/manifest.webmanifest`, gerado no build; o `<link>` é injetado pelo plugin). Sem
+  `orientation` (retrato e paisagem) e, por enquanto, sem `shortcuts` (etapa 4). Ícones `any` e
+  `maskable` em entradas separadas, apontando para `public/icons/*`, que **ainda não existem** (pendência
+  humana no `INDEX.md`): o build passa, mas o Chrome não considera o app instalável até eles existirem.
+- `theme_color`, `background_color` e o `<meta name="theme-color">` repetem o hex do token `fundo`
+  (o manifest não lê CSS); `pwa.config.test.ts` confere que os três são iguais ao `--color-fundo`.
+- **`shared/lib/pwa/use-app-update.ts`** é o **único** arquivo que importa `virtual:pwa-register/react`
+  (os testes mockam este arquivo, nunca o módulo virtual; o mock padrão está em `test/setup.ts`).
+  Expõe `{ precisaAtualizar, atualizar(), adiar() }` e busca versão nova no registro, a cada 60 min
+  com a aba visível e ao voltar a aba para visível. Tipos do módulo virtual: `vite-plugin-pwa/react`
+  em `tsconfig.app.json`.
+- **`UpdatePrompt`** (renderizado pelo `AppLayout` no `#overlay-root`, acima da barra inferior):
+  "Nova versão disponível", **Atualizar** (`updateServiceWorker(true)`, o único recarregamento do app) e
+  **Depois** (esconde até o próximo carregamento). Não aparece enquanto há um `<dialog open>`
+  (`shared/hooks/use-dialog-open.ts`) e volta quando ele fecha. Sem diálogo nativo de confirmação, sem
+  ativação imediata do SW e sem recarga automática (`no-forced-reload.test.ts` varre o código).
+- Animação do aviso: `update-in` (nome próprio; `pulse`/`spin`/`ping`/`bounce` colidem com o Tailwind),
+  desligada pela regra global de `prefers-reduced-motion`.
 
 ---
 

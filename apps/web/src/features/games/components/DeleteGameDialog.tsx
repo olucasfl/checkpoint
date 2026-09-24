@@ -17,7 +17,7 @@ export function DeleteGameDialog({ game, onClose }: DeleteGameDialogProps) {
   const mutation = useDeleteGame();
   const [error, setError] = useState('');
 
-  async function confirm() {
+  async function confirmarRemocao() {
     if (!game) {
       return;
     }
@@ -55,7 +55,7 @@ export function DeleteGameDialog({ game, onClose }: DeleteGameDialogProps) {
           </button>
           <button
             type="button"
-            onClick={confirm}
+            onClick={confirmarRemocao}
             disabled={mutation.isPending}
             className="min-h-12 rounded-[4px] bg-erro px-[22px] font-display text-[13px] font-extrabold tracking-[0.1em] text-fundo disabled:opacity-70"
           >
