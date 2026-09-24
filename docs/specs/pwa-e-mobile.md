@@ -216,6 +216,9 @@ runStorageMigrations(): void; // chamada em main.tsx antes do render
   - menor que a atual → aplica `MIGRATIONS[n]` de `n` até a atual, em ordem, e grava a atual;
   - uma migração lança, ou a versão gravada é **maior** que a atual (volta de versão) → apaga **todas
     as chaves com prefixo `checkpoint:`** (só as nossas) e grava a atual.
+  - `checkpoint:versao` **ilegível ou não numérica** (`abc`, `0`, `-1`, `1.5`, vazia) → tratada como
+    "maior": apaga as chaves `checkpoint:*` e grava a atual (não dá para confiar nos dados de um
+    formato que não se sabe qual é). Decisão tomada na implementação e aprovada.
   - Hoje `MIGRATIONS` é vazio (versão 1). Toda mudança de formato de uma chave existente sobe
     `STORAGE_SCHEMA_VERSION` **e** acrescenta a migração no mesmo commit.
 - Chaves criadas por esta spec (todas `dispositivo`):
@@ -269,6 +272,15 @@ runStorageMigrations(): void; // chamada em main.tsx antes do render
   confirmação de remoção): "Sem conexão. Nada foi salvo — tente de novo quando a conexão voltar." O
   diálogo continua aberto com os dados. Botões **não** ficam desabilitados por causa do estado (o
   detector pode estar atrasado; tentar de novo é sempre permitido).
+- **Duas exceções ao texto acima** (decisões tomadas na implementação e aprovadas; o código e os
+  testes já seguem isto):
+  - **Capa que falha depois de o jogo ser salvo** (sem resposta) → "Sem conexão. O jogo foi salvo, mas
+    a capa não — tente de novo quando a conexão voltar." O "Nada foi salvo" seria falso: o jogo já
+    está no servidor e o próximo Salvar é `PATCH`.
+  - **Timeout** (`ECONNABORTED`/`ETIMEDOUT`) → "O servidor não respondeu a tempo. Confira a lista antes
+    de tentar de novo." Fica separado de `ERR_NETWORK` porque, com o tempo esgotado, o servidor pode ter
+    gravado sem conseguir responder; afirmar "nada foi salvo" seria arriscado. (Só `ERR_NETWORK` diz
+    "Nada foi salvo".)
 
 ### Etapa 3 — PWA base
 
@@ -474,30 +486,32 @@ e 4, porque o SW é desligado no `dev`. "Emulação" = DevTools → Device Toolb
 
 ### Etapa 2 — storage e conectividade
 
-- [ ] **CA-17** — **Dado** `apps/web/src`, **quando** procuro `localStorage` e `sessionStorage`,
+- [x] **CA-17** — **Dado** `apps/web/src`, **quando** procuro `localStorage` e `sessionStorage`,
       **então** só aparecem dentro de `shared/lib/storage/` (e nos testes dele).
 - [ ] **CA-18** — **Dado** uma chave registrada gravada com JSON inválido (DevTools → Application →
       Local Storage, editar à mão para `{quebrado`), **quando** o app lê essa chave, **então** usa o
       padrão, não mostra erro na tela e a chave some do storage.
-- [ ] **CA-19** — **Dado** o storage bloqueado (Chrome → Configurações → Cookies e dados do site →
+      _Pendente: verificação pela UI na etapa 4 (primeira chave registrada). Hoje coberto por teste
+      unitário e pelo módulo real no navegador, sem tela que leia chave._
+- [x] **CA-19** — **Dado** o storage bloqueado (Chrome → Configurações → Cookies e dados do site →
       "Bloquear" para `localhost`), **quando** abro `/`, **então** o catálogo funciona igual e não há
       erro não tratado no console.
-- [ ] **CA-20** — **Dado** `checkpoint:versao` = `99` e uma chave `checkpoint:qualquer`, e uma chave
+- [x] **CA-20** — **Dado** `checkpoint:versao` = `99` e uma chave `checkpoint:qualquer`, e uma chave
       `outro-app:x` no mesmo origin, **quando** recarrego, **então** `checkpoint:versao` volta a `1`,
       `checkpoint:qualquer` some e `outro-app:x` continua lá.
-- [ ] **CA-21** — **Dado** o catálogo carregado, **quando** marco "Offline" no DevTools (Network),
+- [x] **CA-21** — **Dado** o catálogo carregado, **quando** marco "Offline" no DevTools (Network),
       **então** o aviso "Você está offline…" aparece em até 1 s e a lista continua visível; **quando**
       desmarco, **então** aparece "Conexão restabelecida", some em ~3 s e a lista é recarregada (uma
       request `GET /api/games` nova no Network).
-- [ ] **CA-22** — **Dado** o web aberto e a **API parada** (Ctrl+C no `dev` da API; o navegador segue
-      online), **quando** clico em um filtro ou salvo algo, **então** aparece "Não foi possível falar com
+- [x] **CA-22** — **Dado** o web aberto e a **API parada** (Ctrl+C no `dev` da API; o navegador segue
+      online), **quando** salvo algo, **então** aparece "Não foi possível falar com
       o servidor. Tentando de novo…" com "Tentar agora"; **quando** subo a API de novo, **então** em até
       ~30 s o aviso vira "Conexão restabelecida" sem eu recarregar a página.
-- [ ] **CA-23** — **Dado** o DevTools em "Offline", **quando** preencho o formulário de novo jogo e
+- [x] **CA-23** — **Dado** o DevTools em "Offline", **quando** preencho o formulário de novo jogo e
       clico Salvar, **então** o formulário continua aberto com os dados, mostra "Sem conexão. Nada foi
       salvo — tente de novo quando a conexão voltar." e nenhum jogo novo existe depois
       (`curl http://localhost:3333/api/games`).
-- [ ] **CA-24** — **Dado** a API parada, **quando** abro `/` do zero, **então** vejo "Sem conexão. Seu
+- [x] **CA-24** — **Dado** a API parada, **quando** abro `/` do zero, **então** vejo "Sem conexão. Seu
       catálogo aparece quando a conexão voltar." com "Tentar de novo" (e não o esqueleto de
       carregamento para sempre).
 
