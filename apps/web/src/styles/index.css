@@ -376,7 +376,7 @@ button:disabled {
 
   /* ---- Animações (só CSS) ---- */
   .cta-pulse {
-    animation: pulse 2.4s ease-in-out infinite;
+    animation: neon-pulse 2.4s ease-in-out infinite;
   }
 
   .dot-blink {
@@ -455,7 +455,7 @@ button:disabled {
   }
 }
 
-@keyframes pulse {
+@keyframes neon-pulse {
   0%,
   100% {
     box-shadow:

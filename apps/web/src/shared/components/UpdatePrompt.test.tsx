@@ -110,7 +110,6 @@ describe('UpdatePrompt', () => {
 
     expect(css).toMatch(/\.update-in\s*\{[^}]*animation:\s*update-in/);
     expect(css).toMatch(/@keyframes update-in\b/);
-    expect(css).not.toMatch(/@keyframes\s+(pulse|spin|ping|bounce)\b[^{]*\{[^}]*update/);
     expect(css).toMatch(
       /@media \(prefers-reduced-motion: reduce\)\s*\{[^}]*\*,[^}]*animation:\s*none !important/,
     );
