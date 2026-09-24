@@ -11,7 +11,7 @@ import {
 } from '../lib/form-values';
 import { type CoverChange } from '../lib/save-game';
 import { CoverField } from './CoverField';
-import { Field, FieldError, inputClass, LABEL } from './form-parts';
+import { Field, FieldError, inputClass, LABEL } from '@/shared/components/form-parts';
 import { PlatformField } from './PlatformField';
 import { RatingField } from './RatingField';
 import { StatusPicker } from './StatusPicker';

@@ -91,10 +91,10 @@ checkpoint/
 │   └── web/                           # @checkpoint/web
 │       ├── pwa.config.ts               # manifest + plugin de PWA (Workbox); ver §5.8
 │       └── src/
-│           ├── app/                    # providers.tsx (AppProviders) + router.tsx (AppRouter)
-│           │   └── layout/             # AppLayout (fundo + navegação), BottomNav, TopNav, nav-items.ts
-│           ├── features/               # uma pasta por feature — hoje games/ (api/, lib/, components/)
-│           ├── pages/                  # páginas de rota — GamesPage (/) e StatusPage (/status)
+│           ├── app/                    # providers.tsx (AppProviders) + routes.tsx (as rotas) + router.tsx (AppRouter)
+│           │   └── layout/             # AppLayout/AppFrame, AuthLayout, RequireAuth, LoadingScreen, Backdrop, BottomNav, TopNav, nav-items.ts
+│           ├── features/               # uma pasta por feature — hoje games/ e auth/ (api/, lib/, session/, components/)
+│           ├── pages/                  # páginas de rota — GamesPage (/), PerfilPage (/perfil), LoginPage, RegistroPage e StatusPage (/status)
 │           ├── shared/
 │           │   ├── components/         # Icon (Material Symbols), ModalDialog (<dialog> nativo), OverlayPortal, ConnectionBanner, UpdatePrompt, InstallNudge
 │           │   ├── hooks/              # use-typing-outside-dialog (esconde a barra com o teclado aberto), use-connectivity, use-dialog-open
@@ -280,12 +280,13 @@ Registre o módulo novo em `app.module.ts` (`imports: [...]`).
 ### 5.1 Composição da aplicação
 
 - `src/main.tsx` monta `<AppProviders><AppRouter/></AppProviders>`.
-- `src/app/providers.tsx` — ponto único para providers globais. Hoje só `QueryClientProvider`
-  (`shared/lib/query-client.ts`); tema, auth etc. entram aqui quando existirem.
-- `src/app/router.tsx` — `createBrowserRouter` com a lista de rotas: `/` → `GamesPage` (o catálogo) e
-  `/status` → `StatusPage` (o diagnóstico de health que antes era a home), as duas **aninhadas no
-  `AppLayout`** (§5.6). Registre rotas novas aqui, como filhas do layout, conforme cada feature ganha
-  uma página.
+- `src/app/providers.tsx` — ponto único para providers globais: `QueryClientProvider`
+  (`shared/lib/query-client.ts`) e o `AuthProvider` (§5.10); tema etc. entram aqui quando existirem.
+- `src/app/routes.tsx` — a lista de rotas (à parte do roteador para os testes usarem um roteador em
+  memória): `/` (`GamesPage`) e `/perfil` (`PerfilPage`) dentro do **`RequireAuth`** e do `AppLayout`
+  (§5.6, §5.10); `/status` (o diagnóstico de health) **público**, no `AppLayout`; `/login` e `/registro`
+  no `AuthLayout` (sem barra). `src/app/router.tsx` só cria o `createBrowserRouter(routes)`. Registre
+  rotas novas em `routes.tsx`, como filhas do layout, conforme cada feature ganha uma página.
 
 ### 5.2 Alias de import
 
@@ -297,7 +298,8 @@ Registre o módulo novo em `app.module.ts` (`imports: [...]`).
 
 `shared/lib/api-client.ts` exporta uma instância única do axios (`apiClient`), `baseURL` vindo de
 `shared/lib/env.ts` (`VITE_API_URL`, já incluindo o prefixo `/api`). Toda chamada à API passa por
-essa instância — não crie um segundo `axios.create()`. Cache/estado de servidor é TanStack Query
+essa instância — não crie um segundo `axios.create()`. Ele tem **três interceptors**, todos nesta mesma instância:
+Bearer + marcas de requisição, detecção de conectividade (§5.7) e sessão (§5.10). Cache/estado de servidor é TanStack Query
 (`shared/lib/query-client.ts`); não há Redux/Zustand/Context-como-store no projeto.
 
 ### 5.4 Onde as coisas vão
@@ -349,11 +351,13 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
 
 ### 5.6 Layout mobile-first (`app/layout/`, spec `docs/specs/pwa-e-mobile.md`, etapa 1)
 
-- **`AppLayout`** envolve toda tela do app: fundo Neon (orbes + _scanlines_, que saíram da
-  `GamesPage`), `TopNav`, o `<Outlet/>` e a `BottomNav`. **Nenhuma página importa a navegação**
+- **`AppLayout`** envolve toda tela do app (menos `/login` e `/registro`, que usam o `AuthLayout`): fundo
+  Neon (`Backdrop`: orbes + _scanlines_), `TopNav`, o `<Outlet/>` e a `BottomNav`. A moldura em si é o
+  `AppFrame` (recebe `children`), para o `RequireAuth` poder mostrar a moldura com uma mensagem no lugar da
+  rota. **Nenhuma página importa a navegação**
   (teste em `AppLayout.test.tsx`).
-- **`nav-items.ts`** é a fonte única dos destinos (hoje "Jogos" e "Adicionar"; "Perfil" entra com a
-  spec `autenticacao`). `/status` fica fora de propósito.
+- **`nav-items.ts`** é a fonte única dos destinos: "Jogos", "Adicionar" e "Perfil" (`/perfil`), nesta
+  ordem, na barra inferior e (os links) no topo em >= 768px. `/status` fica fora de propósito.
 - **`BottomNav`** (< 768px, o `md`): fixa embaixo, renderizada por portal (`OverlayPortal`) no
   `#overlay-root`, irmão do `#root` no `index.html`, para nenhum `transform` de ancestral prender o
   `position: fixed`. Some enquanto um campo **fora de diálogo** está focado
@@ -462,6 +466,44 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
   "Entendi" ou o prompt recusado gravam `dispensado-em`; aceito some e não volta.
 - **Atalhos do manifest** (`pwa.config.ts`): "Adicionar jogo" → `/?novo=1` e "Jogando" →
   `/?status=JOGANDO`, sem `icons` (os PNGs de 96 px são opcionais e não existem).
+
+### 5.10 Autenticação no web (`features/auth/`, spec `docs/specs/autenticacao.md`, etapa 2)
+
+- **Access token só em memória** (`shared/lib/auth-token.ts`, uma variável de módulo): nunca em armazenamento
+  local, de sessão, IndexedDB nem cookie legível (`hygiene.test.ts` e `shared/lib/storage/no-token-in-storage.test.ts`).
+  Recarregar a página o perde; o **refresh** (cookie `HttpOnly`, que o JS não lê) o recupera. A única marca
+  local é a chave `checkpoint:sessao:ativa` (escopo `usuario`), que distingue "visitante" de "a sessão terminou".
+- **Estado da sessão** (`session/session.ts`, um store externo lido por `useAuth()`): `carregando` (o boot ainda
+  não respondeu) · `autenticado` · `visitante` (com o motivo: `sessao` = a sessão terminou, `usuario` = saiu,
+  `null` = nunca entrou) · `desconectado` (o boot não chegou a saber: sem rede, 5xx ou 429).
+  O **`AuthProvider`** faz o boot (`POST /auth/refresh`, uma promessa só mesmo com o `StrictMode`), refaz o boot
+  quando a conectividade volta a `online` estando `desconectado`, e escuta o `BroadcastChannel('checkpoint-auth')`.
+- **Interceptor de sessão no `apiClient`** (`shared/lib/api-client.ts`, a mesma instância): põe o `Bearer`; um 401
+  `AUTH_TOKEN_EXPIRADO` dispara **uma** renovação compartilhada (`refreshOnce`: requests paralelas recebem a
+  MESMA promessa, então sai um `POST /auth/refresh` só) e cada request é repetida **uma** vez
+  (`sessionRetried`); um 409 `AUTH_REFRESH_CONCORRENTE` tenta de novo uma vez após 500 ms;
+  `AUTH_SESSAO_ENCERRADA` (ou o refresh dando 401) é o logout local; sem rede na renovação a original falha
+  como erro de rede, **sem deslogar**. As marcas `isAuthCall` (registro, login, refresh, logout: sem Bearer, sem
+  renovação, com `withCredentials`; refresh e logout com `X-Checkpoint-Csrf: 1`) e `isConnectivityProbe` (a
+  sonda: nunca passa pela renovação) impedem laços. O `shared` não importa a feature: a sessão se registra em
+  `shared/lib/session-handlers.ts`.
+- **Rotas** (`app/routes.tsx`): `RequireAuth` segura as telas logadas: `carregando` mostra só o logo (**nenhuma
+  query sai antes do boot**), `visitante` vai para `/login?voltar=…` (com `motivo=sessao` só se tinha sessão e a
+  perdeu; quem acabou de sair vai para `/login` limpo), `desconectado` mostra a moldura do app com "Sem conexão.
+  Seu catálogo aparece quando a conexão voltar." e **não** redireciona. O `AuthLayout` (`/login`, `/registro`)
+  manda quem já tem sessão para `safeRedirect(voltar)` (login) ou `/` (registro): é ele quem redireciona depois
+  de um login bem-sucedido.
+- **`safeRedirect`** (`lib/safe-redirect.ts`): aceita só caminho interno (nada de `//`, `/\`, esquema, controle,
+  > 512 caracteres, `/login`, `/registro`); confere o valor cru **e** o decodificado.
+- **Mensagens só pelo `code`** (`lib/auth-errors.ts`): `Record<ApiErrorCode, string>` (um código novo no shared
+  quebra o typecheck até ganhar texto). Nada compara a `message` da API (`hygiene.test.ts` varre o código).
+- **Logout local** (`encerrarLocal`): token `null`, `queryClient.clear()`, `storage.clearScope('usuario')`; as chaves
+  `instalacao:*` (escopo `dispositivo`) ficam. **Sair** chama `POST /auth/logout`; **sem conexão não sai** ("Sem
+  conexão. Para sair, conecte-se."), porque o cookie `HttpOnly` só o servidor apaga. Depois de sair, o
+  `BroadcastChannel` avisa as outras abas, que fazem o logout local na hora.
+- **Telas:** `LoginForm` e `RegistroForm` (validação local com as regras da API; "Confirmar senha" só no registro;
+  `CampoSenha` com "mostrar senha" de 44 × 44 e `aria-pressed`), `PerfilPage` (nome, e-mail "(não verificado — usado
+  só para entrar)" e Sair). Reusam `shared/components/form-parts` (movido de `features/games`) e o visual Neon.
 
 ---
 

@@ -1,30 +1,25 @@
+import { type ReactNode } from 'react';
 import { Outlet } from 'react-router-dom';
 import { ConnectionBanner } from '@/shared/components/ConnectionBanner';
 import { InstallNudge } from '@/shared/components/InstallNudge';
 import { UpdatePrompt } from '@/shared/components/UpdatePrompt';
+import { Backdrop } from './Backdrop';
 import { BottomNav } from './BottomNav';
 import { TopNav } from './TopNav';
 
 /**
- * Layout de todas as telas do app: fundo Neon (orbes + scanlines), navegação do topo (>= 768px), o
- * conteúdo da rota e a barra inferior (< 768px). Nenhuma página importa a navegação à mão.
+ * A moldura das telas do app: fundo Neon (orbes + scanlines), navegação do topo (>= 768px), o conteúdo
+ * e a barra inferior (< 768px). Fora do `AppLayout` para o `RequireAuth` poder mostrar a moldura com
+ * uma mensagem (sem conexão) no lugar da rota.
  */
-export function AppLayout() {
+export function AppFrame({ children }: { children: ReactNode }) {
   return (
     <div className="app-shell relative overflow-hidden">
-      <div
-        aria-hidden="true"
-        className="orb orb-magenta -right-[160px] -top-[200px] size-[420px] md:-right-[220px] md:-top-[280px] md:size-[720px]"
-      />
-      <div
-        aria-hidden="true"
-        className="orb orb-ciano -bottom-[220px] -left-[180px] size-[420px] md:-bottom-[320px] md:-left-[260px] md:size-[760px]"
-      />
-      <div aria-hidden="true" className="scanlines" />
+      <Backdrop />
 
       <div className="nav-clearance relative">
         <TopNav />
-        <Outlet />
+        {children}
       </div>
 
       <BottomNav />
@@ -32,5 +27,14 @@ export function AppLayout() {
       <UpdatePrompt />
       <InstallNudge />
     </div>
+  );
+}
+
+/** Layout de todas as telas logadas e do `/status`. Nenhuma página importa a navegação à mão. */
+export function AppLayout() {
+  return (
+    <AppFrame>
+      <Outlet />
+    </AppFrame>
   );
 }

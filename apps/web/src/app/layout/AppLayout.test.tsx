@@ -63,7 +63,14 @@ function renderAt(url: string) {
   return userEvent.setup({ applyAccept: false });
 }
 
-const mainNav = () => screen.getByRole('navigation', { name: 'Navegação principal' });
+/** A barra INFERIOR (a do topo, em >= 768px, tem os mesmos destinos e o mesmo nome acessível). */
+const mainNav = () => {
+  const nav = document.querySelector<HTMLElement>('nav.bottom-nav');
+  if (!nav) {
+    throw new Error('barra inferior não encontrada');
+  }
+  return nav;
+};
 
 beforeEach(() => {
   vi.resetAllMocks();
@@ -75,7 +82,7 @@ afterEach(() => {
 });
 
 describe('barra inferior (CA-02)', () => {
-  it('em `/`: Jogos ativo (aria-current), Adicionar, e nenhum item Perfil', async () => {
+  it('em `/`: Jogos ativo (aria-current), Adicionar e Perfil (pwa-e-mobile CA-02, autenticacao CA-36)', async () => {
     renderAt('/');
     await screen.findByText(/nenhum jogo cadastrado/i);
 
@@ -85,20 +92,32 @@ describe('barra inferior (CA-02)', () => {
       'page',
     );
     expect(within(nav).getByRole('button', { name: 'Adicionar' })).toBeInTheDocument();
-    expect(within(nav).queryByText('Perfil')).not.toBeInTheDocument();
+    expect(within(nav).getByRole('link', { name: 'Perfil' })).toHaveAttribute('href', '/perfil');
   });
 
-  it('em `/status`, Jogos não está ativo e /status não é um item', () => {
+  it('em `/status`, Jogos não está ativo e /status não é um item (só Jogos e Perfil são links)', () => {
     renderAt('/status');
 
     const nav = mainNav();
     expect(within(nav).getByRole('link', { name: 'Jogos' })).not.toHaveAttribute('aria-current');
-    expect(within(nav).getAllByRole('link')).toHaveLength(1);
+    expect(
+      within(nav)
+        .getAllByRole('link')
+        .map((link) => link.textContent),
+    ).toEqual([expect.stringContaining('Jogos'), expect.stringContaining('Perfil')]);
   });
 
-  it('com um destino só, o topo não repete a navegação (o desktop fica como era)', () => {
+  it('o topo (>= 768px) repete os links: Jogos e Perfil (autenticacao CA-36)', () => {
     renderAt('/status');
-    expect(screen.getAllByRole('navigation', { name: 'Navegação principal' })).toHaveLength(1);
+
+    const navs = screen.getAllByRole('navigation', { name: 'Navegação principal' });
+    expect(navs).toHaveLength(2);
+    const top = navs.find((nav) => !nav.classList.contains('bottom-nav'));
+    expect(
+      within(top as HTMLElement)
+        .getAllByRole('link')
+        .map((link) => link.textContent),
+    ).toEqual([expect.stringContaining('Jogos'), expect.stringContaining('Perfil')]);
   });
 });
 
@@ -132,9 +151,7 @@ describe('barra some com o teclado virtual (campo fora de diálogo focado)', () 
     expect(mainNav()).toBeInTheDocument();
 
     await user.click(screen.getByLabelText('Campo'));
-    await waitFor(() =>
-      expect(screen.queryByRole('navigation', { name: 'Navegação principal' })).toBeNull(),
-    );
+    await waitFor(() => expect(document.querySelector('nav.bottom-nav')).toBeNull());
 
     await user.click(screen.getByRole('button', { name: 'Outro botão' }));
     await waitFor(() => expect(mainNav()).toBeInTheDocument());
@@ -148,9 +165,7 @@ describe('barra some com o teclado virtual (campo fora de diálogo focado)', () 
     expect(await screen.findByLabelText('Título')).toHaveFocus();
     await act(() => new Promise((resolve) => setTimeout(resolve, 10)));
 
-    expect(
-      screen.getByRole('navigation', { name: 'Navegação principal', hidden: true }),
-    ).toBeInTheDocument();
+    expect(document.querySelector('nav.bottom-nav')).toBeInTheDocument();
   });
 });
 

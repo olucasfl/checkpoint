@@ -3,10 +3,9 @@ import { Icon } from '@/shared/components/Icon';
 import { NAV_LINKS } from './nav-items';
 
 /**
- * Os mesmos destinos da barra inferior, no topo, em >= 768px. Com um destino só ("Jogos", a página
- * atual) não há para onde navegar, então nada é mostrado e o desktop fica como era; aparece quando a
- * spec autenticacao acrescentar "Perfil". "Adicionar" no desktop é o botão "Adicionar jogo" do
- * catálogo.
+ * Os mesmos destinos da barra inferior, no topo, em >= 768px. "Adicionar" no desktop é o botão "Adicionar
+ * jogo" do catálogo, então só os links aparecem aqui. Com menos de dois destinos não há para onde
+ * navegar e nada é mostrado.
  */
 export function TopNav() {
   if (NAV_LINKS.length < 2) {

@@ -5,7 +5,7 @@ import {
   type GameStatus,
 } from '@checkpoint/shared';
 import { Icon } from '@/shared/components/Icon';
-import { Field, FieldError, inputClass, LABEL } from './form-parts';
+import { Field, FieldError, inputClass, LABEL } from '@/shared/components/form-parts';
 
 interface RatingFieldProps {
   status: GameStatus;

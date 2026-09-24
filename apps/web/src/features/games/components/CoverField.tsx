@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { GAME_COVER_MIME_TYPES } from '@checkpoint/shared';
 import { Icon } from '@/shared/components/Icon';
 import { validateCoverFile } from '../lib/cover-file';
-import { Field, FieldError, LABEL } from './form-parts';
+import { Field, FieldError, LABEL } from '@/shared/components/form-parts';
 import { GameCover } from './GameCover';
 
 interface CoverFieldProps {

@@ -1,12 +1,17 @@
 import { type ReactNode } from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';
+import { AuthProvider } from '@/features/auth/session/AuthProvider';
 import { queryClient } from '@/shared/lib/query-client';
 
 interface AppProvidersProps {
   children: ReactNode;
 }
 
-/** Ponto unico para registrar providers globais (query, tema, auth, etc). */
+/** Ponto unico para registrar providers globais (query, sessão, tema, etc). */
 export function AppProviders({ children }: AppProvidersProps) {
-  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>{children}</AuthProvider>
+    </QueryClientProvider>
+  );
 }

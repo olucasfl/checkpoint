@@ -1,7 +1,7 @@
 import { GAME_STATUS, type GameStatus } from '@checkpoint/shared';
 import { Icon } from '@/shared/components/Icon';
 import { STATUS_META } from '../lib/status-meta';
-import { LABEL } from './form-parts';
+import { LABEL } from '@/shared/components/form-parts';
 
 interface StatusPickerProps {
   value: GameStatus;

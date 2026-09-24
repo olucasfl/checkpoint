@@ -1,6 +1,6 @@
 import { Icon } from '@/shared/components/Icon';
 import { extraPlatform, PLATFORM_GROUPS } from '../lib/platforms';
-import { Field, FieldError, inputClass, LABEL } from './form-parts';
+import { Field, FieldError, inputClass, LABEL } from '@/shared/components/form-parts';
 
 interface PlatformFieldProps {
   value: string;

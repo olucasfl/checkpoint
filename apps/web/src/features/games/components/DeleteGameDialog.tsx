@@ -4,7 +4,7 @@ import { Icon } from '@/shared/components/Icon';
 import { ModalDialog } from '@/shared/components/ModalDialog';
 import { useDeleteGame } from '../api/use-games';
 import { describeError } from '../lib/api-error';
-import { FieldError } from './form-parts';
+import { FieldError } from '@/shared/components/form-parts';
 
 interface DeleteGameDialogProps {
   /** Jogo a remover; `null` = diálogo fechado. */
