@@ -44,7 +44,7 @@ commit — `/docs-sync` confere se ela bate com a realidade.
 
 **`catalogo-jogos` — verificação real pendente (etapa 3):**
 
-- [ ] **CA-84** (`prefers-reduced-motion`): hoje só está verificado por teste (a regra CSS existe, conferida no
+- [x] **CA-84** (`prefers-reduced-motion`): hoje só está verificado por teste (a regra CSS existe, conferida no
       Vitest). Falta a verificação real: ligar a preferência do sistema (Windows: Configurações →
       Acessibilidade → Efeitos visuais → "Efeitos de animação" desligado), abrir `/` e conferir que o
       pulso do botão, as _scanlines_, os orbes, o ponto piscando e o tremer do campo com erro estão
@@ -52,13 +52,13 @@ commit — `/docs-sync` confere se ela bate com a realidade.
 
 **`pwa-e-mobile` — ponto de quebra (etapa 1):**
 
-- [ ] O catálogo passa de 900 px para 768 px (`md`) na etapa 1. Ao terminar a etapa 1, rodar
+- [x] O catálogo passa de 900 px para 768 px (`md`) na etapa 1. Ao terminar a etapa 1, rodar
       `/spec-sync docs/specs/catalogo-jogos.md` para conferir se algum critério ou diretriz do catálogo
       cita 900 px.
 
 **`pwa-e-mobile` — ícones (etapa 3):**
 
-- [ ] Criar os PNGs da tabela "Ícones" da spec em `apps/web/public/` (192/512 `any`, 192/512
+- [x] Criar os PNGs da tabela "Ícones" da spec em `apps/web/public/` (192/512 `any`, 192/512
       `maskable` com fundo opaco, `apple-touch-icon` 180 sem transparência, favicon 32). Até lá o build
       passa, mas o app não é instalável e o convite de instalação (etapa 4) não aparece.
 

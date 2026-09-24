@@ -1,6 +1,6 @@
 # Spec: PWA e mobile
 
-> Status: em andamento (aprovada em 2026-09-23; etapas 1 a 3 implementadas)
+> Status: em andamento (aprovada em 2026-09-23; etapas 1 a 3 implementadas; etapa 4 pendente)
 
 ## Objetivo
 
@@ -394,6 +394,10 @@ VitePWA({
 - O `UpdatePrompt` **não aparece enquanto houver um `<dialog open>`** no documento; aparece quando o
   diálogo fecha.
 - Sem `confirm()`, sem `skipWaiting` incondicional, sem `controllerchange → reload`.
+- **Desvio aprovado na implementação:** `use-app-update` é mockado **globalmente** em
+  `apps/web/src/test/setup.ts`, porque o módulo virtual só existe no build do Vite e qualquer teste que
+  renderize o `AppLayout` (que traz o `UpdatePrompt`) tentaria resolvê-lo. O `UpdatePrompt.test.tsx`
+  sobrescreve esse mock para cada estado. O módulo virtual continua sem ser mockado em teste nenhum.
 
 ### Etapa 4 — instalação
 
@@ -517,40 +521,40 @@ e 4, porque o SW é desligado no `dev`. "Emulação" = DevTools → Device Toolb
 
 ### Etapa 3 — PWA base
 
-- [ ] **CA-25** — **Dado** o build rodando no `preview`, **quando** abro DevTools → Application →
+- [x] **CA-25** — **Dado** o build rodando no `preview`, **quando** abro DevTools → Application →
       Manifest, **então** vejo `id` `/`, `start_url` `/`, `scope` `/`, `display` `standalone`,
       `theme_color` e `background_color` `#07040f`, `lang` `pt-BR`, sem `orientation`, e ícones
-      `any` e `maskable` em entradas separadas. _Com os ícones ainda ausentes, o DevTools mostra erro de
-      ícone e "não instalável": esperado até a pendência humana ser resolvida._
-- [ ] **CA-26** — **Dado** o build no `preview`, **quando** a página carrega, **então** DevTools →
+      `any` e `maskable` em entradas separadas. _Ícones adicionados em 2026-09-24; app instalável
+      verificado pelo humano._
+- [x] **CA-26** — **Dado** o build no `preview`, **quando** a página carrega, **então** DevTools →
       Application → Service Workers mostra um SW **ativado** para `http://localhost:4173/`, e Cache
       Storage tem só um cache `workbox-precache-v2-…` cujas entradas são todas de
       `http://localhost:4173` (nenhuma de `:3333`, `fonts.googleapis.com`, `fonts.gstatic.com` ou
       `supabase.co`).
-- [ ] **CA-27** — **Dado** o SW ativo, **quando** uso o catálogo, **então** no Network nenhuma request
+- [x] **CA-27** — **Dado** o SW ativo, **quando** uso o catálogo, **então** no Network nenhuma request
       a `:3333/api` aparece como "(ServiceWorker)" no Size; e as fontes e as capas também não.
-- [ ] **CA-28** — **Dado** o app aberto uma vez com o SW ativo, **quando** marco "Offline" e recarrego
+- [x] **CA-28** — **Dado** o app aberto uma vez com o SW ativo, **quando** marco "Offline" e recarrego
       `/`, e depois abro `/status` direto pela barra de endereço, **então** em ambos aparece o shell do
       app (topo, barra inferior, aviso de offline), não a página de erro do navegador.
-- [ ] **CA-29** — **Dado** o app aberto no `preview`, **quando** mudo um texto qualquer do web, rodo o
+- [x] **CA-29** — **Dado** o app aberto no `preview`, **quando** mudo um texto qualquer do web, rodo o
       build de novo e volto à aba (ou espero a checagem), **então** aparece "Nova versão disponível" com
       **Atualizar** e **Depois**, e a página **não** recarregou sozinha; **quando** clico **Atualizar**,
       **então** a página recarrega com o texto novo; **e** Cache Storage não tem mais as entradas da
       versão anterior.
-- [ ] **CA-30** — **Dado** uma versão nova esperando e o formulário de jogo aberto, **quando** a
+- [x] **CA-30** — **Dado** uma versão nova esperando e o formulário de jogo aberto, **quando** a
       checagem encontra a versão nova, **então** o aviso não aparece enquanto o diálogo está aberto;
       **quando** fecho o diálogo, **então** ele aparece.
-- [ ] **CA-31** — **Dado** o aviso de versão nova, **quando** clico **Depois**, **então** ele some e a
+- [x] **CA-31** — **Dado** o aviso de versão nova, **quando** clico **Depois**, **então** ele some e a
       página continua na versão antiga, sem recarregar; **quando** fecho todas as abas do app e abro de
       novo, **então** a versão nova está ativa.
-- [ ] **CA-32** — **Dado** `npm run dev -w @checkpoint/web`, **quando** abro o app, **então** não há
+- [x] **CA-32** — **Dado** `npm run dev -w @checkpoint/web`, **quando** abro o app, **então** não há
       SW registrado para `localhost:5173` (DevTools → Service Workers vazio para essa origem).
-- [ ] **CA-33** — **Dado** `apps/web/public` sem nenhum dos ícones da tabela, **quando** rodo
+- [x] **CA-33** — **Dado** `apps/web/public` sem nenhum dos ícones da tabela, **quando** rodo
       `npm run build`, **então** o build conclui sem erro.
-- [ ] **CA-34** — **Dado** `apps/web/index.html` e o `pwa.config.ts`, **quando** rodo os testes do web,
+- [x] **CA-34** — **Dado** `apps/web/index.html` e o `pwa.config.ts`, **quando** rodo os testes do web,
       **então** um teste confere que `theme_color`, `background_color` e o `<meta name="theme-color">`
       são iguais ao `--color-fundo` de `styles/index.css`.
-- [ ] **CA-35** — **Dado** `apps/web/src` e `apps/web/public`, **quando** procuro `confirm(`,
+- [x] **CA-35** — **Dado** `apps/web/src` e `apps/web/public`, **quando** procuro `confirm(`,
       `skipWaiting()`, `controllerchange` e `location.reload`, **então** não há ocorrência (o único
       recarregamento é o do `updateServiceWorker(true)`, disparado pelo clique).
 
