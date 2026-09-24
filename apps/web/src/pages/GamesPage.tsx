@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { type Game } from '@checkpoint/shared';
 import { Icon } from '@/shared/components/Icon';
 import { ModalDialog } from '@/shared/components/ModalDialog';
+import { useConnectivity } from '@/shared/hooks/use-connectivity';
 import { useGames } from '@/features/games/api/use-games';
 import { DeleteGameDialog } from '@/features/games/components/DeleteGameDialog';
 import { GameForm } from '@/features/games/components/GameForm';
@@ -29,6 +30,7 @@ export function GamesPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const filter = parseStatusFilter(searchParams.get('status'));
   const { data, isPending, isError, refetch } = useGames();
+  const connection = useConnectivity();
   const [form, setForm] = useState<FormDialog>({ open: false });
   const [toDelete, setToDelete] = useState<Game | null>(null);
 
@@ -89,8 +91,11 @@ export function GamesPage() {
         </div>
 
         {isPending && <ListLoading />}
-        {isError && <ListError onRetry={() => void refetch()} />}
-        {!isPending && !isError && visible.length === 0 && (
+        {/* Com a lista já carregada, um refetch que falha não a esconde (spec, "Catálogo sem conexão"). */}
+        {isError && data === undefined && (
+          <ListError onRetry={() => void refetch()} offline={connection !== 'online'} />
+        )}
+        {!isPending && data !== undefined && visible.length === 0 && (
           <ListEmpty filtered={filter !== 'TODOS' && games.length > 0} />
         )}
         {visible.length > 0 && (

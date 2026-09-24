@@ -40,7 +40,7 @@ export async function saveGame(
       game = await api.removeCover(game.id);
     }
   } catch (error) {
-    return { game, coverError: describeError(error) };
+    return { game, coverError: describeError(error, 'capa') };
   }
 
   return { game, coverError: null };

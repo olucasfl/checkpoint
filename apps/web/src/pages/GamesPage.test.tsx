@@ -4,8 +4,10 @@ import userEvent from '@testing-library/user-event';
 import { AxiosError } from 'axios';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { type Game } from '@checkpoint/shared';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { gamesApi } from '@/features/games/api/games-api';
+import { OFFLINE_NOT_SAVED } from '@/features/games/lib/api-error';
+import { connectivity } from '@/shared/lib/connectivity';
 import { GamesPage } from './GamesPage';
 
 vi.mock('@/features/games/api/games-api', () => ({
@@ -389,5 +391,94 @@ describe('?novo=1 abre o formulário de novo jogo (pwa-e-mobile CA-04)', () => {
     await screen.findByText('Celeste');
 
     expect(screen.queryByRole('heading', { name: 'NOVO JOGO' })).not.toBeInTheDocument();
+  });
+});
+
+describe('sem conexão (pwa-e-mobile CA-23, CA-24)', () => {
+  const networkError = () => new AxiosError('Network Error', 'ERR_NETWORK');
+  const OFFLINE_LIST = 'Sem conexão. Seu catálogo aparece quando a conexão voltar.';
+
+  afterEach(() => {
+    connectivity.reportReachable();
+  });
+
+  it.each([
+    ['sem-servidor', true],
+    ['offline', false],
+  ])(
+    'lista que falha com o estado %s: mensagem de conexão e "Tentar de novo" (CA-24)',
+    async (_state, browserOnline) => {
+      const onLine = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(browserOnline);
+      connectivity.reportUnreachable();
+      api.list.mockRejectedValue(networkError());
+      renderPage();
+
+      expect(await screen.findByText(OFFLINE_LIST)).toBeInTheDocument();
+      expect(screen.queryByText('A API não respondeu.')).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'TENTAR DE NOVO' })).toBeEnabled();
+      expect(screen.queryByRole('status', { name: 'Carregando jogos' })).not.toBeInTheDocument();
+      onLine.mockRestore();
+    },
+  );
+
+  it('"Tentar de novo" busca outra vez e, com resposta, mostra o catálogo', async () => {
+    connectivity.reportUnreachable();
+    api.list.mockRejectedValueOnce(networkError());
+    const user = renderPage();
+    await screen.findByText(OFFLINE_LIST);
+
+    api.list.mockResolvedValue(CATALOG);
+    await user.click(screen.getByRole('button', { name: 'TENTAR DE NOVO' }));
+
+    expect(await screen.findByText('Celeste')).toBeInTheDocument();
+  });
+
+  it('lista já carregada continua visível quando o refetch seguinte falha sem conexão (CA-21)', async () => {
+    api.remove.mockRejectedValue(networkError());
+    const user = renderPage();
+    await screen.findByText('Celeste');
+
+    // A remoção falha e o onSettled refaz a busca, que também falha: a lista não some.
+    connectivity.reportUnreachable();
+    api.list.mockRejectedValue(networkError());
+    await user.click(screen.getByRole('button', { name: 'Remover Celeste' }));
+    await user.click(await screen.findByRole('button', { name: 'REMOVER' }));
+    await waitFor(() => expect(api.list).toHaveBeenCalledTimes(2));
+
+    expect(
+      within(screen.getByRole('list', { name: 'Jogos' })).getByText('Celeste'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(OFFLINE_LIST)).not.toBeInTheDocument();
+  });
+
+  it('salvar edição sem resposta: nada salvo, diálogo aberto com os dados, botão habilitado', async () => {
+    connectivity.reportUnreachable();
+    api.update.mockRejectedValue(networkError());
+    const user = renderPage();
+    await screen.findByText('Celeste');
+
+    await user.click(screen.getByRole('button', { name: 'Editar Celeste' }));
+    await user.click(await screen.findByRole('button', { name: 'SALVAR' }));
+
+    expect(await screen.findByText(OFFLINE_NOT_SAVED)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'EDITAR JOGO' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Título')).toHaveValue('Celeste');
+    expect(screen.getByRole('button', { name: 'SALVAR' })).toBeEnabled();
+  });
+
+  it('remover sem resposta: mesma mensagem, confirmação aberta e o jogo continua na lista', async () => {
+    connectivity.reportUnreachable();
+    api.remove.mockRejectedValue(networkError());
+    const user = renderPage();
+    await screen.findByText('Celeste');
+
+    await user.click(screen.getByRole('button', { name: 'Remover Celeste' }));
+    await user.click(await screen.findByRole('button', { name: 'REMOVER' }));
+
+    expect(await screen.findByText(OFFLINE_NOT_SAVED)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'REMOVER' })).toBeEnabled();
+    expect(
+      within(screen.getByRole('list', { name: 'Jogos' })).getByText('Celeste'),
+    ).toBeInTheDocument();
   });
 });

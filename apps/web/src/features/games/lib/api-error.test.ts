@@ -1,6 +1,13 @@
 import { AxiosError, type AxiosResponse } from 'axios';
 import { describe, expect, it } from 'vitest';
-import { describeError, forForm, NETWORK_ERROR, UNEXPECTED_ERROR } from './api-error';
+import {
+  describeError,
+  forForm,
+  NO_ANSWER,
+  OFFLINE_COVER_NOT_SAVED,
+  OFFLINE_NOT_SAVED,
+  UNEXPECTED_ERROR,
+} from './api-error';
 
 /** Erro do axios como o `apiClient` o produz quando a API responde com um status de erro. */
 function httpError(status: number, data: unknown): AxiosError {
@@ -75,11 +82,31 @@ describe('describeError — mapeia fields da ApiErrorResponse para os campos (CA
 });
 
 describe('describeError — falhas sem corpo da API', () => {
-  it('API fora do ar (sem resposta) vira a mensagem de rede', () => {
+  it('API fora do ar (sem resposta) diz que nada foi salvo (CA-23)', () => {
     const error = describeError(new AxiosError('Network Error', 'ERR_NETWORK'));
 
-    expect(error).toEqual({ message: NETWORK_ERROR, fields: {} });
+    expect(error).toEqual({ message: OFFLINE_NOT_SAVED, fields: {} });
+    expect(OFFLINE_NOT_SAVED).toBe(
+      'Sem conexão. Nada foi salvo — tente de novo quando a conexão voltar.',
+    );
   });
+
+  it('falha da capa, com o jogo já salvo, não afirma que nada foi salvo', () => {
+    const error = describeError(new AxiosError('Network Error', 'ERR_NETWORK'), 'capa');
+
+    expect(error.message).toBe(OFFLINE_COVER_NOT_SAVED);
+    expect(error.message).not.toMatch(/nada foi salvo/i);
+  });
+
+  it.each(['ECONNABORTED', 'ETIMEDOUT'])(
+    'tempo esgotado (%s) não afirma que nada foi salvo: o servidor pode ter gravado',
+    (code) => {
+      const error = describeError(new AxiosError('timeout', code));
+
+      expect(error).toEqual({ message: NO_ANSWER, fields: {} });
+      expect(error.message).not.toMatch(/nada foi salvo/i);
+    },
+  );
 
   it('resposta que não é o formato da API vira a mensagem genérica', () => {
     expect(describeError(httpError(500, '<html>erro</html>'))).toEqual({

@@ -5,7 +5,7 @@ import { AxiosError, type AxiosResponse } from 'axios';
 import { type Game } from '@checkpoint/shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { gamesApi } from '../api/games-api';
-import { NETWORK_ERROR } from '../lib/api-error';
+import { OFFLINE_NOT_SAVED } from '../lib/api-error';
 import { GameForm } from './GameForm';
 
 // Só a camada de API é falsa: o saveGame, os hooks e o formulário rodam de verdade.
@@ -298,7 +298,7 @@ describe('erros da API no campo certo (CA-44)', () => {
     await user.type(screen.getByLabelText('Título'), 'Hades');
     await user.click(save());
 
-    expect(await screen.findByText(NETWORK_ERROR)).toHaveAttribute('role', 'alert');
+    expect(await screen.findByText(OFFLINE_NOT_SAVED)).toHaveAttribute('role', 'alert');
   });
 
   it('título vazio é barrado antes de qualquer request', async () => {

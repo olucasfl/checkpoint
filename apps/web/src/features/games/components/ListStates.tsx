@@ -38,13 +38,27 @@ export function ListEmpty({ filtered }: { filtered: boolean }) {
   );
 }
 
-/** Erro ao carregar a lista, com a opção de tentar de novo (CA-50). */
-export function ListError({ onRetry }: { onRetry: () => void }) {
+/**
+ * Erro ao carregar a lista, com a opção de tentar de novo (CA-50). Sem conexão (`offline` ou `sem-servidor`), a causa é
+ * conhecida e o texto diz que o catálogo volta com a conexão; a mensagem genérica só serve quando a
+ * conexão parece boa e mesmo assim a API falhou.
+ */
+export function ListError({
+  onRetry,
+  offline = false,
+}: {
+  onRetry: () => void;
+  offline?: boolean;
+}) {
   return (
     <div role="alert" className={STATE_BOX} data-state="error">
       <Icon name="wifi_off" size={40} filled className="text-erro" />
       <div className={STATE_TITLE}>Não deu para carregar</div>
-      <p className="m-0 text-[17px] text-texto-suave">A API não respondeu.</p>
+      <p className="m-0 text-[17px] text-texto-suave">
+        {offline
+          ? 'Sem conexão. Seu catálogo aparece quando a conexão voltar.'
+          : 'A API não respondeu.'}
+      </p>
       <button
         type="button"
         onClick={onRetry}

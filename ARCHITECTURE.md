@@ -93,9 +93,9 @@ checkpoint/
 │           ├── features/               # uma pasta por feature — hoje games/ (api/, lib/, components/)
 │           ├── pages/                  # páginas de rota — GamesPage (/) e StatusPage (/status)
 │           ├── shared/
-│           │   ├── components/         # Icon (Material Symbols), ModalDialog (<dialog> nativo), OverlayPortal
-│           │   ├── hooks/              # use-typing-outside-dialog (esconde a barra com o teclado aberto)
-│           │   └── lib/                # api-client.ts (axios), query-client.ts, env.ts
+│           │   ├── components/         # Icon (Material Symbols), ModalDialog (<dialog> nativo), OverlayPortal, ConnectionBanner
+│           │   ├── hooks/              # use-typing-outside-dialog (esconde a barra com o teclado aberto), use-connectivity
+│           │   └── lib/                # api-client.ts (axios), query-client.ts, env.ts, connectivity.ts, storage/ (armazenamento local tipado)
 │           ├── styles/                 # index.css — entrada do Tailwind
 │           └── main.tsx
 │
@@ -254,7 +254,7 @@ essa instância — não crie um segundo `axios.create()`. Cache/estado de servi
 | `src/pages/`             | Componentes de página, um por rota, registrados em `app/router.tsx`.                                       |
 | `src/shared/components/` | Componentes de UI reutilizáveis entre features.                                                            |
 | `src/shared/hooks/`      | Hooks reutilizáveis entre features.                                                                        |
-| `src/shared/lib/`        | Infra transversal: cliente HTTP, query client, acesso a env.                                               |
+| `src/shared/lib/`        | Infra transversal: cliente HTTP, query client, acesso a env, conectividade, armazenamento local (§5.7).    |
 | `src/styles/`            | Entrada do Tailwind (`index.css`) e qualquer CSS global.                                                   |
 
 Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
@@ -319,6 +319,41 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
   espaçar o `-` dentro do `calc()`).
 - **Viewport** (`index.html`): `viewport-fit=cover` e `interactive-widget=resizes-content`, **sem**
   `maximum-scale`/`user-scalable` (zoom não é travado, WCAG 1.4.4).
+
+### 5.7 Armazenamento local e conectividade (`shared/lib/`, spec `docs/specs/pwa-e-mobile.md`, etapa 2)
+
+- **Armazenamento local só por `shared/lib/storage/`.** Nenhum outro arquivo do web usa a API nativa
+  do navegador para isso (o teste `no-direct-access.test.ts` varre o `src` inteiro). Cada chave é
+  declarada com `defineKey({ nome, escopo, padrao, validar })` (`keys.ts`; nome repetido lança);
+  `escopo` é `dispositivo` (fica ao trocar de usuário) ou `usuario` (`storage.clearScope('usuario')`
+  apaga só as chaves **registradas** desse escopo, nunca por prefixo). Tudo é gravado como JSON sob
+  `checkpoint:`.
+- `storage.get/set/remove` **nunca lançam**: JSON inválido ou valor que o `validar` recusa devolve o
+  padrão e apaga a chave; armazenamento bloqueado ou cheio cai num `Map` em memória (cota cheia avisa
+  com **um** `console.warn` por sessão, sem o valor).
+- **Versão e migração** (`migrations.ts`): `STORAGE_SCHEMA_VERSION` (hoje 1) em `checkpoint:versao`;
+  `runStorageMigrations()` roda em `main.tsx` **antes** do render. Ausente → grava a atual; menor →
+  aplica `MIGRATIONS[n]` (n→n+1) em ordem; maior, ilegível ou migração que lança → apaga **todas** as
+  chaves `checkpoint:*` (só elas; `outro-app:x` fica) e grava a atual. Mudar o formato de uma chave =
+  subir a versão + escrever a migração.
+- **Conectividade** (`connectivity.ts`, hook `use-connectivity`): store externo lido por
+  `useSyncExternalStore` com `online | offline | sem-servidor`. Entradas: eventos `online`/`offline` e
+  `visibilitychange` (ligados por `connectivity.start()` em `main.tsx`) e o **interceptor de resposta
+  do `apiClient`** (sem resposta → `sem-servidor`, ou `offline` se `navigator.onLine` é falso; qualquer
+  resposta HTTP → `online`). A sondagem `GET /api/health` usa o **mesmo** `apiClient`, com a marca
+  `isConnectivityProbe` na config para o interceptor não a realimentar; espera 5/10/20 s e depois 30 s
+  (este só com a aba visível). Voltar a `online` chama `queryClient.invalidateQueries()`.
+  `connectivity.ts` não importa o `api-client` (evita ciclo): é o `api-client` que registra a sondagem.
+- `queryClient` usa `networkMode: 'always'` em queries e mutations (o padrão pausaria a consulta sem
+  rede e a lista ficaria carregando para sempre).
+- **`ConnectionBanner`** (renderizado pelo `AppLayout` no `#overlay-root`): região `role="status"`
+  sempre presente; aviso no topo, abaixo de `env(safe-area-inset-top)`; "Conexão restabelecida" some em
+  3 s; "Tentar agora" chama `connectivity.retryNow()`.
+- **Mensagens sem conexão** (`features/games/lib/api-error.ts`): escrita sem resposta → "Sem conexão.
+  Nada foi salvo…"; capa que falha depois de o jogo salvo → "O jogo foi salvo, mas a capa não…"; tempo
+  esgotado → "O servidor não respondeu a tempo…" (o servidor pode ter gravado). `ListError` recebe
+  `offline` e mostra "Sem conexão. Seu catálogo aparece quando a conexão voltar.". Botões **não** são
+  desabilitados por causa do estado da conexão.
 
 ---
 

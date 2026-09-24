@@ -119,6 +119,20 @@ describe('saveGame — salva o jogo e DEPOIS a capa', () => {
     expect(result.coverError?.fields.capa).toBe('Falha ao acessar o armazenamento de capas');
   });
 
+  it('capa sem resposta depois de o jogo salvo: não diz que nada foi salvo (pwa-e-mobile CA-23)', async () => {
+    const { api } = fakeApi({
+      uploadCover: vi.fn(async () =>
+        Promise.reject(new AxiosError('Network Error', 'ERR_NETWORK')),
+      ),
+    });
+
+    const result = await saveGame({ values, cover: { kind: 'upload', file } }, api);
+
+    expect(result.game.id).toBe('g1');
+    expect(result.coverError?.message).toMatch(/O jogo foi salvo, mas a capa não/);
+    expect(result.coverError?.message).not.toMatch(/nada foi salvo/i);
+  });
+
   it('depois da falha da capa, salvar de novo é PATCH no id salvo e reenvia a capa, sem 409', async () => {
     const storageDown = httpError(502, { statusCode: 502, message: 'x', fields: { arquivo: 'x' } });
     const first = fakeApi({ uploadCover: vi.fn(async () => Promise.reject(storageDown)) });

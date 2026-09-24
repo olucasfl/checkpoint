@@ -1,4 +1,5 @@
 import { Outlet } from 'react-router-dom';
+import { ConnectionBanner } from '@/shared/components/ConnectionBanner';
 import { BottomNav } from './BottomNav';
 import { TopNav } from './TopNav';
 
@@ -25,6 +26,7 @@ export function AppLayout() {
       </div>
 
       <BottomNav />
+      <ConnectionBanner />
     </div>
   );
 }
