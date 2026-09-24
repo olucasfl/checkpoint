@@ -8,7 +8,7 @@ commit — `/docs-sync` confere se ela bate com a realidade.
 | ----------------- | -------------------------------------- | --------------- |
 | Catálogo de jogos | [catalogo-jogos.md](catalogo-jogos.md) | 🚧 em andamento |
 | PWA e mobile      | [pwa-e-mobile.md](pwa-e-mobile.md)     | 🚧 em andamento |
-| Autenticação      | [autenticacao.md](autenticacao.md)     | 📝 rascunho     |
+| Autenticação      | [autenticacao.md](autenticacao.md)     | ✅ aprovada     |
 | Perfil            | [perfil.md](perfil.md)                 | 📝 rascunho     |
 
 ## Legenda de status
@@ -70,14 +70,16 @@ commit — `/docs-sync` confere se ela bate com a realidade.
 
 **`autenticacao` — aprovações e dados (etapas 1, 3 e 4):**
 
-- [ ] Aprovar a **instalação** das dependências no início da etapa 1 (`RULES.md` §9). As bibliotecas
+- [x] Aprovar a **instalação** das dependências no início da etapa 1 (`RULES.md` §9). As bibliotecas
       já foram escolhidas em 2026-09-23 (Q1: cookie; Q2: `argon2`, com `node:crypto.scrypt` de plano B,
       e `@nestjs/throttler`); faltam `@nestjs/jwt` e `cookie-parser`.
-- [ ] **Decidir Q5 e aprovar a mudança destrutiva** de `Game` (ainda em aberto): `@@unique` com `userId` (migração A3) e
+- [x] **Decidir Q5 e aprovar a mudança destrutiva** de `Game` (Q5 decidida em 2026-09-24: descartar os jogos): `@@unique` com `userId` (migração A3) e
       `userId` obrigatório (migração A4). Backup do banco antes de cada uma.
-- [ ] Entre as etapas 3 e 4: criar a própria conta e executar o SQL de destino dos jogos sem dono (Q5).
-      Não commitar esse SQL (tem e-mail real).
-- [ ] Gerar `JWT_ACCESS_SECRET` e `JWT_REFRESH_SECRET` (diferentes) e definir `AUTH_REGISTRATION_OPEN`
+- [ ] Entre as etapas 3 e 4 (Q5 = descartar; **sem conta e sem SQL com e-mail**): listar os `capaPath`
+      dos jogos sem dono, apagar esses objetos no bucket `capas`, executar
+      `DELETE FROM "Game" WHERE "userId" IS NULL;` e conferir que
+      `SELECT count(*) FROM "Game" WHERE "userId" IS NULL;` dá `0`.
+- [x] Gerar `JWT_ACCESS_SECRET` e `JWT_REFRESH_SECRET` (diferentes) e definir `AUTH_REGISTRATION_OPEN`
       em `apps/api/.env`.
 
 Mudanças destrutivas de schema (`/db-change`) e outras aprovações explícitas exigidas por

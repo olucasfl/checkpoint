@@ -1,7 +1,7 @@
 # Spec: perfil
 
-> Status: rascunho (Q7 e Q8 decididas em 2026-09-23; continua rascunho porque depende de
-> `autenticacao`, que ainda tem a Q5 aberta)
+> Status: rascunho (Q7 e Q8 decididas em 2026-09-23; a Q5 da `autenticacao` foi decidida em
+> 2026-09-24: descartar os jogos existentes). Continua rascunho só aguardando a aprovação do humano.
 
 ## Objetivo
 
@@ -293,7 +293,7 @@ Quatro etapas, cada uma parando para validação. Branch sugerida: `feat/perfil`
 | 1     | `/perfil` completo (cabeçalho, resumo, nome editável, links, instalar) · `modules/users` com `PATCH /me` | `autenticacao` etapa 2 (e etapa 5 para o link de senha levar a algum lugar) · `pwa-e-mobile` etapa 4 (botão instalar) | CA-01 a CA-07 |
 | 2     | rotas de sessões + seção "Sessões ativas"                                                                | `autenticacao` etapa 1                                                                                                | CA-08 a CA-13 |
 | 3     | `checkpoint:prefs` · token `destaque` · aplicação antes do render · as cinco preferências                | `pwa-e-mobile` etapas 1 e 2 (Q7 decidida)                                                                             | CA-14 a CA-23 |
-| 4     | `POST /users/me/exclusao` · Zona de perigo · diálogo                                                     | `autenticacao` etapa 4 (dono obrigatório, cascade; ainda depende da Q5)                                               | CA-24 a CA-30 |
+| 4     | `POST /users/me/exclusao` · Zona de perigo · diálogo                                                     | `autenticacao` etapa 4 (dono obrigatório, cascade; Q5 decidida em 2026-09-24: descartar os jogos)                     | CA-24 a CA-30 |
 
 `ARCHITECTURE.md` muda junto: §3/§4.4 (módulo `users`, rotas de sessões no `auth`), §5 (página
 `/perfil`, `checkpoint:prefs`, token `destaque`, `game-cover` em `shared/lib`), §6 (contratos novos).
@@ -337,8 +337,8 @@ novas.
 
 ## Questões em aberto
 
-Nenhuma nesta spec. As duas foram decididas pelo humano em 2026-09-23. A spec continua em rascunho só
-porque depende de `autenticacao` (Q5 aberta lá).
+Nenhuma nesta spec. As duas foram decididas pelo humano em 2026-09-23. A Q5 da `autenticacao` foi decidida em
+2026-09-24 (descartar os jogos). A spec continua em rascunho só aguardando a aprovação do humano.
 
 - [x] **Q7 — Quais preferências, e o avatar entra?** **Decidido: as cinco da tabela** (cor de destaque,
       filtro inicial, densidade, efeitos visuais, plataformas favoritas). **Ordenação padrão fica fora**

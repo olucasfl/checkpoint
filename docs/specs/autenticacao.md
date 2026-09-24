@@ -1,9 +1,9 @@
 # Spec: autenticação
 
-> Status: rascunho (Q1 a Q4 decididas em 2026-09-23; continua rascunho enquanto Q5 estiver aberta)
+> Status: aprovada (2026-09-24; Q1 a Q5 decididas; mudança destrutiva A3/A4 aprovada)
 >
 > ⚠️ Contém **mudança destrutiva de schema** (`Game.userId` obrigatório e `@@unique` alterado),
-> com **aprovação humana pendente** (`RULES.md` §3). Ver "Modelo de dados" e a Questão Q5.
+> **aprovada pelo humano em 2026-09-24** (`RULES.md` §3). Ver "Modelo de dados" e a Questão Q5.
 
 ## Objetivo
 
@@ -40,8 +40,7 @@ Implementada em **cinco etapas**, cada uma parando para validação.
 ## Stack
 
 Padrão da casa, com as divergências abaixo. **Toda dependência nova exige aprovação (`RULES.md` §9).**
-Em 2026-09-23 o humano **escolheu** as bibliotecas (Q1, Q2), mas **nenhuma instalação está aprovada
-ainda**: a aprovação de cada pacote é pedida no início da etapa 1, antes de mexer em `package.json`.
+Em 2026-09-23 o humano **escolheu** as bibliotecas (Q1, Q2), e **aprovou a instalação em 2026-09-24**: `@nestjs/jwt`, `@nestjs/throttler`, `argon2` (com `node:crypto.scrypt` de plano B, já decidido na Q2) e `cookie-parser` (+ os `@types` correspondentes em dev, se necessários). Qualquer outro pacote exige nova aprovação.
 Versões conferidas no registry em 2026-09-23.
 
 | Pacote (workspace)                                                         | Tipo          | Para quê                                                                                                                                       | Pendente de                             |
@@ -427,7 +426,7 @@ model RefreshSession {
   verificadas"), e a recuperação de senha como uma tabela própria de tokens de uso único. Nenhuma das
   duas exige mudança destrutiva. **Não** se cria nenhum desses campos agora.
 
-### `Game.userId` — **DESTRUTIVO, aprovação pendente** (`RULES.md` §3)
+### `Game.userId` — **DESTRUTIVO, aprovado em 2026-09-24** (`RULES.md` §3)
 
 **Por que é destrutivo:** (a) `@@unique([tituloNormalizado, plataformaNormalizada])` é trocado por
 `@@unique([userId, tituloNormalizado, plataformaNormalizada])` ("`@@unique` alterado"); (b) `userId`
@@ -441,7 +440,7 @@ um usuário dentro da migração poria e-mail e hash de senha reais no repositó
 | ------------------------------ | ----------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
 | **Migração A1** (etapa 1)      | cria `User` e `RefreshSession`                                                                              | aditiva                                                                                                                       | sim (drop das tabelas novas) |
 | **Migração A3** (etapa 3)      | `Game.userId String?` + FK para `User` com `onDelete: Cascade`; troca o `@@unique` pelo que inclui `userId` | **destrutiva** (`@@unique` alterado), sem perda de dado: o índice novo é **menos** restritivo, não falha com as linhas atuais | sim                          |
-| **Passo humano** (entre 3 e 4) | decidir o destino dos jogos sem dono (Q5) e executar o SQL correspondente no banco                          | dado, não schema                                                                                                              | depende da opção             |
+| **Passo humano** (entre 3 e 4) | descartar os jogos sem dono e as capas deles (Q5 = b), sem precisar de conta                                | dado, não schema                                                                                                              | depende da opção             |
 | **Migração A4** (etapa 4)      | `Game.userId` passa a `NOT NULL`                                                                            | **destrutiva** (obrigatório em tabela com linhas)                                                                             | sim (volta a nulável)        |
 
 - **Entre A3 e A4**, jogos com `userId NULL` ficam **invisíveis** pela API (toda query filtra por
@@ -457,14 +456,18 @@ um usuário dentro da migração poria e-mail e hash de senha reais no repositó
   END $$;
   ```
 
-- **SQL do passo humano** (executado pelo humano no editor SQL do Supabase ou com
-  `npx prisma db execute`, **nunca commitado**, porque leva um e-mail real):
-  - Opção recomendada (atribuir ao dono), depois de criar a própria conta pelo `/registro`:
-    `UPDATE "Game" SET "userId" = (SELECT "id" FROM "User" WHERE "email" = '<seu e-mail normalizado>') WHERE "userId" IS NULL;`
-    Confirmar antes com `SELECT count(*) FROM "Game" WHERE "userId" IS NULL;` e depois esperar `0`.
-  - Opção alternativa (descartar): `DELETE FROM "Game" WHERE "userId" IS NULL;` **mais** a remoção das
-    capas desses jogos no bucket (listar os `capaPath` antes do `DELETE`), senão os objetos ficam
-    órfãos.
+- **Passo humano (Q5 = b, decidido em 2026-09-24): descartar os jogos existentes** (são de teste).
+  Executado pelo humano no editor SQL do Supabase ou com `npx prisma db execute`. **Não precisa de
+  conta criada antes.** Não é migração; é dado. Ordem (as capas primeiro, senão os objetos ficam
+  órfãos no bucket):
+  1. listar os `capaPath` dos jogos sem dono:
+     `SELECT "capaPath" FROM "Game" WHERE "userId" IS NULL AND "capaPath" IS NOT NULL;`
+  2. apagar esses objetos no bucket `capas`;
+  3. `DELETE FROM "Game" WHERE "userId" IS NULL;`
+  4. conferir `SELECT count(*) FROM "Game" WHERE "userId" IS NULL;` = `0`.
+- **Opção descartada (registrada):** atribuir todos à conta do dono, com
+  `UPDATE "Game" SET "userId" = (SELECT "id" FROM "User" WHERE "email" = '<e-mail normalizado>') WHERE "userId" IS NULL;`
+  depois de criar a conta pelo `/registro`. Não será usada; o SQL levaria um e-mail real.
 - `onDelete: Cascade` em `Game.user`: excluir um usuário apaga os jogos dele no banco (as capas no
   bucket são responsabilidade de quem exclui; ver spec `perfil`).
 - O `@@unique` com `userId` na frente também serve de índice para `where: { userId }`, então **não** se
@@ -669,7 +672,7 @@ começam com a aprovação da mudança destrutiva registrada nesta spec**.
 | 1     | deps aprovadas · envs · migração A1 · `modules/auth` (registro, login, refresh, logout, me) · guard global + `@Public`/`@CurrentUser` · throttler · CORS sem `*` · contrato no shared · `games` `@Public()` temporário | Q1, Q2, Q4 respondidas                             | CA-01 a CA-22 |
 | 2     | web: `AuthProvider`, interceptor, `/login`, `/registro`, `RequireAuth`, `/perfil` mínimo, "Perfil" na barra, logout, `BroadcastChannel`                                                                                | etapa 1 · `pwa-e-mobile` etapas 1 e 2              | CA-23 a CA-39 |
 | 3     | migração A3 · `games` protegido e filtrado por `userId` · caminho novo das capas                                                                                                                                       | etapa 2 · **aprovação da mudança destrutiva** · Q5 | CA-40 a CA-47 |
-| —     | **passo humano:** criar a própria conta e executar o SQL de Q5                                                                                                                                                         | etapa 3                                            | —             |
+| —     | **passo humano:** executar o SQL de Q5 (descartar os jogos sem dono e as capas deles; não precisa de conta)                                                                                                            | etapa 3                                            | —             |
 | 4     | migração A4 (`NOT NULL` com trava)                                                                                                                                                                                     | passo humano concluído                             | CA-48 a CA-50 |
 | 5     | `PUT /api/auth/senha` + `/perfil/senha`                                                                                                                                                                                | etapa 2                                            | CA-51 a CA-56 |
 
@@ -735,14 +738,13 @@ real** em `.env.example`):
   Em domínios diferentes o cookie `SameSite=Lax` não é enviado e a sessão se perde a cada recarga.
   Detalhe em "Tokens e cookie"; a escolha da hospedagem fica para a spec de deploy.
 - `AUTH_REGISTRATION_LIMIT_PER_HOUR` é para dev/teste: em ambiente exposto, deixar ausente (3/h).
-- **Banco:** confirmar o banco antes de cada `db:migrate` (`RULES.md` §3); A3 e A4 só com aprovação e
-  backup.
+- **Banco:** confirmar o banco antes de cada `db:migrate` (`RULES.md` §3); A3 e A4 aprovadas em 2026-09-24, com
+  backup antes de cada uma.
 
 ## Questões em aberto
 
-Q1 a Q4 decididas pelo humano em 2026-09-23. **Q5 continua aberta**, e com ela a aprovação da mudança
-destrutiva de `Game` (migrações A3 e A4): enquanto isso, esta spec fica em **rascunho** e as etapas 3 e
-4 não começam.
+Q1 a Q4 decididas pelo humano em 2026-09-23 e a **Q5 em 2026-09-24**, com a aprovação da mudança
+destrutiva de `Game` (migrações A3 e A4), cada uma com backup do banco antes.
 
 - [x] **Q1 — Onde fica o refresh token?** **Decidido (2026-09-23): cookie `HttpOnly`**
       (`SameSite=Lax`, `Path=/api/auth`), com o access token **só em memória**. Consequências já na
@@ -752,21 +754,23 @@ destrutiva de `Game` (migrações A3 e A4): enquanto isso, esta spec fica em **r
       m = 19 MiB, t = 2, p = 1) **e `@nestjs/throttler@^6.7.0`**. **Plano B:** se o `argon2` falhar ao
       instalar, cair para `node:crypto.scrypt`, sem dependência (parâmetros em "Stack"), registrando o
       motivo na spec. A **aprovação de instalação** (`RULES.md` §9) destes pacotes, de `@nestjs/jwt` e
-      de `cookie-parser` ainda é pedida no início da etapa 1.
+      de `cookie-parser` foi dada pelo humano em 2026-09-24.
 - [x] **Q3 — Senha esquecida sem e-mail.** **Decidido (2026-09-23): aceito por enquanto.** Esquecer a
       senha deixa a conta inacessível até existir a spec de e-mail (o dono pode resetar via SQL). Sem
       código de recuperação.
 - [x] **Q4 — Registro aberto ou fechado?** **Decidido (2026-09-23): flag `AUTH_REGISTRATION_OPEN`,
       começando `true`.** O humano muda para `false` depois de criar a própria conta. O limite por IP
       (padrão 3/h, configurável só para dev/teste) vale nos dois casos.
-- [ ] **Q5 — Destino dos jogos já cadastrados** (e **aprovação da mudança destrutiva** A3 + A4).
-      **EM ABERTO.** (a) **atribuir todos à conta do dono** (SQL do passo humano), (b) apagar (e as
-      capas), (c) outro. **Recomendação: (a)**, em duas fases como descrito em "Modelo de dados".
-      Preciso de um "ok" explícito para: trocar o `@@unique` (A3) e tornar `userId` obrigatório (A4).
+- [x] **Q5 — Destino dos jogos já cadastrados** (e **aprovação da mudança destrutiva** A3 + A4).
+      **Decidido (2026-09-24): (b) descartar.** Os jogos existentes são de teste: o passo humano
+      apaga os jogos sem dono e as capas deles no bucket (listando os `capaPath` antes), sem
+      precisar de conta. **Descartada:** (a) atribuir todos à conta do dono. **Aprovadas** as
+      migrações A3 (troca o `@@unique`) e A4 (`userId` obrigatório), com backup do banco antes de
+      cada uma.
 
 ## Suposições
 
-Marcadas para aprovação junto da spec:
+Aprovadas junto da spec em 2026-09-24:
 
 - TTLs: access 15 min; refresh 30 dias, renovado a cada rotação (a sessão morre depois de 30 dias
   **sem uso**); janela de graça 30 s; teto de 10 sessões por usuário.
