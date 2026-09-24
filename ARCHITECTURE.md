@@ -25,7 +25,7 @@ comportamento que ela descreve.
 | Banco                | PostgreSQL 16, instância local ou gerenciada (ex.: Supabase) — sem Docker no projeto                                                                                                                                                                            |
 | Qualidade            | ESLint 9 (flat config, `eslint.config.mjs` na raiz), Prettier, Husky, lint-staged, commitlint (Conventional Commits)                                                                                                                                            |
 | Testes               | Jest 30 + ts-jest na API e Vitest 4 + Testing Library + jsdom na web (`npm test -w <workspace>`); `packages/shared` não tem runner próprio. `npm test` na raiz compila o `shared` antes (`pretest`). Convenções em `.claude/skills/checkpoint-testing/SKILL.md` |
-| Auth                 | Não existe                                                                                                                                                                                                                                                      |
+| Auth                 | API pronta (spec `autenticacao`, etapa 1): e-mail e senha, access token (JWT, 15 min) + refresh token (30 dias) em cookie HttpOnly, com rotação e guard global (§4.5). O web (etapa 2) e o dono dos jogos (etapa 3) ainda não existem: `games` segue público    |
 | PWA / service worker | Não existe                                                                                                                                                                                                                                                      |
 | Deploy / CI          | Não existe (sem Dockerfile de produção, sem workflow de CI, sem manifest de hospedagem)                                                                                                                                                                         |
 
@@ -74,17 +74,19 @@ checkpoint/
 ├── apps/
 │   ├── api/                          # @checkpoint/api
 │   │   ├── prisma/
-│   │   │   ├── schema.prisma         # datasource + generator + enum GameStatus + model Game
+│   │   │   ├── schema.prisma         # datasource + generator + enum GameStatus + models Game, User e RefreshSession
 │   │   │   └── migrations/           # migrations versionadas (commitadas)
 │   │   └── src/
-│   │       ├── common/                # errors/ (ApiErrorResponse), pipes/ (ValidationPipe global); filters/, interceptors/, decorators/ vazias (.gitkeep)
+│   │       ├── common/                # errors/ (ApiErrorResponse), pipes/ (ValidationPipe global), decorators/ (@Public, @CurrentUser), dto/ (transforms); filters/ e interceptors/ vazias (.gitkeep)
 │   │       ├── config/                 # app.config.ts, env.validation.ts, index.ts
 │   │       ├── database/               # PrismaModule (@Global) + PrismaService
-│   │       ├── modules/                # um módulo por domínio — hoje health/ e games/
+│   │       ├── modules/                # um módulo por domínio — hoje health/, games/ e auth/
 │   │       │   ├── health/             # GET /api/health → status da API + do banco
-│   │       │   └── games/              # catálogo de jogos: GET/POST/PATCH/DELETE /api/games
-│   │       ├── app.module.ts
-│   │       └── main.ts                 # bootstrap: prefixo /api, CORS, ValidationPipe, Swagger
+│   │       │   ├── games/              # catálogo de jogos: GET/POST/PATCH/DELETE /api/games
+│   │       │   └── auth/               # registro, login, refresh, logout, me; guard global de access token (§4.5)
+│   │       ├── app.module.ts           # inclui o guard global (APP_GUARD)
+│   │       ├── app.setup.ts            # setupApp(): prefixo /api, cookie-parser, CORS, ValidationPipe, Swagger (o main.ts e a verificação manual usam o mesmo)
+│   │       └── main.ts                 # bootstrap: cria o app, setupApp() e listen
 │   │
 │   └── web/                           # @checkpoint/web
 │       ├── pwa.config.ts               # manifest + plugin de PWA (Workbox); ver §5.8
@@ -119,32 +121,45 @@ implementado.
 
 ## 4. Backend (`apps/api`)
 
-### 4.1 Ciclo de vida da request (`src/main.ts`)
+### 4.1 Ciclo de vida da request (`src/main.ts` + `src/app.setup.ts`)
 
 1. **Prefixo global** `api` (`API_GLOBAL_PREFIX`, `src/config/app.config.ts`) — toda rota fica sob
    `/api/*`.
-2. **CORS** habilitado com `credentials: true`; a origem vem de `CORS_ORIGIN` e é parseada por
-   `parseCorsOrigin()` (`*` → libera tudo; lista separada por vírgula → `string[]`; um valor só →
-   `string`).
+2. **`cookie-parser`** (para ler o cookie `checkpoint_refresh`) e **CORS** com `credentials: true`. A origem
+   vem de `CORS_ORIGIN`, parseada por `parseCorsOrigin()` **sempre para uma lista** (com uma string única o
+   `cors` responderia `Access-Control-Allow-Origin` para qualquer origem). **`CORS_ORIGIN=*` é recusado no
+   boot** (`env.validation.ts`): com cookie de sessão, refletir qualquer origem deixaria qualquer site
+   renovar a sessão.
 3. **`ValidationPipe` global**: `whitelist: true`, `forbidNonWhitelisted: true`, `transform: true`,
    `enableImplicitConversion: true`. Todo DTO precisa declarar exatamente os campos que aceita —
    campo não declarado é removido (`whitelist`) ou rejeita a request com 400
    (`forbidNonWhitelisted`), dependendo de onde a validação pega primeiro. O pipe é montado por
    `createValidationPipe()` (`src/common/pipes/app-validation.pipe.ts`, o mesmo que os testes de
    DTO usam) e seu `exceptionFactory` devolve os erros no formato `ApiErrorResponse` de
-   `@checkpoint/shared`: `{ statusCode, message, fields? }`, com uma mensagem por campo em `fields`
+   `@checkpoint/shared`: `{ statusCode, code?, message, fields? }` (`code: 'VALIDACAO'` nos erros do pipe), com uma mensagem por campo em `fields`
    (o web a mostra junto do campo). Os erros de negócio (409, 400 da regra da nota) usam o mesmo
    formato, via `badRequestError`/`conflictError` (`src/common/errors/api-error.ts`).
    Como `enableImplicitConversion` converte por tipo antes de validar (`["a"]` viraria `"a"`), os
-   DTOs de `games` leem o valor cru com `TrimString`/`RawValue` (`modules/games/dto/transforms.ts`).
-4. **Swagger** servido em `/api/docs` (`SWAGGER_PATH`), montado a partir do `DocumentBuilder` em
-   `main.ts`. Todo controller novo deve usar `@ApiTags`/`@ApiOperation` como `HealthController` já
+   DTOs leem o valor cru com `TrimString`/`RawValue` (`common/dto/transforms.ts`), que também desligam a
+   conversão implícita da propriedade (`@Type(() => Object)`): sem isso, `{"senha":{"toString":"x"}}` faria o
+   class-transformer lançar `TypeError` (500 num endpoint público).
+4. **Guard global** (`APP_GUARD` em `app.module.ts`, `modules/auth/access-token.guard.ts`): toda rota exige
+   `Authorization: Bearer <access token>`, **exceto as marcadas com `@Public()`** (`common/decorators/`).
+   Esquecer o decorator **fecha** a rota, nunca a abre. Hoje são públicas: `health`, as rotas de auth
+   (`registro`, `login`, `refresh`, `logout`) e, **só até a etapa 3 da spec `autenticacao`**, o
+   `GamesController` inteiro (o catálogo continua sem dono e sem proteção). `@CurrentUser()` entrega
+   `{ id, sessionId }` ao controller.
+5. **Swagger** servido em `/api/docs` (`SWAGGER_PATH`), montado a partir do `DocumentBuilder` em
+   `app.setup.ts`, com `addBearerAuth()` (botão "Authorize"). Todo controller novo deve usar `@ApiTags`/`@ApiOperation` como `HealthController` já
    faz — é a única documentação viva das rotas hoje.
 
 ### 4.2 Configuração e ambiente (`src/config/`)
 
 - `env.validation.ts` — `EnvironmentVariables` (class-validator) valida `NODE_ENV`, `PORT`,
-  `DATABASE_URL`, `CORS_ORIGIN` e `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`,
+  `DATABASE_URL`, `CORS_ORIGIN` (obrigatória, **sem padrão e sem `*`**), `JWT_ACCESS_SECRET`,
+  `JWT_REFRESH_SECRET` (≥ 32 caracteres, **diferentes** entre si), `AUTH_REGISTRATION_OPEN`
+  (`true`/`false`, sem padrão; o texto é lido cru porque a conversão implícita transformaria `"false"` em
+  `true`), `AUTH_REGISTRATION_LIMIT_PER_HOUR` (opcional, inteiro ≥ 1; ausente = 3) e `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`,
   `SUPABASE_STORAGE_BUCKET` (capas, §4.4) no boot; falta ou valor inválido **derruba a aplicação** com a
   lista de erros. `SUPABASE_SERVICE_ROLE_KEY` também recusa uma chave que comece com
   `sb_publishable_` (a chave pública, sujeita a RLS, com que todo upload falharia com 403). Variável de ambiente nova em `apps/api/.env` **precisa** ganhar um campo aqui, ou
@@ -169,11 +184,16 @@ implementado.
   (`prisma migrate dev`/`prisma migrate deploy`), diferente de um fluxo baseado em `db push` sem
   histórico — toda mudança de schema gera um arquivo em `prisma/migrations/` que fica commitado.
   Ver §7 e `.claude/rules/RULES.md`.
+- **`User` e `RefreshSession`** (spec `autenticacao`, migração A1, **aditiva**): `User` (`nome`, `email`
+  único e sempre normalizado, `senhaHash`) e `RefreshSession` (uma linha por dispositivo logado; o `id` é o
+  `sid` dos tokens; guarda só o **SHA-256** do refresh token e o do anterior, mais um rótulo do dispositivo
+  derivado do `User-Agent`, sem IP), com `onDelete: Cascade`. **`Game` não tem dono ainda**: `Game.userId` e a
+  troca do `@@unique` são as migrações A3 e A4 (etapas 3 e 4), **destrutivas** e já aprovadas na spec.
 
 ### 4.4 Módulo por domínio (`src/modules/`)
 
 Convenção NestJS padrão, um módulo por domínio, cada um com `*.module.ts` + `*.controller.ts` +
-`*.service.ts` (+ `dto/` quando a rota aceitar body). Hoje há dois:
+`*.service.ts` (+ `dto/` quando a rota aceitar body). Hoje há três (`health/`, `games/` e `auth/`, §4.5):
 
 - `health/` — `GET /api/health`, sem domínio; serve de modelo de forma.
 - `games/` — o catálogo de jogos (spec `docs/specs/catalogo-jogos.md`, etapas 1 e 2; o web está em §5.5):
@@ -219,6 +239,39 @@ apps/api/src/modules/games/
 ```
 
 Registre o módulo novo em `app.module.ts` (`imports: [...]`).
+
+### 4.5 Autenticação (`modules/auth/`, spec `docs/specs/autenticacao.md`, etapa 1)
+
+- **Rotas** (`/api/auth`, tag Swagger `auth`): `POST registro`, `POST login`, `POST refresh`, `POST logout` (as
+  quatro `@Public()`) e `GET me` (protegida). Erros com `code` estável (`ApiErrorCode` do shared), nunca
+  comparando a `message`.
+- **Tokens:** access JWT HS256 (15 min, `JWT_ACCESS_SECRET`, `{ sub, sid, typ: 'access' }`, só em memória no
+  web) e refresh JWT HS256 (30 dias, **segredo separado**, `jti` aleatório) no cookie `checkpoint_refresh`
+  (`HttpOnly`, `SameSite=Lax`, `Path=/api/auth`, `Secure` só em produção). O corpo **nunca** traz o refresh
+  token. O banco guarda só `sha256(refreshToken)`.
+- **Sessão = uma linha de `RefreshSession`** por dispositivo; máximo de 10 por usuário (a 11ª apaga a de
+  `ultimoUsoEm` mais antigo). O **guard global** confere a sessão do access token a cada request (uma leitura
+  por chave primária): logout, reuso e (etapa 5) troca de senha derrubam o access token **na hora**.
+- **Rotação:** `refresh` troca o token **na mesma linha** (`updateMany` condicionado ao hash apresentado; `count
+0` = corrida = 409 `AUTH_REFRESH_CONCORRENTE`). O token anterior vale por **30 s** (corrida de abas); fora da
+  janela, ou se não bate com nenhum dos dois hashes, é **reuso**: a sessão é apagada, o cookie é limpo e um
+  `warn` registra o `sessionId` (nunca o token).
+- **Anti-CSRF:** `refresh` e `logout` exigem `X-Checkpoint-Csrf: 1` (`CsrfHeaderGuard`; força o preflight de
+  CORS). Sem ele: 403 `AUTH_ORIGEM_INVALIDA`.
+- **Limite por IP** (`@nestjs/throttler`, memória, uma instância) só no `AuthController`: login 5/min, refresh
+  30/min, registro **3/h** (constante no código; a env opcional `AUTH_REGISTRATION_LIMIT_PER_HOUR` só existe
+  para verificação manual). 429 com `code: LIMITE_TENTATIVAS` e `Retry-After`.
+- **Hash de senha: `node:crypto.scrypt`** (`password-hasher.ts`, N=2^17, r=8, p=1, sal de 16 bytes, formato
+  `scrypt$N$r$p$sal$hash`), **não argon2**: o `argon2` não instala nesta máquina (sem binário pré-compilado e sem
+  toolchain do Visual Studio), e a spec já previa esse plano B. `PasswordHasher` isola o algoritmo. Login com
+  e-mail inexistente ainda paga um hash (contra um hash fixo) para o tempo não denunciar a conta.
+- **Sem dado sensível** em corpo nem log: o `select` do Prisma é uma lista branca (`USUARIO_PUBLICO_SELECT`);
+  nenhuma rota loga senha, token, cookie ou cabeçalho `Authorization`.
+- Testes ao lado do código: `auth.service.spec.ts` (rotação, janela, reuso, teto de 10, com relógio falso),
+  `access-token.guard.spec.ts` (`@Public`, tipos de token trocados, vencido, sessão apagada),
+  `password-hasher.spec.ts` (scrypt real), `session-device.spec.ts`, `dto/*.spec.ts` e
+  `auth.http.spec.ts` (HTTP numa porta local: cookie, anti-CSRF, 429, CORS, corpos e logs). O
+  `testing/fake-auth-prisma.ts` é um Prisma em memória só para testes.
 
 ---
 
@@ -465,14 +518,17 @@ mudanças de schema por um agente.
 
 ## 8. Variáveis de ambiente
 
-| Arquivo         | Variáveis                                                              | Para quê                                                                                                                                                                        |
-| --------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `apps/api/.env` | `NODE_ENV`, `PORT`, `DATABASE_URL`, `CORS_ORIGIN`                      | Validadas em `src/config/env.validation.ts`; falta/erro derruba o boot                                                                                                          |
-| `apps/api/.env` | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_STORAGE_BUCKET` | Storage das capas; validadas em `env.validation.ts` (obrigatórias). O valor da chave é a **secret key** (`sb_secret_…`) e só o backend a usa: nunca vai para o web nem para log |
-| `apps/api/.env` | `DIRECT_URL`                                                           | Só o Prisma CLI lê (via `schema.prisma`); necessária apenas se `DATABASE_URL` for uma conexão pooled (ex.: Supabase)                                                            |
-| `apps/web/.env` | `VITE_API_URL`                                                         | Consumida em `src/shared/lib/env.ts`, `baseURL` do `apiClient`                                                                                                                  |
+| Arquivo         | Variáveis                                                              | Para quê                                                                                                                                                                                                                                                                                                      |
+| --------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/api/.env` | `NODE_ENV`, `PORT`, `DATABASE_URL`, `CORS_ORIGIN`                      | Validadas em `src/config/env.validation.ts`; falta/erro derruba o boot                                                                                                                                                                                                                                        |
+| `apps/api/.env` | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_STORAGE_BUCKET` | Storage das capas; validadas em `env.validation.ts` (obrigatórias). O valor da chave é a **secret key** (`sb_secret_…`) e só o backend a usa: nunca vai para o web nem para log                                                                                                                               |
+| `apps/api/.env` | `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `AUTH_REGISTRATION_OPEN`    | Autenticação; obrigatórias em `env.validation.ts`. Os dois segredos têm ≥ 32 caracteres e são **diferentes**; gere cada um localmente (`node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"`). Nunca vão para o web, spec, log ou PR. `AUTH_REGISTRATION_OPEN` é `true` ou `false` |
+| `apps/api/.env` | `AUTH_REGISTRATION_LIMIT_PER_HOUR`                                     | **Opcional**, só dev/teste: sobrescreve o limite de 3 registros por hora por IP. Em ambiente exposto, deixe ausente                                                                                                                                                                                           |
+| `apps/api/.env` | `DIRECT_URL`                                                           | Só o Prisma CLI lê (via `schema.prisma`); necessária apenas se `DATABASE_URL` for uma conexão pooled (ex.: Supabase)                                                                                                                                                                                          |
+| `apps/web/.env` | `VITE_API_URL`                                                         | Consumida em `src/shared/lib/env.ts`, `baseURL` do `apiClient`                                                                                                                                                                                                                                                |
 
-Cada arquivo tem um `.env.example` correspondente, versionado. Nunca commitar `.env` real nem
+`CORS_ORIGIN` deixou de ter padrão e **recusa `*`** (cookie de sessão): liste as origens, ex.:
+`http://localhost:5173`. Cada arquivo tem um `.env.example` correspondente, versionado. Nunca commitar `.env` real nem
 colar valor real em spec, teste, commit ou log.
 
 ---

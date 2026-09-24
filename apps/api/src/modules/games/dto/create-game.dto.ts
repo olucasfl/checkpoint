@@ -18,7 +18,7 @@ import {
   type CreateGameRequest,
   type GameStatus,
 } from '@checkpoint/shared';
-import { RawValue, TrimString } from './transforms';
+import { RawValue, TrimString } from '../../../common/dto/transforms';
 
 export class CreateGameDto implements CreateGameRequest {
   @ApiProperty({ example: 'Hollow Knight', maxLength: GAME_TITLE_MAX_LENGTH })

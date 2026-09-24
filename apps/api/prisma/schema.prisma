@@ -45,3 +45,41 @@ model Game {
   @@unique([tituloNormalizado, plataformaNormalizada])
   @@index([status])
 }
+
+// Conta de acesso (spec autenticacao). Aditivo: nao toca em "Game". A relacao com os jogos
+// (`Game.userId`) entra na etapa 3, em migracao propria.
+model User {
+  id        String @id @default(uuid())
+  nome      String @db.VarChar(60)
+  // Sempre gravado normalizado (trim + minusculas). E so identificador de login: NAO e verificado.
+  email     String @unique @db.VarChar(254)
+  // Hash no formato autodescritivo do algoritmo (`scrypt$N$r$p$sal$hash`), nunca a senha.
+  senhaHash String @db.VarChar(255)
+
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  sessoes RefreshSession[]
+}
+
+// Uma linha por dispositivo logado. O `id` e o `sid` dos tokens.
+model RefreshSession {
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // sha256 (hex) do refresh atual: o token tem alta entropia, entao um hash rapido basta, e o bcrypt
+  // truncaria em 72 bytes e colidiria tokens do mesmo usuario.
+  tokenHash     String    @db.Char(64)
+  // Do refresh anterior: janela de graca (corrida de abas) e deteccao de reuso.
+  hashAnterior  String?   @db.Char(64)
+  rotacionadoEm DateTime?
+
+  // Rotulo legivel derivado do User-Agent ("Chrome · Android"); sem IP e sem localizacao.
+  dispositivo String   @db.VarChar(80)
+  criadoEm    DateTime @default(now())
+  ultimoUsoEm DateTime @default(now())
+  expiraEm    DateTime
+
+  @@index([userId])
+}

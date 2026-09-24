@@ -58,6 +58,10 @@ Versões conferidas no registry em 2026-09-23.
   `node:crypto.scrypt` (N = 2^17, r = 8, p = 1, sal de 16 bytes, saída de 64 bytes, gravado num formato
   autodescritivo `scrypt$N$r$p$sal$hash` em base64). Nenhuma outra biblioteca de hash entra sem nova
   aprovação. O `PasswordHasher` isola o algoritmo, então a troca não afeta o resto do módulo.
+  **Registrado em 2026-09-24 (etapa 1):** `npm install argon2@^0.45.1` falhou no Windows — sem binário
+  pré-compilado para esta plataforma, o `node-gyp` tentou compilar e não achou o Visual Studio ("Desktop
+  development with C++"). Foi usado o plano B (`node:crypto.scrypt`, sem instalar mais nada); o formato
+  autodescritivo `scrypt$N$r$p$sal$hash` permite migrar para argon2 depois sem invalidar as senhas.
 
 ## Comportamento esperado
 

@@ -3,6 +3,8 @@
  * Codigo puro: sem `window`, sem Node, sem `@prisma/client` (ARCHITECTURE.md §6).
  */
 
+import { type ApiErrorCode } from './auth';
+
 /**
  * Codigos de status, sem espaco e sem acento. O texto de tela ("Quero jogar")
  * vive so no web; o contrato, o Prisma e a API usam estes codigos.
@@ -62,8 +64,21 @@ export interface ListGamesQuery {
   status?: GameStatus;
 }
 
-/** Campos de formulario que um erro pode apontar (`arquivo` = a capa). */
-export type ApiErrorField = 'titulo' | 'plataforma' | 'status' | 'nota' | 'arquivo';
+/**
+ * Campos de formulario que um erro pode apontar (`arquivo` = a capa). Os cinco ultimos sao os dos
+ * formularios de autenticacao (spec autenticacao): um tipo so para `fields`, no web inteiro.
+ */
+export type ApiErrorField =
+  | 'titulo'
+  | 'plataforma'
+  | 'status'
+  | 'nota'
+  | 'arquivo'
+  | 'nome'
+  | 'email'
+  | 'senha'
+  | 'senhaAtual'
+  | 'novaSenha';
 
 /**
  * Formato dos erros 400, 409, 413 e 502 (o 404 traz so `statusCode` e `message`).
@@ -71,6 +86,8 @@ export type ApiErrorField = 'titulo' | 'plataforma' | 'status' | 'nota' | 'arqui
  */
 export interface ApiErrorResponse {
   statusCode: number;
+  /** Codigo estavel (rotas de auth): o web mostra o texto pelo `code`, nunca pela `message`. */
+  code?: ApiErrorCode;
   message: string;
   fields?: Partial<Record<ApiErrorField, string>>;
 }

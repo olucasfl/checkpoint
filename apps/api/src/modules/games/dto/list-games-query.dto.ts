@@ -1,7 +1,7 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsIn, IsOptional } from 'class-validator';
 import { GAME_STATUS, type GameStatus, type ListGamesQuery } from '@checkpoint/shared';
-import { RawValue } from './transforms';
+import { RawValue } from '../../../common/dto/transforms';
 
 export class ListGamesQueryDto implements ListGamesQuery {
   @ApiPropertyOptional({ enum: GAME_STATUS, description: 'Filtra a lista por status.' })

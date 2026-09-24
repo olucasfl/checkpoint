@@ -29,6 +29,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { GAME_COVER_FIELD } from '@checkpoint/shared';
+import { Public } from '../../common/decorators/public.decorator';
 import { ApiErrorResponseDto } from '../../common/errors/api-error-response.dto';
 import { CoverUploadInterceptor } from './cover/cover-upload.interceptor';
 import { CreateGameDto } from './dto/create-game.dto';
@@ -37,6 +38,8 @@ import { ListGamesQueryDto } from './dto/list-games-query.dto';
 import { UpdateGameDto } from './dto/update-game.dto';
 import { GamesService } from './games.service';
 
+// Público só nas etapas 1 e 2 da spec autenticacao: a etapa 3 fecha o catálogo e o filtra por dono.
+@Public()
 @ApiTags('games')
 @Controller('games')
 export class GamesController {

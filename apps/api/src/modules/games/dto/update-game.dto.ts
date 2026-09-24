@@ -19,7 +19,7 @@ import {
   type GameStatus,
   type UpdateGameRequest,
 } from '@checkpoint/shared';
-import { RawValue, TrimString } from './transforms';
+import { RawValue, TrimString } from '../../../common/dto/transforms';
 
 /**
  * Todos os campos são opcionais, mas `titulo` e `status` NÃO aceitam `null`: por isso usam

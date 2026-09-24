@@ -7,6 +7,7 @@
  * Nada que dependa de `window`, do Node ou do Prisma.
  */
 
+export * from './auth';
 export * from './games';
 
 /** Exemplo de contrato compartilhado — substitua quando as entidades existirem. */

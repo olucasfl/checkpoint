@@ -95,15 +95,24 @@ cp apps/api/.env.example apps/api/.env
 cp apps/web/.env.example apps/web/.env
 ```
 
-| Arquivo         | Para quê                                                                                                                  |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `apps/api/.env` | `PORT`, `DATABASE_URL`, `CORS_ORIGIN`, `NODE_ENV`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_STORAGE_BUCKET` |
-| `apps/web/.env` | `VITE_API_URL`                                                                                                            |
+| Arquivo         | Para quê                                                                                                                                                                                                                                       |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/api/.env` | `PORT`, `DATABASE_URL`, `CORS_ORIGIN`, `NODE_ENV`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_STORAGE_BUCKET`, `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `AUTH_REGISTRATION_OPEN` e, opcional, `AUTH_REGISTRATION_LIMIT_PER_HOUR` |
+| `apps/web/.env` | `VITE_API_URL`                                                                                                                                                                                                                                 |
 
 > As variáveis `SUPABASE_*` são **obrigatórias** (a API não sobe sem elas) e servem só às capas dos
 > jogos: `SUPABASE_URL` é a URL do projeto, `SUPABASE_STORAGE_BUCKET` é o bucket público `capas`, e
 > `SUPABASE_SERVICE_ROLE_KEY` recebe a **secret key** (`sb_secret_…`, em Settings → API Keys →
 > Secret keys) — não a publishable. Ela só existe no backend: nunca no web, nunca em log ou commit.
+
+> As variáveis de autenticação também são **obrigatórias**, e a API não sobe sem elas.
+> `JWT_ACCESS_SECRET` e `JWT_REFRESH_SECRET` têm pelo menos 32 caracteres e precisam ser **diferentes**
+> entre si; gere cada um localmente com
+> `node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"` e nunca os cole em log,
+> spec ou commit. `AUTH_REGISTRATION_OPEN` é `true` ou `false` (abre ou fecha o registro de contas novas).
+> `AUTH_REGISTRATION_LIMIT_PER_HOUR` é **opcional** e só serve para dev/teste (o padrão é 3 registros por
+> hora por IP): em ambiente exposto, deixe-a ausente. `CORS_ORIGIN` não aceita mais `*` (cookie de sessão):
+> liste as origens, ex.: `http://localhost:5173`.
 
 > `DATABASE_URL` deve apontar para um PostgreSQL 16 acessível (instância local instalada na
 > máquina ou um serviço gerenciado, ex.: Supabase). Este projeto não usa Docker.

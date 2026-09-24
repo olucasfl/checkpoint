@@ -2,7 +2,17 @@ import { ValidationPipe, type ValidationError } from '@nestjs/common';
 import { type ApiErrorField } from '@checkpoint/shared';
 import { badRequestError, type ApiFieldErrors } from '../errors/api-error';
 
-const FIELDS: readonly ApiErrorField[] = ['titulo', 'plataforma', 'status', 'nota'];
+const FIELDS: readonly ApiErrorField[] = [
+  'titulo',
+  'plataforma',
+  'status',
+  'nota',
+  'nome',
+  'email',
+  'senha',
+  'senhaAtual',
+  'novaSenha',
+];
 
 function isApiErrorField(property: string): property is ApiErrorField {
   return (FIELDS as readonly string[]).includes(property);
@@ -35,7 +45,7 @@ export function validationErrorsToException(errors: ValidationError[]) {
       ? `Campos não permitidos: ${unknownProperties.join(', ')}`
       : 'Dados inválidos';
 
-  return badRequestError(message, fields);
+  return badRequestError(message, fields, 'VALIDACAO');
 }
 
 /**

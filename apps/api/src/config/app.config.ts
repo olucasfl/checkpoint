@@ -11,20 +11,14 @@ export const API_GLOBAL_PREFIX = 'api';
 export const SWAGGER_PATH = 'docs';
 
 /**
- * Converte a env CORS_ORIGIN em um valor aceito pelo CORS do Nest.
- * `*` libera todas as origens; caso contrario, aceita uma lista separada por virgula.
+ * Converte a env CORS_ORIGIN na lista de origens do CORS. Sempre uma LISTA, nunca uma string: com uma
+ * string o `cors` devolve `Access-Control-Allow-Origin` para qualquer origem que perguntar. `*` é
+ * recusado no boot (`env.validation.ts`): com cookie de sessão e `credentials: true`, refletir
+ * qualquer origem deixaria qualquer site renovar a sessão.
  */
-export function parseCorsOrigin(rawOrigin: string): string | string[] | boolean {
-  const value = rawOrigin.trim();
-
-  if (value === '*') {
-    return true;
-  }
-
-  const origins = value
+export function parseCorsOrigin(rawOrigin: string): string[] {
+  return rawOrigin
     .split(',')
     .map((origin) => origin.trim())
     .filter(Boolean);
-
-  return origins.length > 1 ? origins : (origins[0] ?? false);
 }
