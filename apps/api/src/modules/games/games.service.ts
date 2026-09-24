@@ -52,8 +52,8 @@ export class GamesService {
     private readonly storage: StorageService,
   ) {}
 
-  // Todo acesso é do dono: `userId` entra em todo `where`. Jogo de outro usuário (ou sem dono, até a
-  // migração A4) é tratado como inexistente, sem revelar que o id existe.
+  // Todo acesso é do dono: `userId` entra em todo `where`. Jogo de outro usuário é tratado como
+  // inexistente, sem revelar que o id existe.
   async list(userId: string, status?: GameStatus): Promise<Game[]> {
     const rows = await this.prisma.game.findMany({
       where: { userId, ...(status && { status }) },

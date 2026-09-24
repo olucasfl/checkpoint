@@ -6,6 +6,7 @@ import {
   HttpCode,
   HttpStatus,
   Post,
+  Put,
   Req,
   Res,
   UseGuards,
@@ -42,6 +43,7 @@ import { AuthThrottlerGuard, registrationLimitPerHour } from './auth-throttler.g
 import { AuthService, type SessionResult } from './auth.service';
 import {
   LOGIN_LIMIT,
+  PASSWORD_CHANGE_LIMIT,
   REFRESH_COOKIE_NAME,
   REFRESH_LIMIT,
   REGISTRATION_WINDOW_MS,
@@ -50,6 +52,7 @@ import { CsrfHeaderGuard } from './csrf-header.guard';
 import { AuthResponseDto, UsuarioDto } from './dto/auth-response.dto';
 import { LoginDto } from './dto/login.dto';
 import { RegistroDto } from './dto/registro.dto';
+import { TrocarSenhaDto } from './dto/trocar-senha.dto';
 
 const CSRF_DOC = {
   name: CSRF_HEADER,
@@ -186,6 +189,32 @@ export class AuthController {
   })
   me(@CurrentUser() user: AuthenticatedUser): Promise<Usuario> {
     return this.authService.me(user.id);
+  }
+
+  @Put('senha')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Throttle({ default: PASSWORD_CHANGE_LIMIT })
+  @ApiOperation({
+    summary: 'Troca a senha de quem está logado',
+    description:
+      'Exige a senha atual. Encerra todas as OUTRAS sessões e mantém a deste dispositivo. ' +
+      'Limite: 5 a cada 15 minutos por IP.',
+  })
+  @ApiBearerAuth()
+  @ApiNoContentResponse({ description: 'Senha trocada; as outras sessões foram encerradas' })
+  @ApiBadRequestResponse({
+    type: ApiErrorResponseDto,
+    description:
+      '`VALIDACAO` (com `fields`), `AUTH_SENHA_ATUAL_INCORRETA` (`fields.senhaAtual`) ou ' +
+      '`AUTH_SENHA_IGUAL_ATUAL` (`fields.novaSenha`)',
+  })
+  @ApiUnauthorizedResponse({
+    type: ApiErrorResponseDto,
+    description: '`AUTH_NAO_AUTENTICADO`, `AUTH_TOKEN_EXPIRADO` ou `AUTH_SESSAO_ENCERRADA`',
+  })
+  @ApiTooManyRequestsResponse({ type: ApiErrorResponseDto, description: '`LIMITE_TENTATIVAS`' })
+  trocarSenha(@CurrentUser() user: AuthenticatedUser, @Body() dto: TrocarSenhaDto): Promise<void> {
+    return this.authService.trocarSenha(user, dto);
   }
 
   /** Põe o refresh token no cookie e devolve só o que vai no corpo. */

@@ -28,6 +28,15 @@ export const authErrors = {
     ),
   origemInvalida: () =>
     apiError(403, 'AUTH_ORIGEM_INVALIDA', 'Não foi possível completar a requisição.'),
+  // 400, nunca 401: o web trata qualquer 401 como sessão perdida, e a pessoa continua logada.
+  senhaAtualIncorreta: () =>
+    apiError(400, 'AUTH_SENHA_ATUAL_INCORRETA', 'Senha atual incorreta.', {
+      senhaAtual: 'Senha atual incorreta.',
+    }),
+  senhaIgualAtual: () =>
+    apiError(400, 'AUTH_SENHA_IGUAL_ATUAL', 'A nova senha precisa ser diferente da atual.', {
+      novaSenha: 'A nova senha precisa ser diferente da atual.',
+    }),
   limiteTentativas: () =>
     apiError(429, 'LIMITE_TENTATIVAS', 'Muitas tentativas. Aguarde um pouco e tente de novo.'),
 };

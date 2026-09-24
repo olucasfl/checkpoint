@@ -7,6 +7,7 @@ import { LoginPage } from '@/pages/LoginPage';
 import { PerfilPage } from '@/pages/PerfilPage';
 import { RegistroPage } from '@/pages/RegistroPage';
 import { StatusPage } from '@/pages/StatusPage';
+import { TrocarSenhaPage } from '@/pages/TrocarSenhaPage';
 
 /**
  * As rotas do app, à parte do roteador do navegador para os testes usarem um roteador em memória.
@@ -23,6 +24,7 @@ export const routes: RouteObject[] = [
         children: [
           { path: '/', element: <GamesPage /> },
           { path: '/perfil', element: <PerfilPage /> },
+          { path: '/perfil/senha', element: <TrocarSenhaPage /> },
         ],
       },
     ],

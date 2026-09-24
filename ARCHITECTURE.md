@@ -12,22 +12,22 @@ comportamento que ela descreve.
 
 ## 1. Visão geral
 
-|                      |                                                                                                                                                                                                                                                                 |
-| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Tipo de repo         | Monorepo único, npm workspaces (`apps/*`, `packages/*`) — não é multi-repo                                                                                                                                                                                      |
-| Gerenciador          | npm 10+ (workspaces). Não usar pnpm nem yarn                                                                                                                                                                                                                    |
-| Node                 | 20.19+ (`engines` do `package.json` da raiz; `.nvmrc` = `20.19`). O piso vem do `jsdom@27`; as versões de teste do web foram escolhidas para rodar em Node 20.19                                                                                                |
-| Linguagem            | TypeScript 5, strict, em todos os workspaces                                                                                                                                                                                                                    |
-| `apps/api`           | `@checkpoint/api` — NestJS 11, Express, Prisma 6, PostgreSQL 16                                                                                                                                                                                                 |
-| `apps/web`           | `@checkpoint/web` — React 19, Vite 6, React Router 7, TanStack Query 5, Tailwind CSS 4, axios                                                                                                                                                                   |
-| `packages/shared`    | `@checkpoint/shared` — tipos/contratos/utils puros, compilado para `dist/` (CommonJS + `.d.ts`)                                                                                                                                                                 |
-| Storage de arquivos  | Supabase Storage (bucket público `capas`, mesmo projeto do banco), só para as capas dos jogos; acessado pelo backend pela REST com `fetch` (sem SDK). Leitura pública; escrita só pelo backend, com a secret key                                                |
-| Banco                | PostgreSQL 16, instância local ou gerenciada (ex.: Supabase) — sem Docker no projeto                                                                                                                                                                            |
-| Qualidade            | ESLint 9 (flat config, `eslint.config.mjs` na raiz), Prettier, Husky, lint-staged, commitlint (Conventional Commits)                                                                                                                                            |
-| Testes               | Jest 30 + ts-jest na API e Vitest 4 + Testing Library + jsdom na web (`npm test -w <workspace>`); `packages/shared` não tem runner próprio. `npm test` na raiz compila o `shared` antes (`pretest`). Convenções em `.claude/skills/checkpoint-testing/SKILL.md` |
-| Auth                 | Spec `autenticacao`, etapas 1 a 3: e-mail e senha, access token (JWT, 15 min) + refresh token (30 dias) em cookie HttpOnly, com rotação e guard global (§4.5); telas no web (§5.10); cada jogo tem dono e `games` exige login (§4.4)                            |
-| PWA / service worker | Não existe                                                                                                                                                                                                                                                      |
-| Deploy / CI          | Não existe (sem Dockerfile de produção, sem workflow de CI, sem manifest de hospedagem)                                                                                                                                                                         |
+|                      |                                                                                                                                                                                                                                                                  |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Tipo de repo         | Monorepo único, npm workspaces (`apps/*`, `packages/*`) — não é multi-repo                                                                                                                                                                                       |
+| Gerenciador          | npm 10+ (workspaces). Não usar pnpm nem yarn                                                                                                                                                                                                                     |
+| Node                 | 20.19+ (`engines` do `package.json` da raiz; `.nvmrc` = `20.19`). O piso vem do `jsdom@27`; as versões de teste do web foram escolhidas para rodar em Node 20.19                                                                                                 |
+| Linguagem            | TypeScript 5, strict, em todos os workspaces                                                                                                                                                                                                                     |
+| `apps/api`           | `@checkpoint/api` — NestJS 11, Express, Prisma 6, PostgreSQL 16                                                                                                                                                                                                  |
+| `apps/web`           | `@checkpoint/web` — React 19, Vite 6, React Router 7, TanStack Query 5, Tailwind CSS 4, axios                                                                                                                                                                    |
+| `packages/shared`    | `@checkpoint/shared` — tipos/contratos/utils puros, compilado para `dist/` (CommonJS + `.d.ts`)                                                                                                                                                                  |
+| Storage de arquivos  | Supabase Storage (bucket público `capas`, mesmo projeto do banco), só para as capas dos jogos; acessado pelo backend pela REST com `fetch` (sem SDK). Leitura pública; escrita só pelo backend, com a secret key                                                 |
+| Banco                | PostgreSQL 16, instância local ou gerenciada (ex.: Supabase) — sem Docker no projeto                                                                                                                                                                             |
+| Qualidade            | ESLint 9 (flat config, `eslint.config.mjs` na raiz), Prettier, Husky, lint-staged, commitlint (Conventional Commits)                                                                                                                                             |
+| Testes               | Jest 30 + ts-jest na API e Vitest 4 + Testing Library + jsdom na web (`npm test -w <workspace>`); `packages/shared` não tem runner próprio. `npm test` na raiz compila o `shared` antes (`pretest`). Convenções em `.claude/skills/checkpoint-testing/SKILL.md`  |
+| Auth                 | Spec `autenticacao`, etapas 1 a 5: e-mail e senha, access token (JWT, 15 min) + refresh token (30 dias) em cookie HttpOnly, com rotação e guard global (§4.5); troca de senha; telas no web (§5.10); cada jogo tem dono obrigatório e `games` exige login (§4.4) |
+| PWA / service worker | Não existe                                                                                                                                                                                                                                                       |
+| Deploy / CI          | Não existe (sem Dockerfile de produção, sem workflow de CI, sem manifest de hospedagem)                                                                                                                                                                          |
 
 Não assuma nenhuma dessas ausências como "esquecimento" a corrigir de lado — são decisões de
 escopo do esqueleto. Adicionar qualquer uma delas é uma feature própria, com spec (`docs/specs/`),
@@ -94,7 +94,7 @@ checkpoint/
 │           ├── app/                    # providers.tsx (AppProviders) + routes.tsx (as rotas) + router.tsx (AppRouter)
 │           │   └── layout/             # AppLayout/AppFrame, AuthLayout, RequireAuth, LoadingScreen, Backdrop, BottomNav, TopNav, nav-items.ts
 │           ├── features/               # uma pasta por feature — hoje games/ e auth/ (api/, lib/, session/, components/)
-│           ├── pages/                  # páginas de rota — GamesPage (/), PerfilPage (/perfil), LoginPage, RegistroPage e StatusPage (/status)
+│           ├── pages/                  # páginas de rota — GamesPage (/), PerfilPage (/perfil), TrocarSenhaPage (/perfil/senha), LoginPage, RegistroPage e StatusPage (/status)
 │           ├── shared/
 │           │   ├── components/         # Icon (Material Symbols), ModalDialog (<dialog> nativo), OverlayPortal, ConnectionBanner, UpdatePrompt, InstallNudge
 │           │   ├── hooks/              # use-typing-outside-dialog (esconde a barra com o teclado aberto), use-connectivity, use-dialog-open
@@ -188,12 +188,13 @@ implementado.
   único e sempre normalizado, `senhaHash`) e `RefreshSession` (uma linha por dispositivo logado; o `id` é o
   `sid` dos tokens; guarda só o **SHA-256** do refresh token e o do anterior, mais um rótulo do dispositivo
   derivado do `User-Agent`, sem IP), com `onDelete: Cascade`.
-- **`Game.userId`** (spec `autenticacao`, migração A3 `game_dono`, **destrutiva** por trocar o `@@unique`,
-  aprovada na spec): `String?` com FK para `User` e `onDelete: Cascade` (excluir a conta apaga os jogos no
-  banco; as capas no bucket ficam por conta de quem exclui). A unicidade passou a ser **por dono**; com
-  `userId` na frente, o mesmo índice serve ao `where: { userId }`, então não há `@@index([userId])`.
-  **Nulável só até a migração A4** (etapa 4, `NOT NULL`): os jogos anteriores à etapa 3 ficaram com
-  `userId NULL`, invisíveis pela API, até o passo humano da spec (Q5) descartá-los.
+- **`Game.userId`** (spec `autenticacao`): **obrigatório** (`String`, `NOT NULL`), com FK para `User` e
+  `onDelete: Cascade` (excluir a conta apaga os jogos no banco; as capas no bucket ficam por conta de quem
+  exclui). Veio em duas migrações **destrutivas**, aprovadas na spec: a A3 (`game_dono`) criou a coluna
+  nulável e trocou o `@@unique`; a A4 (`game_dono_obrigatorio`) fez o `SET NOT NULL`, precedido de uma trava
+  escrita à mão (`DO $$ … RAISE EXCEPTION`) que aborta com mensagem clara se ainda houver jogo sem dono. A
+  unicidade é **por dono**; com `userId` na frente, o mesmo índice serve ao `where: { userId }`, então não há
+  `@@index([userId])`.
 
 ### 4.4 Módulo por domínio (`src/modules/`)
 
@@ -256,18 +257,24 @@ apps/api/src/modules/games/
 
 Registre o módulo novo em `app.module.ts` (`imports: [...]`).
 
-### 4.5 Autenticação (`modules/auth/`, spec `docs/specs/autenticacao.md`, etapa 1)
+### 4.5 Autenticação (`modules/auth/`, spec `docs/specs/autenticacao.md`, etapas 1 e 5)
 
 - **Rotas** (`/api/auth`, tag Swagger `auth`): `POST registro`, `POST login`, `POST refresh`, `POST logout` (as
-  quatro `@Public()`) e `GET me` (protegida). Erros com `code` estável (`ApiErrorCode` do shared), nunca
-  comparando a `message`.
+  quatro `@Public()`), `GET me` e `PUT senha` (protegidas). Erros com `code` estável (`ApiErrorCode` do shared),
+  nunca comparando a `message`.
+- **Troca de senha** (`PUT /api/auth/senha`, etapa 5, `TrocarSenhaDto`): `{ senhaAtual, novaSenha }`, com a nova
+  sob a mesma regra do registro e a atual só não vazia e ≤ 72 bytes. **204**; senha atual errada → 400
+  `AUTH_SENHA_ATUAL_INCORRETA` (`fields.senhaAtual`); nova igual à atual → 400 `AUTH_SENHA_IGUAL_ATUAL`
+  (`fields.novaSenha`), checada **só depois** de a atual conferir. Erro de negócio de quem está logado **nunca é
+  401** (o web trata 401 como sessão perdida). Sucesso grava o hash novo e apaga **todas as outras**
+  `RefreshSession` do usuário (mantém a do `sid` atual) numa **mesma transação**.
 - **Tokens:** access JWT HS256 (15 min, `JWT_ACCESS_SECRET`, `{ sub, sid, typ: 'access' }`, só em memória no
   web) e refresh JWT HS256 (30 dias, **segredo separado**, `jti` aleatório) no cookie `checkpoint_refresh`
   (`HttpOnly`, `SameSite=Lax`, `Path=/api/auth`, `Secure` só em produção). O corpo **nunca** traz o refresh
   token. O banco guarda só `sha256(refreshToken)`.
 - **Sessão = uma linha de `RefreshSession`** por dispositivo; máximo de 10 por usuário (a 11ª apaga a de
   `ultimoUsoEm` mais antigo). O **guard global** confere a sessão do access token a cada request (uma leitura
-  por chave primária): logout, reuso e (etapa 5) troca de senha derrubam o access token **na hora**.
+  por chave primária): logout, reuso e troca de senha derrubam o access token **na hora**.
 - **Rotação:** `refresh` troca o token **na mesma linha** (`updateMany` condicionado ao hash apresentado; `count
 0` = corrida = 409 `AUTH_REFRESH_CONCORRENTE`). O token anterior vale por **30 s** (corrida de abas); fora da
   janela, ou se não bate com nenhum dos dois hashes, é **reuso**: a sessão é apagada, o cookie é limpo e um
@@ -275,7 +282,7 @@ Registre o módulo novo em `app.module.ts` (`imports: [...]`).
 - **Anti-CSRF:** `refresh` e `logout` exigem `X-Checkpoint-Csrf: 1` (`CsrfHeaderGuard`; força o preflight de
   CORS). Sem ele: 403 `AUTH_ORIGEM_INVALIDA`.
 - **Limite por IP** (`@nestjs/throttler`, memória, uma instância) só no `AuthController`: login 5/min, refresh
-  30/min, registro **3/h** (constante no código; a env opcional `AUTH_REGISTRATION_LIMIT_PER_HOUR` só existe
+  30/min, troca de senha **5 a cada 15 min**, registro **3/h** (constante no código; a env opcional `AUTH_REGISTRATION_LIMIT_PER_HOUR` só existe
   para verificação manual). 429 com `code: LIMITE_TENTATIVAS` e `Retry-After`.
 - **Hash de senha: `node:crypto.scrypt`** (`password-hasher.ts`, N=2^17, r=8, p=1, sal de 16 bytes, formato
   `scrypt$N$r$p$sal$hash`), **não argon2**: o `argon2` não instala nesta máquina (sem binário pré-compilado e sem
@@ -283,7 +290,8 @@ Registre o módulo novo em `app.module.ts` (`imports: [...]`).
   e-mail inexistente ainda paga um hash (contra um hash fixo) para o tempo não denunciar a conta.
 - **Sem dado sensível** em corpo nem log: o `select` do Prisma é uma lista branca (`USUARIO_PUBLICO_SELECT`);
   nenhuma rota loga senha, token, cookie ou cabeçalho `Authorization`.
-- Testes ao lado do código: `auth.service.spec.ts` (rotação, janela, reuso, teto de 10, com relógio falso),
+- Testes ao lado do código: `auth.service.spec.ts` (rotação, janela, reuso, teto de 10, troca de senha, com
+  relógio falso),
   `access-token.guard.spec.ts` (`@Public`, tipos de token trocados, vencido, sessão apagada),
   `password-hasher.spec.ts` (scrypt real), `session-device.spec.ts`, `dto/*.spec.ts` e
   `auth.http.spec.ts` (HTTP numa porta local: cookie, anti-CSRF, 429, CORS, corpos e logs). O
@@ -299,7 +307,8 @@ Registre o módulo novo em `app.module.ts` (`imports: [...]`).
 - `src/app/providers.tsx` — ponto único para providers globais: `QueryClientProvider`
   (`shared/lib/query-client.ts`) e o `AuthProvider` (§5.10); tema etc. entram aqui quando existirem.
 - `src/app/routes.tsx` — a lista de rotas (à parte do roteador para os testes usarem um roteador em
-  memória): `/` (`GamesPage`) e `/perfil` (`PerfilPage`) dentro do **`RequireAuth`** e do `AppLayout`
+  memória): `/` (`GamesPage`), `/perfil` (`PerfilPage`) e `/perfil/senha` (`TrocarSenhaPage`) dentro do
+  **`RequireAuth`** e do `AppLayout`
   (§5.6, §5.10); `/status` (o diagnóstico de health) **público**, no `AppLayout`; `/login` e `/registro`
   no `AuthLayout` (sem barra). `src/app/router.tsx` só cria o `createBrowserRouter(routes)`. Registre
   rotas novas em `routes.tsx`, como filhas do layout, conforme cada feature ganha uma página.
@@ -483,7 +492,7 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
 - **Atalhos do manifest** (`pwa.config.ts`): "Adicionar jogo" → `/?novo=1` e "Jogando" →
   `/?status=JOGANDO`, sem `icons` (os PNGs de 96 px são opcionais e não existem).
 
-### 5.10 Autenticação no web (`features/auth/`, spec `docs/specs/autenticacao.md`, etapa 2)
+### 5.10 Autenticação no web (`features/auth/`, spec `docs/specs/autenticacao.md`, etapas 2 e 5)
 
 - **Access token só em memória** (`shared/lib/auth-token.ts`, uma variável de módulo): nunca em armazenamento
   local, de sessão, IndexedDB nem cookie legível (`hygiene.test.ts` e `shared/lib/storage/no-token-in-storage.test.ts`).
@@ -519,7 +528,14 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
   `BroadcastChannel` avisa as outras abas, que fazem o logout local na hora.
 - **Telas:** `LoginForm` e `RegistroForm` (validação local com as regras da API; "Confirmar senha" só no registro;
   `CampoSenha` com "mostrar senha" de 44 × 44 e `aria-pressed`), `PerfilPage` (nome, e-mail "(não verificado — usado
-  só para entrar)" e Sair). Reusam `shared/components/form-parts` (movido de `features/games`) e o visual Neon.
+  só para entrar)", link "Trocar senha" e Sair). Reusam `shared/components/form-parts` (movido de `features/games`)
+  e o visual Neon.
+- **`/perfil/senha`** (etapa 5, `TrocarSenhaPage` + `TrocarSenhaForm`): Senha atual (`current-password`), Nova senha
+  e Confirmar nova senha (`new-password`), cada uma com o "mostrar senha". Confirmação diferente → "As senhas não
+  coincidem" **sem request**; erros pelo `code`/`fields`. `authApi.trocarSenha` é uma chamada protegida comum (Bearer
+  e renovação pelo interceptor). Sucesso navega para `/perfil` com o aviso no `state` da navegação
+  (`lib/perfil-avisos.ts`: só um aviso conhecido é mostrado, em `role="status"`). As outras sessões caem no
+  servidor; o outro navegador descobre na próxima request (401 → `/login?motivo=sessao`).
 
 ---
 

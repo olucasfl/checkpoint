@@ -29,7 +29,7 @@ export interface SessionRow {
 }
 
 type Where = {
-  id?: string | { in: string[] };
+  id?: string | { in: string[] } | { not: string };
   email?: string;
   userId?: string;
   tokenHash?: string;
@@ -45,6 +45,9 @@ function matches(row: Record<string, unknown>, where: Where | undefined): boolea
     if (condition !== null && typeof condition === 'object') {
       if ('in' in condition) {
         return (condition.in as unknown[]).includes(value);
+      }
+      if ('not' in condition) {
+        return value !== condition.not;
       }
       if ('lt' in condition) {
         return (value as Date).getTime() < (condition.lt as Date).getTime();
@@ -77,6 +80,11 @@ export class FakeAuthPrisma {
   users: UserRow[] = [];
   sessions: SessionRow[] = [];
 
+  /** Forma de array: as operações já foram disparadas; basta esperar todas (sem rollback, como teste). */
+  $transaction = jest.fn(async (operations: Promise<unknown>[]): Promise<unknown[]> =>
+    Promise.all(operations),
+  );
+
   user = {
     findUnique: jest.fn(
       async (args: { where: Where; select?: Record<string, boolean> }): Promise<unknown> => {
@@ -95,6 +103,23 @@ export class FakeAuthPrisma {
         const now = new Date();
         const row: UserRow = { id: randomUUID(), criadoEm: now, atualizadoEm: now, ...args.data };
         this.users.push(row);
+        return project(row, args.select);
+      },
+    ),
+    update: jest.fn(
+      async (args: {
+        where: { id: string };
+        data: Partial<Pick<UserRow, 'nome' | 'senhaHash'>>;
+        select?: Record<string, boolean>;
+      }): Promise<unknown> => {
+        const row = this.users.find((user) => user.id === args.where.id);
+        if (!row) {
+          throw new Prisma.PrismaClientKnownRequestError('Record not found', {
+            code: 'P2025',
+            clientVersion: 'teste',
+          });
+        }
+        Object.assign(row, args.data, { atualizadoEm: new Date() });
         return project(row, args.select);
       },
     ),

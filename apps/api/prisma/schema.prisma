@@ -40,10 +40,10 @@ model Game {
   // resposta a partir de SUPABASE_URL e do bucket, entao trocar de projeto nao exige migrar dados.
   capaPath String? @db.VarChar(120)
 
-  // Dono do jogo. Opcional so ate a migracao A4 (spec autenticacao): os jogos anteriores nao tem dono
-  // e ficam invisiveis pela API ate o passo humano descarta-los.
-  userId String?
-  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Dono do jogo (spec autenticacao). Excluir a conta apaga os jogos dela; as capas no bucket ficam
+  // por conta de quem exclui.
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   criadoEm     DateTime @default(now())
   atualizadoEm DateTime @updatedAt

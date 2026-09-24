@@ -18,6 +18,7 @@ export const FIELD_TEXT = {
   senhaLonga: `A senha pode ter no máximo ${PASSWORD_MAX_BYTES} bytes (cerca de ${PASSWORD_MAX_BYTES} letras sem acento)`,
   senhaSoEspacos: 'A senha não pode ser só espaços',
   senhaLoginVazia: 'Informe a senha',
+  senhaAtualVazia: 'Informe a senha atual',
   senhasDiferentes: 'As senhas não coincidem',
 } as const;
 
@@ -56,6 +57,14 @@ export function novaSenhaError(senha: string): string | undefined {
 export function loginSenhaError(senha: string): string | undefined {
   if (senha.length === 0) {
     return FIELD_TEXT.senhaLoginVazia;
+  }
+  return utf8ByteLength(senha) > PASSWORD_MAX_BYTES ? FIELD_TEXT.senhaLonga : undefined;
+}
+
+/** Senha ATUAL da troca: como a do login (pode ser uma senha antiga curta). */
+export function senhaAtualError(senha: string): string | undefined {
+  if (senha.length === 0) {
+    return FIELD_TEXT.senhaAtualVazia;
   }
   return utf8ByteLength(senha) > PASSWORD_MAX_BYTES ? FIELD_TEXT.senhaLonga : undefined;
 }

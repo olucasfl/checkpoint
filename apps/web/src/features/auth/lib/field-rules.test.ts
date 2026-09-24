@@ -6,6 +6,7 @@ import {
   loginSenhaError,
   nomeError,
   novaSenhaError,
+  senhaAtualError,
 } from './field-rules';
 
 describe('regras de campo (as mesmas da API)', () => {
@@ -33,6 +34,12 @@ describe('regras de campo (as mesmas da API)', () => {
     expect(loginSenhaError('')).toBe(FIELD_TEXT.senhaLoginVazia);
     expect(loginSenhaError('curta')).toBeUndefined();
     expect(loginSenhaError('a'.repeat(73))).toBe(FIELD_TEXT.senhaLonga);
+  });
+
+  it('senha atual (troca de senha): não vazia e até 72 bytes; pode ser curta', () => {
+    expect(senhaAtualError('')).toBe(FIELD_TEXT.senhaAtualVazia);
+    expect(senhaAtualError('curta')).toBeUndefined();
+    expect(senhaAtualError('á'.repeat(37))).toBe(FIELD_TEXT.senhaLonga);
   });
 
   it('confirmação: tem de ser igual, sem apará-la', () => {

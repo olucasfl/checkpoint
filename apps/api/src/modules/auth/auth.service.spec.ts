@@ -478,3 +478,113 @@ describe('limite de registros por hora (CA-16)', () => {
     },
   );
 });
+
+describe('trocarSenha (CA-51 a CA-53)', () => {
+  /** Ana com três sessões (três dispositivos); a troca é feita pela primeira. */
+  async function anaComTresSessoes() {
+    const a = await service.register(ANA, CURL);
+    await service.login({ email: ANA.email, senha: ANA.senha }, CURL);
+    await service.login({ email: ANA.email, senha: ANA.senha }, CURL);
+    const [atual, ...outras] = db.sessions.map((s) => s.id);
+    return { user: { id: a.usuario.id, sessionId: atual as string }, outras };
+  }
+
+  it('grava o hash da nova senha e apaga as OUTRAS sessões, mantendo a atual (CA-51)', async () => {
+    const { user, outras } = await anaComTresSessoes();
+    expect(outras).toHaveLength(2);
+
+    await service.trocarSenha(user, { senhaAtual: ANA.senha, novaSenha: 'outra-senha-boa' });
+
+    expect(db.users[0]?.senhaHash).toBe('fake$outra-senha-boa');
+    expect(db.sessions.map((s) => s.id)).toEqual([user.sessionId]);
+    // As duas escritas vão juntas, na mesma transação.
+    expect(db.$transaction).toHaveBeenCalledTimes(1);
+    expect(db.refreshSession.deleteMany).toHaveBeenLastCalledWith({
+      where: { userId: user.id, id: { not: user.sessionId } },
+    });
+  });
+
+  it('não toca nas sessões de OUTRA conta', async () => {
+    const { user } = await anaComTresSessoes();
+    await service.register(
+      { nome: 'Bia', email: 'bia@exemplo.com', senha: 'segredo-da-bia' },
+      CURL,
+    );
+
+    await service.trocarSenha(user, { senhaAtual: ANA.senha, novaSenha: 'outra-senha-boa' });
+
+    expect(db.sessions).toHaveLength(2);
+  });
+
+  it('depois da troca, a senha antiga não entra e a nova entra', async () => {
+    const { user } = await anaComTresSessoes();
+
+    await service.trocarSenha(user, { senhaAtual: ANA.senha, novaSenha: 'outra-senha-boa' });
+
+    await expect(
+      errorOf(service.login({ email: ANA.email, senha: ANA.senha }, CURL)),
+    ).resolves.toMatchObject({ status: 401, body: { code: 'AUTH_CREDENCIAIS_INVALIDAS' } });
+    await expect(
+      service.login({ email: ANA.email, senha: 'outra-senha-boa' }, CURL),
+    ).resolves.toMatchObject({ usuario: { email: 'ana@exemplo.com' } });
+  });
+
+  it('senha atual errada → 400 AUTH_SENHA_ATUAL_INCORRETA com fields.senhaAtual; nada muda (CA-52)', async () => {
+    const { user } = await anaComTresSessoes();
+    const hashAntes = db.users[0]?.senhaHash;
+
+    const erro = await errorOf(
+      service.trocarSenha(user, { senhaAtual: 'nao-e-esta', novaSenha: 'outra-senha-boa' }),
+    );
+
+    expect(erro).toEqual({
+      status: 400,
+      body: {
+        statusCode: 400,
+        code: 'AUTH_SENHA_ATUAL_INCORRETA',
+        message: 'Senha atual incorreta.',
+        fields: { senhaAtual: 'Senha atual incorreta.' },
+      },
+    });
+    expect(db.users[0]?.senhaHash).toBe(hashAntes);
+    expect(db.sessions).toHaveLength(3);
+    expect(db.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('nova igual à atual → 400 AUTH_SENHA_IGUAL_ATUAL com fields.novaSenha, sem gravar (CA-53)', async () => {
+    const { user } = await anaComTresSessoes();
+
+    const erro = await errorOf(
+      service.trocarSenha(user, { senhaAtual: ANA.senha, novaSenha: ANA.senha }),
+    );
+
+    expect(erro).toMatchObject({
+      status: 400,
+      body: { code: 'AUTH_SENHA_IGUAL_ATUAL', fields: { novaSenha: expect.any(String) } },
+    });
+    expect(db.sessions).toHaveLength(3);
+    expect(db.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('a regra "igual à atual" só é checada DEPOIS de a atual conferir (não denuncia a senha)', async () => {
+    const { user } = await anaComTresSessoes();
+
+    // Atual errada e nova igual à informada: a resposta é a da senha atual, não a da igualdade.
+    const erro = await errorOf(
+      service.trocarSenha(user, { senhaAtual: 'chute-errado', novaSenha: 'chute-errado' }),
+    );
+
+    expect(erro.body).toMatchObject({ code: 'AUTH_SENHA_ATUAL_INCORRETA' });
+  });
+
+  it('usuário que não existe mais → 401 AUTH_SESSAO_ENCERRADA', async () => {
+    await expect(
+      errorOf(
+        service.trocarSenha(
+          { id: 'id-que-nao-existe', sessionId: 'x' },
+          { senhaAtual: 'a', novaSenha: 'outra-senha-boa' },
+        ),
+      ),
+    ).resolves.toMatchObject({ status: 401, body: { code: 'AUTH_SESSAO_ENCERRADA' } });
+  });
+});

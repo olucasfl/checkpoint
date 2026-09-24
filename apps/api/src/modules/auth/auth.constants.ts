@@ -18,3 +18,4 @@ export const REFRESH_COOKIE_PATH = '/api/auth';
 export const LOGIN_LIMIT = { limit: 5, ttl: 60_000 } as const;
 export const REFRESH_LIMIT = { limit: 30, ttl: 60_000 } as const;
 export const REGISTRATION_WINDOW_MS = 60 * 60 * 1000;
+export const PASSWORD_CHANGE_LIMIT = { limit: 5, ttl: 15 * 60_000 } as const;

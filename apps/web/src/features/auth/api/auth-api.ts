@@ -3,6 +3,7 @@ import {
   type AuthResponse,
   type LoginRequest,
   type RegistroRequest,
+  type TrocarSenhaRequest,
   type Usuario,
 } from '@checkpoint/shared';
 import { apiClient, type ApiRequestConfig } from '@/shared/lib/api-client';
@@ -40,5 +41,10 @@ export const authApi = {
   async me(): Promise<Usuario> {
     const response = await apiClient.get<Usuario>('/auth/me');
     return response.data;
+  },
+
+  /** Rota protegida comum (Bearer e renovação): a senha errada volta 400, nunca 401. */
+  async trocarSenha(body: TrocarSenhaRequest): Promise<void> {
+    await apiClient.put('/auth/senha', body);
   },
 };

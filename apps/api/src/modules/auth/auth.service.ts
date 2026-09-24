@@ -6,8 +6,10 @@ import {
   normalizeEmail,
   type LoginRequest,
   type RegistroRequest,
+  type TrocarSenhaRequest,
   type Usuario,
 } from '@checkpoint/shared';
+import { type AuthenticatedUser } from '../../common/decorators/current-user.decorator';
 import { PrismaService } from '../../database/prisma.service';
 import { type EnvironmentVariables } from '../../config/env.validation';
 import { authErrors } from './auth-errors';
@@ -210,6 +212,40 @@ export class AuthService implements OnModuleInit {
       throw authErrors.sessaoEncerrada();
     }
     return toUsuario(user);
+  }
+
+  /**
+   * Troca a senha de quem está logado. A regra "nova diferente da atual" só é checada depois de a atual
+   * conferir: antes disso, a resposta denunciaria qual é a senha atual. Sucesso encerra TODAS as outras
+   * sessões (quem trocou a senha por suspeita de vazamento derruba quem estiver usando a conta) e mantém
+   * a deste dispositivo, na mesma transação que grava o hash novo.
+   */
+  async trocarSenha(user: AuthenticatedUser, dto: TrocarSenhaRequest): Promise<void> {
+    const row = await this.prisma.user.findUnique({
+      where: { id: user.id },
+      select: { senhaHash: true },
+    });
+    if (!row) {
+      throw authErrors.sessaoEncerrada();
+    }
+    if (!(await this.hasher.verify(row.senhaHash, dto.senhaAtual))) {
+      throw authErrors.senhaAtualIncorreta();
+    }
+    if (dto.novaSenha === dto.senhaAtual) {
+      throw authErrors.senhaIgualAtual();
+    }
+
+    const senhaHash = await this.hasher.hash(dto.novaSenha);
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: user.id },
+        data: { senhaHash },
+        select: { id: true },
+      }),
+      this.prisma.refreshSession.deleteMany({
+        where: { userId: user.id, id: { not: user.sessionId } },
+      }),
+    ]);
   }
 
   /** Cria a sessão deste dispositivo, limpa as vencidas e respeita o teto de sessões. */

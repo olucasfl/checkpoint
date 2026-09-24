@@ -18,6 +18,7 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { AuthThrottlerGuard } from './auth-throttler.guard';
 import { AuthTokensService } from './auth-tokens.service';
+import { PASSWORD_CHANGE_LIMIT } from './auth.constants';
 import { CsrfHeaderGuard } from './csrf-header.guard';
 import { PasswordHasher } from './password-hasher';
 import { FakeAuthPrisma, fakeHasher } from './testing/fake-auth-prisma';
@@ -679,5 +680,145 @@ describe('nada sensível nos corpos nem nos logs (CA-20)', () => {
     await call('GET', '/auth/me', { bearer: access });
 
     expect(logger.lines.join('\n')).not.toContain(access);
+  });
+});
+
+describe('PUT /auth/senha (CA-51 a CA-55)', () => {
+  /** Ana logada em dois "jars": A (o registro) e B (um login). */
+  async function anaEmDoisJars() {
+    const a = await registerAna();
+    const loginB = await call('POST', '/auth/login', {
+      body: { email: 'ana@exemplo.com', senha: 'segredo-forte' },
+    });
+    return {
+      a,
+      b: {
+        refresh: cookieValue(loginB),
+        access: (loginB.json as { accessToken: string }).accessToken,
+      },
+    };
+  }
+
+  const troca = (bearer: string | undefined, body: unknown) =>
+    call('PUT', '/auth/senha', { bearer, body });
+
+  it('204 sem corpo; A continua, B cai na hora; a senha antiga não entra e a nova entra (CA-51)', async () => {
+    const { a, b } = await anaEmDoisJars();
+
+    const reply = await troca(a.access, {
+      senhaAtual: 'segredo-forte',
+      novaSenha: 'outra-senha-boa',
+    });
+
+    expect(reply.status).toBe(204);
+    expect(reply.text).toBe('');
+    expect((await call('GET', '/auth/me', { bearer: a.access })).status).toBe(200);
+    expect((await call('POST', '/auth/refresh', { cookie: a.refresh, csrf: true })).status).toBe(
+      200,
+    );
+    const meB = await call('GET', '/auth/me', { bearer: b.access });
+    expect(meB.status).toBe(401);
+    expect(meB.json).toMatchObject({ code: 'AUTH_SESSAO_ENCERRADA' });
+    expect((await call('POST', '/auth/refresh', { cookie: b.refresh, csrf: true })).status).toBe(
+      401,
+    );
+    const antiga = await call('POST', '/auth/login', {
+      body: { email: 'ana@exemplo.com', senha: 'segredo-forte' },
+    });
+    const nova = await call('POST', '/auth/login', {
+      body: { email: 'ana@exemplo.com', senha: 'outra-senha-boa' },
+    });
+    expect(antiga.status).toBe(401);
+    expect(nova.status).toBe(200);
+  });
+
+  it('senha atual errada → 400 AUTH_SENHA_ATUAL_INCORRETA; B continua logado (CA-52)', async () => {
+    const { a, b } = await anaEmDoisJars();
+
+    const reply = await troca(a.access, { senhaAtual: 'nao-e-esta', novaSenha: 'outra-senha-boa' });
+
+    expect(reply.status).toBe(400);
+    expect(reply.json).toEqual({
+      statusCode: 400,
+      code: 'AUTH_SENHA_ATUAL_INCORRETA',
+      message: 'Senha atual incorreta.',
+      fields: { senhaAtual: 'Senha atual incorreta.' },
+    });
+    expect((await call('GET', '/auth/me', { bearer: b.access })).status).toBe(200);
+  });
+
+  it('nova igual à atual → 400 AUTH_SENHA_IGUAL_ATUAL com fields.novaSenha (CA-53)', async () => {
+    const { access } = await registerAna();
+
+    const reply = await troca(access, { senhaAtual: 'segredo-forte', novaSenha: 'segredo-forte' });
+
+    expect(reply.status).toBe(400);
+    expect(reply.json).toMatchObject({
+      code: 'AUTH_SENHA_IGUAL_ATUAL',
+      fields: { novaSenha: 'A nova senha precisa ser diferente da atual.' },
+    });
+  });
+
+  it.each([
+    ['7 caracteres', '1234567'],
+    ['73 bytes', `${'á'.repeat(36)}x`],
+  ])('novaSenha de %s → 400 VALIDACAO com fields.novaSenha (CA-54)', async (_nome, novaSenha) => {
+    const { access } = await registerAna();
+
+    const reply = await troca(access, { senhaAtual: 'segredo-forte', novaSenha });
+
+    expect(reply.status).toBe(400);
+    expect(reply.json).toMatchObject({
+      code: 'VALIDACAO',
+      fields: { novaSenha: expect.any(String) },
+    });
+  });
+
+  it('sem token → 401 AUTH_NAO_AUTENTICADO, sem tocar em nada (CA-54)', async () => {
+    await registerAna();
+
+    const reply = await troca(undefined, {
+      senhaAtual: 'segredo-forte',
+      novaSenha: 'outra-senha-boa',
+    });
+
+    expect(reply.status).toBe(401);
+    expect(reply.json).toMatchObject({ code: 'AUTH_NAO_AUTENTICADO' });
+    expect(db.users[0]?.senhaHash).toBe('fake$segredo-forte');
+  });
+
+  it('a 6ª troca (certa ou errada) no mesmo IP → 429 LIMITE_TENTATIVAS com Retry-After (CA-55)', async () => {
+    const { access } = await registerAna();
+    const statuses: number[] = [];
+    let sexta: Reply | undefined;
+    for (let i = 0; i < 6; i += 1) {
+      sexta = await troca(access, { senhaAtual: 'errada-mesmo', novaSenha: 'outra-senha-boa' });
+      statuses.push(sexta.status);
+    }
+
+    expect(statuses).toEqual([400, 400, 400, 400, 400, 429]);
+    expect(sexta?.json).toMatchObject({ statusCode: 429, code: 'LIMITE_TENTATIVAS' });
+    expect(Number(sexta?.headers.get('retry-after'))).toBeGreaterThan(0);
+  });
+
+  it('a janela do limite é de 15 minutos, com 5 trocas (CA-55)', () => {
+    expect(PASSWORD_CHANGE_LIMIT).toEqual({ limit: 5, ttl: 15 * 60 * 1000 });
+  });
+
+  it('nenhuma senha vai para o corpo nem para o log', async () => {
+    const { access } = await registerAna();
+    await troca(access, { senhaAtual: 'segredo-forte', novaSenha: 'outra-senha-boa' });
+    await troca(access, { senhaAtual: 'errada-mesmo', novaSenha: 'mais-uma-senha' });
+
+    for (const proibido of [
+      'segredo-forte',
+      'outra-senha-boa',
+      'errada-mesmo',
+      'mais-uma-senha',
+      'fake$',
+    ]) {
+      expect(bodies.join('\n')).not.toContain(proibido);
+      expect(logger.lines.join('\n')).not.toContain(proibido);
+    }
   });
 });

@@ -19,6 +19,7 @@ export const FIELD_MESSAGES = {
   senhaLonga: `A senha pode ter no máximo ${PASSWORD_MAX_BYTES} bytes (cerca de ${PASSWORD_MAX_BYTES} letras sem acento)`,
   senhaSoEspacos: 'A senha não pode ser só espaços',
   senhaLoginVazia: 'Informe a senha',
+  senhaAtualVazia: 'Informe a senha atual',
 } as const;
 
 /** Cada regra devolve a mensagem do problema, ou `null` se o valor está ok. */
@@ -60,6 +61,14 @@ export const novaSenhaProblem: FieldProblem = (value) => {
 export const senhaLoginProblem: FieldProblem = (value) => {
   if (typeof value !== 'string' || value.length === 0) {
     return FIELD_MESSAGES.senhaLoginVazia;
+  }
+  return utf8ByteLength(value) > PASSWORD_MAX_BYTES ? FIELD_MESSAGES.senhaLonga : null;
+};
+
+/** Senha ATUAL da troca: como a do login, só não vazia e dentro do teto (pode ser uma senha antiga curta). */
+export const senhaAtualProblem: FieldProblem = (value) => {
+  if (typeof value !== 'string' || value.length === 0) {
+    return FIELD_MESSAGES.senhaAtualVazia;
   }
   return utf8ByteLength(value) > PASSWORD_MAX_BYTES ? FIELD_MESSAGES.senhaLonga : null;
 };
