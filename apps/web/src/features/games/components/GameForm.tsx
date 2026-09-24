@@ -186,7 +186,7 @@ export function GameForm({ game, onDone, onCancel }: GameFormProps) {
         onRemove={removeCover}
       />
 
-      <div className="sticky bottom-0 -mx-6 -mb-6 flex justify-end gap-2.5 border-t border-borda bg-painel px-6 py-4">
+      <div className="sheet-footer sticky bottom-0 -mx-6 -mb-6 flex justify-end gap-2.5 border-t border-borda bg-painel px-6 pt-4">
         <button
           type="button"
           onClick={onCancel}

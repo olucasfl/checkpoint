@@ -12,7 +12,8 @@ interface ModalDialogProps {
 /**
  * `<dialog>` nativo aberto com `showModal()`: o Esc fecha, o foco fica preso dentro e volta ao botão
  * que abriu, tudo sem biblioteca. O conteúdo só existe enquanto aberto, então cada abertura começa
- * com o formulário limpo.
+ * com o formulário limpo. O tamanho e a posição vêm da classe `.modal` (styles/index.css): folha
+ * inferior em tela estreita, centralizado em >= 768px.
  */
 export function ModalDialog({ open, onClose, labelledBy, children }: ModalDialogProps) {
   const ref = useRef<HTMLDialogElement>(null);
@@ -37,7 +38,7 @@ export function ModalDialog({ open, onClose, labelledBy, children }: ModalDialog
       ref={ref}
       aria-labelledby={labelledBy}
       onClose={onClose}
-      className="modal glow-dialog m-auto w-[min(560px,calc(100vw-32px))] rounded-lg border border-magenta bg-painel p-0 text-texto"
+      className="modal glow-dialog border border-magenta bg-painel p-0 text-texto"
     >
       {open ? children : null}
     </dialog>

@@ -71,7 +71,7 @@ function renderPage(url = '/') {
 
 const rows = () => screen.queryAllByRole('listitem');
 const titles = () =>
-  rows().map((row) => within(row).getByText(/./, { selector: 'span.truncate' }).textContent);
+  rows().map((row) => within(row).getByText(/./, { selector: 'span.game-title' }).textContent);
 const filterButton = (name: RegExp) =>
   within(screen.getByRole('group', { name: 'Filtrar por status' })).getByRole('button', { name });
 
@@ -371,5 +371,23 @@ describe('diálogos (CA-42, CA-49)', () => {
 
     await waitFor(() => expect(screen.queryByText('Celeste')).not.toBeInTheDocument());
     expect(api.remove).toHaveBeenCalledWith('2');
+  });
+});
+
+describe('?novo=1 abre o formulário de novo jogo (pwa-e-mobile CA-04)', () => {
+  it('abre o diálogo vazio e tira só o "novo" da URL, mantendo o filtro', async () => {
+    renderPage('/?status=ZERADO&novo=1');
+
+    expect(await screen.findByRole('heading', { name: 'NOVO JOGO' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Título')).toHaveValue('');
+    await waitFor(() => expect(screen.getByTestId('search')).toHaveTextContent('?status=ZERADO'));
+    expect(screen.getByTestId('search').textContent).not.toContain('novo');
+  });
+
+  it('sem o parâmetro, o diálogo fica fechado', async () => {
+    renderPage('/');
+    await screen.findByText('Celeste');
+
+    expect(screen.queryByRole('heading', { name: 'NOVO JOGO' })).not.toBeInTheDocument();
   });
 });

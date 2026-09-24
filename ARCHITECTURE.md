@@ -89,11 +89,12 @@ checkpoint/
 │   └── web/                           # @checkpoint/web
 │       └── src/
 │           ├── app/                    # providers.tsx (AppProviders) + router.tsx (AppRouter)
+│           │   └── layout/             # AppLayout (fundo + navegação), BottomNav, TopNav, nav-items.ts
 │           ├── features/               # uma pasta por feature — hoje games/ (api/, lib/, components/)
 │           ├── pages/                  # páginas de rota — GamesPage (/) e StatusPage (/status)
 │           ├── shared/
-│           │   ├── components/         # Icon (Material Symbols) e ModalDialog (<dialog> nativo)
-│           │   ├── hooks/              # vazio (.gitkeep)
+│           │   ├── components/         # Icon (Material Symbols), ModalDialog (<dialog> nativo), OverlayPortal
+│           │   ├── hooks/              # use-typing-outside-dialog (esconde a barra com o teclado aberto)
 │           │   └── lib/                # api-client.ts (axios), query-client.ts, env.ts
 │           ├── styles/                 # index.css — entrada do Tailwind
 │           └── main.tsx
@@ -228,8 +229,9 @@ Registre o módulo novo em `app.module.ts` (`imports: [...]`).
 - `src/app/providers.tsx` — ponto único para providers globais. Hoje só `QueryClientProvider`
   (`shared/lib/query-client.ts`); tema, auth etc. entram aqui quando existirem.
 - `src/app/router.tsx` — `createBrowserRouter` com a lista de rotas: `/` → `GamesPage` (o catálogo) e
-  `/status` → `StatusPage` (o diagnóstico de health que antes era a home). Registre rotas novas aqui
-  conforme cada feature ganha uma página.
+  `/status` → `StatusPage` (o diagnóstico de health que antes era a home), as duas **aninhadas no
+  `AppLayout`** (§5.6). Registre rotas novas aqui, como filhas do layout, conforme cada feature ganha
+  uma página.
 
 ### 5.2 Alias de import
 
@@ -290,6 +292,33 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
   `showModal()`, então `src/test/setup.ts` tem um polyfill mínimo): `lib/*.test.ts`,
   `GameForm.test.tsx`, `GamesPage.test.tsx`, `api/games-api.test.ts` e `styles/tokens.test.ts` (sem hex
   fora do `@theme`, regra de movimento reduzido no CSS, links de fontes).
+
+### 5.6 Layout mobile-first (`app/layout/`, spec `docs/specs/pwa-e-mobile.md`, etapa 1)
+
+- **`AppLayout`** envolve toda tela do app: fundo Neon (orbes + _scanlines_, que saíram da
+  `GamesPage`), `TopNav`, o `<Outlet/>` e a `BottomNav`. **Nenhuma página importa a navegação**
+  (teste em `AppLayout.test.tsx`).
+- **`nav-items.ts`** é a fonte única dos destinos (hoje "Jogos" e "Adicionar"; "Perfil" entra com a
+  spec `autenticacao`). `/status` fica fora de propósito.
+- **`BottomNav`** (< 768px, o `md`): fixa embaixo, renderizada por portal (`OverlayPortal`) no
+  `#overlay-root`, irmão do `#root` no `index.html`, para nenhum `transform` de ancestral prender o
+  `position: fixed`. Some enquanto um campo **fora de diálogo** está focado
+  (`use-typing-outside-dialog`), para não flutuar sobre o teclado virtual. "Adicionar" navega para
+  `/?novo=1` (mantendo o `?status=` quando já está em `/`); a `GamesPage` abre o formulário e tira o
+  `novo` da URL com `replace` (`features/games/lib/new-game.ts`).
+- **`TopNav`** (>= 768px) usa a mesma lista, mas só aparece com mais de um link; com um só, o desktop
+  fica como era (o "Adicionar" do desktop é o botão "Adicionar jogo" do catálogo).
+- **Ponto de quebra único: 768px (`md`).** O catálogo usava `max-[900px]`; não usa mais.
+- **CSS** (`styles/index.css`, camada `components`): `.app-shell` (`100dvh` com `100vh` de reserva),
+  `.safe-x`, `.nav-clearance` e `.bottom-nav` (safe-area por `env()`), `.game-row` (grade no celular,
+  linha no desktop, áreas por `data-area`), `.game-title` (2 linhas no celular), `dialog.modal` (folha
+  inferior no celular com a animação `sheet-up`, centralizado em >= 768px), `.sheet-footer`/`.sheet-pad`.
+  Globais: `touch-action: manipulation`, piso de 16px nos campos (camada `base`, evita o zoom do iOS),
+  hover da linha só com `@media (hover: hover)` e `overscroll-behavior-y: none` só no app instalado.
+  `env(safe-area-*)` fica em classe própria, não em classe arbitrária do Tailwind (que poderia
+  espaçar o `-` dentro do `calc()`).
+- **Viewport** (`index.html`): `viewport-fit=cover` e `interactive-widget=resizes-content`, **sem**
+  `maximum-scale`/`user-scalable` (zoom não é travado, WCAG 1.4.4).
 
 ---
 

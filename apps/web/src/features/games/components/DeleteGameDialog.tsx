@@ -32,7 +32,7 @@ export function DeleteGameDialog({ game, onClose }: DeleteGameDialogProps) {
 
   return (
     <ModalDialog open={game !== null} onClose={onClose} labelledBy="delete-dialog-title">
-      <div className="flex flex-col gap-5 p-7">
+      <div className="sheet-pad flex flex-col gap-5 px-7 pt-7">
         <h2
           id="delete-dialog-title"
           className="m-0 flex items-center gap-2.5 font-display text-xl font-extrabold tracking-[0.12em]"

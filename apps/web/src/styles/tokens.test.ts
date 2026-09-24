@@ -82,3 +82,62 @@ describe('fontes e ícones (CA-88)', () => {
     expect(links).toContain('fonts.googleapis.com');
   });
 });
+
+describe('mobile-first (pwa-e-mobile, etapa 1)', () => {
+  const viewport = indexHtml.match(/<meta\s+name="viewport"[\s\S]*?\/>/)?.[0] ?? '';
+
+  it('viewport com viewport-fit=cover e sem travar o zoom (CA-12)', () => {
+    expect(viewport).toContain('width=device-width');
+    expect(viewport).toContain('viewport-fit=cover');
+    expect(viewport).toContain('interactive-widget=resizes-content');
+    expect(viewport).not.toMatch(/maximum-scale/);
+    expect(viewport).not.toMatch(/user-scalable/);
+  });
+
+  it('#overlay-root existe, vem depois do #root e não está dentro dele (CA-15)', () => {
+    const doc = new DOMParser().parseFromString(indexHtml, 'text/html');
+    const root = doc.getElementById('root');
+    const overlay = doc.getElementById('overlay-root');
+
+    expect(root).not.toBeNull();
+    expect(overlay).not.toBeNull();
+    expect(root?.contains(overlay)).toBe(false);
+    expect(overlay?.parentElement).toBe(root?.parentElement);
+    expect(root?.compareDocumentPosition(overlay as Node)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+
+  it('toque sem atraso e campos com fonte mínima de 16px (CA-11)', () => {
+    expect(css).toMatch(/html\s*\{[^}]*touch-action:\s*manipulation/);
+    expect(css).toMatch(/input,\s*select,\s*textarea\s*\{[^}]*font-size:\s*16px/);
+  });
+
+  it('hover da linha só em aparelho com hover (CA-14)', () => {
+    expect(css).toMatch(/@media \(hover: hover\)\s*\{\s*\.row-hover:hover/);
+    expect(css.replace(/@media \(hover: hover\)\s*\{\s*\.row-hover:hover/, '')).not.toMatch(
+      /\.row-hover:hover/,
+    );
+  });
+
+  it('safe-area e 100dvh no layout, na barra inferior e na folha (CA-05, CA-08, CA-09)', () => {
+    expect(css).toMatch(/\.app-shell\s*\{[^}]*min-height:\s*100vh;[^}]*min-height:\s*100dvh/);
+    expect(css).toMatch(/\.nav-clearance\s*\{[^}]*env\(safe-area-inset-bottom\)/);
+    expect(css).toMatch(/\.bottom-nav\s*\{[^}]*env\(safe-area-inset-bottom\)/);
+    expect(css).toMatch(/\.safe-x\s*\{[^}]*env\(safe-area-inset-left\)/);
+    expect(css).toMatch(/dialog\.modal\s*\{[^}]*env\(safe-area-inset-top\)/);
+  });
+
+  it('a subida da folha é uma animação, desligada pela regra global de movimento reduzido (CA-13)', () => {
+    expect(css).toMatch(/dialog\.modal\s*\{[^}]*animation:\s*sheet-up/);
+    expect(css).toContain('@keyframes sheet-up');
+    const reduced = css.match(/@media \(prefers-reduced-motion: reduce\)\s*\{[\s\S]*$/)?.[0] ?? '';
+    expect(reduced).toMatch(
+      /\*,\s*\*::before,\s*\*::after\s*\{[^}]*animation:\s*none\s*!important/,
+    );
+  });
+
+  it('o "puxar para atualizar" só é desligado no app instalado', () => {
+    expect(css).toMatch(
+      /@media \(display-mode: standalone\)\s*\{\s*body\s*\{[^}]*overscroll-behavior-y:\s*none/,
+    );
+  });
+});

@@ -2,7 +2,14 @@
 <html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- viewport-fit=cover: o conteúdo vai até as bordas e a safe-area é respeitada no CSS (env()).
+         interactive-widget=resizes-content: com o teclado virtual aberto, o layout encolhe (Chrome
+         Android). SEM maximum-scale/user-scalable: travar o zoom fere a WCAG 1.4.4 (spec
+         pwa-e-mobile); o zoom ao focar campo no iOS é evitado com fonte >= 16px nos campos. -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content"
+    />
     <meta name="color-scheme" content="dark" />
     <title>checkpoint</title>
     <!-- Fontes e ícones por <link>, sem pacote npm (spec catalogo-jogos, "Fontes e ícones").
@@ -16,6 +23,10 @@
   </head>
   <body>
     <div id="root"></div>
+    <!-- Alvo dos elementos position: fixed (barra inferior e avisos), via portal. Fica FORA do #root
+         para um transform/filter de um ancestral nunca virar containing block e "prender" o fixed.
+         Os <dialog> com showModal() usam o top layer nativo, sem portal. -->
+    <div id="overlay-root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

@@ -41,11 +41,34 @@
   --font-corpo: 'Rajdhani', system-ui, sans-serif;
 }
 
+/* Tira o atraso do toque duplo (zoom por toque duplo) sem travar o zoom por pinça. */
+html {
+  touch-action: manipulation;
+}
+
 body {
   margin: 0;
   background: var(--color-fundo);
   color: var(--color-texto);
   font-family: var(--font-corpo);
+}
+
+/* No app instalado, "puxar para atualizar" recarregaria a página no meio de um formulário. Na aba do
+   navegador fica o comportamento padrão. */
+@media (display-mode: standalone) {
+  body {
+    overscroll-behavior-y: none;
+  }
+}
+
+/* Piso de 16px nos campos: abaixo disso o Safari do iOS dá zoom ao focar. Na camada base, então as
+   classes dos componentes (maiores, ex.: 19px) continuam valendo. */
+@layer base {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
 }
 
 button {
@@ -85,6 +108,141 @@ button:disabled {
 }
 
 @layer components {
+  /* ---- Layout mobile-first (spec pwa-e-mobile, etapa 1). Ponto de quebra: 48rem (768px, o `md`). ---- */
+
+  /* 100dvh acompanha a barra de endereço que some/aparece no celular; 100vh fica de reserva. */
+  .app-shell {
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+
+  /* Laterais nunca menores que a safe-area (paisagem com entalhe). */
+  .safe-x {
+    padding-left: max(1rem, env(safe-area-inset-left));
+    padding-right: max(1rem, env(safe-area-inset-right));
+  }
+
+  /* Espaço para a última linha da lista não ficar sob a barra inferior (64px + safe-area). */
+  .nav-clearance {
+    padding-bottom: calc(64px + env(safe-area-inset-bottom));
+  }
+
+  .bottom-nav {
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+
+  /* Fileira de filtros que rola na horizontal sem barra visível (o arrasto continua funcionando). */
+  .scroll-row {
+    scrollbar-width: none;
+  }
+
+  .scroll-row::-webkit-scrollbar {
+    display: none;
+  }
+
+  /*
+   * Linha do jogo. Em tela estreita é uma grade: capa | título, plataforma, selo | ações, e a nota
+   * numa segunda linha com a largura toda. Em >= 48rem volta a ser a linha única de hoje.
+   */
+  .game-row {
+    display: grid;
+    grid-template-columns: 52px minmax(0, 1fr) auto;
+    grid-template-areas:
+      'capa texto acoes'
+      'capa selo acoes'
+      'nota nota nota';
+  }
+
+  .game-row > [data-area='capa'] {
+    grid-area: capa;
+  }
+
+  .game-row > [data-area='texto'] {
+    grid-area: texto;
+  }
+
+  .game-row > [data-area='selo'] {
+    grid-area: selo;
+  }
+
+  .game-row > [data-area='nota'] {
+    grid-area: nota;
+  }
+
+  .game-row > [data-area='acoes'] {
+    grid-area: acoes;
+  }
+
+  /* Título: até 2 linhas no celular (quebrando até palavra de 120 letras); uma linha no desktop. */
+  .game-title {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+    overflow-wrap: anywhere;
+  }
+
+  /*
+   * Diálogo: folha inferior no celular (largura total, colada embaixo, cantos de cima arredondados,
+   * altura limitada à tela menos a safe-area de cima); centralizado em >= 48rem, como antes.
+   * O <dialog> modal é o contêiner de rolagem; o rodapé do formulário é sticky dentro dele.
+   */
+  dialog.modal {
+    width: 100%;
+    max-width: 100%;
+    margin: auto 0 0;
+    max-height: calc(100vh - 16px);
+    max-height: calc(100dvh - env(safe-area-inset-top) - 16px);
+    border-radius: 16px 16px 0 0;
+    animation: sheet-up 0.2s ease-out;
+  }
+
+  /* Rodapé das ações do diálogo acima da barra de gestos (formulário: rodapé sticky; confirmação:
+     o conteúdo inteiro). */
+  .sheet-footer {
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+
+  .sheet-pad {
+    padding-bottom: max(1.75rem, env(safe-area-inset-bottom));
+  }
+
+  @media (min-width: 48rem) {
+    .safe-x {
+      padding-left: max(3.5rem, env(safe-area-inset-left));
+      padding-right: max(3.5rem, env(safe-area-inset-right));
+    }
+
+    .nav-clearance {
+      padding-bottom: 0;
+    }
+
+    .game-row {
+      display: flex;
+    }
+
+    .game-title {
+      display: block;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
+    dialog.modal {
+      width: min(560px, calc(100vw - 32px));
+      margin: auto;
+      max-height: calc(100vh - 2rem);
+      max-height: calc(100dvh - 2rem);
+      border-radius: 8px;
+      animation: none;
+    }
+
+    .sheet-footer {
+      padding-bottom: 1rem;
+    }
+  }
+
   /* ---- Fundo decorativo ---- */
   .orb {
     position: absolute;
@@ -235,10 +393,22 @@ button:disabled {
       background 0.18s;
   }
 
-  .row-hover:hover {
-    transform: translateX(6px);
-    border-color: var(--color-ciano);
-    background: var(--color-painel-hover);
+  /* Só em aparelho com hover de verdade: no toque, o :hover "gruda" depois do toque. */
+  @media (hover: hover) {
+    .row-hover:hover {
+      transform: translateX(6px);
+      border-color: var(--color-ciano);
+      background: var(--color-painel-hover);
+    }
+  }
+}
+
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
   }
 }
 

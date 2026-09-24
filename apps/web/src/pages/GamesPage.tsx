@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { type Game } from '@checkpoint/shared';
 import { Icon } from '@/shared/components/Icon';
@@ -11,6 +11,7 @@ import { ListEmpty, ListError, ListLoading } from '@/features/games/components/L
 import { StatPanels } from '@/features/games/components/StatPanels';
 import { StatusFilter } from '@/features/games/components/StatusFilter';
 import { countByStatus, filterGames } from '@/features/games/lib/count-by-status';
+import { wantsNewGame, withoutNewGameParam } from '@/features/games/lib/new-game';
 import {
   parseStatusFilter,
   statusFilterToParams,
@@ -22,7 +23,7 @@ type FormDialog = { open: false } | { open: true; game?: Game };
 
 /**
  * Catálogo de jogos (rota `/`). Busca a lista COMPLETA uma vez; o filtro (na URL, `/?status=`) e as
- * contagens dos painéis e dos botões saem dela, no cliente.
+ * contagens dos painéis e dos botões saem dela, no cliente. O fundo e a navegação vêm do AppLayout.
  */
 export function GamesPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -35,42 +36,42 @@ export function GamesPage() {
   const counts = useMemo(() => countByStatus(games), [games]);
   const visible = useMemo(() => filterGames(games, filter), [games, filter]);
 
+  // `/?novo=1` (barra inferior, atalho do app instalado): abre o formulário e tira o parâmetro da
+  // URL com `replace`, para um reload ou o "voltar" não reabrirem o formulário.
+  useEffect(() => {
+    if (wantsNewGame(searchParams)) {
+      setForm({ open: true });
+      setSearchParams(withoutNewGameParam(searchParams), { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
+
   function changeFilter(next: Filter) {
     setSearchParams(statusFilterToParams(next));
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden px-14 pb-16 pt-10 max-[900px]:px-4 max-[900px]:pb-12 max-[900px]:pt-6">
-      <div
-        aria-hidden="true"
-        className="orb orb-magenta -right-[220px] -top-[280px] size-[720px]"
-      />
-      <div
-        aria-hidden="true"
-        className="orb orb-ciano -bottom-[320px] -left-[260px] size-[760px]"
-      />
-      <div aria-hidden="true" className="scanlines" />
-
-      <main className="relative mx-auto flex max-w-[1168px] flex-col gap-7">
+    <div className="safe-x pb-12 pt-6 md:pb-16 md:pt-10">
+      <main className="relative mx-auto flex max-w-[1168px] flex-col gap-5 md:gap-7">
         <header className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="glow-logo grid size-[52px] place-items-center rounded-md border border-magenta text-magenta">
-              <Icon name="flag" size={30} filled />
+          <div className="flex items-center gap-3 md:gap-4">
+            <div className="glow-logo grid size-10 place-items-center rounded-md border border-magenta text-magenta md:size-[52px]">
+              <Icon name="flag" size={26} filled />
             </div>
             <div>
-              <h1 className="glow-text-magenta m-0 font-display text-[30px] font-extrabold tracking-[0.14em]">
+              <h1 className="glow-text-magenta m-0 font-display text-[22px] font-extrabold tracking-[0.14em] md:text-[30px]">
                 CHECKPOINT
               </h1>
-              <div className="text-[15px] font-semibold uppercase tracking-[0.28em] text-texto-suave">
+              <div className="text-[13px] font-semibold uppercase tracking-[0.2em] text-texto-suave md:text-[15px] md:tracking-[0.28em]">
                 Seu registro de jogos
               </div>
             </div>
           </div>
 
+          {/* No celular, "Adicionar" fica na barra inferior. */}
           <button
             type="button"
             onClick={() => setForm({ open: true })}
-            className="cta-pulse flex h-[52px] items-center gap-2.5 rounded-[4px] bg-magenta px-6 font-display text-sm font-extrabold uppercase tracking-[0.1em] text-fundo transition-transform hover:-translate-y-0.5"
+            className="cta-pulse hidden h-[52px] items-center gap-2.5 rounded-[4px] bg-magenta px-6 font-display text-sm font-extrabold uppercase tracking-[0.1em] text-fundo transition-transform hover:-translate-y-0.5 md:flex"
           >
             <Icon name="add_circle" size={22} />
             Adicionar jogo
@@ -79,9 +80,9 @@ export function GamesPage() {
 
         <StatPanels counts={counts} />
 
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-center md:justify-between">
           <StatusFilter filter={filter} counts={counts} onChange={changeFilter} />
-          <div className="flex items-center gap-1.5 text-[15px] font-semibold uppercase tracking-[0.14em] text-texto-suave">
+          <div className="flex items-center gap-1.5 text-[13px] font-semibold uppercase tracking-[0.14em] text-texto-suave md:text-[15px]">
             <Icon name="history" size={18} />
             Última atualização primeiro
           </div>
