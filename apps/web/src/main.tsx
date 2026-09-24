@@ -1,8 +1,10 @@
+import '@/shared/lib/pwa/install-prompt';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { AppProviders } from '@/app/providers';
 import { AppRouter } from '@/app/router';
 import { connectivity } from '@/shared/lib/connectivity';
+import { registrarDiaDeUso } from '@/shared/lib/pwa/usage-days';
 import { runStorageMigrations } from '@/shared/lib/storage/migrations';
 import '@/shared/lib/api-client';
 import '@/styles/index.css';
@@ -15,6 +17,8 @@ if (!container) {
 
 // Antes do primeiro render: nenhuma tela lê o armazenamento local com o formato antigo.
 runStorageMigrations();
+// Depois das migrações (que podem apagar `checkpoint:*`) e antes do render, que lê a contagem.
+registrarDiaDeUso();
 connectivity.start();
 
 createRoot(container).render(

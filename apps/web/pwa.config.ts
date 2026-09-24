@@ -18,10 +18,15 @@ export const MANIFEST: Partial<ManifestOptions> = {
   start_url: '/',
   scope: '/',
   display: 'standalone',
-  // Sem `orientation`: retrato e paisagem. Sem `shortcuts`: entram na etapa 4.
+  // Sem `orientation`: retrato e paisagem.
   theme_color: FUNDO,
   background_color: FUNDO,
   categories: ['games', 'entertainment'],
+  // Sem `icons` nos atalhos: os PNGs de 96 px são opcionais e não existem; o Android usa o do app.
+  shortcuts: [
+    { name: 'Adicionar jogo', url: '/?novo=1' },
+    { name: 'Jogando', url: '/?status=JOGANDO' },
+  ],
   // `any` e `maskable` em entradas separadas: um ícone "any maskable" é recortado pela máscara e
   // perde as bordas, ou fica com fundo sobrando quando mostrado como `any`.
   icons: [

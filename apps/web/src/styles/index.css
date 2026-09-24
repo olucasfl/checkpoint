@@ -134,7 +134,8 @@ button:disabled {
   }
 
   /* Aviso de versão nova: acima da barra inferior (64px + safe-area) no celular; no desktop, no canto. */
-  .update-prompt {
+  .update-prompt,
+  .install-nudge {
     inset-inline: 16px;
     bottom: calc(64px + env(safe-area-inset-bottom) + 8px);
   }
@@ -225,7 +226,8 @@ button:disabled {
       padding-bottom: 0;
     }
 
-    .update-prompt {
+    .update-prompt,
+    .install-nudge {
       inset-inline: auto 24px;
       bottom: 24px;
       width: 440px;

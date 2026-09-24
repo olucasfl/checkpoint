@@ -423,6 +423,14 @@ VitePWA({
     some. Aceito → some e não volta.
 - **Atalhos do manifest** (`shortcuts`): "Adicionar jogo" → `/?novo=1`; "Jogando" →
   `/?status=JOGANDO`, com os ícones de 96 px opcionais da tabela.
+- **Decisões da implementação (aprovadas):**
+  - **Prioridade da atualização:** se o `UpdatePrompt` está visível, o `InstallNudge` espera; os dois
+    nunca aparecem juntos. O `UpdatePrompt` publica sua visibilidade num store mínimo
+    (`shared/lib/pwa/update-prompt-visibility.ts`) em vez de o convite chamar `useAppUpdate`, porque
+    cada chamada registraria o service worker de novo.
+  - **Contagem de dias de uso:** `registrarDiaDeUso()` roda em `main.tsx`, logo depois de
+    `runStorageMigrations()` e antes do render; usa o dia **local** (AAAA-MM-DD), não UTC.
+  - **Atalhos sem `icons`:** os PNGs de 96 px são opcionais e não existem; o manifest não os declara.
 
 ## Modelo de dados
 

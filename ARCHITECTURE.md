@@ -94,9 +94,9 @@ checkpoint/
 │           ├── features/               # uma pasta por feature — hoje games/ (api/, lib/, components/)
 │           ├── pages/                  # páginas de rota — GamesPage (/) e StatusPage (/status)
 │           ├── shared/
-│           │   ├── components/         # Icon (Material Symbols), ModalDialog (<dialog> nativo), OverlayPortal, ConnectionBanner, UpdatePrompt
+│           │   ├── components/         # Icon (Material Symbols), ModalDialog (<dialog> nativo), OverlayPortal, ConnectionBanner, UpdatePrompt, InstallNudge
 │           │   ├── hooks/              # use-typing-outside-dialog (esconde a barra com o teclado aberto), use-connectivity, use-dialog-open
-│           │   └── lib/                # api-client.ts (axios), query-client.ts, env.ts, connectivity.ts, storage/ (armazenamento local tipado), pwa/ (use-app-update)
+│           │   └── lib/                # api-client.ts (axios), query-client.ts, env.ts, connectivity.ts, storage/ (armazenamento local tipado), pwa/ (use-app-update, install-prompt, display, usage-days, install-keys)
 │           ├── styles/                 # index.css — entrada do Tailwind
 │           └── main.tsx
 │
@@ -368,9 +368,8 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
   com `npm run build` + `npm run preview -w @checkpoint/web` (:4173). O Vitest tem config própria,
   sem o plugin: nenhum teste registra SW.
 - **Manifest** (`/manifest.webmanifest`, gerado no build; o `<link>` é injetado pelo plugin). Sem
-  `orientation` (retrato e paisagem) e, por enquanto, sem `shortcuts` (etapa 4). Ícones `any` e
-  `maskable` em entradas separadas, apontando para `public/icons/*`, que **ainda não existem** (pendência
-  humana no `INDEX.md`): o build passa, mas o Chrome não considera o app instalável até eles existirem.
+  `orientation` (retrato e paisagem). Com `shortcuts` (§5.9). Ícones `any` e `maskable` em entradas
+  separadas, apontando para `public/icons/*`.
 - `theme_color`, `background_color` e o `<meta name="theme-color">` repetem o hex do token `fundo`
   (o manifest não lê CSS); `pwa.config.test.ts` confere que os três são iguais ao `--color-fundo`.
 - **`shared/lib/pwa/use-app-update.ts`** é o **único** arquivo que importa `virtual:pwa-register/react`
@@ -385,6 +384,31 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
   ativação imediata do SW e sem recarga automática (`no-forced-reload.test.ts` varre o código).
 - Animação do aviso: `update-in` (nome próprio; `pulse`/`spin`/`ping`/`bounce` colidem com o Tailwind),
   desligada pela regra global de `prefers-reduced-motion`.
+
+### 5.9 Instalação (`shared/lib/pwa/`, `InstallNudge`, spec `docs/specs/pwa-e-mobile.md`, etapa 4)
+
+- **`install-prompt.ts`** é importado na **primeira linha** de `main.tsx` (teste confere): liga na
+  importação `beforeinstallprompt` (`preventDefault()` + guarda o evento) e `appinstalled` (descarta o
+  evento e grava `instalacao:instalado = true`). O Chrome dispara o evento uma vez e cedo; quem começa a
+  escutar dentro de um componente o perde. Exporta `podeInstalar()`, `pedirInstalacao()`
+  (`'aceito' | 'recusado' | 'indisponivel'`; o evento só vale uma vez) e `assinar(cb)`. O tipo
+  `BeforeInstallPromptEvent` é declarado ali (não existe no `lib.dom`).
+- **`display.ts`**: `estaInstalado()` (`display-mode: standalone` ou `navigator.standalone`) e
+  `ehSafariIos()` (iPhone/iPad, incluindo iPadOS que se apresenta como Mac; Chrome/Firefox/Edge do iOS
+  não contam; fora do app instalado).
+- **Chaves** (`install-keys.ts`, todas `dispositivo`, por `defineKey`): `instalacao:instalado`,
+  `instalacao:dispensado-em` (epoch ms ou `null`) e `instalacao:dias-de-uso` (`{ ultimoDia, total }`).
+- **Contagem de dias de uso** (`usage-days.ts`): `registrarDiaDeUso()` roda em `main.tsx` logo **depois**
+  de `runStorageMigrations()` e antes do render. O dia é o **local** (AAAA-MM-DD; UTC viraria o dia às 21h
+  no Brasil). `proximosDiasDeUso` é a parte pura.
+- **`InstallNudge`** (renderizado pelo `AppLayout` no `#overlay-root`, acima da barra inferior, mesmo
+  cartão do `UpdatePrompt`): aparece 4 s depois da carga, quando TODAS valem: não instalado, `instalado`
+  falso, convite nativo **ou** Safari do iOS, fora de `/login` e `/registro`, sem `<dialog open>`
+  (`use-dialog-open`), `dias-de-uso.total >= 2`, `dispensado-em` nulo ou há >= 14 dias, **e sem o
+  `UpdatePrompt` na tela** (`update-prompt-visibility.ts`: a atualização tem prioridade). "Agora não",
+  "Entendi" ou o prompt recusado gravam `dispensado-em`; aceito some e não volta.
+- **Atalhos do manifest** (`pwa.config.ts`): "Adicionar jogo" → `/?novo=1` e "Jogando" →
+  `/?status=JOGANDO`, sem `icons` (os PNGs de 96 px são opcionais e não existem).
 
 ---
 

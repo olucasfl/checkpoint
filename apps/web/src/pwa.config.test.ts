@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { wantsNewGame } from '@/features/games/lib/new-game';
+import { parseStatusFilter } from '@/features/games/lib/status-filter';
 import css from '@/styles/index.css?raw';
 import indexHtml from '../index.html?raw';
 import { MANIFEST, pwaOptions } from '../pwa.config';
@@ -34,9 +36,29 @@ describe('manifest (CA-25)', () => {
     });
   });
 
-  it('sem orientation (retrato e paisagem) e sem shortcuts (etapa 4)', () => {
+  it('sem orientation (retrato e paisagem)', () => {
     expect(MANIFEST).not.toHaveProperty('orientation');
-    expect(MANIFEST).not.toHaveProperty('shortcuts');
+  });
+
+  it('atalhos: "Adicionar jogo" abre o formulário e "Jogando" filtra; sem a propriedade icons', () => {
+    const shortcuts = MANIFEST.shortcuts ?? [];
+
+    expect(shortcuts.map((shortcut) => [shortcut.name, shortcut.url])).toEqual([
+      ['Adicionar jogo', '/?novo=1'],
+      ['Jogando', '/?status=JOGANDO'],
+    ]);
+    for (const shortcut of shortcuts) {
+      expect(shortcut).not.toHaveProperty('icons');
+    }
+  });
+
+  it('as URLs dos atalhos são as que o catálogo entende (?novo=1 e ?status=)', () => {
+    const [adicionar, jogando] = MANIFEST.shortcuts ?? [];
+
+    expect(wantsNewGame(new URL(adicionar?.url ?? '', 'http://x').searchParams)).toBe(true);
+    expect(
+      parseStatusFilter(new URL(jogando?.url ?? '', 'http://x').searchParams.get('status')),
+    ).toBe('JOGANDO');
   });
 
   it('ícones any e maskable em entradas separadas, nos caminhos definitivos', () => {

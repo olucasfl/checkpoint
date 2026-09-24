@@ -1,6 +1,7 @@
-import { act, render, screen } from '@testing-library/react';
+import { act, render, renderHook, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { useUpdatePromptVisivel } from '@/shared/lib/pwa/update-prompt-visibility';
 import { UpdatePrompt } from './UpdatePrompt';
 
 const update = vi.hoisted(() => ({
@@ -94,6 +95,22 @@ describe('UpdatePrompt', () => {
       dialog.setAttribute('open', '');
     });
     expect(region()).toBeEmptyDOMElement();
+  });
+
+  it('informa o InstallNudge: visível só com versão nova e sem diálogo (a atualização tem prioridade)', async () => {
+    const { result } = renderHook(() => useUpdatePromptVisivel());
+    update.precisaAtualizar = true;
+    const dialog = addDialog(true);
+    const { unmount } = render(<UpdatePrompt />);
+    expect(result.current).toBe(false);
+
+    await act(async () => {
+      dialog.removeAttribute('open');
+    });
+    expect(result.current).toBe(true);
+
+    unmount();
+    expect(result.current).toBe(false);
   });
 
   it('dialog fechado (sem o atributo open) não esconde o aviso', () => {

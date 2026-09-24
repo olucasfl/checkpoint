@@ -1,6 +1,8 @@
+import { useEffect } from 'react';
 import { Icon } from '@/shared/components/Icon';
 import { OverlayPortal } from '@/shared/components/OverlayPortal';
 import { useDialogOpen } from '@/shared/hooks/use-dialog-open';
+import { setUpdatePromptVisivel } from '@/shared/lib/pwa/update-prompt-visibility';
 import { useAppUpdate } from '@/shared/lib/pwa/use-app-update';
 
 /**
@@ -12,6 +14,13 @@ import { useAppUpdate } from '@/shared/lib/pwa/use-app-update';
 export function UpdatePrompt() {
   const { precisaAtualizar, atualizar, adiar } = useAppUpdate();
   const dialogOpen = useDialogOpen();
+  const visivel = precisaAtualizar && !dialogOpen;
+
+  // O convite de instalação espera enquanto este aviso está na tela.
+  useEffect(() => {
+    setUpdatePromptVisivel(visivel);
+    return () => setUpdatePromptVisivel(false);
+  }, [visivel]);
 
   return (
     <OverlayPortal>
@@ -20,7 +29,7 @@ export function UpdatePrompt() {
         aria-live="polite"
         className="update-prompt pointer-events-none fixed z-40"
       >
-        {precisaAtualizar && !dialogOpen && (
+        {visivel && (
           <div className="update-in pointer-events-auto flex items-center gap-3 rounded-md border border-ciano bg-painel px-3.5 py-2.5 text-[16px] text-texto">
             <Icon name="system_update" size={22} filled className="text-ciano" />
             <span className="flex-1">Nova versão disponível</span>
