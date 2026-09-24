@@ -33,6 +33,14 @@ Não assuma nenhuma dessas ausências como "esquecimento" a corrigir de lado —
 escopo do esqueleto. Adicionar qualquer uma delas é uma feature própria, com spec (`docs/specs/`),
 não um efeito colateral de outra tarefa.
 
+**Testes sob carga (linha "Testes" acima):** o timeout por teste é de **20 s** no Jest
+(`apps/api/jest.config.js`, que substituiu o bloco `jest` do `package.json` para caber o comentário) e
+no Vitest (`testTimeout` e `hookTimeout` em `apps/web/vitest.config.ts`), e o Vitest usa no máximo
+**4 workers** (`maxWorkers`). Existem porque a máquina de desenvolvimento é lenta (projeto dentro do
+OneDrive): com o padrão de 5 s e um worker por núcleo, o `npm test` da raiz falhava de forma
+intermitente ("Test timed out in 5000ms", "Failed to start forks worker"), embora cada arquivo
+passasse sozinho. Não são folga para teste lento: um teste que precise de mais que isso é um problema.
+
 ---
 
 ## 2. Grafo de dependências dos workspaces
