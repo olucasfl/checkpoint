@@ -1,6 +1,6 @@
 # Spec: PWA e mobile
 
-> Status: em andamento (aprovada em 2026-09-23; etapas 1 a 3 implementadas; etapa 4 pendente)
+> Status: em andamento (aprovada em 2026-09-23; etapas 1 a 4 implementadas; faltam verificações em aparelho real: CA-09 a CA-12 e CA-41)
 
 ## Objetivo
 
@@ -450,61 +450,63 @@ e 4, porque o SW é desligado no `dev`. "Emulação" = DevTools → Device Toolb
 
 ### Etapa 1 — layout mobile-first
 
-- [ ] **CA-01** — **Dado** o catálogo com 10 jogos (um deles com título de 120 caracteres sem espaço),
+- [x] **CA-01** — **Dado** o catálogo com 10 jogos (um deles com título de 120 caracteres sem espaço),
       **quando** abro `/` em 360×640, **então** `document.documentElement.scrollWidth` é igual a
-      `clientWidth` (sem rolagem horizontal da página).
-- [ ] **CA-02** — **Dado** 360×640, **quando** abro `/`, **então** vejo a barra inferior com "Jogos"
+      `clientWidth` (sem rolagem horizontal da página). _Verificado pelo humano no Chrome em 360×640 (2026-09-24)._
+- [x] **CA-02** — **Dado** 360×640, **quando** abro `/`, **então** vejo a barra inferior com "Jogos"
       (`aria-current="page"`), "Adicionar" e nenhum item "Perfil" (ele só entra com `autenticacao`
       etapa 2); **e** o botão "Adicionar jogo" do topo não aparece. **Dado** 1280 px, **então** a barra
       inferior não existe e o topo mostra "Adicionar jogo" como hoje.
-- [ ] **CA-03** — **Dado** 360×640, **quando** toco em "Adicionar" na barra, **então** abre o
+- [x] **CA-03** — **Dado** 360×640, **quando** toco em "Adicionar" na barra, **então** abre o
       formulário de novo jogo como folha inferior (largura total, colada embaixo) com o foco no Título.
-- [ ] **CA-04** — **Dado** que abro `http://localhost:5173/?novo=1`, **quando** a página carrega,
+- [x] **CA-04** — **Dado** que abro `http://localhost:5173/?novo=1`, **quando** a página carrega,
       **então** o formulário de novo jogo está aberto e a URL virou `/` (sem `novo`); **quando**
       recarrego, **então** o formulário não reabre. **Dado** `/status`, **quando** toco em "Adicionar",
       **então** vou para `/` com o formulário aberto.
-- [ ] **CA-05** — **Dado** 360×640 com a lista rolada até o fim, **quando** olho a última linha,
+- [x] **CA-05** — **Dado** 360×640 com a lista rolada até o fim, **quando** olho a última linha,
       **então** ela está inteira acima da barra inferior (nada coberto).
-- [ ] **CA-06** — **Dado** 360×640, **quando** meço (DevTools → inspecionar) os itens da barra
+- [x] **CA-06** — **Dado** 360×640, **quando** meço (DevTools → inspecionar) os itens da barra
       inferior, os filtros, as ações da linha, os botões de status e os botões do rodapé da folha,
-      **então** todos têm ≥ 44 × 44 px.
-- [ ] **CA-07** — **Dado** 360×640 (quatro filtros com contagem), **quando** arrasto a fileira de filtros, **então**
+      **então** todos têm ≥ 44 × 44 px. _Verificado pelo humano no Chrome em 360×640 (2026-09-24)._
+- [x] **CA-07** — **Dado** 360×640 (quatro filtros com contagem), **quando** arrasto a fileira de filtros, **então**
       ela rola na horizontal sem mover a página; **e** com `/?status=ZERADO` o filtro "Zerado" está
-      visível sem rolar.
-- [ ] **CA-08** — **Dado** o formulário aberto em 360×640 com a capa escolhida (conteúdo maior que a
+      visível sem rolar. _Verificado pelo humano no Chrome em 360×640 (2026-09-24)._
+- [x] **CA-08** — **Dado** o formulário aberto em 360×640 com a capa escolhida (conteúdo maior que a
       tela), **quando** rolo o conteúdo, **então** o rodapé com Cancelar/Salvar continua visível
       embaixo; **e** a folha não passa da altura da tela.
 - [ ] **CA-09** — **Dado** o emulador de iPhone com entalhe (DevTools, "iPhone 14 Pro") ou um aparelho
       real, **quando** abro `/` em retrato e em paisagem, **então** nenhum botão fica sob o entalhe ou
       sob a barra de gestos (a barra inferior tem espaço extra embaixo; as laterais em paisagem também).
+      _Pendente: aparelho real._
 - [ ] **CA-10** — **Dado** um celular Android real com Chrome, **quando** foco o Título no formulário,
       **então** o teclado abre, o campo e o botão Salvar ficam visíveis acima dele, e a página não dá
-      zoom. _Manual, aparelho real._
+      zoom. _Manual, aparelho real. Pendente: aparelho real._
 - [ ] **CA-11** — **Dado** um iPhone real com Safari, **quando** foco qualquer campo do formulário,
       **então** a página **não** dá zoom (fonte ≥ 16 px) e o campo focado fica visível. **E** no
-      DevTools, o `font-size` computado de todo `input`/`select` é ≥ 16 px. _Parte manual, aparelho real._
+      DevTools, o `font-size` computado de todo `input`/`select` é ≥ 16 px. _Parte manual, aparelho real. Pendente: aparelho real._
 - [ ] **CA-12** — **Dado** o celular, **quando** faço pinça na página, **então** ela amplia (zoom não
       travado); **e** o `<meta name="viewport">` não contém `maximum-scale` nem `user-scalable`.
-- [ ] **CA-13** — **Dado** `prefers-reduced-motion: reduce` emulado, **quando** abro o formulário em
+      _Pendente: aparelho real._
+- [x] **CA-13** — **Dado** `prefers-reduced-motion: reduce` emulado, **quando** abro o formulário em
       360×640, **então** a folha aparece sem animação de subida; **e** os avisos das etapas 2 a 4 também
       aparecem sem deslizar.
-- [ ] **CA-14** — **Dado** o toque (emulação com toque ligado), **quando** toco numa linha da lista e
+- [x] **CA-14** — **Dado** o toque (emulação com toque ligado), **quando** toco numa linha da lista e
       solto, **então** ela não fica com o fundo de hover preso.
-- [ ] **CA-15** — **Dado** `apps/web/index.html`, **quando** o leio, **então** `#overlay-root` existe,
+- [x] **CA-15** — **Dado** `apps/web/index.html`, **quando** o leio, **então** `#overlay-root` existe,
       é irmão de `#root` (não está dentro dele); **e** a barra inferior está dentro de `#overlay-root`
       (DevTools → Elements).
-- [ ] **CA-16** — **Dado** o código, **quando** procuro o componente da barra inferior em
+- [x] **CA-16** — **Dado** o código, **quando** procuro o componente da barra inferior em
       `apps/web/src/pages`, **então** nenhuma página o importa (ele vem do `AppLayout`).
 
 ### Etapa 2 — storage e conectividade
 
 - [x] **CA-17** — **Dado** `apps/web/src`, **quando** procuro `localStorage` e `sessionStorage`,
       **então** só aparecem dentro de `shared/lib/storage/` (e nos testes dele).
-- [ ] **CA-18** — **Dado** uma chave registrada gravada com JSON inválido (DevTools → Application →
+- [x] **CA-18** — **Dado** uma chave registrada gravada com JSON inválido (DevTools → Application →
       Local Storage, editar à mão para `{quebrado`), **quando** o app lê essa chave, **então** usa o
       padrão, não mostra erro na tela e a chave some do storage.
-      _Pendente: verificação pela UI na etapa 4 (primeira chave registrada). Hoje coberto por teste
-      unitário e pelo módulo real no navegador, sem tela que leia chave._
+      _Verificado pela UI na etapa 4: `{quebrado` em `instalacao:dias-de-uso`, recarregando, a chave
+      voltou ao padrão (regravada pela contagem) sem erro na tela._
 - [x] **CA-19** — **Dado** o storage bloqueado (Chrome → Configurações → Cookies e dados do site →
       "Bloquear" para `localhost`), **quando** abro `/`, **então** o catálogo funciona igual e não há
       erro não tratado no console.
@@ -570,24 +572,26 @@ e 4, porque o SW é desligado no `dev`. "Emulação" = DevTools → Device Toolb
 
 Requer os ícones da etapa 3 (pendência humana) para o Chrome considerar o app instalável.
 
-- [ ] **CA-36** — **Dado** Chrome no desktop ou Android, app não instalado, aberto em 2 dias diferentes
+- [x] **CA-36** — **Dado** Chrome no desktop ou Android, app não instalado, aberto em 2 dias diferentes
       (simular: `checkpoint:instalacao:dias-de-uso` = `{"ultimoDia":"2026-09-22","total":1}` e
       recarregar), **quando** ~4 s se passam em `/`, **então** aparece o convite com **Instalar** e
       **Agora não**; **quando** clico **Instalar**, **então** abre o prompt nativo do Chrome.
-- [ ] **CA-37** — **Dado** o convite visível, **quando** clico **Agora não**, **então** ele some e
+- [x] **CA-37** — **Dado** o convite visível, **quando** clico **Agora não**, **então** ele some e
       `checkpoint:instalacao:dispensado-em` tem o horário atual; **quando** recarrego, **então** ele não
       aparece; **quando** mudo `dispensado-em` para 15 dias atrás e recarrego, **então** aparece de novo.
-- [ ] **CA-38** — **Dado** o app aberto pelo ícone instalado (standalone), **quando** uso o app,
+- [x] **CA-38** — **Dado** o app aberto pelo ícone instalado (standalone), **quando** uso o app,
       **então** o convite nunca aparece. **Dado** a aba do navegador depois de instalar (evento
       `appinstalled`), **então** também não.
-- [ ] **CA-39** — **Dado** um iPhone com Safari (ou o emulador com _user agent_ de iPhone Safari),
+- [x] **CA-39** — **Dado** um iPhone com Safari (ou o emulador com _user agent_ de iPhone Safari),
       condições de tempo atendidas, **quando** abro `/`, **então** o convite mostra o passo a passo com
       o ícone de Compartilhar e o botão **Entendi**, sem botão Instalar.
-- [ ] **CA-40** — **Dado** o formulário aberto, ou a rota `/login`, **quando** as condições de tempo
-      são atendidas, **então** o convite não aparece.
+- [x] **CA-40** — **Dado** o formulário aberto, ou a rota `/login`, **quando** as condições de tempo
+      são atendidas, **então** o convite não aparece. _Exclusão da rota `/login` coberta só por teste
+      unitário até a spec `autenticacao`._
 - [ ] **CA-41** — **Dado** o app instalado no Android, **quando** pressiono o ícone, **então** vejo os
       atalhos "Adicionar jogo" e "Jogando"; **quando** escolho "Adicionar jogo", **então** o app abre
-      com o formulário aberto. _Manual, aparelho real._
+      com o formulário aberto. _Manual, aparelho real. Pendente: aparelho real (Android, depende de
+      deploy com HTTPS)._
 
 ## Plano de testes
 

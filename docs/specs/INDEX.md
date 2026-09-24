@@ -62,6 +62,12 @@ commit — `/docs-sync` confere se ela bate com a realidade.
       `maskable` com fundo opaco, `apple-touch-icon` 180 sem transparência, favicon 32). Até lá o build
       passa, mas o app não é instalável e o convite de instalação (etapa 4) não aparece.
 
+**`pwa-e-mobile` — aparelho real:**
+
+- [ ] Verificar em aparelho real **CA-09** (entalhe e barra de gestos, retrato e paisagem), **CA-10**
+      (teclado no Android), **CA-11** (sem zoom ao focar campo no iPhone), **CA-12** (zoom por pinça) e
+      **CA-41** (atalhos do ícone no Android). O CA-41 depende de deploy com HTTPS.
+
 **`autenticacao` — aprovações e dados (etapas 1, 3 e 4):**
 
 - [ ] Aprovar a **instalação** das dependências no início da etapa 1 (`RULES.md` §9). As bibliotecas
