@@ -1,6 +1,7 @@
 /**
  * Capa gerada para o jogo sem imagem: uma cor da paleta fixa (capa-1 a capa-6, no @theme) escolhida
- * por hash determinístico do título, e as iniciais. O mesmo título dá sempre a mesma capa.
+ * por hash determinístico do título, e as iniciais. O mesmo título dá sempre a mesma capa. Mora em
+ * `shared/` porque o avatar de iniciais do `/perfil` usa a mesma regra com o nome da pessoa.
  */
 
 /** Classes por extenso (o Tailwind precisa achá-las no código). Índice = resultado do hash. */

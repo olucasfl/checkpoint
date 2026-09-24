@@ -80,10 +80,11 @@ checkpoint/
 │   │       ├── common/                # errors/ (ApiErrorResponse), pipes/ (ValidationPipe global), decorators/ (@Public, @CurrentUser), dto/ (transforms); filters/ e interceptors/ vazias (.gitkeep)
 │   │       ├── config/                 # app.config.ts, env.validation.ts, index.ts
 │   │       ├── database/               # PrismaModule (@Global) + PrismaService
-│   │       ├── modules/                # um módulo por domínio — hoje health/, games/ e auth/
+│   │       ├── modules/                # um módulo por domínio — hoje health/, games/, auth/ e users/
 │   │       │   ├── health/             # GET /api/health → status da API + do banco
 │   │       │   ├── games/              # catálogo de jogos: GET/POST/PATCH/DELETE /api/games
-│   │       │   └── auth/               # registro, login, refresh, logout, me; guard global de access token (§4.5)
+│   │       │   ├── auth/               # registro, login, refresh, logout, me; guard global de access token (§4.5)
+│   │       │   └── users/              # a conta do usuário logado: PATCH /api/users/me (nome); lista branca do Usuario
 │   │       ├── app.module.ts           # inclui o guard global (APP_GUARD)
 │   │       ├── app.setup.ts            # setupApp(): prefixo /api, cookie-parser, CORS, ValidationPipe, Swagger (o main.ts e a verificação manual usam o mesmo)
 │   │       └── main.ts                 # bootstrap: cria o app, setupApp() e listen
@@ -93,12 +94,12 @@ checkpoint/
 │       └── src/
 │           ├── app/                    # providers.tsx (AppProviders) + routes.tsx (as rotas) + router.tsx (AppRouter)
 │           │   └── layout/             # AppLayout/AppFrame, AuthLayout, RequireAuth, LoadingScreen, Backdrop, BottomNav, TopNav, nav-items.ts
-│           ├── features/               # uma pasta por feature — hoje games/ e auth/ (api/, lib/, session/, components/)
+│           ├── features/               # uma pasta por feature — hoje games/, auth/ e perfil/ (api/, lib/, session/, components/)
 │           ├── pages/                  # páginas de rota — GamesPage (/), PerfilPage (/perfil), TrocarSenhaPage (/perfil/senha), LoginPage, RegistroPage e StatusPage (/status)
 │           ├── shared/
 │           │   ├── components/         # Icon (Material Symbols), ModalDialog (<dialog> nativo), OverlayPortal, ConnectionBanner, UpdatePrompt, InstallNudge
-│           │   ├── hooks/              # use-typing-outside-dialog (esconde a barra com o teclado aberto), use-connectivity, use-dialog-open
-│           │   └── lib/                # api-client.ts (axios), query-client.ts, env.ts, connectivity.ts, storage/ (armazenamento local tipado), pwa/ (use-app-update, install-prompt, display, usage-days, install-keys)
+│           │   ├── hooks/              # use-typing-outside-dialog (esconde a barra com o teclado aberto), use-connectivity, use-dialog-open, use-install-option
+│           │   └── lib/                # api-client.ts (axios), query-client.ts, env.ts, connectivity.ts, game-cover.ts (cor + iniciais por hash), storage/ (armazenamento local tipado), pwa/ (use-app-update, install-prompt, display, usage-days, install-keys)
 │           ├── styles/                 # index.css — entrada do Tailwind
 │           └── main.tsx
 │
@@ -199,7 +200,8 @@ implementado.
 ### 4.4 Módulo por domínio (`src/modules/`)
 
 Convenção NestJS padrão, um módulo por domínio, cada um com `*.module.ts` + `*.controller.ts` +
-`*.service.ts` (+ `dto/` quando a rota aceitar body). Hoje há três (`health/`, `games/` e `auth/`, §4.5):
+`*.service.ts` (+ `dto/` quando a rota aceitar body). Hoje há quatro (`health/`, `games/`, `auth/`, §4.5, e
+`users/`):
 
 - `health/` — `GET /api/health`, sem domínio; serve de modelo de forma.
 - `games/` — o catálogo de jogos (spec `docs/specs/catalogo-jogos.md`, etapas 1 e 2; o web está em §5.5):
@@ -254,6 +256,17 @@ apps/api/src/modules/games/
 ├── dto/                  # class-validator + Swagger; transforms.ts lê o valor cru
 └── testing/              # só para testes: o app HTTP com o guard global e tokens sintéticos
 ```
+
+- `users/` — a conta do usuário logado (spec `docs/specs/perfil.md`, etapa 1). Hoje só
+  `PATCH /api/users/me` (protegida pelo guard global), corpo `AtualizarPerfilRequest { nome }` com a mesma
+  regra do registro (`nomeProblem` de `auth/dto/field-rules.ts`: `trim`, 1 a 60). 200 + `Usuario`; 400
+  `VALIDACAO` para nome vazio, 61 caracteres, `{}` ou campo desconhecido (**inclusive `email`**, que não é
+  editável); 401 sem token; conta que sumiu (`P2025`) → 401 `AUTH_SESSAO_ENCERRADA`, como o `GET /auth/me`.
+  `usuario-publico.ts` guarda a **lista branca** `USUARIO_PUBLICO_SELECT` (`id`, `nome`, `email`,
+  `criadoEm`) e o `toUsuario`: uma definição só, usada também pelo `AuthService`, para nenhum `select`
+  devolver `senhaHash`. Testes: `users.service.spec.ts` (Prisma mockado), `dto/atualizar-perfil.dto.spec.ts`
+  (pelo pipe do `main.ts`) e `users.http.spec.ts` (porta local, com a auth de verdade e o Prisma falso de
+  `auth/testing/`).
 
 Registre o módulo novo em `app.module.ts` (`imports: [...]`).
 
@@ -329,14 +342,14 @@ Bearer + marcas de requisição, detecção de conectividade (§5.7) e sessão (
 
 ### 5.4 Onde as coisas vão
 
-| Pasta                    | Para quê                                                                                                   |
-| ------------------------ | ---------------------------------------------------------------------------------------------------------- |
-| `src/features/<nome>/`   | Uma feature de domínio (componentes, hooks, chamadas de API específicas dela). Hoje só `games/`: ver §5.5. |
-| `src/pages/`             | Componentes de página, um por rota, registrados em `app/router.tsx`.                                       |
-| `src/shared/components/` | Componentes de UI reutilizáveis entre features.                                                            |
-| `src/shared/hooks/`      | Hooks reutilizáveis entre features.                                                                        |
-| `src/shared/lib/`        | Infra transversal: cliente HTTP, query client, acesso a env, conectividade, armazenamento local (§5.7).    |
-| `src/styles/`            | Entrada do Tailwind (`index.css`) e qualquer CSS global.                                                   |
+| Pasta                    | Para quê                                                                                                                            |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `src/features/<nome>/`   | Uma feature de domínio (componentes, hooks, chamadas de API específicas dela): `games/` (§5.5), `auth/` (§5.10), `perfil/` (§5.11). |
+| `src/pages/`             | Componentes de página, um por rota, registrados em `app/router.tsx`.                                                                |
+| `src/shared/components/` | Componentes de UI reutilizáveis entre features.                                                                                     |
+| `src/shared/hooks/`      | Hooks reutilizáveis entre features.                                                                                                 |
+| `src/shared/lib/`        | Infra transversal: cliente HTTP, query client, acesso a env, conectividade, armazenamento local (§5.7).                             |
+| `src/styles/`            | Entrada do Tailwind (`index.css`) e qualquer CSS global.                                                                            |
 
 Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
 `features/<nome>/`; se é usado por duas ou mais features (ou não pertence a nenhuma), vai em
@@ -349,8 +362,7 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
   essa query. Chamadas só pelo `apiClient`, tipos de `@checkpoint/shared`. O upload da capa manda
   `multipart/form-data` **explícito**: o `apiClient` tem `Content-Type: application/json` por padrão e,
   nesse caso, o axios converte o `FormData` em JSON (a API recebia o arquivo vazio: 400).
-- **`lib/`** (lógica pura, com teste ao lado): `count-by-status`, `status-filter`, `game-cover` (cor da
-  capa gerada por hash FNV-1a do título + iniciais), `api-error` (mapeia o `fields` da
+- **`lib/`** (lógica pura, com teste ao lado): `count-by-status`, `status-filter`, `api-error` (mapeia o `fields` da
   `ApiErrorResponse` para os campos do formulário), `cover-file` (pré-checagem de tipo e tamanho),
   `form-values` (`nota: null` explícito em "Quero jogar"), `platforms` (lista de plataformas) e
   `save-game` (salva o jogo e SÓ DEPOIS a capa; se a capa falha, devolve o jogo salvo + o erro da capa e
@@ -527,8 +539,7 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
   conexão. Para sair, conecte-se."), porque o cookie `HttpOnly` só o servidor apaga. Depois de sair, o
   `BroadcastChannel` avisa as outras abas, que fazem o logout local na hora.
 - **Telas:** `LoginForm` e `RegistroForm` (validação local com as regras da API; "Confirmar senha" só no registro;
-  `CampoSenha` com "mostrar senha" de 44 × 44 e `aria-pressed`), `PerfilPage` (nome, e-mail "(não verificado — usado
-  só para entrar)", link "Trocar senha" e Sair). Reusam `shared/components/form-parts` (movido de `features/games`)
+  `CampoSenha` com "mostrar senha" de 44 × 44 e `aria-pressed`) e o Sair do `/perfil` (a página está em §5.11). Reusam `shared/components/form-parts` (movido de `features/games`)
   e o visual Neon.
 - **`/perfil/senha`** (etapa 5, `TrocarSenhaPage` + `TrocarSenhaForm`): Senha atual (`current-password`), Nova senha
   e Confirmar nova senha (`new-password`), cada uma com o "mostrar senha". Confirmação diferente → "As senhas não
@@ -536,6 +547,31 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
   e renovação pelo interceptor). Sucesso navega para `/perfil` com o aviso no `state` da navegação
   (`lib/perfil-avisos.ts`: só um aviso conhecido é mostrado, em `role="status"`). As outras sessões caem no
   servidor; o outro navegador descobre na próxima request (401 → `/login?motivo=sessao`).
+
+### 5.11 Perfil (`features/perfil/`, `pages/PerfilPage.tsx`, spec `docs/specs/perfil.md`, etapa 1)
+
+- **`/perfil`** (dentro do `RequireAuth` + `AppLayout`): cabeçalho, seção **Conta** ("Salvo na sua conta":
+  Trocar senha → `/perfil/senha`, Sair) e seção **App** ("Instalar app", só quando dá). Empilhado abaixo de
+  1024px e em duas colunas (`lg:grid-cols-2`) a partir de 1024px.
+- **Cabeçalho** (`PerfilCabecalho`): avatar de iniciais 64 × 64 com a mesma regra da capa gerada dos jogos
+  aplicada ao nome (**`shared/lib/game-cover.ts`**, movido de `features/games/lib` por servir às duas
+  features: cor da paleta `capa-1` a `capa-6` por hash FNV-1a do texto aparado e em minúsculas, e as
+  iniciais); o nome (editável); o e-mail com "(não verificado — usado só para entrar)"; "Membro desde
+  <mês de ano>" (`Intl.DateTimeFormat('pt-BR')`); e o resumo "N jogos · X zerados · Y jogando · Z quero
+  jogar" (`lib/resumo.ts`), calculado da **mesma query `['games']`** do catálogo (`useGames` +
+  `countByStatus`, sem endpoint novo; "—" enquanto carrega). Nome e e-mail aparecem uma vez só na tela.
+- **Nome editável** (`NomeEditavel`): Editar (44 × 44, `aria-label="Editar nome"`) abre o campo com o nome e
+  o foco nele; **Esc** ou Cancelar fecham **sem request**; Salvar valida com a regra local
+  (`features/auth/lib/field-rules`) e manda `PATCH /users/me` (`api/perfil-api.ts`, pelo `apiClient`). O
+  sucesso chama `atualizarUsuario` da sessão (`features/auth/session/session.ts`, exposto no `useAuth`), que
+  troca o `usuario` só se for a mesma conta ainda autenticada: o nome muda na tela toda sem recarregar. Erros
+  pelo `code`/`fields` (`describeAuthError`); o foco volta ao Editar ao fechar.
+- **Instalar app** (`InstalarApp` + `shared/hooks/use-install-option.ts`): `nativo` quando o Chrome/Edge
+  guardou o convite (`podeInstalar()`), `ios` no Safari do iPhone/iPad (mostra o passo a passo), e nada quando
+  já instalado (`estaInstalado()` ou a chave `instalacao:instalado`). Sem as regras de intervalo do
+  `InstallNudge`: é um botão sempre disponível.
+- **Testes:** `pages/PerfilPage.test.tsx` (cabeçalho e resumo, "—" carregando, edição com Esc sem request,
+  validação local, erros da API, instalar só quando aplicável) e `features/perfil/lib/resumo.test.ts`.
 
 ---
 
@@ -550,7 +586,11 @@ antes de `api`/`web` (§2). Hoje tem:
   constantes de limite e `statusAllowsRating` (regra da nota, usada pela API e pelo formulário).
   A capa entra como `Game.capaUrl` (URL pública ou `null`), `GAME_COVER_MAX_BYTES` (2 MB),
   `GAME_COVER_MIME_TYPES`, `GAME_COVER_FIELD` (`arquivo`) e o campo `arquivo` em `ApiErrorField`.
-- `index.ts` — reexporta `games` e mantém dois exemplos herdados do esqueleto
+- `auth.ts` — contrato da autenticação e da conta: `Usuario`, `RegistroRequest`, `LoginRequest`,
+  `AuthResponse`, `TrocarSenhaRequest`, **`AtualizarPerfilRequest`** (`{ nome }`, de `PATCH /api/users/me`),
+  os limites (`USER_NAME_MAX_LENGTH` etc.), as regras puras (`normalizeEmail`, `utf8ByteLength`,
+  `passwordProblem`), `API_ERROR_CODES`/`ApiErrorCode` e `CSRF_HEADER`.
+- `index.ts` — reexporta `auth` e `games` e mantém dois exemplos herdados do esqueleto
   (`HealthCheckResponse`, `APP_NAME`).
 
 O que entra aqui: tipos de request/response compartilhados entre API e web, enums de domínio,

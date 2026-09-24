@@ -1,6 +1,7 @@
 # Spec: autenticação
 
-> Status: aprovada (2026-09-24; Q1 a Q5 decididas; mudança destrutiva A3/A4 aprovada)
+> Status: em andamento (etapas 1 a 5 implementadas; 49 de 56 critérios comprovados por teste em
+> 2026-09-24; faltam CA-17, CA-21, CA-22, CA-40, CA-48, CA-49 e CA-50: ver `INDEX.md`)
 >
 > ⚠️ Contém **mudança destrutiva de schema** (`Game.userId` obrigatório e `@@unique` alterado),
 > **aprovada pelo humano em 2026-09-24** (`RULES.md` §3). Ver "Modelo de dados" e a Questão Q5.
@@ -555,59 +556,59 @@ export const CSRF_HEADER = 'X-Checkpoint-Csrf';
 
 ### Etapa 1 — API de auth
 
-- [ ] **CA-01** — **Dado** registro aberto e nenhum usuário, **quando** `POST /auth/registro` com `{"nome":" Ana Teste ","email":"  Ana@Exemplo.COM ","senha":"segredo-forte"}`, **então** 201 com `accessToken` e `usuario` = `{ id (UUID), nome: "Ana Teste", email: "ana@exemplo.com", criadoEm }`, e o cabeçalho `Set-Cookie` tem `checkpoint_refresh=…; Max-Age=2592000; Path=/api/auth; HttpOnly; SameSite=Lax` (sem `Secure` em dev).
-- [ ] **CA-02** — **Dado** a conta do CA-01, **quando** registro de novo com `"email":"ANA@exemplo.com "`, **então** 409, `code: "AUTH_EMAIL_EM_USO"` e `fields.email` presente, e continua existindo um só usuário.
-- [ ] **CA-03** — **Dado** `POST /auth/registro` com (a) `nome` vazio ou de 61 caracteres, (b) `email` `"ana"`, (c) `senha` de 7 caracteres, (d) `senha` de 37 "á" (74 bytes), (e) `senha` de 8 espaços, (f) um campo extra `"admin":true`, **quando** enviado, **então** 400 com `code: "VALIDACAO"` e o `fields` do campo certo em (a) a (e), e 400 em (f); **e** `senha` de 36 "á" (72 bytes) é aceita (201).
-- [ ] **CA-04** — **Dado** `AUTH_REGISTRATION_OPEN=false`, **quando** `POST /auth/registro` válido, **então** 403 `AUTH_REGISTRO_FECHADO` e nenhum usuário é criado; **e** o login de uma conta existente continua funcionando.
-- [ ] **CA-05** — **Dado** a conta do CA-01, **quando** `POST /auth/login` com `{"email":" ANA@exemplo.com","senha":"segredo-forte"}`, **então** 200 com `accessToken`, `usuario` e o cookie; **e** no Prisma Studio há uma `RefreshSession` nova desse usuário com `tokenHash` de 64 caracteres hexadecimais, **diferente** do valor do cookie, e `dispositivo` preenchido (ex.: `"curl"` → `"Outro · Outro"`).
-- [ ] **CA-06** — **Dado** a conta do CA-01, **quando** faço login com a senha errada e com `nao-existe@exemplo.com`, **então** as duas respostas são 401 com o **mesmo corpo** `{"statusCode":401,"code":"AUTH_CREDENCIAIS_INVALIDAS","message":"E-mail ou senha incorretos."}`, sem `fields`.
-- [ ] **CA-07** — **Dado** um `accessToken` válido, **quando** `GET /auth/me` com `Authorization: Bearer <token>`, **então** 200 com o `Usuario`; **sem** o cabeçalho, ou com o token alterado num caractere, **então** 401 `AUTH_NAO_AUTENTICADO`; **e** usando o **refresh** token (valor do cookie) como Bearer, **então** 401 `AUTH_NAO_AUTENTICADO` (segredos separados).
-- [ ] **CA-08** — **Dado** um access token vencido (teste unitário com relógio falso; manual: esperar 16 min), **quando** `GET /auth/me`, **então** 401 `AUTH_TOKEN_EXPIRADO`.
-- [ ] **CA-09** — **Dado** o jar do login, **quando** `curl $J $CSRF -X POST /auth/refresh`, **então** 200 com `accessToken` novo e um `Set-Cookie` com valor **diferente** do anterior; **e** o número de `RefreshSession` do usuário não muda (mesma linha, `ultimoUsoEm` e `expiraEm` avançaram).
-- [ ] **CA-10** — **Dado** que guardei o cookie **antes** do CA-09, **quando** faço refresh com ele em até 30 s depois da rotação, **então** 409 `AUTH_REFRESH_CONCORRENTE`, a sessão continua e o cookie **novo** ainda renova (200).
-- [ ] **CA-11** — **Dado** o cookie anterior e mais de 30 s desde a rotação, **quando** faço refresh com ele, **então** 401 `AUTH_SESSAO_ENCERRADA`, `Set-Cookie` limpando `checkpoint_refresh`, a linha da sessão some do banco, e o cookie **novo** também passa a dar 401 (reuso encerra a sessão); **e** o log da API tem um aviso com o id da sessão e sem nenhum token.
-- [ ] **CA-12** — **Dado** `POST /auth/refresh` **sem** cookie, **então** 401 `AUTH_SESSAO_ENCERRADA`; **dado** o cookie válido mas **sem** o cabeçalho `X-Checkpoint-Csrf`, **então** 403 `AUTH_ORIGEM_INVALIDA` e a sessão não é rotacionada.
-- [ ] **CA-13** — **Dado** uma sessão logada, **quando** `POST /auth/logout` com o jar e o cabeçalho, **então** 204, `Set-Cookie` com `Max-Age=0`, a sessão some do banco, e o access token dela passa a dar 401 `AUTH_SESSAO_ENCERRADA` **na hora** em `GET /auth/me`; **quando** repito o logout, **então** 204.
-- [ ] **CA-14** — **Dado** dois logins da mesma conta em jars diferentes (A e B), **quando** faço logout em A, **então** B continua: `me` 200 e `refresh` 200.
-- [ ] **CA-15** — **Dado** 10 sessões ativas da mesma conta, **quando** faço o 11º login, **então** continuam 10 sessões e a de `ultimoUsoEm` mais antigo deixou de renovar (401).
-- [ ] **CA-16** — **Dado** o mesmo IP, **quando** faço 6 logins em menos de 1 minuto, **então** o 6º responde 429 com `code: "LIMITE_TENTATIVAS"` e cabeçalho `Retry-After`; **e**, com `AUTH_REGISTRATION_LIMIT_PER_HOUR=2`, 3 registros seguidos → o 3º é 429. (O padrão de 3 por hora sem a env é verificado por teste unitário, não à mão.)
+- [x] **CA-01** — **Dado** registro aberto e nenhum usuário, **quando** `POST /auth/registro` com `{"nome":" Ana Teste ","email":"  Ana@Exemplo.COM ","senha":"segredo-forte"}`, **então** 201 com `accessToken` e `usuario` = `{ id (UUID), nome: "Ana Teste", email: "ana@exemplo.com", criadoEm }`, e o cabeçalho `Set-Cookie` tem `checkpoint_refresh=…; Max-Age=2592000; Path=/api/auth; HttpOnly; SameSite=Lax` (sem `Secure` em dev).
+- [x] **CA-02** — **Dado** a conta do CA-01, **quando** registro de novo com `"email":"ANA@exemplo.com "`, **então** 409, `code: "AUTH_EMAIL_EM_USO"` e `fields.email` presente, e continua existindo um só usuário.
+- [x] **CA-03** — **Dado** `POST /auth/registro` com (a) `nome` vazio ou de 61 caracteres, (b) `email` `"ana"`, (c) `senha` de 7 caracteres, (d) `senha` de 37 "á" (74 bytes), (e) `senha` de 8 espaços, (f) um campo extra `"admin":true`, **quando** enviado, **então** 400 com `code: "VALIDACAO"` e o `fields` do campo certo em (a) a (e), e 400 em (f); **e** `senha` de 36 "á" (72 bytes) é aceita (201).
+- [x] **CA-04** — **Dado** `AUTH_REGISTRATION_OPEN=false`, **quando** `POST /auth/registro` válido, **então** 403 `AUTH_REGISTRO_FECHADO` e nenhum usuário é criado; **e** o login de uma conta existente continua funcionando.
+- [x] **CA-05** — **Dado** a conta do CA-01, **quando** `POST /auth/login` com `{"email":" ANA@exemplo.com","senha":"segredo-forte"}`, **então** 200 com `accessToken`, `usuario` e o cookie; **e** no Prisma Studio há uma `RefreshSession` nova desse usuário com `tokenHash` de 64 caracteres hexadecimais, **diferente** do valor do cookie, e `dispositivo` preenchido (ex.: `"curl"` → `"Outro · Outro"`).
+- [x] **CA-06** — **Dado** a conta do CA-01, **quando** faço login com a senha errada e com `nao-existe@exemplo.com`, **então** as duas respostas são 401 com o **mesmo corpo** `{"statusCode":401,"code":"AUTH_CREDENCIAIS_INVALIDAS","message":"E-mail ou senha incorretos."}`, sem `fields`.
+- [x] **CA-07** — **Dado** um `accessToken` válido, **quando** `GET /auth/me` com `Authorization: Bearer <token>`, **então** 200 com o `Usuario`; **sem** o cabeçalho, ou com o token alterado num caractere, **então** 401 `AUTH_NAO_AUTENTICADO`; **e** usando o **refresh** token (valor do cookie) como Bearer, **então** 401 `AUTH_NAO_AUTENTICADO` (segredos separados).
+- [x] **CA-08** — **Dado** um access token vencido (teste unitário com relógio falso; manual: esperar 16 min), **quando** `GET /auth/me`, **então** 401 `AUTH_TOKEN_EXPIRADO`.
+- [x] **CA-09** — **Dado** o jar do login, **quando** `curl $J $CSRF -X POST /auth/refresh`, **então** 200 com `accessToken` novo e um `Set-Cookie` com valor **diferente** do anterior; **e** o número de `RefreshSession` do usuário não muda (mesma linha, `ultimoUsoEm` e `expiraEm` avançaram).
+- [x] **CA-10** — **Dado** que guardei o cookie **antes** do CA-09, **quando** faço refresh com ele em até 30 s depois da rotação, **então** 409 `AUTH_REFRESH_CONCORRENTE`, a sessão continua e o cookie **novo** ainda renova (200).
+- [x] **CA-11** — **Dado** o cookie anterior e mais de 30 s desde a rotação, **quando** faço refresh com ele, **então** 401 `AUTH_SESSAO_ENCERRADA`, `Set-Cookie` limpando `checkpoint_refresh`, a linha da sessão some do banco, e o cookie **novo** também passa a dar 401 (reuso encerra a sessão); **e** o log da API tem um aviso com o id da sessão e sem nenhum token.
+- [x] **CA-12** — **Dado** `POST /auth/refresh` **sem** cookie, **então** 401 `AUTH_SESSAO_ENCERRADA`; **dado** o cookie válido mas **sem** o cabeçalho `X-Checkpoint-Csrf`, **então** 403 `AUTH_ORIGEM_INVALIDA` e a sessão não é rotacionada.
+- [x] **CA-13** — **Dado** uma sessão logada, **quando** `POST /auth/logout` com o jar e o cabeçalho, **então** 204, `Set-Cookie` com `Max-Age=0`, a sessão some do banco, e o access token dela passa a dar 401 `AUTH_SESSAO_ENCERRADA` **na hora** em `GET /auth/me`; **quando** repito o logout, **então** 204.
+- [x] **CA-14** — **Dado** dois logins da mesma conta em jars diferentes (A e B), **quando** faço logout em A, **então** B continua: `me` 200 e `refresh` 200.
+- [x] **CA-15** — **Dado** 10 sessões ativas da mesma conta, **quando** faço o 11º login, **então** continuam 10 sessões e a de `ultimoUsoEm` mais antigo deixou de renovar (401).
+- [x] **CA-16** — **Dado** o mesmo IP, **quando** faço 6 logins em menos de 1 minuto, **então** o 6º responde 429 com `code: "LIMITE_TENTATIVAS"` e cabeçalho `Retry-After`; **e**, com `AUTH_REGISTRATION_LIMIT_PER_HOUR=2`, 3 registros seguidos → o 3º é 429. (O padrão de 3 por hora sem a env é verificado por teste unitário, não à mão.)
 - [ ] **CA-17** — **Dado** a etapa 1 implantada, **quando** `GET /api/health` e `GET /api/games` sem token, **então** ambos 200 (games ainda público até a etapa 3); **e** `GET /api/auth/me` sem token é 401.
-- [ ] **CA-18** — **Dado** `apps/api/.env` sem `JWT_ACCESS_SECRET`, sem `JWT_REFRESH_SECRET` ou sem `AUTH_REGISTRATION_OPEN`; ou com um segredo de menos de 32 caracteres; ou com os dois segredos iguais; ou com `CORS_ORIGIN=*`, **quando** a API sobe, **então** ela falha listando o problema; **e** `apps/api/.env.example` lista as três variáveis novas **sem valor real**.
-- [ ] **CA-19** — **Dado** uma request com `Origin: http://localhost:5173` para `/auth/refresh`, **então** a resposta traz `Access-Control-Allow-Origin: http://localhost:5173` e `Access-Control-Allow-Credentials: true`; **dado** `Origin: http://malicioso.exemplo`, **então** a resposta não traz `Access-Control-Allow-Origin`.
-- [ ] **CA-20** — **Dado** as respostas dos CA-01 a CA-15, **quando** procuro `senhaHash`, `tokenHash`, `hashAnterior` e o valor do refresh token nos **corpos**, **então** não há ocorrência; **e** o console da API durante esses passos não contém nenhuma senha, token ou cookie.
+- [x] **CA-18** — **Dado** `apps/api/.env` sem `JWT_ACCESS_SECRET`, sem `JWT_REFRESH_SECRET` ou sem `AUTH_REGISTRATION_OPEN`; ou com um segredo de menos de 32 caracteres; ou com os dois segredos iguais; ou com `CORS_ORIGIN=*`, **quando** a API sobe, **então** ela falha listando o problema; **e** `apps/api/.env.example` lista as três variáveis novas **sem valor real**.
+- [x] **CA-19** — **Dado** uma request com `Origin: http://localhost:5173` para `/auth/refresh`, **então** a resposta traz `Access-Control-Allow-Origin: http://localhost:5173` e `Access-Control-Allow-Credentials: true`; **dado** `Origin: http://malicioso.exemplo`, **então** a resposta não traz `Access-Control-Allow-Origin`.
+- [x] **CA-20** — **Dado** as respostas dos CA-01 a CA-15, **quando** procuro `senhaHash`, `tokenHash`, `hashAnterior` e o valor do refresh token nos **corpos**, **então** não há ocorrência; **e** o console da API durante esses passos não contém nenhuma senha, token ou cookie.
 - [ ] **CA-21** — **Dado** a migração A1, **quando** aplicada, **então** ela só cria `User` e `RefreshSession` (nenhuma tabela existente muda) e um segundo `npm run db:migrate` não gera migração nova.
 - [ ] **CA-22** — **Dado** `/api/docs`, **quando** abro, **então** vejo a tag `auth` com as rotas e o botão "Authorize" (Bearer).
 
 ### Etapa 2 — web
 
-- [ ] **CA-23** — **Dado** um navegador sem cookie, **quando** abro `/`, **então** vou para `/login?voltar=%2F` **sem** a mensagem "Sua sessão terminou".
-- [ ] **CA-24** — **Dado** `/registro`, **quando** olho a tela, **então** vejo Nome, E-mail, Senha, Confirmar senha, o texto sobre e-mail não verificado e falta de recuperação, e o link "Já tenho conta"; **quando** as senhas não coincidem, **então** aparece "As senhas não coincidem" e nenhuma request sai; **quando** preencho certo, **então** entro direto em `/`.
-- [ ] **CA-25** — **Dado** `/login`, **quando** erro a senha, **então** aparece "E-mail ou senha incorretos.", o e-mail continua preenchido, a senha é limpa e o foco vai para ela.
-- [ ] **CA-26** — **Dado** que estou logado, **quando** recarrego `/`, **então** continuo logado (Network: `POST /api/auth/refresh` 200 antes de `GET /api/games`).
-- [ ] **CA-27** — **Dado** que estou logado, **quando** olho DevTools → Application, **então** Local Storage, Session Storage e IndexedDB não têm nenhum token; o cookie `checkpoint_refresh` aparece com HttpOnly marcado; e `document.cookie` no console não o mostra.
-- [ ] **CA-28** — **Dado** três requests paralelas recebendo 401 `AUTH_TOKEN_EXPIRADO` (teste unitário do interceptor), **quando** o interceptor reage, **então** sai **exatamente um** `POST /auth/refresh` e as três são repetidas uma vez com o token novo.
-- [ ] **CA-29** — **Dado** que estou logado, **quando** apago a minha `RefreshSession` no Prisma Studio e clico num filtro, **então** vou para `/login?motivo=sessao&voltar=…` com "Sua sessão terminou. Entre de novo."
-- [ ] **CA-30** — **Dado** que estou logado, **quando** paro a API e recarrego a página, **então** vejo o app com "Sem conexão. Seu catálogo aparece quando a conexão voltar." (não a tela de login); **quando** subo a API, **então** o catálogo carrega sozinho, ainda logado.
-- [ ] **CA-31** — **Dado** `/login?voltar=/perfil`, **quando** entro, **então** vou para `/perfil`; **dado** `voltar` = `//malicioso.exemplo`, `https://malicioso.exemplo`, `/\malicioso.exemplo` ou `/login`, **então** vou para `/`.
-- [ ] **CA-32** — **Dado** que estou logado, **quando** abro `/login` ou `/registro`, **então** vou para `/`.
-- [ ] **CA-33** — **Dado** que estou logado em `/perfil`, **quando** clico **Sair**, **então** vou para `/login` sem mensagem, o cookie some, `checkpoint:sessao:ativa` some, as chaves `checkpoint:instalacao:*` continuam; **e** "voltar" do navegador para `/` me manda de novo ao login.
-- [ ] **CA-34** — **Dado** que estou logado e o DevTools em "Offline", **quando** clico **Sair**, **então** vejo "Sem conexão. Para sair, conecte-se." e continuo logado.
-- [ ] **CA-35** — **Dado** duas abas logadas, **quando** saio numa, **então** a outra vai para `/login` (imediatamente, via `BroadcastChannel`).
-- [ ] **CA-36** — **Dado** `/perfil`, **quando** abro, **então** vejo o nome, o e-mail com "(não verificado — usado só para entrar)" e **Sair**; **e** a barra inferior (360 px) tem o item "Perfil".
-- [ ] **CA-37** — **Dado** `/login` e `/registro` em 360×640, **quando** inspeciono, **então** os campos têm os `type`/`autocomplete` da spec, fonte ≥ 16 px, o botão "mostrar senha" tem 44 × 44 e `aria-pressed`, e Enter no último campo envia.
-- [ ] **CA-38** — **Dado** o código de `apps/web/src/features/auth`, **quando** procuro comparação com o texto de `message` da API, **então** não há: as mensagens saem do `Record<ApiErrorCode, string>`; **e** remover um código do mapa quebra o `typecheck`.
-- [ ] **CA-39** — **Dado** 6 tentativas de login seguidas, **quando** a 6ª responde 429, **então** a tela mostra "Muitas tentativas. Aguarde um pouco e tente de novo."
+- [x] **CA-23** — **Dado** um navegador sem cookie, **quando** abro `/`, **então** vou para `/login?voltar=%2F` **sem** a mensagem "Sua sessão terminou".
+- [x] **CA-24** — **Dado** `/registro`, **quando** olho a tela, **então** vejo Nome, E-mail, Senha, Confirmar senha, o texto sobre e-mail não verificado e falta de recuperação, e o link "Já tenho conta"; **quando** as senhas não coincidem, **então** aparece "As senhas não coincidem" e nenhuma request sai; **quando** preencho certo, **então** entro direto em `/`.
+- [x] **CA-25** — **Dado** `/login`, **quando** erro a senha, **então** aparece "E-mail ou senha incorretos.", o e-mail continua preenchido, a senha é limpa e o foco vai para ela.
+- [x] **CA-26** — **Dado** que estou logado, **quando** recarrego `/`, **então** continuo logado (Network: `POST /api/auth/refresh` 200 antes de `GET /api/games`).
+- [x] **CA-27** — **Dado** que estou logado, **quando** olho DevTools → Application, **então** Local Storage, Session Storage e IndexedDB não têm nenhum token; o cookie `checkpoint_refresh` aparece com HttpOnly marcado; e `document.cookie` no console não o mostra.
+- [x] **CA-28** — **Dado** três requests paralelas recebendo 401 `AUTH_TOKEN_EXPIRADO` (teste unitário do interceptor), **quando** o interceptor reage, **então** sai **exatamente um** `POST /auth/refresh` e as três são repetidas uma vez com o token novo.
+- [x] **CA-29** — **Dado** que estou logado, **quando** apago a minha `RefreshSession` no Prisma Studio e faço uma ação que fala com a API (ex.: salvar um jogo ou recarregar a página; **clicar num filtro do catálogo não serve**, porque o filtro age sobre a lista já carregada, no cliente, sem request), **então** vou para `/login?motivo=sessao&voltar=…` com "Sua sessão terminou. Entre de novo."
+- [x] **CA-30** — **Dado** que estou logado, **quando** paro a API e recarrego a página, **então** vejo o app com "Sem conexão. Seu catálogo aparece quando a conexão voltar." (não a tela de login); **quando** subo a API, **então** o catálogo carrega sozinho, ainda logado.
+- [x] **CA-31** — **Dado** `/login?voltar=/perfil`, **quando** entro, **então** vou para `/perfil`; **dado** `voltar` = `//malicioso.exemplo`, `https://malicioso.exemplo`, `/\malicioso.exemplo` ou `/login`, **então** vou para `/`.
+- [x] **CA-32** — **Dado** que estou logado, **quando** abro `/login` ou `/registro`, **então** vou para `/`.
+- [x] **CA-33** — **Dado** que estou logado em `/perfil`, **quando** clico **Sair**, **então** vou para `/login` sem mensagem, o cookie some, `checkpoint:sessao:ativa` some, as chaves `checkpoint:instalacao:*` continuam; **e** "voltar" do navegador para `/` me manda de novo ao login.
+- [x] **CA-34** — **Dado** que estou logado e o DevTools em "Offline", **quando** clico **Sair**, **então** vejo "Sem conexão. Para sair, conecte-se." e continuo logado.
+- [x] **CA-35** — **Dado** duas abas logadas, **quando** saio numa, **então** a outra vai para `/login` (imediatamente, via `BroadcastChannel`).
+- [x] **CA-36** — **Dado** `/perfil`, **quando** abro, **então** vejo o nome, o e-mail com "(não verificado — usado só para entrar)" e **Sair**; **e** a barra inferior (360 px) tem o item "Perfil".
+- [x] **CA-37** — **Dado** `/login` e `/registro` em 360×640, **quando** inspeciono, **então** os campos têm os `type`/`autocomplete` da spec, fonte ≥ 16 px, o botão "mostrar senha" tem 44 × 44 e `aria-pressed`, e Enter no último campo envia.
+- [x] **CA-38** — **Dado** o código de `apps/web/src/features/auth`, **quando** procuro comparação com o texto de `message` da API, **então** não há: as mensagens saem do `Record<ApiErrorCode, string>`; **e** remover um código do mapa quebra o `typecheck`.
+- [x] **CA-39** — **Dado** 6 tentativas de login seguidas, **quando** a 6ª responde 429, **então** a tela mostra "Muitas tentativas. Aguarde um pouco e tente de novo."
 
 ### Etapa 3 — dono dos jogos, fase 1
 
 - [ ] **CA-40** — **Dado** o banco com N jogos sem dono, **quando** a migração A3 é aplicada, **então** `SELECT count(*) FROM "Game"` continua N, todos com `"userId" IS NULL`, existe a FK para `User` com `ON DELETE CASCADE`, o índice único é `(userId, tituloNormalizado, plataformaNormalizada)`, os dois `CHECK` continuam, e um segundo `db:migrate` não gera migração nova.
-- [ ] **CA-41** — **Dado** a etapa 3, **quando** `GET /api/games` sem token, **então** 401 `AUTH_NAO_AUTENTICADO`.
-- [ ] **CA-42** — **Dado** Ana com 2 jogos e Bia com 1, **quando** cada uma faz `GET /api/games`, **então** cada uma vê só os seus; **e** `PATCH`, `DELETE`, `PUT /capa` e `DELETE /capa` da Bia no id de um jogo da Ana → 404 `"Jogo não encontrado"`, e o jogo da Ana não muda.
-- [ ] **CA-43** — **Dado** Ana com "Celeste / PC", **quando** Bia cria "celeste / pc", **então** 201; **quando** Ana cria "CELESTE / PC", **então** 409 `"Já existe esse jogo nesta plataforma"`.
-- [ ] **CA-44** — **Dado** jogos sem dono no banco (da fase anterior), **quando** Ana e Bia listam, **então** nenhum deles aparece.
-- [ ] **CA-45** — **Dado** Ana logada, **quando** envia uma capa nova, **então** a `capaUrl` contém `/capas/<idDaAna>/<gameId>/`; **e** uma capa enviada antes da etapa 3 (`/capas/<gameId>/…`) continua aparecendo depois da atribuição do jogo.
-- [ ] **CA-46** — **Dado** `POST /api/games` com `"userId":"<outro id>"`, **então** 400; **e** nenhum response de `games` contém `userId`.
-- [ ] **CA-47** — **Dado** o web logado como Ana com a lista carregada, **quando** saio e entro como Bia na mesma aba, **então** a lista da Ana **nunca** aparece, nem por um instante (o cache foi limpo; a primeira pintura é o estado de carregamento).
+- [x] **CA-41** — **Dado** a etapa 3, **quando** `GET /api/games` sem token, **então** 401 `AUTH_NAO_AUTENTICADO`.
+- [x] **CA-42** — **Dado** Ana com 2 jogos e Bia com 1, **quando** cada uma faz `GET /api/games`, **então** cada uma vê só os seus; **e** `PATCH`, `DELETE`, `PUT /capa` e `DELETE /capa` da Bia no id de um jogo da Ana → 404 `"Jogo não encontrado"`, e o jogo da Ana não muda.
+- [x] **CA-43** — **Dado** Ana com "Celeste / PC", **quando** Bia cria "celeste / pc", **então** 201; **quando** Ana cria "CELESTE / PC", **então** 409 `"Já existe esse jogo nesta plataforma"`.
+- [x] **CA-44** — **Dado** jogos sem dono no banco (da fase anterior), **quando** Ana e Bia listam, **então** nenhum deles aparece.
+- [x] **CA-45** — **Dado** Ana logada, **quando** envia uma capa nova, **então** a `capaUrl` contém `/capas/<idDaAna>/<gameId>/`; **e** uma capa enviada antes da etapa 3 (`/capas/<gameId>/…`) continua aparecendo depois da atribuição do jogo.
+- [x] **CA-46** — **Dado** `POST /api/games` com `"userId":"<outro id>"`, **então** 400; **e** nenhum response de `games` contém `userId`.
+- [x] **CA-47** — **Dado** o web logado como Ana com a lista carregada, **quando** saio e entro como Bia na mesma aba, **então** a lista da Ana **nunca** aparece, nem por um instante: o cache foi limpo e a primeira pintura com conteúdo do app é o estado de carregamento. (O quadro vazio de ~6 ms antes de o React montar, só com o fundo, não mostra dado nenhum e não conta como vazamento.)
 
 ### Etapa 4 — dono dos jogos, fase 2
 
@@ -617,12 +618,12 @@ export const CSRF_HEADER = 'X-Checkpoint-Csrf';
 
 ### Etapa 5 — troca de senha
 
-- [ ] **CA-51** — **Dado** Ana logada em dois jars (A e B), **quando** `PUT /api/auth/senha` pelo A com `{"senhaAtual":"segredo-forte","novaSenha":"outra-senha-boa"}`, **então** 204; login com a senha antiga → 401; com a nova → 200; em A, `me` e `refresh` continuam 200; em B, `me` → 401 `AUTH_SESSAO_ENCERRADA` e `refresh` → 401.
-- [ ] **CA-52** — **Dado** `senhaAtual` errada, **então** 400 `AUTH_SENHA_ATUAL_INCORRETA` com `fields.senhaAtual`, a senha não muda e as outras sessões continuam.
-- [ ] **CA-53** — **Dado** `novaSenha` igual à atual, **então** 400 `AUTH_SENHA_IGUAL_ATUAL` com `fields.novaSenha`.
-- [ ] **CA-54** — **Dado** `novaSenha` de 7 caracteres ou de 73 bytes, **então** 400 `VALIDACAO` com `fields.novaSenha`; **dado** a request sem token, **então** 401.
-- [ ] **CA-55** — **Dado** o mesmo IP, **quando** faço 6 trocas de senha (certas ou erradas) em 15 min, **então** a 6ª é 429.
-- [ ] **CA-56** — **Dado** `/perfil/senha` no web, **quando** a confirmação não coincide, **então** "As senhas não coincidem" sem request; **quando** troco com sucesso, **então** volto para `/perfil` com "Senha alterada. As outras sessões foram encerradas."; **e** outro navegador logado na mesma conta vai para `/login?motivo=sessao` na próxima ação.
+- [x] **CA-51** — **Dado** Ana logada em dois jars (A e B), **quando** `PUT /api/auth/senha` pelo A com `{"senhaAtual":"segredo-forte","novaSenha":"outra-senha-boa"}`, **então** 204; login com a senha antiga → 401; com a nova → 200; em A, `me` e `refresh` continuam 200; em B, `me` → 401 `AUTH_SESSAO_ENCERRADA` e `refresh` → 401.
+- [x] **CA-52** — **Dado** `senhaAtual` errada, **então** 400 `AUTH_SENHA_ATUAL_INCORRETA` com `fields.senhaAtual`, a senha não muda e as outras sessões continuam.
+- [x] **CA-53** — **Dado** `novaSenha` igual à atual, **então** 400 `AUTH_SENHA_IGUAL_ATUAL` com `fields.novaSenha`.
+- [x] **CA-54** — **Dado** `novaSenha` de 7 caracteres ou de 73 bytes, **então** 400 `VALIDACAO` com `fields.novaSenha`; **dado** a request sem token, **então** 401.
+- [x] **CA-55** — **Dado** o mesmo IP, **quando** faço 6 trocas de senha (certas ou erradas) em 15 min, **então** a 6ª é 429.
+- [x] **CA-56** — **Dado** `/perfil/senha` no web, **quando** a confirmação não coincide, **então** "As senhas não coincidem" sem request; **quando** troco com sucesso, **então** volto para `/perfil` com "Senha alterada. As outras sessões foram encerradas."; **e** outro navegador logado na mesma conta vai para `/login?motivo=sessao` na próxima ação.
 
 ## Plano de testes
 

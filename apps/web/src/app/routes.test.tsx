@@ -120,6 +120,8 @@ describe('RequireAuth — visitante (CA-23, CA-29, CA-33)', () => {
     const { router, where, user } = renderAt('/perfil');
     await user.click(await screen.findByRole('button', { name: 'Sair' }));
     await waitFor(() => expect(where()).toBe('/login'));
+    // O /perfil busca a lista para o resumo ANTES de sair; o que importa é nada sair DEPOIS.
+    games.list.mockClear();
 
     await router.navigate('/');
 

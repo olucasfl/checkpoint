@@ -1,7 +1,6 @@
 # Spec: perfil
 
-> Status: rascunho (Q7 e Q8 decididas em 2026-09-23; a Q5 da `autenticacao` foi decidida em
-> 2026-09-24: descartar os jogos existentes). Continua rascunho só aguardando a aprovação do humano.
+> Status: em andamento (aprovada pelo humano em 2026-09-24; etapa 1 em implementação)
 
 ## Objetivo
 

@@ -1,10 +1,13 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { type ReactElement } from 'react';
 import { AxiosError } from 'axios';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { authApi } from '../api/auth-api';
 import { entrar, resetSessionForTests } from '../session/session';
+import { gamesApi } from '@/features/games/api/games-api';
 import { PerfilPage } from '@/pages/PerfilPage';
 import { TrocarSenhaForm } from './TrocarSenhaForm';
 
@@ -18,7 +21,15 @@ vi.mock('../api/auth-api', () => ({
     trocarSenha: vi.fn(),
   },
 }));
+// O `/perfil` mostra o resumo do catálogo (query ['games']); aqui a lista vem vazia.
+vi.mock('@/features/games/api/games-api', () => ({ gamesApi: { list: vi.fn() } }));
 const api = vi.mocked(authApi);
+
+/** O `/perfil` usa a query de jogos: toda renderização dele precisa de um QueryClient. */
+function comQuery(ui: ReactElement) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return <QueryClientProvider client={client}>{ui}</QueryClientProvider>;
+}
 
 function httpError(status: number, code: string, fields?: Record<string, string>): AxiosError {
   return new AxiosError('falhou', 'ERR_BAD_REQUEST', undefined, undefined, {
@@ -33,12 +44,14 @@ function httpError(status: number, code: string, fields?: Record<string, string>
 /** O formulário em `/perfil/senha`, com o `/perfil` de verdade ao lado para o sucesso voltar a ele. */
 function renderForm() {
   render(
-    <MemoryRouter initialEntries={['/perfil/senha']}>
-      <Routes>
-        <Route path="/perfil/senha" element={<TrocarSenhaForm />} />
-        <Route path="/perfil" element={<PerfilPage />} />
-      </Routes>
-    </MemoryRouter>,
+    comQuery(
+      <MemoryRouter initialEntries={['/perfil/senha']}>
+        <Routes>
+          <Route path="/perfil/senha" element={<TrocarSenhaForm />} />
+          <Route path="/perfil" element={<PerfilPage />} />
+        </Routes>
+      </MemoryRouter>,
+    ),
   );
   return userEvent.setup();
 }
@@ -59,6 +72,7 @@ async function preencher(
 
 beforeEach(() => {
   vi.resetAllMocks();
+  vi.mocked(gamesApi.list).mockResolvedValue([]);
   resetSessionForTests();
   entrar({
     accessToken: 'token',
@@ -180,9 +194,11 @@ describe('TrocarSenhaForm (CA-56)', () => {
 describe('/perfil e a troca de senha', () => {
   it('o link "Trocar senha" leva a /perfil/senha', () => {
     render(
-      <MemoryRouter initialEntries={['/perfil']}>
-        <PerfilPage />
-      </MemoryRouter>,
+      comQuery(
+        <MemoryRouter initialEntries={['/perfil']}>
+          <PerfilPage />
+        </MemoryRouter>,
+      ),
     );
 
     expect(screen.getByRole('link', { name: 'Trocar senha' })).toHaveAttribute(
@@ -193,9 +209,13 @@ describe('/perfil e a troca de senha', () => {
 
   it('sem o aviso no state da navegação, nenhuma mensagem de sucesso aparece', () => {
     render(
-      <MemoryRouter initialEntries={[{ pathname: '/perfil', state: { aviso: 'qualquer texto' } }]}>
-        <PerfilPage />
-      </MemoryRouter>,
+      comQuery(
+        <MemoryRouter
+          initialEntries={[{ pathname: '/perfil', state: { aviso: 'qualquer texto' } }]}
+        >
+          <PerfilPage />
+        </MemoryRouter>,
+      ),
     );
 
     expect(screen.queryByRole('status')).not.toBeInTheDocument();

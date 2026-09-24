@@ -148,6 +148,17 @@ export function entrar(auth: AuthResponse): void {
   markAuthenticated(auth);
 }
 
+/**
+ * A API devolveu o usuário atualizado (ex.: nome editado no `/perfil`): troca o `usuario` da sessão
+ * para toda tela que o lê mudar sem recarregar. Só vale para a MESMA conta autenticada: uma resposta
+ * que chega depois de sair (ou de outra conta) é ignorada.
+ */
+export function atualizarUsuario(usuario: Usuario): void {
+  if (state.status === 'autenticado' && state.usuario?.id === usuario.id) {
+    setState({ usuario });
+  }
+}
+
 /** Logout local: nada de token, cache nem preferências do usuário; as chaves `instalacao:*` ficam. */
 export function encerrarLocal(saida: Exclude<SessionExit, null>): void {
   setAccessToken(null);

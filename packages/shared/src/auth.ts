@@ -87,6 +87,11 @@ export interface TrocarSenhaRequest {
   novaSenha: string;
 }
 
+/** Corpo de `PATCH /api/users/me` (spec perfil). Só o nome: o e-mail não é editável. */
+export interface AtualizarPerfilRequest {
+  nome: string;
+}
+
 /** Códigos estáveis dos erros: o web mostra o texto pelo `code`, nunca comparando a `message`. */
 export const API_ERROR_CODES = [
   'VALIDACAO',

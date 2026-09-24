@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { coverBackground, coverInitials } from '../lib/game-cover';
+import { coverBackground, coverInitials } from '@/shared/lib/game-cover';
 
 interface GameCoverProps {
   titulo: string;

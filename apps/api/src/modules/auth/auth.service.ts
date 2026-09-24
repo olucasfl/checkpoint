@@ -19,31 +19,15 @@ import {
   REFRESH_GRACE_WINDOW_MS,
   REFRESH_TOKEN_TTL_SECONDS,
 } from './auth.constants';
+import { USUARIO_PUBLICO_SELECT, toUsuario, type UsuarioRow } from '../users/usuario-publico';
 import { PasswordHasher } from './password-hasher';
 import { deviceLabel } from './session-device';
-
-/**
- * Lista branca do que sai do banco sobre o usuário: NUNCA o registro inteiro, para `senhaHash` não
- * poder vazar por um `select` esquecido.
- */
-export const USUARIO_PUBLICO_SELECT = {
-  id: true,
-  nome: true,
-  email: true,
-  criadoEm: true,
-} as const satisfies Prisma.UserSelect;
-
-type UsuarioRow = Prisma.UserGetPayload<{ select: typeof USUARIO_PUBLICO_SELECT }>;
 
 /** O que o controller recebe: o refresh token vai para o cookie, nunca para o corpo. */
 export interface SessionResult {
   accessToken: string;
   refreshToken: string;
   usuario: Usuario;
-}
-
-function toUsuario(row: UsuarioRow): Usuario {
-  return { id: row.id, nome: row.nome, email: row.email, criadoEm: row.criadoEm.toISOString() };
 }
 
 /** SHA-256 e não bcrypt: o token já tem alta entropia, e o bcrypt truncaria em 72 bytes. */
