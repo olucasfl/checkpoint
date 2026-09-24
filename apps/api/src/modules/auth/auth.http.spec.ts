@@ -405,9 +405,9 @@ describe('GET /auth/me e o guard global (CA-07, CA-17)', () => {
     expect(fechada.status).toBe(401);
   });
 
-  it('health e o catálogo de jogos continuam públicos nas etapas 1 e 2 (CA-17)', () => {
+  it('health continua público; o catálogo de jogos deixou de ser na etapa 3 (CA-17, CA-41)', () => {
     expect(Reflect.getMetadata(IS_PUBLIC_KEY, HealthController)).toBe(true);
-    expect(Reflect.getMetadata(IS_PUBLIC_KEY, GamesController)).toBe(true);
+    expect(Reflect.getMetadata(IS_PUBLIC_KEY, GamesController)).toBeUndefined();
   });
 });
 

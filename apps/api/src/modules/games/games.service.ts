@@ -52,26 +52,29 @@ export class GamesService {
     private readonly storage: StorageService,
   ) {}
 
-  async list(status?: GameStatus): Promise<Game[]> {
+  // Todo acesso é do dono: `userId` entra em todo `where`. Jogo de outro usuário (ou sem dono, até a
+  // migração A4) é tratado como inexistente, sem revelar que o id existe.
+  async list(userId: string, status?: GameStatus): Promise<Game[]> {
     const rows = await this.prisma.game.findMany({
-      where: status ? { status } : undefined,
+      where: { userId, ...(status && { status }) },
       orderBy: [{ atualizadoEm: 'desc' }, { criadoEm: 'desc' }],
     });
 
     return rows.map((row) => this.toGame(row));
   }
 
-  async create(dto: CreateGameRequest): Promise<Game> {
+  async create(userId: string, dto: CreateGameRequest): Promise<Game> {
     const titulo = cleanTitle(dto.titulo);
     const plataforma = cleanPlatform(dto.plataforma);
     const nota = dto.nota ?? null;
 
     this.assertRatingAllowed(dto.status, nota);
-    await this.assertNotDuplicate(titulo, plataforma);
+    await this.assertNotDuplicate(userId, titulo, plataforma);
 
     try {
       const row = await this.prisma.game.create({
         data: {
+          userId,
           titulo,
           plataforma,
           status: dto.status,
@@ -85,12 +88,12 @@ export class GamesService {
     }
   }
 
-  async update(id: string, dto: UpdateGameRequest): Promise<Game> {
+  async update(userId: string, id: string, dto: UpdateGameRequest): Promise<Game> {
     if (Object.values(dto).every((value) => value === undefined)) {
       throw badRequestError(EMPTY_UPDATE);
     }
 
-    const current = await this.findOrFail(id);
+    const current = await this.findOrFail(userId, id);
 
     // A validação olha o estado FINAL (registro atual + body), não só o body: um PATCH só com
     // { status: "QUERO_JOGAR" } num jogo que já tem nota tem de falhar.
@@ -101,11 +104,11 @@ export class GamesService {
     const nota = dto.nota !== undefined ? dto.nota : current.nota;
 
     this.assertRatingAllowed(status, nota);
-    await this.assertNotDuplicate(titulo, plataforma, id);
+    await this.assertNotDuplicate(userId, titulo, plataforma, id);
 
     try {
       const row = await this.prisma.game.update({
-        where: { id },
+        where: { id, userId },
         data: { titulo, plataforma, status, nota, ...uniquenessKeys(titulo, plataforma) },
       });
       return this.toGame(row);
@@ -114,11 +117,11 @@ export class GamesService {
     }
   }
 
-  async remove(id: string): Promise<void> {
+  async remove(userId: string, id: string): Promise<void> {
     let removed: GameRow;
 
     try {
-      removed = await this.prisma.game.delete({ where: { id } });
+      removed = await this.prisma.game.delete({ where: { id, userId } });
     } catch (error) {
       throw this.translateDatabaseError(error);
     }
@@ -132,25 +135,27 @@ export class GamesService {
   /**
    * Troca a capa: sobe o objeto novo, aponta o jogo para ele e só então apaga o antigo. Se o
    * banco falhar depois do upload, o objeto novo é apagado para não ficar órfão.
+   * Capas novas ficam sob o prefixo do dono (`<userId>/<gameId>/…`), o que facilita apagar tudo de
+   * uma conta. As anteriores seguem no caminho gravado no `capaPath`, sem migrar objeto.
    */
-  async setCover(id: string, file: { buffer: Buffer } | undefined): Promise<Game> {
+  async setCover(userId: string, id: string, file: { buffer: Buffer } | undefined): Promise<Game> {
     if (!file || file.buffer.length === 0) {
       throw badRequestError(COVER_MISSING, { arquivo: COVER_MISSING });
     }
 
-    const current = await this.findOrFail(id);
+    const current = await this.findOrFail(userId, id);
 
     const image = detectImageType(file.buffer);
     if (!image) {
       throw badRequestError(COVER_INVALID_TYPE, { arquivo: COVER_INVALID_TYPE });
     }
 
-    const capaPath = `${id}/${randomUUID()}.${image.extension}`;
+    const capaPath = `${userId}/${id}/${randomUUID()}.${image.extension}`;
     await this.storage.upload(capaPath, file.buffer, image.mime);
 
     let updated: GameRow;
     try {
-      updated = await this.prisma.game.update({ where: { id }, data: { capaPath } });
+      updated = await this.prisma.game.update({ where: { id, userId }, data: { capaPath } });
     } catch (error) {
       await this.removeObjectQuietly(capaPath);
       throw this.translateDatabaseError(error);
@@ -167,8 +172,8 @@ export class GamesService {
    * Remove a capa: apaga o objeto ANTES de zerar o banco, para uma falha do storage (502) não
    * deixar o jogo apontando para nada. Sem capa, devolve o jogo sem chamar o storage (idempotente).
    */
-  async removeCover(id: string): Promise<Game> {
-    const current = await this.findOrFail(id);
+  async removeCover(userId: string, id: string): Promise<Game> {
+    const current = await this.findOrFail(userId, id);
 
     if (!current.capaPath) {
       return this.toGame(current);
@@ -177,14 +182,20 @@ export class GamesService {
     await this.storage.remove(current.capaPath);
 
     try {
-      const updated = await this.prisma.game.update({ where: { id }, data: { capaPath: null } });
+      const updated = await this.prisma.game.update({
+        where: { id, userId },
+        data: { capaPath: null },
+      });
       return this.toGame(updated);
     } catch (error) {
       throw this.translateDatabaseError(error);
     }
   }
 
-  /** Sem plataforma = "" no banco (ver schema.prisma); a API expõe null. `capaPath` nunca sai. */
+  /**
+   * Sem plataforma = "" no banco (ver schema.prisma); a API expõe null. `capaPath` e `userId` nunca
+   * saem: os campos da resposta são listados um a um.
+   */
   private toGame(row: GameRow): Game {
     return {
       id: row.id,
@@ -198,8 +209,8 @@ export class GamesService {
     };
   }
 
-  private async findOrFail(id: string): Promise<GameRow> {
-    const game = await this.prisma.game.findUnique({ where: { id } });
+  private async findOrFail(userId: string, id: string): Promise<GameRow> {
+    const game = await this.prisma.game.findUnique({ where: { id, userId } });
     if (!game) {
       throw new NotFoundException(GAME_NOT_FOUND);
     }
@@ -224,15 +235,21 @@ export class GamesService {
   /**
    * Checagem prévia para dar um erro claro. Quem garante a unicidade de verdade é o @@unique do
    * banco: se duas requests passarem juntas por aqui, a segunda cai em P2002 (translateDatabaseError).
-   * Ao editar, o próprio jogo (`ignoreId`) não conta como duplicata.
+   * Ao editar, o próprio jogo (`ignoreId`) não conta como duplicata. A unicidade é por dono: o mesmo
+   * jogo em contas diferentes não conflita.
    */
   private async assertNotDuplicate(
+    userId: string,
     titulo: string,
     plataforma: string,
     ignoreId?: string,
   ): Promise<void> {
     const duplicate = await this.prisma.game.findFirst({
-      where: { ...uniquenessKeys(titulo, plataforma), ...(ignoreId && { id: { not: ignoreId } }) },
+      where: {
+        userId,
+        ...uniquenessKeys(titulo, plataforma),
+        ...(ignoreId && { id: { not: ignoreId } }),
+      },
       select: { id: true },
     });
 

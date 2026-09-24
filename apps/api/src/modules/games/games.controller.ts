@@ -17,6 +17,7 @@ import {
 import {
   ApiBadGatewayResponse,
   ApiBadRequestResponse,
+  ApiBearerAuth,
   ApiBody,
   ApiConflictResponse,
   ApiConsumes,
@@ -27,9 +28,13 @@ import {
   ApiOperation,
   ApiPayloadTooLargeResponse,
   ApiTags,
+  ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { GAME_COVER_FIELD } from '@checkpoint/shared';
-import { Public } from '../../common/decorators/public.decorator';
+import {
+  CurrentUser,
+  type AuthenticatedUser,
+} from '../../common/decorators/current-user.decorator';
 import { ApiErrorResponseDto } from '../../common/errors/api-error-response.dto';
 import { CoverUploadInterceptor } from './cover/cover-upload.interceptor';
 import { CreateGameDto } from './dto/create-game.dto';
@@ -38,9 +43,13 @@ import { ListGamesQueryDto } from './dto/list-games-query.dto';
 import { UpdateGameDto } from './dto/update-game.dto';
 import { GamesService } from './games.service';
 
-// Público só nas etapas 1 e 2 da spec autenticacao: a etapa 3 fecha o catálogo e o filtra por dono.
-@Public()
+// Sem `@Public()`: o guard global exige o access token, e cada jogo só existe para o próprio dono.
 @ApiTags('games')
+@ApiBearerAuth()
+@ApiUnauthorizedResponse({
+  type: ApiErrorResponseDto,
+  description: '`AUTH_NAO_AUTENTICADO`, `AUTH_TOKEN_EXPIRADO` ou `AUTH_SESSAO_ENCERRADA`',
+})
 @Controller('games')
 export class GamesController {
   constructor(private readonly gamesService: GamesService) {}
@@ -52,8 +61,11 @@ export class GamesController {
   })
   @ApiOkResponse({ type: GameResponseDto, isArray: true })
   @ApiBadRequestResponse({ type: ApiErrorResponseDto, description: 'Status inválido no filtro' })
-  list(@Query() query: ListGamesQueryDto): Promise<GameResponseDto[]> {
-    return this.gamesService.list(query.status);
+  list(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() query: ListGamesQueryDto,
+  ): Promise<GameResponseDto[]> {
+    return this.gamesService.list(user.id, query.status);
   }
 
   @Post()
@@ -65,10 +77,13 @@ export class GamesController {
   })
   @ApiConflictResponse({
     type: ApiErrorResponseDto,
-    description: 'Já existe um jogo com o mesmo título e plataforma',
+    description: 'Já existe um jogo seu com o mesmo título e plataforma',
   })
-  create(@Body() dto: CreateGameDto): Promise<GameResponseDto> {
-    return this.gamesService.create(dto);
+  create(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: CreateGameDto,
+  ): Promise<GameResponseDto> {
+    return this.gamesService.create(user.id, dto);
   }
 
   @Patch(':id')
@@ -85,16 +100,17 @@ export class GamesController {
     description:
       'Payload inválido, body vazio, id que não é UUID ou nota incompatível com o status',
   })
-  @ApiNotFoundResponse({ description: 'Jogo não encontrado' })
+  @ApiNotFoundResponse({ description: 'Jogo não encontrado (inclusive jogo de outro usuário)' })
   @ApiConflictResponse({
     type: ApiErrorResponseDto,
     description: 'A edição geraria duplicata de outro jogo',
   })
   update(
+    @CurrentUser() user: AuthenticatedUser,
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateGameDto,
   ): Promise<GameResponseDto> {
-    return this.gamesService.update(id, dto);
+    return this.gamesService.update(user.id, id, dto);
   }
 
   @Delete(':id')
@@ -105,9 +121,12 @@ export class GamesController {
   })
   @ApiNoContentResponse({ description: 'Jogo removido' })
   @ApiBadRequestResponse({ type: ApiErrorResponseDto, description: 'id que não é UUID' })
-  @ApiNotFoundResponse({ description: 'Jogo não encontrado' })
-  remove(@Param('id', ParseUUIDPipe) id: string): Promise<void> {
-    return this.gamesService.remove(id);
+  @ApiNotFoundResponse({ description: 'Jogo não encontrado (inclusive jogo de outro usuário)' })
+  remove(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<void> {
+    return this.gamesService.remove(user.id, id);
   }
 
   @Put(':id/capa')
@@ -132,14 +151,15 @@ export class GamesController {
     type: ApiErrorResponseDto,
     description: 'Campo `arquivo` ausente/vazio, tipo fora de JPEG/PNG/WebP ou id que não é UUID',
   })
-  @ApiNotFoundResponse({ description: 'Jogo não encontrado' })
+  @ApiNotFoundResponse({ description: 'Jogo não encontrado (inclusive jogo de outro usuário)' })
   @ApiPayloadTooLargeResponse({ type: ApiErrorResponseDto, description: 'Arquivo acima de 2 MB' })
   @ApiBadGatewayResponse({ type: ApiErrorResponseDto, description: 'Falha do storage' })
   setCover(
+    @CurrentUser() user: AuthenticatedUser,
     @Param('id', ParseUUIDPipe) id: string,
     @UploadedFile() file?: Express.Multer.File,
   ): Promise<GameResponseDto> {
-    return this.gamesService.setCover(id, file);
+    return this.gamesService.setCover(user.id, id, file);
   }
 
   @Delete(':id/capa')
@@ -149,12 +169,15 @@ export class GamesController {
   })
   @ApiOkResponse({ type: GameResponseDto, description: 'Jogo com `capaUrl: null`' })
   @ApiBadRequestResponse({ type: ApiErrorResponseDto, description: 'id que não é UUID' })
-  @ApiNotFoundResponse({ description: 'Jogo não encontrado' })
+  @ApiNotFoundResponse({ description: 'Jogo não encontrado (inclusive jogo de outro usuário)' })
   @ApiBadGatewayResponse({
     type: ApiErrorResponseDto,
     description: 'Falha do storage; a capa continua associada ao jogo',
   })
-  removeCover(@Param('id', ParseUUIDPipe) id: string): Promise<GameResponseDto> {
-    return this.gamesService.removeCover(id);
+  removeCover(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<GameResponseDto> {
+    return this.gamesService.removeCover(user.id, id);
   }
 }

@@ -25,7 +25,7 @@ comportamento que ela descreve.
 | Banco                | PostgreSQL 16, instância local ou gerenciada (ex.: Supabase) — sem Docker no projeto                                                                                                                                                                            |
 | Qualidade            | ESLint 9 (flat config, `eslint.config.mjs` na raiz), Prettier, Husky, lint-staged, commitlint (Conventional Commits)                                                                                                                                            |
 | Testes               | Jest 30 + ts-jest na API e Vitest 4 + Testing Library + jsdom na web (`npm test -w <workspace>`); `packages/shared` não tem runner próprio. `npm test` na raiz compila o `shared` antes (`pretest`). Convenções em `.claude/skills/checkpoint-testing/SKILL.md` |
-| Auth                 | API pronta (spec `autenticacao`, etapa 1): e-mail e senha, access token (JWT, 15 min) + refresh token (30 dias) em cookie HttpOnly, com rotação e guard global (§4.5). O web (etapa 2) e o dono dos jogos (etapa 3) ainda não existem: `games` segue público    |
+| Auth                 | Spec `autenticacao`, etapas 1 a 3: e-mail e senha, access token (JWT, 15 min) + refresh token (30 dias) em cookie HttpOnly, com rotação e guard global (§4.5); telas no web (§5.10); cada jogo tem dono e `games` exige login (§4.4)                            |
 | PWA / service worker | Não existe                                                                                                                                                                                                                                                      |
 | Deploy / CI          | Não existe (sem Dockerfile de produção, sem workflow de CI, sem manifest de hospedagem)                                                                                                                                                                         |
 
@@ -145,10 +145,9 @@ implementado.
    class-transformer lançar `TypeError` (500 num endpoint público).
 4. **Guard global** (`APP_GUARD` em `app.module.ts`, `modules/auth/access-token.guard.ts`): toda rota exige
    `Authorization: Bearer <access token>`, **exceto as marcadas com `@Public()`** (`common/decorators/`).
-   Esquecer o decorator **fecha** a rota, nunca a abre. Hoje são públicas: `health`, as rotas de auth
-   (`registro`, `login`, `refresh`, `logout`) e, **só até a etapa 3 da spec `autenticacao`**, o
-   `GamesController` inteiro (o catálogo continua sem dono e sem proteção). `@CurrentUser()` entrega
-   `{ id, sessionId }` ao controller.
+   Esquecer o decorator **fecha** a rota, nunca a abre. Hoje são públicas só `health` e as rotas de auth
+   (`registro`, `login`, `refresh`, `logout`); o `GamesController` é protegido desde a etapa 3 da spec
+   `autenticacao`. `@CurrentUser()` entrega `{ id, sessionId }` ao controller.
 5. **Swagger** servido em `/api/docs` (`SWAGGER_PATH`), montado a partir do `DocumentBuilder` em
    `app.setup.ts`, com `addBearerAuth()` (botão "Authorize"). Todo controller novo deve usar `@ApiTags`/`@ApiOperation` como `HealthController` já
    faz — é a única documentação viva das rotas hoje.
@@ -175,9 +174,10 @@ implementado.
   `onModuleDestroy`, expõe `isHealthy()` (usado só pelo health check hoje — `SELECT 1`).
 - `prisma/schema.prisma` tem o enum `GameStatus` (`ZERADO`, `JOGANDO`, `QUERO_JOGAR`) e o model
   `Game`: `titulo`, `plataforma` (`""` = sem plataforma; a API expõe `null`), `status`, `nota`
-  (`Int?`), `capaPath` (`String?`: caminho do objeto da capa no bucket, não a URL), `criadoEm`/`atualizadoEm` e as colunas `tituloNormalizado`/`plataformaNormalizada`,
+  (`Int?`), `capaPath` (`String?`: caminho do objeto da capa no bucket, não a URL), `userId` (o dono,
+  ver abaixo), `criadoEm`/`atualizadoEm` e as colunas `tituloNormalizado`/`plataformaNormalizada`,
   preenchidas pelo `GamesService` (aparadas e em minúsculas) e cobertas por
-  `@@unique([tituloNormalizado, plataformaNormalizada])`. É assim, e não com um índice `lower()`
+  `@@unique([userId, tituloNormalizado, plataformaNormalizada])`. É assim, e não com um índice `lower()`
   escrito à mão, para o Prisma enxergar toda a estrutura e o `migrate dev` não acusar drift. A
   migration também tem dois `CHECK` escritos à mão (nota entre 0 e 10; nota nula com
   `QUERO_JOGAR`), que o Prisma não modela e não vê como drift. Este projeto usa **migrations versionadas**
@@ -187,8 +187,13 @@ implementado.
 - **`User` e `RefreshSession`** (spec `autenticacao`, migração A1, **aditiva**): `User` (`nome`, `email`
   único e sempre normalizado, `senhaHash`) e `RefreshSession` (uma linha por dispositivo logado; o `id` é o
   `sid` dos tokens; guarda só o **SHA-256** do refresh token e o do anterior, mais um rótulo do dispositivo
-  derivado do `User-Agent`, sem IP), com `onDelete: Cascade`. **`Game` não tem dono ainda**: `Game.userId` e a
-  troca do `@@unique` são as migrações A3 e A4 (etapas 3 e 4), **destrutivas** e já aprovadas na spec.
+  derivado do `User-Agent`, sem IP), com `onDelete: Cascade`.
+- **`Game.userId`** (spec `autenticacao`, migração A3 `game_dono`, **destrutiva** por trocar o `@@unique`,
+  aprovada na spec): `String?` com FK para `User` e `onDelete: Cascade` (excluir a conta apaga os jogos no
+  banco; as capas no bucket ficam por conta de quem exclui). A unicidade passou a ser **por dono**; com
+  `userId` na frente, o mesmo índice serve ao `where: { userId }`, então não há `@@index([userId])`.
+  **Nulável só até a migração A4** (etapa 4, `NOT NULL`): os jogos anteriores à etapa 3 ficaram com
+  `userId NULL`, invisíveis pela API, até o passo humano da spec (Q5) descartá-los.
 
 ### 4.4 Módulo por domínio (`src/modules/`)
 
@@ -197,14 +202,22 @@ Convenção NestJS padrão, um módulo por domínio, cada um com `*.module.ts` +
 
 - `health/` — `GET /api/health`, sem domínio; serve de modelo de forma.
 - `games/` — o catálogo de jogos (spec `docs/specs/catalogo-jogos.md`, etapas 1 e 2; o web está em §5.5):
+  - **Por dono** (spec `autenticacao`, etapa 3): o controller **não** é `@Public()`; todo método recebe
+    o `userId` de `@CurrentUser()` e o `GamesService` o põe em **todo** `where` (`list` filtra por
+    `userId`; `create` grava; `update`, `remove`, `setCover` e `removeCover` buscam/gravam com
+    `where: { id, userId }`). Jogo de outro usuário ou sem dono é **404 "Jogo não encontrado"**, igual a
+    um id inexistente (não revela que existe). `userId` **não** está no `Game` da resposta (os campos
+    são listados um a um em `toGame`) e **não** é aceito no corpo (400, campo desconhecido).
   - `GET /api/games[?status=]` (ordenado por `atualizadoEm` desc, desempate `criadoEm` desc),
     `POST /api/games`, `PATCH /api/games/:id` (parcial; só `plataforma` e `nota` aceitam `null`) e
     `DELETE /api/games/:id` (204).
   - **Capa** (uma por jogo, opcional): `PUT /api/games/:id/capa` (multipart, campo `arquivo`) e
     `DELETE /api/games/:id/capa`. Só JPEG/PNG/WebP, identificados pela **assinatura do arquivo**
     (`cover/image-signature.ts`) e não pelo `Content-Type`; até 2 MB (413). O objeto vai para o
-    bucket público `capas` do Supabase como `<gameId>/<uuid>.<ext>`; o banco guarda só o caminho
-    (`capaPath`) e a resposta expõe `capaUrl` (nunca o caminho). Trocar a capa envia o objeto novo,
+    bucket público `capas` do Supabase como `<userId>/<gameId>/<uuid>.<ext>` (o prefixo do dono
+    facilita apagar tudo de uma conta); o banco guarda o caminho inteiro (`capaPath`) e a resposta
+    expõe `capaUrl` (nunca o caminho). As capas enviadas antes da etapa 3 seguem em
+    `<gameId>/<uuid>.<ext>` e continuam funcionando pelo caminho gravado, sem migrar objeto. Trocar a capa envia o objeto novo,
     grava e só então apaga o antigo; remover o jogo apaga a capa em _best effort_ (a falha vira log,
     não erro). Falha do storage é **502** (`fields.arquivo`), nunca 500.
   - **`StorageService`** (`cover/storage.service.ts`) fala com a REST do Supabase Storage pelo
@@ -219,7 +232,7 @@ Convenção NestJS padrão, um módulo por domínio, cada um com `*.module.ts` +
   - **Regra da nota:** validada no service sobre o **estado final** (registro atual + body), porque
     o DTO só enxerga o body: `{ status: "QUERO_JOGAR" }` num jogo com nota é 400, a menos que o
     mesmo body traga `nota: null`. A API nunca apaga a nota por conta própria.
-  - **Duplicidade** (mesmo título e plataforma, sem diferenciar caixa nem espaços nas pontas): checagem
+  - **Duplicidade** (mesmo dono, título e plataforma, sem diferenciar caixa nem espaços nas pontas): checagem
     prévia para dar um 409 claro; a garantia real é o `@@unique` do banco, e o `P2002` da corrida
     também vira 409. Ao editar, o próprio jogo não conta como duplicata.
   - `id` que não é UUID → 400 (`ParseUUIDPipe`); UUID sem jogo → 404.
@@ -227,7 +240,9 @@ Convenção NestJS padrão, um módulo por domínio, cada um com `*.module.ts` +
     `dto/*.spec.ts` (validação pelo pipe do `main.ts`), `games.http.spec.ts` e
     `games.cover.http.spec.ts` (status e corpo por HTTP, numa porta local, com o multer real e sem
     banco nem Supabase), `games.cover.service.spec.ts` e `cover/*.spec.ts` (assinatura de imagem e
-    `StorageService` com `fetch` mockado).
+    `StorageService` com `fetch` mockado). Os dois specs HTTP sobem o app por
+    `testing/games-http-app.ts`, com o **guard global real** (JWT assinado pelo `AuthTokensService`,
+    sessão num mapa em memória), para cobrir o 401 sem token e o 404 cruzado entre usuários.
 
 ```
 apps/api/src/modules/games/
@@ -235,7 +250,8 @@ apps/api/src/modules/games/
 ├── games.controller.ts   # rotas, @ApiTags/@Api*Response
 ├── games.service.ts      # regra de negócio, injeta PrismaService e StorageService
 ├── cover/                # capa: StorageService (REST do Supabase), assinatura, interceptor
-└── dto/                  # class-validator + Swagger; transforms.ts lê o valor cru
+├── dto/                  # class-validator + Swagger; transforms.ts lê o valor cru
+└── testing/              # só para testes: o app HTTP com o guard global e tokens sintéticos
 ```
 
 Registre o módulo novo em `app.module.ts` (`imports: [...]`).

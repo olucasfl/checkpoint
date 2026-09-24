@@ -62,6 +62,16 @@ describe('StorageService', () => {
         'https://abc.supabase.co/storage/v1/object/public/capas/a%20b/c%23d.png',
       );
     });
+
+    it('serve os dois formatos de caminho: o novo com o dono e o antigo, sem ele (CA-45)', () => {
+      const userId = '0b6c1f7e-2a3d-4e5f-8a9b-1c2d3e4f5a6b';
+      const base = 'https://abc.supabase.co/storage/v1/object/public/capas';
+
+      expect(createService().publicUrl(`${userId}/${OBJECT_PATH}`)).toBe(
+        `${base}/${userId}/${OBJECT_PATH}`,
+      );
+      expect(createService().publicUrl(OBJECT_PATH)).toBe(`${base}/${OBJECT_PATH}`);
+    });
   });
 
   describe('upload', () => {

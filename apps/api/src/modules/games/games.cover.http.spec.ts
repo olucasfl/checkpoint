@@ -1,22 +1,17 @@
 import { type INestApplication } from '@nestjs/common';
-import { Test } from '@nestjs/testing';
 import { Prisma, type Game as GameRow } from '@prisma/client';
-import { type AddressInfo } from 'node:net';
 import { badGatewayError } from '../../common/errors/api-error';
-import { createValidationPipe } from '../../common/pipes/app-validation.pipe';
-import { API_GLOBAL_PREFIX } from '../../config/app.config';
-import { PrismaService } from '../../database/prisma.service';
-import { StorageService } from './cover/storage.service';
-import { GamesController } from './games.controller';
-import { GamesService } from './games.service';
+import { ANA_ID, startGamesApp } from './testing/games-http-app';
 
 /**
  * Capa (etapa 2) por HTTP de verdade: o multipart é lido pelo multer real (limite de 2 MB, campo
- * `arquivo`), com PrismaService e StorageService como objetos simples de funções. Nenhum teste
- * toca o banco nem o Supabase.
+ * `arquivo`), com o guard global ligado (toda chamada leva o token da Ana) e PrismaService e
+ * StorageService como objetos simples de funções. Nenhum teste toca o banco nem o Supabase.
  */
 const ID = '3f2b8a52-9c1e-4d6a-8f31-0a7e5b2c9d44';
-const OBJECT = `${ID}/7d1c2e60-1111-4222-8333-444455556666.png`;
+const OBJECT = `${ANA_ID}/${ID}/7d1c2e60-1111-4222-8333-444455556666.png`;
+/** Capa enviada antes da etapa 3 de autenticacao: sem o prefixo do dono. */
+const LEGACY_OBJECT = `${ID}/0a1b2c3d-1111-4222-8333-444455556666.webp`;
 const TWO_MB = 2 * 1024 * 1024;
 
 const COVER_ERROR = {
@@ -39,6 +34,7 @@ const storage = { upload: jest.fn(), remove: jest.fn(), publicUrl: jest.fn() };
 function row(overrides: Partial<GameRow> = {}): GameRow {
   return {
     id: ID,
+    userId: ANA_ID,
     titulo: 'Hollow Knight',
     plataforma: '',
     status: 'JOGANDO',
@@ -60,9 +56,14 @@ function pngOfSize(size: number): Buffer {
 
 let app: INestApplication;
 let baseUrl: string;
+let token: string;
 
 async function send(method: string, path: string, init?: RequestInit) {
-  const response = await fetch(`${baseUrl}${path}`, { method, ...init });
+  const response = await fetch(`${baseUrl}${path}`, {
+    method,
+    ...init,
+    headers: { ...(init?.headers as Record<string, string>), authorization: `Bearer ${token}` },
+  });
   const text = await response.text();
   return { status: response.status, json: text ? (JSON.parse(text) as unknown) : undefined };
 }
@@ -89,22 +90,10 @@ function upload(path: string, file: UploadFile | null) {
 }
 
 beforeAll(async () => {
-  const moduleRef = await Test.createTestingModule({
-    controllers: [GamesController],
-    providers: [
-      GamesService,
-      { provide: PrismaService, useValue: { game } },
-      { provide: StorageService, useValue: storage },
-    ],
-  }).compile();
-
-  app = moduleRef.createNestApplication({ logger: false });
-  app.setGlobalPrefix(API_GLOBAL_PREFIX);
-  app.useGlobalPipes(createValidationPipe());
-  await app.listen(0, '127.0.0.1');
-
-  const { port } = app.getHttpServer().address() as AddressInfo;
-  baseUrl = `http://127.0.0.1:${port}/${API_GLOBAL_PREFIX}`;
+  const started = await startGamesApp(game, storage);
+  app = started.app;
+  baseUrl = started.baseUrl;
+  token = await started.tokenFor(ANA_ID);
 });
 
 afterAll(async () => {
@@ -117,7 +106,7 @@ beforeEach(() => {
 });
 
 describe('PUT /api/games/:id/capa', () => {
-  it('200 com a capaUrl, e o objeto sobe com o tipo detectado (CA-53)', async () => {
+  it('200 com a capaUrl, e o objeto sobe em <userId>/<gameId>/ com o tipo detectado (CA-53, CA-45)', async () => {
     game.findUnique.mockResolvedValue(row());
     game.update.mockResolvedValue(row({ capaPath: OBJECT }));
 
@@ -126,8 +115,9 @@ describe('PUT /api/games/:id/capa', () => {
     expect(status).toBe(200);
     expect(json).toMatchObject({ id: ID, capaUrl: `https://storage.teste/capas/${OBJECT}` });
     expect(json).not.toHaveProperty('capaPath');
+    expect(json).not.toHaveProperty('userId');
     expect(storage.upload).toHaveBeenCalledWith(
-      expect.stringMatching(new RegExp(`^${ID}/.+\\.png$`)),
+      expect.stringMatching(new RegExp(`^${ANA_ID}/${ID}/[0-9a-f-]{36}\\.png$`)),
       expect.any(Buffer),
       'image/png',
     );
@@ -309,6 +299,40 @@ describe('DELETE /api/games/:id/capa', () => {
     expect(status).toBe(502);
     expect(json).toMatchObject({ fields: { arquivo: COVER_ERROR.storage } });
     expect(game.update).not.toHaveBeenCalled();
+  });
+});
+
+describe('capa enviada antes da etapa 3 (CA-45)', () => {
+  it('GET devolve a capaUrl pelo caminho antigo gravado', async () => {
+    game.findMany.mockResolvedValue([row({ capaPath: LEGACY_OBJECT })]);
+
+    const { status, json } = await send('GET', '/games');
+
+    expect(status).toBe(200);
+    expect(json).toMatchObject([{ capaUrl: `https://storage.teste/capas/${LEGACY_OBJECT}` }]);
+  });
+
+  it('trocar a capa antiga sobe a nova com o prefixo do dono e apaga a antiga', async () => {
+    game.findUnique.mockResolvedValue(row({ capaPath: LEGACY_OBJECT }));
+    game.update.mockResolvedValue(row({ capaPath: OBJECT }));
+
+    const { status } = await upload(`/games/${ID}/capa`, { content: pngOfSize(1000) });
+
+    expect(status).toBe(200);
+    expect(storage.upload).toHaveBeenCalledWith(
+      expect.stringMatching(new RegExp(`^${ANA_ID}/${ID}/`)),
+      expect.any(Buffer),
+      'image/png',
+    );
+    expect(storage.remove).toHaveBeenCalledWith(LEGACY_OBJECT);
+  });
+
+  it('DELETE /capa apaga o objeto do caminho antigo', async () => {
+    game.findUnique.mockResolvedValue(row({ capaPath: LEGACY_OBJECT }));
+    game.update.mockResolvedValue(row({ capaPath: null }));
+
+    expect((await send('DELETE', `/games/${ID}/capa`)).status).toBe(200);
+    expect(storage.remove).toHaveBeenCalledWith(LEGACY_OBJECT);
   });
 });
 

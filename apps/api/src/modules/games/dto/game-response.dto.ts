@@ -22,7 +22,8 @@ export class GameResponseDto implements Game {
     type: String,
     nullable: true,
     description: 'URL pública da capa, ou null sem capa.',
-    example: 'https://<ref>.supabase.co/storage/v1/object/public/capas/<gameId>/<uuid>.png',
+    example:
+      'https://<ref>.supabase.co/storage/v1/object/public/capas/<userId>/<gameId>/<uuid>.png',
   })
   capaUrl!: string | null;
 

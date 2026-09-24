@@ -5,12 +5,15 @@ import { type StorageService } from './cover/storage.service';
 import { GamesService } from './games.service';
 
 const ID = '3f2b8a52-9c1e-4d6a-8f31-0a7e5b2c9d44';
+/** Dono de todos os jogos destes testes. */
+const USER = '0b6c1f7e-2a3d-4e5f-8a9b-1c2d3e4f5a6b';
 const DUPLICATE = 'Já existe esse jogo nesta plataforma';
 const RATING = 'Nota só pode ser preenchida quando o status é Zerado ou Jogando';
 
 function row(overrides: Partial<GameRow> = {}): GameRow {
   return {
     id: ID,
+    userId: USER,
     titulo: 'Celeste',
     plataforma: 'PC',
     status: 'ZERADO',
@@ -68,14 +71,14 @@ function prismaError(code: string) {
 
 describe('GamesService', () => {
   describe('list', () => {
-    it('lista todos ordenando por atualizadoEm e depois criadoEm, ambos decrescentes (CA-05)', async () => {
+    it('lista os jogos do dono ordenando por atualizadoEm e depois criadoEm, ambos decrescentes (CA-05, CA-42)', async () => {
       const { service, game } = setup();
       game.findMany.mockResolvedValue([row()]);
 
-      await service.list();
+      await service.list(USER);
 
       expect(game.findMany).toHaveBeenCalledWith({
-        where: undefined,
+        where: { userId: USER },
         orderBy: [{ atualizadoEm: 'desc' }, { criadoEm: 'desc' }],
       });
     });
@@ -84,10 +87,10 @@ describe('GamesService', () => {
       const { service, game } = setup();
       game.findMany.mockResolvedValue([]);
 
-      await service.list('JOGANDO');
+      await service.list(USER, 'JOGANDO');
 
       expect(game.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { status: 'JOGANDO' } }),
+        expect.objectContaining({ where: { userId: USER, status: 'JOGANDO' } }),
       );
     });
 
@@ -95,7 +98,7 @@ describe('GamesService', () => {
       const { service, game } = setup();
       game.findMany.mockResolvedValue([]);
 
-      await expect(service.list('ZERADO')).resolves.toEqual([]);
+      await expect(service.list(USER, 'ZERADO')).resolves.toEqual([]);
     });
 
     it('expoe plataforma vazia como null e nao vaza as colunas normalizadas (CA-01, CA-04)', async () => {
@@ -104,7 +107,7 @@ describe('GamesService', () => {
         row({ plataforma: '', plataformaNormalizada: '', nota: null }),
       ]);
 
-      const [result] = await service.list();
+      const [result] = await service.list(USER);
 
       expect(result).toEqual({
         id: ID,
@@ -118,6 +121,7 @@ describe('GamesService', () => {
       });
       expect(result).not.toHaveProperty('tituloNormalizado');
       expect(result).not.toHaveProperty('plataformaNormalizada');
+      expect(result).not.toHaveProperty('userId');
     });
   });
 
@@ -127,7 +131,7 @@ describe('GamesService', () => {
       game.findFirst.mockResolvedValue(null);
       game.create.mockResolvedValue(row());
 
-      await service.create({
+      await service.create(USER, {
         titulo: '  Outer Wilds  ',
         status: 'QUERO_JOGAR',
         plataforma: ' PC ',
@@ -135,6 +139,7 @@ describe('GamesService', () => {
 
       expect(game.create).toHaveBeenCalledWith({
         data: {
+          userId: USER,
           titulo: 'Outer Wilds',
           plataforma: 'PC',
           status: 'QUERO_JOGAR',
@@ -152,7 +157,7 @@ describe('GamesService', () => {
 
       for (const plataforma of [undefined, null, '   ']) {
         game.create.mockClear();
-        await service.create({ titulo: 'Hades', status: 'JOGANDO', plataforma });
+        await service.create(USER, { titulo: 'Hades', status: 'JOGANDO', plataforma });
 
         expect(game.create).toHaveBeenCalledWith({
           data: expect.objectContaining({ plataforma: '', plataformaNormalizada: '' }),
@@ -165,8 +170,8 @@ describe('GamesService', () => {
       game.findFirst.mockResolvedValue(null);
       game.create.mockResolvedValue(row());
 
-      await service.create({ titulo: 'Celeste', status: 'ZERADO', nota: 9 });
-      await service.create({ titulo: 'Hades', status: 'JOGANDO', nota: 0 });
+      await service.create(USER, { titulo: 'Celeste', status: 'ZERADO', nota: 9 });
+      await service.create(USER, { titulo: 'Hades', status: 'JOGANDO', nota: 0 });
 
       expect(game.create).toHaveBeenCalledTimes(2);
     });
@@ -175,7 +180,7 @@ describe('GamesService', () => {
       const { service, game } = setup();
 
       const error = await failure(
-        service.create({ titulo: 'Hades', status: 'QUERO_JOGAR', nota: 8 }),
+        service.create(USER, { titulo: 'Hades', status: 'QUERO_JOGAR', nota: 8 }),
       );
 
       expect(error.getStatus()).toBe(400);
@@ -192,7 +197,7 @@ describe('GamesService', () => {
       game.findFirst.mockResolvedValue(null);
       game.create.mockResolvedValue(row());
 
-      await service.create({ titulo: 'Hades', status: 'QUERO_JOGAR', nota: null });
+      await service.create(USER, { titulo: 'Hades', status: 'QUERO_JOGAR', nota: null });
 
       expect(game.create).toHaveBeenCalledWith({ data: expect.objectContaining({ nota: null }) });
     });
@@ -202,7 +207,7 @@ describe('GamesService', () => {
       game.findFirst.mockResolvedValue({ id: 'outro' });
 
       const error = await failure(
-        service.create({ titulo: '  cELESTE ', status: 'ZERADO', plataforma: 'pc ' }),
+        service.create(USER, { titulo: '  cELESTE ', status: 'ZERADO', plataforma: 'pc ' }),
       );
 
       expect(error.getStatus()).toBe(409);
@@ -212,7 +217,7 @@ describe('GamesService', () => {
         fields: { titulo: DUPLICATE },
       });
       expect(game.findFirst).toHaveBeenCalledWith({
-        where: { tituloNormalizado: 'celeste', plataformaNormalizada: 'pc' },
+        where: { userId: USER, tituloNormalizado: 'celeste', plataformaNormalizada: 'pc' },
         select: { id: true },
       });
       expect(game.create).not.toHaveBeenCalled();
@@ -222,13 +227,38 @@ describe('GamesService', () => {
       const { service, game } = setup();
       game.findFirst.mockResolvedValue({ id: 'outro' });
 
-      await failure(service.create({ titulo: 'celeste', status: 'ZERADO', plataforma: '   ' }));
+      await failure(
+        service.create(USER, { titulo: 'celeste', status: 'ZERADO', plataforma: '   ' }),
+      );
 
       expect(game.findFirst).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { tituloNormalizado: 'celeste', plataformaNormalizada: '' },
+          where: { userId: USER, tituloNormalizado: 'celeste', plataformaNormalizada: '' },
         }),
       );
+    });
+
+    it('a duplicata e por dono: outro usuario com o mesmo jogo nao conflita (CA-43)', async () => {
+      const { service, game } = setup();
+      const OTHER = '9e8d7c6b-5a4f-4e3d-9c2b-1a0f9e8d7c6b';
+      // "Celeste / PC" existe so para USER.
+      game.findFirst.mockImplementation(({ where }: { where: { userId: string } }) =>
+        Promise.resolve(where.userId === USER ? { id: ID } : null),
+      );
+      game.create.mockResolvedValue(row({ userId: OTHER }));
+
+      await expect(
+        service.create(OTHER, { titulo: 'celeste', status: 'ZERADO', plataforma: 'pc' }),
+      ).resolves.toMatchObject({ id: ID });
+      const error = await failure(
+        service.create(USER, { titulo: 'CELESTE', status: 'ZERADO', plataforma: 'PC' }),
+      );
+
+      expect(error.getStatus()).toBe(409);
+      expect(game.create).toHaveBeenCalledTimes(1);
+      expect(game.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ userId: OTHER }),
+      });
     });
 
     it('traduz o P2002 do banco (corrida entre duas requests) em 409 (CA-38)', async () => {
@@ -236,7 +266,7 @@ describe('GamesService', () => {
       game.findFirst.mockResolvedValue(null);
       game.create.mockRejectedValue(prismaError('P2002'));
 
-      const error = await failure(service.create({ titulo: 'Celeste', status: 'ZERADO' }));
+      const error = await failure(service.create(USER, { titulo: 'Celeste', status: 'ZERADO' }));
 
       expect(error.getStatus()).toBe(409);
       expect(error.getResponse()).toMatchObject({ fields: { titulo: DUPLICATE } });
@@ -247,7 +277,7 @@ describe('GamesService', () => {
       game.findFirst.mockResolvedValue(null);
       game.create.mockRejectedValue(new Error('conexao perdida'));
 
-      await expect(service.create({ titulo: 'Celeste', status: 'ZERADO' })).rejects.toThrow(
+      await expect(service.create(USER, { titulo: 'Celeste', status: 'ZERADO' })).rejects.toThrow(
         'conexao perdida',
       );
     });
@@ -257,7 +287,7 @@ describe('GamesService', () => {
     it('rejeita body vazio com 400 antes de consultar o banco (CA-24)', async () => {
       const { service, game } = setup();
 
-      const error = await failure(service.update(ID, {}));
+      const error = await failure(service.update(USER, ID, {}));
 
       expect(error.getStatus()).toBe(400);
       expect(game.findUnique).not.toHaveBeenCalled();
@@ -266,19 +296,21 @@ describe('GamesService', () => {
     it('trata campos undefined como ausentes (CA-24)', async () => {
       const { service } = setup();
 
-      const error = await failure(service.update(ID, { titulo: undefined, nota: undefined }));
+      const error = await failure(service.update(USER, ID, { titulo: undefined, nota: undefined }));
 
       expect(error.getStatus()).toBe(400);
     });
 
-    it('devolve 404 quando o jogo nao existe (CA-27)', async () => {
+    it('devolve 404 quando o jogo nao existe ou e de outro usuario: busca pelo id E pelo dono (CA-27, CA-42)', async () => {
       const { service, game } = setup();
       game.findUnique.mockResolvedValue(null);
 
-      const error = await failure(service.update(ID, { titulo: 'X' }));
+      const error = await failure(service.update(USER, ID, { titulo: 'X' }));
 
       expect(error.getStatus()).toBe(404);
       expect(error.getResponse()).toMatchObject({ message: 'Jogo não encontrado' });
+      expect(game.findUnique).toHaveBeenCalledWith({ where: { id: ID, userId: USER } });
+      expect(game.findFirst).not.toHaveBeenCalled();
       expect(game.update).not.toHaveBeenCalled();
     });
 
@@ -288,10 +320,10 @@ describe('GamesService', () => {
       game.findFirst.mockResolvedValue(null);
       game.update.mockResolvedValue(row({ status: 'JOGANDO', nota: null }));
 
-      await service.update(ID, { status: 'JOGANDO' });
+      await service.update(USER, ID, { status: 'JOGANDO' });
 
       expect(game.update).toHaveBeenCalledWith({
-        where: { id: ID },
+        where: { id: ID, userId: USER },
         data: {
           titulo: 'Celeste',
           plataforma: 'PC',
@@ -308,7 +340,7 @@ describe('GamesService', () => {
         const { service, game } = setup();
         game.findUnique.mockResolvedValue(row({ status: 'JOGANDO', nota: 7 }));
 
-        const error = await failure(service.update(ID, { status: 'QUERO_JOGAR' }));
+        const error = await failure(service.update(USER, ID, { status: 'QUERO_JOGAR' }));
 
         expect(error.getStatus()).toBe(400);
         expect(error.getResponse()).toEqual({
@@ -325,7 +357,7 @@ describe('GamesService', () => {
         game.findFirst.mockResolvedValue(null);
         game.update.mockResolvedValue(row({ status: 'QUERO_JOGAR', nota: null }));
 
-        await service.update(ID, { status: 'QUERO_JOGAR', nota: null });
+        await service.update(USER, ID, { status: 'QUERO_JOGAR', nota: null });
 
         expect(game.update).toHaveBeenCalledWith(
           expect.objectContaining({
@@ -338,7 +370,7 @@ describe('GamesService', () => {
         const { service, game } = setup();
         game.findUnique.mockResolvedValue(row({ status: 'QUERO_JOGAR', nota: null }));
 
-        const error = await failure(service.update(ID, { nota: 5 }));
+        const error = await failure(service.update(USER, ID, { nota: 5 }));
 
         expect(error.getResponse()).toMatchObject({ fields: { nota: RATING } });
         expect(game.update).not.toHaveBeenCalled();
@@ -350,7 +382,7 @@ describe('GamesService', () => {
         game.findFirst.mockResolvedValue(null);
         game.update.mockResolvedValue(row({ status: 'ZERADO', nota: 5 }));
 
-        await service.update(ID, { status: 'ZERADO', nota: 5 });
+        await service.update(USER, ID, { status: 'ZERADO', nota: 5 });
 
         expect(game.update).toHaveBeenCalledWith(
           expect.objectContaining({ data: expect.objectContaining({ status: 'ZERADO', nota: 5 }) }),
@@ -363,7 +395,7 @@ describe('GamesService', () => {
         game.findFirst.mockResolvedValue(null);
         game.update.mockResolvedValue(row({ status: 'JOGANDO', nota: 8 }));
 
-        await service.update(ID, { nota: 8 });
+        await service.update(USER, ID, { nota: 8 });
 
         expect(game.update).toHaveBeenCalledWith(
           expect.objectContaining({
@@ -379,7 +411,7 @@ describe('GamesService', () => {
       game.findFirst.mockResolvedValue(null);
       game.update.mockResolvedValue(row({ plataforma: '', plataformaNormalizada: '' }));
 
-      const result = await service.update(ID, { plataforma: null });
+      const result = await service.update(USER, ID, { plataforma: null });
 
       expect(game.update).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -395,7 +427,7 @@ describe('GamesService', () => {
       game.findFirst.mockResolvedValue(null);
       game.update.mockResolvedValue(row());
 
-      await service.update(ID, { titulo: '  CELESTE 2 ' });
+      await service.update(USER, ID, { titulo: '  CELESTE 2 ' });
 
       expect(game.update).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -413,7 +445,7 @@ describe('GamesService', () => {
       game.findUnique.mockResolvedValue(row({ titulo: 'Hades', plataforma: 'PC' }));
       game.findFirst.mockResolvedValue({ id: 'celeste' });
 
-      const error = await failure(service.update(ID, { titulo: 'celeste' }));
+      const error = await failure(service.update(USER, ID, { titulo: 'celeste' }));
 
       expect(error.getStatus()).toBe(409);
       expect(error.getResponse()).toMatchObject({ fields: { titulo: DUPLICATE } });
@@ -426,10 +458,15 @@ describe('GamesService', () => {
       game.findFirst.mockResolvedValue(null);
       game.update.mockResolvedValue(row({ titulo: 'CELESTE' }));
 
-      await service.update(ID, { titulo: 'CELESTE' });
+      await service.update(USER, ID, { titulo: 'CELESTE' });
 
       expect(game.findFirst).toHaveBeenCalledWith({
-        where: { tituloNormalizado: 'celeste', plataformaNormalizada: 'pc', id: { not: ID } },
+        where: {
+          userId: USER,
+          tituloNormalizado: 'celeste',
+          plataformaNormalizada: 'pc',
+          id: { not: ID },
+        },
         select: { id: true },
       });
       expect(game.update).toHaveBeenCalled();
@@ -441,7 +478,7 @@ describe('GamesService', () => {
       game.findFirst.mockResolvedValue(null);
       game.update.mockRejectedValue(prismaError('P2002'));
 
-      const error = await failure(service.update(ID, { titulo: 'Outro' }));
+      const error = await failure(service.update(USER, ID, { titulo: 'Outro' }));
 
       expect(error.getStatus()).toBe(409);
     });
@@ -452,27 +489,27 @@ describe('GamesService', () => {
       game.findFirst.mockResolvedValue(null);
       game.update.mockRejectedValue(prismaError('P2025'));
 
-      const error = await failure(service.update(ID, { titulo: 'Outro' }));
+      const error = await failure(service.update(USER, ID, { titulo: 'Outro' }));
 
       expect(error.getStatus()).toBe(404);
     });
   });
 
   describe('remove', () => {
-    it('apaga o jogo pelo id (CA-12)', async () => {
+    it('apaga o jogo pelo id e pelo dono (CA-12, CA-42)', async () => {
       const { service, game } = setup();
       game.delete.mockResolvedValue(row());
 
-      await expect(service.remove(ID)).resolves.toBeUndefined();
+      await expect(service.remove(USER, ID)).resolves.toBeUndefined();
 
-      expect(game.delete).toHaveBeenCalledWith({ where: { id: ID } });
+      expect(game.delete).toHaveBeenCalledWith({ where: { id: ID, userId: USER } });
     });
 
-    it('devolve 404 quando o jogo nao existe ou ja foi removido (CA-28, CA-29)', async () => {
+    it('devolve 404 quando o jogo nao existe, ja foi removido ou e de outro usuario (CA-28, CA-29, CA-42)', async () => {
       const { service, game } = setup();
       game.delete.mockRejectedValue(prismaError('P2025'));
 
-      const error = await failure(service.remove(ID));
+      const error = await failure(service.remove(USER, ID));
 
       expect(error.getStatus()).toBe(404);
       expect(error.getResponse()).toMatchObject({ message: 'Jogo não encontrado' });
@@ -482,7 +519,7 @@ describe('GamesService', () => {
       const { service, game } = setup();
       game.delete.mockRejectedValue(new Error('conexao perdida'));
 
-      await expect(service.remove(ID)).rejects.toThrow('conexao perdida');
+      await expect(service.remove(USER, ID)).rejects.toThrow('conexao perdida');
     });
   });
 });

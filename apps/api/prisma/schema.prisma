@@ -35,19 +35,25 @@ model Game {
   tituloNormalizado     String @db.VarChar(120)
   plataformaNormalizada String @default("") @db.VarChar(60)
 
-  // Caminho do objeto no bucket de capas ("<gameId>/<uuid>.<ext>"), nao a URL: a capaUrl e montada
-  // na resposta a partir de SUPABASE_URL e do bucket, entao trocar de projeto nao exige migrar dados.
+  // Caminho do objeto no bucket de capas ("<userId>/<gameId>/<uuid>.<ext>"; as enviadas antes da
+  // etapa 3 de autenticacao ficam em "<gameId>/<uuid>.<ext>"), nao a URL: a capaUrl e montada na
+  // resposta a partir de SUPABASE_URL e do bucket, entao trocar de projeto nao exige migrar dados.
   capaPath String? @db.VarChar(120)
+
+  // Dono do jogo. Opcional so ate a migracao A4 (spec autenticacao): os jogos anteriores nao tem dono
+  // e ficam invisiveis pela API ate o passo humano descarta-los.
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   criadoEm     DateTime @default(now())
   atualizadoEm DateTime @updatedAt
 
-  @@unique([tituloNormalizado, plataformaNormalizada])
+  // Unicidade por dono. Com userId na frente, tambem serve de indice para `where: { userId }`.
+  @@unique([userId, tituloNormalizado, plataformaNormalizada])
   @@index([status])
 }
 
-// Conta de acesso (spec autenticacao). Aditivo: nao toca em "Game". A relacao com os jogos
-// (`Game.userId`) entra na etapa 3, em migracao propria.
+// Conta de acesso (spec autenticacao).
 model User {
   id        String @id @default(uuid())
   nome      String @db.VarChar(60)
@@ -60,6 +66,7 @@ model User {
   atualizadoEm DateTime @updatedAt
 
   sessoes RefreshSession[]
+  games   Game[]
 }
 
 // Uma linha por dispositivo logado. O `id` e o `sid` dos tokens.
