@@ -4,8 +4,10 @@ import { Prisma } from '@prisma/client';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import {
   normalizeEmail,
+  type EncerrarOutrasSessoesResponse,
   type LoginRequest,
   type RegistroRequest,
+  type SessaoAtiva,
   type TrocarSenhaRequest,
   type Usuario,
 } from '@checkpoint/shared';
@@ -230,6 +232,60 @@ export class AuthService implements OnModuleInit {
         where: { userId: user.id, id: { not: user.sessionId } },
       }),
     ]);
+  }
+
+  /**
+   * As sessões VIVAS (não vencidas) de quem está logado: a da própria request primeiro, as outras do
+   * uso mais recente para o mais antigo. O `select` é uma lista branca: hashes, vencimento e `userId`
+   * nunca saem daqui.
+   */
+  async listarSessoes(user: AuthenticatedUser): Promise<SessaoAtiva[]> {
+    const rows = await this.prisma.refreshSession.findMany({
+      where: { userId: user.id, expiraEm: { gt: new Date(Date.now()) } },
+      orderBy: { ultimoUsoEm: 'desc' },
+      select: { id: true, dispositivo: true, criadoEm: true, ultimoUsoEm: true },
+    });
+    const sessoes = rows.map((row) => ({
+      id: row.id,
+      dispositivo: row.dispositivo,
+      criadoEm: row.criadoEm.toISOString(),
+      ultimoUsoEm: row.ultimoUsoEm.toISOString(),
+      atual: row.id === user.sessionId,
+    }));
+    // `sort` é estável: as outras mantêm a ordem por uso que veio do banco.
+    return sessoes.sort((a, b) => Number(b.atual) - Number(a.atual));
+  }
+
+  /**
+   * Encerra UMA sessão do usuário (outro aparelho). O guard confere a sessão a cada request, então o
+   * access token dela cai na hora, e o refresh dela deixa de achar a linha. Id de outro usuário e id
+   * inexistente dão o mesmo 404 (o `where` com o dono garante que ninguém apaga sessão alheia).
+   */
+  async encerrarSessao(user: AuthenticatedUser, sessionId: string): Promise<void> {
+    if (sessionId === user.sessionId) {
+      throw authErrors.sessaoAtual();
+    }
+    const { count } = await this.prisma.refreshSession.deleteMany({
+      where: { id: sessionId, userId: user.id },
+    });
+    if (count === 0) {
+      throw authErrors.sessaoNaoEncontrada();
+    }
+  }
+
+  /**
+   * Encerra todas as OUTRAS sessões vivas; a da própria request continua. A contagem é das vivas, a
+   * mesma que a lista mostra ("Encerrar N sessões"); as vencidas já não servem e saem no próximo login.
+   */
+  async encerrarOutrasSessoes(user: AuthenticatedUser): Promise<EncerrarOutrasSessoesResponse> {
+    const { count } = await this.prisma.refreshSession.deleteMany({
+      where: {
+        userId: user.id,
+        id: { not: user.sessionId },
+        expiraEm: { gt: new Date(Date.now()) },
+      },
+    });
+    return { encerradas: count };
   }
 
   /** Cria a sessão deste dispositivo, limpa as vencidas e respeita o teto de sessões. */

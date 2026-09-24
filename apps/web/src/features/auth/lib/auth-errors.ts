@@ -26,6 +26,9 @@ export const AUTH_MESSAGES: Record<ApiErrorCode, string> = {
   AUTH_SENHA_IGUAL_ATUAL: 'A nova senha precisa ser diferente da atual.',
   AUTH_ORIGEM_INVALIDA: 'Não foi possível completar a requisição.',
   LIMITE_TENTATIVAS: 'Muitas tentativas. Aguarde um pouco e tente de novo.',
+  // Sessões ativas do /perfil (spec perfil, etapa 2).
+  SESSAO_ATUAL: 'Para encerrar esta sessão, use Sair.',
+  SESSAO_NAO_ENCONTRADA: 'Essa sessão já foi encerrada.',
 };
 
 export const NO_CONNECTION_MESSAGE = 'Sem conexão. Tente de novo quando a conexão voltar.';

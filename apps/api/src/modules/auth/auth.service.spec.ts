@@ -589,3 +589,125 @@ describe('trocarSenha (CA-51 a CA-53)', () => {
     ).resolves.toMatchObject({ status: 401, body: { code: 'AUTH_SESSAO_ENCERRADA' } });
   });
 });
+
+describe('sessões ativas (perfil CA-08 a CA-11)', () => {
+  /**
+   * Ana com três sessões, criadas em momentos diferentes (A, B, C, nesta ordem), e Bia com uma. O
+   * `ultimoUsoEm` de cada uma é o momento do login.
+   */
+  async function cenario() {
+    at(0);
+    const a = await service.register(ANA, CURL);
+    const [sA] = db.sessions.map((s) => s.id);
+    at(60_000);
+    await service.login(
+      { email: ANA.email, senha: ANA.senha },
+      'Mozilla/5.0 (Linux; Android 14) Chrome/128.0 Mobile Safari/537.36',
+    );
+    at(120_000);
+    await service.login({ email: ANA.email, senha: ANA.senha }, CURL);
+    const [, sB, sC] = db.sessions.map((s) => s.id);
+    at(180_000);
+    await service.register(
+      { nome: 'Bia', email: 'bia@exemplo.com', senha: 'segredo-da-bia' },
+      CURL,
+    );
+    const sBia = db.sessions.find((s) => s.userId !== a.usuario.id)?.id as string;
+    const ana = (sessionId: string) => ({ id: a.usuario.id, sessionId });
+    return { ana, sA: sA as string, sB: sB as string, sC: sC as string, sBia };
+  }
+
+  it('lista só as da conta, a ATUAL primeiro e depois do uso mais recente ao mais antigo (CA-08)', async () => {
+    const { ana, sA, sB, sC } = await cenario();
+
+    const lista = await service.listarSessoes(ana(sA));
+
+    expect(lista.map((s) => s.id)).toEqual([sA, sC, sB]);
+    expect(lista.map((s) => s.atual)).toEqual([true, false, false]);
+    expect(lista[2]?.dispositivo).toBe('Chrome · Android');
+  });
+
+  it('cada item tem EXATAMENTE id, dispositivo, criadoEm, ultimoUsoEm e atual, com datas ISO (CA-08)', async () => {
+    const { ana, sA } = await cenario();
+
+    const [primeira] = await service.listarSessoes(ana(sA));
+
+    expect(Object.keys(primeira ?? {}).sort()).toEqual([
+      'atual',
+      'criadoEm',
+      'dispositivo',
+      'id',
+      'ultimoUsoEm',
+    ]);
+    // O Prisma falso preenche `criadoEm` com o relógio real; o que importa aqui é o formato ISO.
+    expect(primeira?.criadoEm).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+    expect(primeira?.ultimoUsoEm).toBe(new Date(NOW).toISOString());
+    const [args] = db.refreshSession.findMany.mock.calls.at(-1) as [
+      { select: Record<string, boolean> },
+    ];
+    expect(Object.keys(args.select).sort()).toEqual([
+      'criadoEm',
+      'dispositivo',
+      'id',
+      'ultimoUsoEm',
+    ]);
+  });
+
+  it('sessão VENCIDA não aparece', async () => {
+    const { ana, sA, sB } = await cenario();
+    const vencida = db.sessions.find((s) => s.id === sB);
+    if (vencida) vencida.expiraEm = new Date(NOW - 1);
+
+    const lista = await service.listarSessoes(ana(sA));
+
+    expect(lista.map((s) => s.id)).not.toContain(sB);
+    expect(lista).toHaveLength(2);
+  });
+
+  it('encerrar OUTRA sessão apaga só ela (CA-09)', async () => {
+    const { ana, sA, sB, sC, sBia } = await cenario();
+
+    await service.encerrarSessao(ana(sA), sB);
+
+    expect(db.sessions.map((s) => s.id).sort()).toEqual([sA, sC, sBia].sort());
+  });
+
+  it('encerrar a PRÓPRIA sessão → 400 SESSAO_ATUAL, nada apagado (CA-10)', async () => {
+    const { ana, sA } = await cenario();
+
+    await expect(errorOf(service.encerrarSessao(ana(sA), sA))).resolves.toMatchObject({
+      status: 400,
+      body: { code: 'SESSAO_ATUAL' },
+    });
+    expect(db.sessions).toHaveLength(4);
+  });
+
+  it('sessão de OUTRO usuário e id inexistente → o MESMO 404 SESSAO_NAO_ENCONTRADA; a da Bia continua (CA-10)', async () => {
+    const { ana, sA, sBia } = await cenario();
+
+    const alheia = await errorOf(service.encerrarSessao(ana(sA), sBia));
+    const inexistente = await errorOf(
+      service.encerrarSessao(ana(sA), '00000000-0000-4000-8000-000000000000'),
+    );
+
+    expect(alheia).toEqual(inexistente);
+    expect(alheia).toMatchObject({ status: 404, body: { code: 'SESSAO_NAO_ENCONTRADA' } });
+    expect(db.sessions.map((s) => s.id)).toContain(sBia);
+  });
+
+  it('encerrar todas as OUTRAS: devolve a contagem e só a atual fica; repetir dá 0 (CA-11)', async () => {
+    const { ana, sA, sBia } = await cenario();
+
+    await expect(service.encerrarOutrasSessoes(ana(sA))).resolves.toEqual({ encerradas: 2 });
+    expect(db.sessions.map((s) => s.id).sort()).toEqual([sA, sBia].sort());
+    await expect(service.encerrarOutrasSessoes(ana(sA))).resolves.toEqual({ encerradas: 0 });
+  });
+
+  it('encerrar todas as outras não conta as vencidas (a contagem é a da lista)', async () => {
+    const { ana, sA, sB } = await cenario();
+    const vencida = db.sessions.find((s) => s.id === sB);
+    if (vencida) vencida.expiraEm = new Date(NOW - 1);
+
+    await expect(service.encerrarOutrasSessoes(ana(sA))).resolves.toEqual({ encerradas: 1 });
+  });
+});

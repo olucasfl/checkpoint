@@ -8,6 +8,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { authApi } from '../api/auth-api';
 import { entrar, resetSessionForTests } from '../session/session';
 import { gamesApi } from '@/features/games/api/games-api';
+import { perfilApi } from '@/features/perfil/api/perfil-api';
 import { PerfilPage } from '@/pages/PerfilPage';
 import { TrocarSenhaForm } from './TrocarSenhaForm';
 
@@ -23,6 +24,10 @@ vi.mock('../api/auth-api', () => ({
 }));
 // O `/perfil` mostra o resumo do catálogo (query ['games']); aqui a lista vem vazia.
 vi.mock('@/features/games/api/games-api', () => ({ gamesApi: { list: vi.fn() } }));
+// E a lista de sessões da seção Conta (vazia aqui).
+vi.mock('@/features/perfil/api/perfil-api', () => ({
+  perfilApi: { atualizar: vi.fn(), listarSessoes: vi.fn() },
+}));
 const api = vi.mocked(authApi);
 
 /** O `/perfil` usa a query de jogos: toda renderização dele precisa de um QueryClient. */
@@ -73,6 +78,7 @@ async function preencher(
 beforeEach(() => {
   vi.resetAllMocks();
   vi.mocked(gamesApi.list).mockResolvedValue([]);
+  vi.mocked(perfilApi.listarSessoes).mockResolvedValue([]);
   resetSessionForTests();
   entrar({
     accessToken: 'token',

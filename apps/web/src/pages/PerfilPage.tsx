@@ -6,14 +6,15 @@ import { avisoDoPerfil } from '@/features/auth/lib/perfil-avisos';
 import { useAuth } from '@/features/auth/session/use-auth';
 import { InstalarApp } from '@/features/perfil/components/InstalarApp';
 import { PerfilCabecalho } from '@/features/perfil/components/PerfilCabecalho';
+import { SessoesAtivas } from '@/features/perfil/components/SessoesAtivas';
 
 const SEM_CONEXAO_PARA_SAIR = 'Sem conexão. Para sair, conecte-se.';
 
 /**
- * `/perfil` (spec perfil, etapa 1): cabeçalho (avatar de iniciais, nome editável, e-mail, "Membro
- * desde", resumo do catálogo), a conta (Trocar senha, Sair) e "Instalar app" quando dá. Empilhado no
- * celular; duas colunas em >= 1024px. Mostra o aviso que a troca de senha deixa no `state` da
- * navegação. Sair sem conexão NÃO acontece: o cookie `HttpOnly` só o servidor apaga, e sair "só
+ * `/perfil` (spec perfil, etapas 1 e 2): cabeçalho (avatar de iniciais, nome editável, e-mail,
+ * "Membro desde", resumo do catálogo), a conta (Trocar senha, Sessões ativas, Sair) e "Instalar app"
+ * quando dá. Empilhado no celular; duas colunas em >= 1024px. Mostra o aviso que a troca de senha deixa
+ * no `state` da navegação. Sair sem conexão NÃO acontece: o cookie `HttpOnly` só o servidor apaga, e sair "só
  * localmente" deixaria a sessão voltar no próximo carregamento. Depois de sair, o `RequireAuth` leva
  * para `/login`.
  */
@@ -74,6 +75,8 @@ export function PerfilPage() {
             >
               Trocar senha
             </Link>
+
+            <SessoesAtivas />
 
             {aviso && <FieldError id="perfil-aviso" message={aviso} />}
 

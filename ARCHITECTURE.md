@@ -200,8 +200,8 @@ implementado.
 ### 4.4 Módulo por domínio (`src/modules/`)
 
 Convenção NestJS padrão, um módulo por domínio, cada um com `*.module.ts` + `*.controller.ts` +
-`*.service.ts` (+ `dto/` quando a rota aceitar body). Hoje há quatro (`health/`, `games/`, `auth/`, §4.5, e
-`users/`):
+`*.service.ts` (+ `dto/` quando a rota aceitar body). Hoje há quatro (`health/`, `games/`, `auth/`, §4.5 —
+que também guarda as **sessões ativas** do perfil —, e `users/`):
 
 - `health/` — `GET /api/health`, sem domínio; serve de modelo de forma.
 - `games/` — o catálogo de jogos (spec `docs/specs/catalogo-jogos.md`, etapas 1 e 2; o web está em §5.5):
@@ -270,11 +270,24 @@ apps/api/src/modules/games/
 
 Registre o módulo novo em `app.module.ts` (`imports: [...]`).
 
-### 4.5 Autenticação (`modules/auth/`, spec `docs/specs/autenticacao.md`, etapas 1 e 5)
+### 4.5 Autenticação (`modules/auth/`, spec `docs/specs/autenticacao.md`, etapas 1 e 5; sessões: spec `perfil`, etapa 2)
 
 - **Rotas** (`/api/auth`, tag Swagger `auth`): `POST registro`, `POST login`, `POST refresh`, `POST logout` (as
-  quatro `@Public()`), `GET me` e `PUT senha` (protegidas). Erros com `code` estável (`ApiErrorCode` do shared),
-  nunca comparando a `message`.
+  quatro `@Public()`), `GET me`, `PUT senha`, `GET sessoes`, `DELETE sessoes` e `DELETE sessoes/:id`
+  (protegidas). Erros com `code` estável (`ApiErrorCode` do shared), nunca comparando a `message`.
+- **Sessões ativas** (spec `perfil`, etapa 2; `AuthService.listarSessoes/encerrarSessao/encerrarOutrasSessoes`):
+  - `GET /api/auth/sessoes` → 200 `SessaoAtiva[]`: só as **vivas** (`expiraEm > agora`), a da própria request
+    primeiro (`atual: true`), as outras por `ultimoUsoEm` decrescente. O `select` é lista branca: cada item tem
+    **exatamente** `{ id, dispositivo, criadoEm, ultimoUsoEm, atual }` (nunca `tokenHash`, `hashAnterior`,
+    `expiraEm`, `userId`).
+  - `DELETE /api/auth/sessoes/:id` → **204**; apaga com `where: { id, userId }`, então o access token e o
+    refresh daquela sessão caem **na hora** (o guard confere a sessão a cada request). Id que não é UUID → 400
+    `VALIDACAO` (`sessao-id.pipe.ts`: `ParseUUIDPipe` com `exceptionFactory`; um DTO de parâmetro pelo pipe
+    global diria "campo não permitido: id"); a própria sessão → 400 `SESSAO_ATUAL` (para ela, `logout`);
+    inexistente **ou de outro usuário** → o **mesmo** 404 `SESSAO_NAO_ENCONTRADA` (não revela que existe).
+  - `DELETE /api/auth/sessoes` → 200 `{ encerradas }`: apaga as outras sessões **vivas** (a contagem é a da
+    lista); a atual continua. `sessoes` e `sessoes/:id` não conflitam (o `:id` exige mais um segmento).
+  - Sem `@Throttle` próprio: vale o padrão do módulo (60/min por IP).
 - **Troca de senha** (`PUT /api/auth/senha`, etapa 5, `TrocarSenhaDto`): `{ senhaAtual, novaSenha }`, com a nova
   sob a mesma regra do registro e a atual só não vazia e ≤ 72 bytes. **204**; senha atual errada → 400
   `AUTH_SENHA_ATUAL_INCORRETA` (`fields.senhaAtual`); nova igual à atual → 400 `AUTH_SENHA_IGUAL_ATUAL`
@@ -303,8 +316,8 @@ Registre o módulo novo em `app.module.ts` (`imports: [...]`).
   e-mail inexistente ainda paga um hash (contra um hash fixo) para o tempo não denunciar a conta.
 - **Sem dado sensível** em corpo nem log: o `select` do Prisma é uma lista branca (`USUARIO_PUBLICO_SELECT`);
   nenhuma rota loga senha, token, cookie ou cabeçalho `Authorization`.
-- Testes ao lado do código: `auth.service.spec.ts` (rotação, janela, reuso, teto de 10, troca de senha, com
-  relógio falso),
+- Testes ao lado do código: `auth.service.spec.ts` (rotação, janela, reuso, teto de 10, troca de senha,
+  sessões ativas, com relógio falso), `sessao-id.pipe.spec.ts`,
   `access-token.guard.spec.ts` (`@Public`, tipos de token trocados, vencido, sessão apagada),
   `password-hasher.spec.ts` (scrypt real), `session-device.spec.ts`, `dto/*.spec.ts` e
   `auth.http.spec.ts` (HTTP numa porta local: cookie, anti-CSRF, 429, CORS, corpos e logs). O
@@ -548,10 +561,11 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
   (`lib/perfil-avisos.ts`: só um aviso conhecido é mostrado, em `role="status"`). As outras sessões caem no
   servidor; o outro navegador descobre na próxima request (401 → `/login?motivo=sessao`).
 
-### 5.11 Perfil (`features/perfil/`, `pages/PerfilPage.tsx`, spec `docs/specs/perfil.md`, etapa 1)
+### 5.11 Perfil (`features/perfil/`, `pages/PerfilPage.tsx`, spec `docs/specs/perfil.md`, etapas 1 e 2)
 
 - **`/perfil`** (dentro do `RequireAuth` + `AppLayout`): cabeçalho, seção **Conta** ("Salvo na sua conta":
-  Trocar senha → `/perfil/senha`, Sair) e seção **App** ("Instalar app", só quando dá). Empilhado abaixo de
+  Trocar senha → `/perfil/senha`, Sessões ativas, Sair; **sem repetir o nome**, que é editável no cabeçalho)
+  e seção **App** ("Instalar app", só quando dá). Empilhado abaixo de
   1024px e em duas colunas (`lg:grid-cols-2`) a partir de 1024px.
 - **Cabeçalho** (`PerfilCabecalho`): avatar de iniciais 64 × 64 com a mesma regra da capa gerada dos jogos
   aplicada ao nome (**`shared/lib/game-cover.ts`**, movido de `features/games/lib` por servir às duas
@@ -570,8 +584,19 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
   guardou o convite (`podeInstalar()`), `ios` no Safari do iPhone/iPad (mostra o passo a passo), e nada quando
   já instalado (`estaInstalado()` ou a chave `instalacao:instalado`). Sem as regras de intervalo do
   `InstallNudge`: é um botão sempre disponível.
+- **Sessões ativas** (`SessoesAtivas`, etapa 2): query `['sessoes']` (`api/use-sessoes.ts`, pelo `apiClient`;
+  o logout local limpa o `queryClient` inteiro, esta chave junto). Uma linha por sessão, na ordem da API:
+  ícone `smartphone` (rótulo com Android/iOS) ou `computer`, o `dispositivo` e "Último uso em dd/mm/aaaa hh:mm"
+  (`lib/sessoes.ts`, pelas partes do `Intl`, sem a vírgula do pt-BR). A atual tem o selo "Este aparelho" e
+  **nenhum botão**; as outras têm **Encerrar** (44 × 44, sem confirmação). **Encerrar todas as outras** pede
+  confirmação no `<dialog>` ("Encerrar N sessões? Esses aparelhos vão precisar entrar de novo.") e some sem
+  outras. Toda mutação invalida a lista (inclusive no erro: um 404 também a deixa velha). Erros pelo `code`
+  (`SESSAO_ATUAL`, `SESSAO_NAO_ENCONTRADA` e sem conexão). O aparelho encerrado descobre na próxima request (401
+  `AUTH_SESSAO_ENCERRADA` → `/login?motivo=sessao`), pelo interceptor que já existia.
 - **Testes:** `pages/PerfilPage.test.tsx` (cabeçalho e resumo, "—" carregando, edição com Esc sem request,
-  validação local, erros da API, instalar só quando aplicável) e `features/perfil/lib/resumo.test.ts`.
+  validação local, erros da API, instalar só quando aplicável, ordem da seção Conta),
+  `features/perfil/components/SessoesAtivas.test.tsx` (selo, botão só nas outras, confirmação com N, escondido
+  sem outras, erros por `code`), `features/perfil/lib/resumo.test.ts` e `features/perfil/lib/sessoes.test.ts`.
 
 ---
 
@@ -588,8 +613,11 @@ antes de `api`/`web` (§2). Hoje tem:
   `GAME_COVER_MIME_TYPES`, `GAME_COVER_FIELD` (`arquivo`) e o campo `arquivo` em `ApiErrorField`.
 - `auth.ts` — contrato da autenticação e da conta: `Usuario`, `RegistroRequest`, `LoginRequest`,
   `AuthResponse`, `TrocarSenhaRequest`, **`AtualizarPerfilRequest`** (`{ nome }`, de `PATCH /api/users/me`),
-  os limites (`USER_NAME_MAX_LENGTH` etc.), as regras puras (`normalizeEmail`, `utf8ByteLength`,
-  `passwordProblem`), `API_ERROR_CODES`/`ApiErrorCode` e `CSRF_HEADER`.
+  **`SessaoAtiva`** (`{ id, dispositivo, criadoEm, ultimoUsoEm, atual }`, de `GET /api/auth/sessoes`),
+  **`EncerrarOutrasSessoesResponse`** (`{ encerradas }`), os limites (`USER_NAME_MAX_LENGTH` etc.), as regras
+  puras (`normalizeEmail`, `utf8ByteLength`, `passwordProblem`), `API_ERROR_CODES`/`ApiErrorCode` (com
+  `SESSAO_ATUAL` e `SESSAO_NAO_ENCONTRADA`; o web tem um texto para cada, e o `Record<ApiErrorCode, string>`
+  quebra o `typecheck` se faltar) e `CSRF_HEADER`.
 - `index.ts` — reexporta `auth` e `games` e mantém dois exemplos herdados do esqueleto
   (`HealthCheckResponse`, `APP_NAME`).
 

@@ -9,6 +9,7 @@ import { SESSAO_ATIVA } from '@/features/auth/lib/session-keys';
 import { authApi } from '@/features/auth/api/auth-api';
 import { boot, entrar, resetSessionForTests, getSession } from '@/features/auth/session/session';
 import { gamesApi } from '@/features/games/api/games-api';
+import { perfilApi } from '@/features/perfil/api/perfil-api';
 import { queryClient } from '@/shared/lib/query-client';
 import { storage } from '@/shared/lib/storage/storage';
 import { routes } from './routes';
@@ -25,6 +26,10 @@ vi.mock('@/features/games/api/games-api', () => ({
     uploadCover: vi.fn(),
     removeCover: vi.fn(),
   },
+}));
+// A seção de sessões do /perfil (vazia aqui: o que importa nestes testes é a navegação).
+vi.mock('@/features/perfil/api/perfil-api', () => ({
+  perfilApi: { atualizar: vi.fn(), listarSessoes: vi.fn() },
 }));
 // O diagnóstico faria uma request real de /health; aqui só importa que a rota é pública.
 vi.mock('@/pages/StatusPage', () => ({ StatusPage: () => <main>Diagnóstico</main> }));
@@ -76,6 +81,7 @@ beforeEach(() => {
   storage.clearScope('usuario');
   queryClient.clear();
   games.list.mockResolvedValue([]);
+  vi.mocked(perfilApi.listarSessoes).mockResolvedValue([]);
 });
 
 afterEach(() => {

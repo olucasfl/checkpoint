@@ -127,10 +127,12 @@ Seções, nesta ordem, empilhadas em < 768 px e em duas colunas (conta | prefer�
    "Membro desde setembro de 2026" (`Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' })`);
    resumo "12 jogos · 5 zerados · 3 jogando · 4 quero jogar" (da query `['games']` do catálogo; enquanto
    carrega, "—").
-2. **Conta** (legenda "Salvo na sua conta"):
-   - **Nome** com botão **Editar** (44 × 44, `aria-label="Editar nome"`) → vira campo + **Salvar** /
-     **Cancelar**; Esc cancela; erro sob o campo pelo `fields.nome`. Sucesso atualiza o nome no perfil
-     (o `usuario` do `useAuth`) sem recarregar.
+   - **O nome é editável no próprio cabeçalho** (decisão do humano, 2026-09-24): ao lado dele, o botão
+     **Editar** (44 × 44, `aria-label="Editar nome"`) → vira campo + **Salvar** / **Cancelar**; Esc
+     cancela sem request; erro sob o campo pelo `fields.nome`. Sucesso atualiza o nome (o `usuario` do
+     `useAuth`) sem recarregar. **O nome e o e-mail aparecem uma vez só na tela**: a seção Conta não os
+     repete.
+2. **Conta** (legenda "Salvo na sua conta"), nesta ordem:
    - **Senha** → link "Trocar senha" para `/perfil/senha`.
    - **Sessões ativas** (etapa 2): uma linha por sessão com ícone (`smartphone`/`computer` conforme o
      rótulo), `dispositivo`, "Último uso em 23/09/2026 14:32"; a atual com o selo "Este aparelho" (sem
@@ -218,13 +220,13 @@ Ana; `C` = Bia). UI contra `http://localhost:5173`. Dados sintéticos.
 
 ### Etapa 1 — página e nome
 
-- [ ] **CA-01** — **Dado** Ana ("Ana Teste", criada em setembro de 2026) com 1 jogo Zerado e 2 Jogando, **quando** abro `/perfil`, **então** vejo o avatar "AT", "Ana Teste", "ana@exemplo.com" com "(não verificado — usado só para entrar)", "Membro desde setembro de 2026" e "3 jogos · 1 zerado · 2 jogando · 0 quero jogar"; **e** recarregar mantém a cor do avatar.
-- [ ] **CA-02** — **Dado** Ana logada, **quando** `PATCH /api/users/me` com `{"nome":"  Ana Souza "}`, **então** 200 com `nome: "Ana Souza"` e o mesmo `email`; **e** `GET /api/auth/me` devolve o nome novo.
-- [ ] **CA-03** — **Dado** `PATCH /api/users/me` com `{"nome":""}`, com 61 caracteres, com `{}`, ou com `{"email":"outro@exemplo.com"}`, **então** 400 `VALIDACAO` (com `fields.nome` nos dois primeiros) e nada muda; **sem** token, **então** 401.
-- [ ] **CA-04** — **Dado** `/perfil`, **quando** clico em Editar nome, troco e salvo, **então** o nome muda no cabeçalho sem recarregar; **quando** edito e aperto Esc, **então** volta o nome anterior sem request.
-- [ ] **CA-05** — **Dado** `/perfil`, **quando** clico em "Trocar senha", **então** vou para `/perfil/senha`.
+- [x] **CA-01** — **Dado** Ana ("Ana Teste", criada em setembro de 2026) com 1 jogo Zerado e 2 Jogando, **quando** abro `/perfil`, **então** vejo o avatar "AT", "Ana Teste", "ana@exemplo.com" com "(não verificado — usado só para entrar)", "Membro desde setembro de 2026" e "3 jogos · 1 zerado · 2 jogando · 0 quero jogar"; **e** recarregar mantém a cor do avatar.
+- [x] **CA-02** — **Dado** Ana logada, **quando** `PATCH /api/users/me` com `{"nome":"  Ana Souza "}`, **então** 200 com `nome: "Ana Souza"` e o mesmo `email`; **e** `GET /api/auth/me` devolve o nome novo.
+- [x] **CA-03** — **Dado** `PATCH /api/users/me` com `{"nome":""}`, com 61 caracteres, com `{}`, ou com `{"email":"outro@exemplo.com"}`, **então** 400 `VALIDACAO` (com `fields.nome` nos dois primeiros) e nada muda; **sem** token, **então** 401.
+- [x] **CA-04** — **Dado** `/perfil`, **quando** clico em Editar nome, troco e salvo, **então** o nome muda no cabeçalho sem recarregar; **quando** edito e aperto Esc, **então** volta o nome anterior sem request.
+- [x] **CA-05** — **Dado** `/perfil`, **quando** clico em "Trocar senha", **então** vou para `/perfil/senha`.
 - [ ] **CA-06** — **Dado** Chrome com o app instalável e não instalado, **quando** abro `/perfil`, **então** vejo **Instalar app**, e clicar abre o prompt nativo; **dado** o app aberto instalado (standalone), **então** o botão não aparece.
-- [ ] **CA-07** — **Dado** 360×640, **quando** abro `/perfil`, **então** não há rolagem horizontal e todo botão tem ≥ 44 × 44 px.
+- [x] **CA-07** — **Dado** 360×640, **quando** abro `/perfil`, **então** não há rolagem horizontal e todo botão tem ≥ 44 × 44 px.
 
 ### Etapa 2 — sessões ativas
 

@@ -92,6 +92,27 @@ export interface AtualizarPerfilRequest {
   nome: string;
 }
 
+/**
+ * Uma sessão (aparelho) do usuário logado, em `GET /api/auth/sessoes` (spec perfil). Só isto: nunca
+ * os hashes do refresh, o vencimento nem o `userId`.
+ */
+export interface SessaoAtiva {
+  id: string;
+  /** Rótulo legível ("Chrome · Android"), derivado do User-Agent no login. */
+  dispositivo: string;
+  /** ISO 8601. */
+  criadoEm: string;
+  /** ISO 8601. */
+  ultimoUsoEm: string;
+  /** É a sessão da própria request ("Este aparelho"). */
+  atual: boolean;
+}
+
+/** Resposta de `DELETE /api/auth/sessoes` (encerrar todas as outras). */
+export interface EncerrarOutrasSessoesResponse {
+  encerradas: number;
+}
+
 /** Códigos estáveis dos erros: o web mostra o texto pelo `code`, nunca comparando a `message`. */
 export const API_ERROR_CODES = [
   'VALIDACAO',
@@ -106,5 +127,8 @@ export const API_ERROR_CODES = [
   'AUTH_SENHA_IGUAL_ATUAL',
   'AUTH_ORIGEM_INVALIDA',
   'LIMITE_TENTATIVAS',
+  // Sessões ativas (spec perfil, etapa 2).
+  'SESSAO_ATUAL',
+  'SESSAO_NAO_ENCONTRADA',
 ] as const;
 export type ApiErrorCode = (typeof API_ERROR_CODES)[number];

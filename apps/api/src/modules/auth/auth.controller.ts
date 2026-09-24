@@ -1,10 +1,12 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Headers,
   HttpCode,
   HttpStatus,
+  Param,
   Post,
   Put,
   Req,
@@ -21,6 +23,7 @@ import {
   ApiForbiddenResponse,
   ApiHeader,
   ApiNoContentResponse,
+  ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
   ApiTags,
@@ -29,7 +32,12 @@ import {
 } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { type Request, type Response } from 'express';
-import { CSRF_HEADER, type Usuario } from '@checkpoint/shared';
+import {
+  CSRF_HEADER,
+  type EncerrarOutrasSessoesResponse,
+  type SessaoAtiva,
+  type Usuario,
+} from '@checkpoint/shared';
 import {
   CurrentUser,
   type AuthenticatedUser,
@@ -49,9 +57,11 @@ import {
   REGISTRATION_WINDOW_MS,
 } from './auth.constants';
 import { CsrfHeaderGuard } from './csrf-header.guard';
+import { sessaoIdPipe } from './sessao-id.pipe';
 import { AuthResponseDto, UsuarioDto } from './dto/auth-response.dto';
 import { LoginDto } from './dto/login.dto';
 import { RegistroDto } from './dto/registro.dto';
+import { EncerrarOutrasSessoesResponseDto, SessaoAtivaDto } from './dto/sessoes.dto';
 import { TrocarSenhaDto } from './dto/trocar-senha.dto';
 
 const CSRF_DOC = {
@@ -215,6 +225,70 @@ export class AuthController {
   @ApiTooManyRequestsResponse({ type: ApiErrorResponseDto, description: '`LIMITE_TENTATIVAS`' })
   trocarSenha(@CurrentUser() user: AuthenticatedUser, @Body() dto: TrocarSenhaDto): Promise<void> {
     return this.authService.trocarSenha(user, dto);
+  }
+
+  @Get('sessoes')
+  @ApiOperation({
+    summary: 'As sessões (aparelhos) vivas de quem está logado',
+    description:
+      'A da própria request primeiro (`atual: true`), as outras do uso mais recente para o mais antigo.',
+  })
+  @ApiBearerAuth()
+  @ApiOkResponse({ type: SessaoAtivaDto, isArray: true })
+  @ApiUnauthorizedResponse({
+    type: ApiErrorResponseDto,
+    description: '`AUTH_NAO_AUTENTICADO`, `AUTH_TOKEN_EXPIRADO` ou `AUTH_SESSAO_ENCERRADA`',
+  })
+  listarSessoes(@CurrentUser() user: AuthenticatedUser): Promise<SessaoAtiva[]> {
+    return this.authService.listarSessoes(user);
+  }
+
+  // `sessoes` e `sessoes/:id` são caminhos diferentes (o `:id` exige mais um segmento): a ordem aqui
+  // não faz uma rota engolir a outra.
+  @Delete('sessoes')
+  @ApiOperation({
+    summary: 'Encerra todas as OUTRAS sessões',
+    description: 'A sessão da própria request continua. Devolve quantas foram encerradas.',
+  })
+  @ApiBearerAuth()
+  @ApiOkResponse({ type: EncerrarOutrasSessoesResponseDto })
+  @ApiUnauthorizedResponse({
+    type: ApiErrorResponseDto,
+    description: '`AUTH_NAO_AUTENTICADO`, `AUTH_TOKEN_EXPIRADO` ou `AUTH_SESSAO_ENCERRADA`',
+  })
+  encerrarOutrasSessoes(
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<EncerrarOutrasSessoesResponse> {
+    return this.authService.encerrarOutrasSessoes(user);
+  }
+
+  @Delete('sessoes/:id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({
+    summary: 'Encerra uma sessão de outro aparelho',
+    description:
+      'O access token e o refresh dela deixam de valer na hora. A sessão da própria request só se ' +
+      'encerra pelo logout (400 `SESSAO_ATUAL`).',
+  })
+  @ApiBearerAuth()
+  @ApiNoContentResponse({ description: 'Sessão encerrada' })
+  @ApiBadRequestResponse({
+    type: ApiErrorResponseDto,
+    description: '`VALIDACAO` (id que não é UUID) ou `SESSAO_ATUAL`',
+  })
+  @ApiUnauthorizedResponse({
+    type: ApiErrorResponseDto,
+    description: '`AUTH_NAO_AUTENTICADO`, `AUTH_TOKEN_EXPIRADO` ou `AUTH_SESSAO_ENCERRADA`',
+  })
+  @ApiNotFoundResponse({
+    type: ApiErrorResponseDto,
+    description: '`SESSAO_NAO_ENCONTRADA`: inexistente ou de outro usuário (a resposta é a mesma)',
+  })
+  encerrarSessao(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', sessaoIdPipe()) id: string,
+  ): Promise<void> {
+    return this.authService.encerrarSessao(user, id);
   }
 
   /** Põe o refresh token no cookie e devolve só o que vai no corpo. */

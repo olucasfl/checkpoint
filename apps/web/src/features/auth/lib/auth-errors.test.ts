@@ -44,6 +44,9 @@ describe('AUTH_MESSAGES (CA-38)', () => {
     expect(AUTH_MESSAGES.LIMITE_TENTATIVAS).toBe(
       'Muitas tentativas. Aguarde um pouco e tente de novo.',
     );
+    // Sessões ativas (spec perfil, etapa 2).
+    expect(AUTH_MESSAGES.SESSAO_ATUAL).toBe('Para encerrar esta sessão, use Sair.');
+    expect(AUTH_MESSAGES.SESSAO_NAO_ENCONTRADA).toBe('Essa sessão já foi encerrada.');
   });
 });
 

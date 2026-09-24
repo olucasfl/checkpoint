@@ -14,7 +14,14 @@ import { pedirInstalacao, podeInstalar } from '@/shared/lib/pwa/install-prompt';
 import { PerfilPage } from './PerfilPage';
 
 vi.mock('@/features/games/api/games-api', () => ({ gamesApi: { list: vi.fn() } }));
-vi.mock('@/features/perfil/api/perfil-api', () => ({ perfilApi: { atualizar: vi.fn() } }));
+vi.mock('@/features/perfil/api/perfil-api', () => ({
+  perfilApi: {
+    atualizar: vi.fn(),
+    listarSessoes: vi.fn(),
+    encerrarSessao: vi.fn(),
+    encerrarOutrasSessoes: vi.fn(),
+  },
+}));
 vi.mock('@/shared/lib/pwa/install-prompt', () => ({
   podeInstalar: vi.fn(),
   pedirInstalacao: vi.fn(),
@@ -73,6 +80,7 @@ beforeEach(() => {
   resetSessionForTests();
   entrar({ accessToken: 'token', usuario: ANA });
   games.list.mockResolvedValue([jogo('1', 'ZERADO'), jogo('2', 'JOGANDO'), jogo('3', 'JOGANDO')]);
+  perfil.listarSessoes.mockResolvedValue([]);
   vi.mocked(podeInstalar).mockReturnValue(false);
   vi.mocked(ehSafariIos).mockReturnValue(false);
   vi.mocked(estaInstalado).mockReturnValue(false);
@@ -232,6 +240,34 @@ describe('conta (CA-05)', () => {
       '/perfil/senha',
     );
     expect(screen.getByRole('button', { name: 'Sair' })).toBeInTheDocument();
+  });
+
+  it('a seção Conta tem Trocar senha, Sessões ativas e Sair, nesta ordem, sem repetir o nome (etapa 2)', async () => {
+    perfil.listarSessoes.mockResolvedValue([
+      {
+        id: 's-a',
+        dispositivo: 'Chrome · Windows',
+        criadoEm: '2026-09-24T12:00:00.000Z',
+        ultimoUsoEm: '2026-09-24T12:00:00.000Z',
+        atual: true,
+      },
+    ]);
+    renderPerfil();
+
+    const conta = screen.getByRole('region', { name: 'Conta' });
+    await within(conta).findByText('Este aparelho');
+    const ordem = [
+      within(conta).getByRole('link', { name: 'Trocar senha' }),
+      within(conta).getByRole('heading', { name: 'Sessões ativas' }),
+      within(conta).getByRole('button', { name: 'Sair' }),
+    ];
+    for (let i = 1; i < ordem.length; i++) {
+      expect(
+        (ordem[i - 1] as HTMLElement).compareDocumentPosition(ordem[i] as HTMLElement) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    }
+    expect(within(conta).queryByText('Ana Teste')).not.toBeInTheDocument();
   });
 });
 

@@ -39,6 +39,13 @@ export const authErrors = {
     }),
   limiteTentativas: () =>
     apiError(429, 'LIMITE_TENTATIVAS', 'Muitas tentativas. Aguarde um pouco e tente de novo.'),
+  // Sessões ativas (spec perfil, etapa 2).
+  sessaoIdInvalido: () => apiError(400, 'VALIDACAO', 'O id da sessão precisa ser um UUID.'),
+  // A sessão da própria request só se encerra pelo logout, que também limpa o cookie.
+  sessaoAtual: () => apiError(400, 'SESSAO_ATUAL', 'Para encerrar esta sessão, use Sair.'),
+  // Mesma resposta para inexistente e de outro usuário: não revela que o id existe.
+  sessaoNaoEncontrada: () =>
+    apiError(404, 'SESSAO_NAO_ENCONTRADA', 'Essa sessão já foi encerrada.'),
 };
 
 /** O `code` de um erro da API, ou `undefined` se não for um erro no nosso formato. */

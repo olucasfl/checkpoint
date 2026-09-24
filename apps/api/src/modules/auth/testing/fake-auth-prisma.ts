@@ -33,7 +33,7 @@ type Where = {
   email?: string;
   userId?: string;
   tokenHash?: string;
-  expiraEm?: { lt: Date };
+  expiraEm?: { lt: Date } | { gt: Date };
 };
 
 function matches(row: Record<string, unknown>, where: Where | undefined): boolean {
@@ -51,6 +51,9 @@ function matches(row: Record<string, unknown>, where: Where | undefined): boolea
       }
       if ('lt' in condition) {
         return (value as Date).getTime() < (condition.lt as Date).getTime();
+      }
+      if ('gt' in condition) {
+        return (value as Date).getTime() > (condition.gt as Date).getTime();
       }
     }
     return value === condition;

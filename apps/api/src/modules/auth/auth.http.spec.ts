@@ -822,3 +822,141 @@ describe('PUT /auth/senha (CA-51 a CA-55)', () => {
     }
   });
 });
+
+describe('sessões ativas: GET/DELETE /auth/sessoes (perfil CA-08 a CA-11)', () => {
+  const LOGIN = { email: ANA.email, senha: ANA.senha };
+
+  /** Ana em três jars (A = registro, B e C = logins) e Bia em outro; devolve tokens e cookies. */
+  async function tresJarsDaAna() {
+    const a = await registerAna();
+    const login = async () => {
+      const reply = await call('POST', '/auth/login', { body: LOGIN });
+      return {
+        access: (reply.json as { accessToken: string }).accessToken,
+        refresh: cookieValue(reply),
+      };
+    };
+    const b = await login();
+    const c = await login();
+    const bia = await call('POST', '/auth/registro', {
+      body: { nome: 'Bia', email: 'bia@exemplo.com', senha: 'segredo-da-bia' },
+    });
+    return {
+      a: { access: a.access, refresh: a.refresh },
+      b,
+      c,
+      bia: { access: (bia.json as { accessToken: string }).accessToken },
+    };
+  }
+
+  async function idsDe(access: string): Promise<{ id: string; atual: boolean }[]> {
+    const reply = await call('GET', '/auth/sessoes', { bearer: access });
+    return reply.json as unknown as { id: string; atual: boolean }[];
+  }
+
+  it('as três rotas sem token → 401 AUTH_NAO_AUTENTICADO', async () => {
+    for (const [method, path] of [
+      ['GET', '/auth/sessoes'],
+      ['DELETE', '/auth/sessoes'],
+      ['DELETE', '/auth/sessoes/3f2b8a52-9c1e-4d6a-8f31-0a7e5b2c9d44'],
+    ] as const) {
+      const reply = await call(method, path);
+      expect([method, path, reply.status]).toEqual([method, path, 401]);
+      expect(reply.json).toMatchObject({ code: 'AUTH_NAO_AUTENTICADO' });
+    }
+  });
+
+  it('GET: 200 com as 3 sessões da Ana (nenhuma da Bia), a atual primeiro e as chaves EXATAS (CA-08)', async () => {
+    const { a } = await tresJarsDaAna();
+
+    const reply = await call('GET', '/auth/sessoes', { bearer: a.access });
+
+    expect(reply.status).toBe(200);
+    const lista = reply.json as unknown as Record<string, unknown>[];
+    expect(lista).toHaveLength(3);
+    expect(lista.map((s) => s.atual)).toEqual([true, false, false]);
+    for (const sessao of lista) {
+      expect(Object.keys(sessao).sort()).toEqual([
+        'atual',
+        'criadoEm',
+        'dispositivo',
+        'id',
+        'ultimoUsoEm',
+      ]);
+    }
+    expect(reply.text).not.toMatch(/tokenHash|hashAnterior|expiraEm|userId/);
+    expect(reply.text).not.toContain(a.refresh);
+  });
+
+  it('DELETE /:id de B pelo A: 204 sem corpo; o access de B cai NA HORA e o refresh de B também (CA-09)', async () => {
+    const { a, b } = await tresJarsDaAna();
+    const [, ...outras] = await idsDe(a.access);
+    const idDeB = (await idsDe(b.access)).find((s) => s.atual)?.id as string;
+    expect(outras.map((s) => s.id)).toContain(idDeB);
+
+    const reply = await call('DELETE', `/auth/sessoes/${idDeB}`, { bearer: a.access });
+
+    expect(reply.status).toBe(204);
+    expect(reply.text).toBe('');
+    const meB = await call('GET', '/auth/me', { bearer: b.access });
+    expect(meB.status).toBe(401);
+    expect(meB.json).toMatchObject({ code: 'AUTH_SESSAO_ENCERRADA' });
+    const refreshB = await call('POST', '/auth/refresh', { cookie: b.refresh, csrf: true });
+    expect(refreshB.status).toBe(401);
+    expect((await call('GET', '/auth/me', { bearer: a.access })).status).toBe(200);
+  });
+
+  it('DELETE da própria sessão → 400 SESSAO_ATUAL; `abc` → 400 VALIDACAO; da Bia → 404 SESSAO_NAO_ENCONTRADA (CA-10)', async () => {
+    const { a, bia } = await tresJarsDaAna();
+    const idDeA = (await idsDe(a.access)).find((s) => s.atual)?.id as string;
+    const idDaBia = (await idsDe(bia.access))[0]?.id as string;
+
+    const propria = await call('DELETE', `/auth/sessoes/${idDeA}`, { bearer: a.access });
+    const malformado = await call('DELETE', '/auth/sessoes/abc', { bearer: a.access });
+    const daBia = await call('DELETE', `/auth/sessoes/${idDaBia}`, { bearer: a.access });
+    const inexistente = await call('DELETE', '/auth/sessoes/00000000-0000-4000-8000-000000000000', {
+      bearer: a.access,
+    });
+
+    expect(propria.status).toBe(400);
+    expect(propria.json).toMatchObject({ code: 'SESSAO_ATUAL' });
+    expect(malformado.status).toBe(400);
+    expect(malformado.json).toMatchObject({ code: 'VALIDACAO' });
+    expect(daBia.status).toBe(404);
+    expect(daBia.json).toMatchObject({ code: 'SESSAO_NAO_ENCONTRADA' });
+    // Inexistente e alheia: corpo idêntico (não revela que o id existe).
+    expect(inexistente.text).toBe(daBia.text);
+    expect((await call('GET', '/auth/me', { bearer: bia.access })).status).toBe(200);
+    expect((await call('GET', '/auth/me', { bearer: a.access })).status).toBe(200);
+  });
+
+  it('DELETE /sessoes: 200 {"encerradas":2}; B e C caem; repetir dá {"encerradas":0} (CA-11)', async () => {
+    const { a, b, c, bia } = await tresJarsDaAna();
+
+    const reply = await call('DELETE', '/auth/sessoes', { bearer: a.access });
+
+    expect(reply.status).toBe(200);
+    expect(reply.json).toEqual({ encerradas: 2 });
+    expect((await call('GET', '/auth/me', { bearer: b.access })).status).toBe(401);
+    expect((await call('GET', '/auth/me', { bearer: c.access })).status).toBe(401);
+    expect((await call('GET', '/auth/me', { bearer: a.access })).status).toBe(200);
+    expect((await call('GET', '/auth/me', { bearer: bia.access })).status).toBe(200);
+    expect((await idsDe(a.access)).map((s) => s.atual)).toEqual([true]);
+
+    const deNovo = await call('DELETE', '/auth/sessoes', { bearer: a.access });
+    expect(deNovo.json).toEqual({ encerradas: 0 });
+  });
+
+  it('nenhum token, cookie ou senha vai para o log nessas rotas', async () => {
+    const { a, b } = await tresJarsDaAna();
+    const idDeB = (await idsDe(b.access)).find((s) => s.atual)?.id as string;
+    await call('GET', '/auth/sessoes', { bearer: a.access });
+    await call('DELETE', `/auth/sessoes/${idDeB}`, { bearer: a.access });
+    await call('DELETE', '/auth/sessoes', { bearer: a.access });
+
+    const logs = logger.lines.join('\n');
+    for (const segredo of [a.access, a.refresh, b.access, b.refresh, ANA.senha]) {
+      expect(logs).not.toContain(segredo);
+    }
+  });
+});
