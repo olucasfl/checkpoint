@@ -7,6 +7,7 @@ import { AccessTokenGuard } from './modules/auth/access-token.guard';
 import { AuthModule } from './modules/auth/auth.module';
 import { GamesModule } from './modules/games/games.module';
 import { HealthModule } from './modules/health/health.module';
+import { IntegrationsModule } from './modules/integrations/integrations.module';
 import { UsersModule } from './modules/users/users.module';
 
 @Module({
@@ -22,6 +23,7 @@ import { UsersModule } from './modules/users/users.module';
     HealthModule,
     GamesModule,
     UsersModule,
+    IntegrationsModule,
   ],
   providers: [
     // Guard global: toda rota exige access token, exceto as marcadas com `@Public()`.

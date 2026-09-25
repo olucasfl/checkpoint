@@ -1,0 +1,63 @@
+import { type AvisoPlataforma, type Conquista, type Provedor } from '@checkpoint/shared';
+
+/** Quem é o usuário na plataforma, sem os dados de jogo. */
+export interface PerfilBasico {
+  nomeExibicao: string;
+  avatarUrl: string | null;
+  perfilUrl: string | null;
+  /** `false` quando o perfil é privado: a biblioteca e as conquistas não vêm. */
+  publico: boolean;
+}
+
+/** Um item da biblioteca do usuário, do jeito neutro da plataforma. */
+export interface ItemDaBiblioteca {
+  idExterno: string;
+  titulo: string;
+  capaUrl: string | null;
+  minutosJogados: number;
+  ultimaVezJogadoEm: Date | null;
+}
+
+/** O último valor consultado de um jogo (é o que vira `JogoPlataforma` no banco). */
+export interface DadosDoJogo {
+  idExterno: string;
+  minutosJogados: number;
+  ultimaVezJogadoEm: Date | null;
+  /** `null` = negado ou não consultado; `0` = o jogo não tem conquistas. */
+  conquistasTotal: number | null;
+  conquistasDesbloqueadas: number | null;
+  capaUrl: string | null;
+}
+
+/**
+ * O que a API espera de uma plataforma de jogos (spec `integracao-plataformas`, decisão 10). A Steam é a
+ * primeira implementação; PlayStation, Xbox e Epic entram implementando esta interface e acrescentando um
+ * valor a `Provedor`, sem mexer no `IntegrationsService`.
+ *
+ * Os métodos lançam os erros de `plataforma-errors.ts`: `PerfilPrivadoError`, `PlataformaIndisponivelError`,
+ * `PlataformaLimiteError` e `IdExternoInvalidoError`.
+ */
+export interface GameProvider {
+  readonly id: Provedor;
+
+  /** Monta o endereço para onde o navegador vai provar quem é o usuário na plataforma. */
+  iniciarVinculo(ctx: { state: string; returnTo: string; realm: string }): { url: string };
+
+  /** Confere o retorno do navegador e devolve o ID (já comprovado) e o nome do usuário na plataforma. */
+  concluirVinculo(
+    query: Record<string, string>,
+    ctx: { returnTo: string },
+  ): Promise<{ idExterno: string; nomeExibicao: string }>;
+
+  /**
+   * A biblioteca e o perfil, na mesma consulta (o cartão do `/perfil` precisa dos dois, e a detecção de
+   * privacidade cruza as duas chamadas). Lança `PerfilPrivadoError` se os dados não são públicos.
+   */
+  listarBiblioteca(idExterno: string): Promise<{ itens: ItemDaBiblioteca[]; perfil: PerfilBasico }>;
+
+  /** Horas, última vez jogado e conquistas de UM jogo. */
+  obterJogo(
+    idExterno: string,
+    idJogo: string,
+  ): Promise<{ dados: DadosDoJogo; conquistas: Conquista[]; aviso: AvisoPlataforma | null }>;
+}
