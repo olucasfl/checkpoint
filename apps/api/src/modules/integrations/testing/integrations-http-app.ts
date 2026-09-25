@@ -42,9 +42,18 @@ export interface ContaRow {
   vinculadaEm: Date;
 }
 
+export interface GameRow {
+  id: string;
+  userId: string;
+  titulo: string;
+  /** `""` = sem plataforma, como no banco. */
+  plataforma: string;
+}
+
 export interface JogoPlataformaRow {
   id: string;
   userId: string;
+  gameId?: string;
   provedor: 'STEAM';
   idExterno: string;
   conquistasTotal: number | null;
@@ -58,6 +67,7 @@ export interface JogoPlataformaRow {
 export class FakeIntegrationsPrisma {
   contas: ContaRow[] = [];
   jogos: JogoPlataformaRow[] = [];
+  games: GameRow[] = [];
   sessions = new Map<string, string>();
 
   refreshSession = {
@@ -111,6 +121,11 @@ export class FakeIntegrationsPrisma {
       );
       return Promise.resolve({ count: antes - this.contas.length });
     },
+  };
+
+  game = {
+    findMany: ({ where }: { where: { userId: string } }) =>
+      Promise.resolve(this.games.filter((g) => g.userId === where.userId).map((g) => ({ ...g }))),
   };
 
   jogoPlataforma = {

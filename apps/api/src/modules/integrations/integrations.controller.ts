@@ -7,6 +7,7 @@ import {
   HttpStatus,
   Param,
   Post,
+  Query,
   Req,
   Res,
   UseFilters,
@@ -29,7 +30,12 @@ import {
 } from '@nestjs/swagger';
 import { SkipThrottle, Throttle } from '@nestjs/throttler';
 import { type Request, type Response } from 'express';
-import { type ContaVinculada, type PerfilPlataforma, type Provedor } from '@checkpoint/shared';
+import {
+  type ContaVinculada,
+  type ItemBiblioteca,
+  type PerfilPlataforma,
+  type Provedor,
+} from '@checkpoint/shared';
 import { Public } from '../../common/decorators/public.decorator';
 import {
   CurrentUser,
@@ -37,9 +43,11 @@ import {
 } from '../../common/decorators/current-user.decorator';
 import { ApiErrorResponseDto } from '../../common/errors/api-error-response.dto';
 import { type EnvironmentVariables } from '../../config/env.validation';
+import { BibliotecaQueryDto } from './dto/biblioteca-query.dto';
 import {
   ContaVinculadaDto,
   IniciarVinculoResponseDto,
+  ItemBibliotecaDto,
   PerfilPlataformaDto,
 } from './dto/integracao-response.dto';
 import {
@@ -199,6 +207,38 @@ export class IntegrationsController {
     @Param('provedor', ProvedorSlugPipe) provedor: Provedor,
   ): Promise<PerfilPlataforma> {
     return this.integrations.perfil(user.id, provedor);
+  }
+
+  @Get(':provedor/biblioteca')
+  @Header('cache-control', 'no-store')
+  @ApiOperation({
+    summary: 'A biblioteca do usuário na plataforma, para escolher o jogo a ligar',
+    description:
+      'Sem paginação: `busca` (trecho do título, sem caixa nem acento) e `limite` (1 a 50, padrão 30) mantêm a ' +
+      'resposta pequena, ordenada por horas. Usa o mesmo cache de 10 min do cartão do perfil. Cada item traz os ' +
+      'jogos do catálogo com o mesmo título (`jogosParecidos`) e o jogo a que já está ligado (`vinculadoA`); a ' +
+      'rota nunca vincula nada.',
+  })
+  @ApiParam(PROVEDOR_PARAM)
+  @ApiOkResponse({ type: [ItemBibliotecaDto] })
+  @ApiBadRequestResponse({
+    type: ApiErrorResponseDto,
+    description:
+      '`VALIDACAO`: provedor desconhecido, `busca` com mais de 100 caracteres ou `limite` fora de 1 a 50',
+  })
+  @ApiConflictResponse({
+    type: ApiErrorResponseDto,
+    description: '`PLATAFORMA_NAO_VINCULADA` ou `PLATAFORMA_PERFIL_PRIVADO`',
+  })
+  @ApiUnauthorizedResponse({ type: ApiErrorResponseDto })
+  @ApiTooManyRequestsResponse({ type: ApiErrorResponseDto, description: '`LIMITE_TENTATIVAS`' })
+  @ApiResponse502()
+  biblioteca(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('provedor', ProvedorSlugPipe) provedor: Provedor,
+    @Query() query: BibliotecaQueryDto,
+  ): Promise<ItemBiblioteca[]> {
+    return this.integrations.biblioteca(user.id, provedor, query);
   }
 
   @Post(':provedor/perfil/atualizacao')

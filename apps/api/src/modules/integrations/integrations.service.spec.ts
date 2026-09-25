@@ -49,6 +49,7 @@ function montar() {
       update: jest.fn(),
       deleteMany: jest.fn(),
     },
+    game: { findMany: jest.fn() },
     jogoPlataforma: { findMany: jest.fn(), deleteMany: jest.fn() },
     $transaction: jest.fn((operacoes: Promise<unknown>[]) => Promise.all(operacoes)),
   };
@@ -57,6 +58,7 @@ function montar() {
   prisma.contaVinculada.update.mockResolvedValue({ id: 'c1' });
   prisma.contaVinculada.deleteMany.mockResolvedValue({ count: 1 });
   prisma.jogoPlataforma.findMany.mockResolvedValue([]);
+  prisma.game.findMany.mockResolvedValue([]);
   prisma.jogoPlataforma.deleteMany.mockResolvedValue({ count: 0 });
 
   const provider = {
@@ -660,5 +662,254 @@ describe('IntegrationsService.perfil', () => {
       2,
       expect.objectContaining({ where: { userId: BIA, provedor: 'STEAM' } }),
     );
+  });
+});
+
+describe('IntegrationsService.biblioteca (CA-23 a CA-25)', () => {
+  const perfilBasico = {
+    nomeExibicao: 'Jogador',
+    avatarUrl: null,
+    perfilUrl: null,
+    publico: true,
+  };
+
+  function comBiblioteca(itens: ItemDaBiblioteca[]) {
+    const ctx = montar();
+    ctx.prisma.contaVinculada.findUnique.mockResolvedValue({
+      idExterno: STEAM_ID,
+      nomeExibicao: 'Jogador',
+    });
+    ctx.provider.listarBiblioteca.mockResolvedValue({ itens, perfil: perfilBasico });
+    return ctx;
+  }
+
+  const titulos = (itens: { titulo: string }[]) => itens.map((i) => i.titulo);
+  const jogo = (id: string, titulo: string, plataforma = 'PC') => ({ id, titulo, plataforma });
+
+  it('sem conta vinculada → 409 PLATAFORMA_NAO_VINCULADA, sem consultar a plataforma', async () => {
+    const ctx = montar();
+
+    await expect(statusEcodeDe(ctx.service.biblioteca(ANA, 'STEAM'))).resolves.toEqual({
+      status: 409,
+      code: 'PLATAFORMA_NAO_VINCULADA',
+    });
+    expect(ctx.provider.listarBiblioteca).not.toHaveBeenCalled();
+  });
+
+  it('ordena por horas (decrescente) e, no empate, pelo título', async () => {
+    const ctx = comBiblioteca([
+      item('1', 'Zebra', 600),
+      item('2', 'Alfa', 600),
+      item('3', 'Beta', 1200),
+      item('4', 'Gama', 0),
+    ]);
+
+    expect(titulos(await ctx.service.biblioteca(ANA, 'STEAM'))).toEqual([
+      'Beta',
+      'Alfa',
+      'Zebra',
+      'Gama',
+    ]);
+  });
+
+  it('o limite padrão é 30 e o limite pedido vale (CA-23)', async () => {
+    const ctx = comBiblioteca(
+      Array.from({ length: 35 }, (_, i) => item(String(i), `Jogo ${i}`, i)),
+    );
+
+    expect(await ctx.service.biblioteca(ANA, 'STEAM')).toHaveLength(30);
+    expect(await ctx.service.biblioteca(ANA, 'STEAM', { limite: 2 })).toHaveLength(2);
+    expect(await ctx.service.biblioteca(ANA, 'STEAM', { limite: 50 })).toHaveLength(35);
+    // O mais jogado vem primeiro: o corte é dos MENOS jogados.
+    expect((await ctx.service.biblioteca(ANA, 'STEAM', { limite: 1 }))[0]?.titulo).toBe('Jogo 34');
+  });
+
+  it('a busca ignora caixa, acento e pontuação, e acha por trecho (CA-23)', async () => {
+    const ctx = comBiblioteca([
+      item('1', 'Pokémon™: Legends – Arceus', 10),
+      item('2', 'POKER Night', 20),
+      item('3', 'Celeste', 30),
+    ]);
+
+    expect(titulos(await ctx.service.biblioteca(ANA, 'STEAM', { busca: 'pokemon' }))).toEqual([
+      'Pokémon™: Legends – Arceus',
+    ]);
+    expect(titulos(await ctx.service.biblioteca(ANA, 'STEAM', { busca: 'PO' }))).toEqual([
+      'POKER Night',
+      'Pokémon™: Legends – Arceus',
+    ]);
+    expect(
+      titulos(await ctx.service.biblioteca(ANA, 'STEAM', { busca: 'legends arceus' })),
+    ).toEqual(['Pokémon™: Legends – Arceus']);
+  });
+
+  it('busca só de símbolos não filtra nada; busca sem resultado devolve [] sem tocar no banco', async () => {
+    const ctx = comBiblioteca([item('1', 'Celeste', 10), item('2', 'Hades', 5)]);
+
+    expect(await ctx.service.biblioteca(ANA, 'STEAM', { busca: '™ !!' })).toHaveLength(2);
+    expect(await ctx.service.biblioteca(ANA, 'STEAM', { busca: 'inexistente' })).toEqual([]);
+    expect(ctx.prisma.game.findMany).toHaveBeenCalledTimes(1);
+  });
+
+  it('cada item traz o que a Steam sabe: horas, última vez jogado em ISO e a capa', async () => {
+    const ctx = comBiblioteca([
+      {
+        idExterno: '7',
+        titulo: 'Celeste',
+        capaUrl: 'https://cdn.cloudflare.steamstatic.com/steam/apps/7/library_600x900.jpg',
+        minutosJogados: 90,
+        ultimaVezJogadoEm: new Date('2026-02-22T17:24:41Z'),
+      },
+      item('8', 'Hades', 0),
+    ]);
+
+    const [primeiro, segundo] = await ctx.service.biblioteca(ANA, 'STEAM');
+
+    expect(primeiro).toEqual({
+      idExterno: '7',
+      titulo: 'Celeste',
+      capaUrl: 'https://cdn.cloudflare.steamstatic.com/steam/apps/7/library_600x900.jpg',
+      minutosJogados: 90,
+      ultimaVezJogadoEm: '2026-02-22T17:24:41.000Z',
+      jogosParecidos: [],
+      vinculadoA: null,
+    });
+    expect(segundo).toMatchObject({ ultimaVezJogadoEm: null });
+  });
+
+  it('jogosParecidos: o jogo do catálogo com a MESMA chave de título, sem caixa, acento nem ™ (CA-24)', async () => {
+    const ctx = comBiblioteca([item('1', 'CELESTE™', 10), item('2', 'Celeste 64', 5)]);
+    ctx.prisma.game.findMany.mockResolvedValue([jogo('g1', 'Celeste'), jogo('g2', 'Hades')]);
+
+    const [celeste, celeste64] = await ctx.service.biblioteca(ANA, 'STEAM');
+
+    expect(celeste?.jogosParecidos).toEqual([{ id: 'g1', titulo: 'Celeste', plataforma: 'PC' }]);
+    // Igualdade, sem aproximação: "Celeste 64" não é "Celeste".
+    expect(celeste64?.jogosParecidos).toEqual([]);
+  });
+
+  it('o jogo do catálogo que já está ligado à Steam NÃO aparece em jogosParecidos (CA-24)', async () => {
+    const ctx = comBiblioteca([item('1', 'Celeste', 10)]);
+    ctx.prisma.game.findMany.mockResolvedValue([
+      jogo('g1', 'Celeste'),
+      jogo('g2', 'Celeste', 'PS5'),
+    ]);
+    ctx.prisma.jogoPlataforma.findMany.mockResolvedValue([{ gameId: 'g1', idExterno: '999' }]);
+
+    const [celeste] = await ctx.service.biblioteca(ANA, 'STEAM');
+
+    expect(celeste?.jogosParecidos).toEqual([{ id: 'g2', titulo: 'Celeste', plataforma: 'PS5' }]);
+  });
+
+  it('o mesmo título em plataformas diferentes: todos aparecem, no máximo 3; plataforma vazia vira null', async () => {
+    const ctx = comBiblioteca([item('1', 'Celeste', 10)]);
+    ctx.prisma.game.findMany.mockResolvedValue([
+      jogo('g1', 'Celeste', 'PC'),
+      jogo('g2', 'Celeste', 'PS5'),
+      jogo('g3', 'Celeste', ''),
+      jogo('g4', 'Celeste', 'Nintendo Switch'),
+      jogo('g5', 'Celeste', 'Xbox'),
+    ]);
+
+    const [celeste] = await ctx.service.biblioteca(ANA, 'STEAM');
+
+    expect(celeste?.jogosParecidos).toHaveLength(3);
+    expect(celeste?.jogosParecidos.map((j) => j.plataforma)).toEqual(['PC', 'PS5', null]);
+  });
+
+  it('vinculadoA: o jogo ao qual o item já está ligado; um item ligado não sugere outros (CA-25)', async () => {
+    const ctx = comBiblioteca([item('504230', 'Celeste', 10)]);
+    ctx.prisma.game.findMany.mockResolvedValue([
+      jogo('g1', 'Celeste (PS5)', 'PS5'),
+      jogo('g2', 'Celeste', 'PC'),
+    ]);
+    ctx.prisma.jogoPlataforma.findMany.mockResolvedValue([{ gameId: 'g1', idExterno: '504230' }]);
+
+    const [celeste] = await ctx.service.biblioteca(ANA, 'STEAM');
+
+    expect(celeste?.vinculadoA).toEqual({ id: 'g1', titulo: 'Celeste (PS5)', plataforma: 'PS5' });
+    expect(celeste?.jogosParecidos).toEqual([]);
+  });
+
+  it('título só de símbolos não sugere nada (chave vazia não casa com tudo)', async () => {
+    const ctx = comBiblioteca([item('1', '™®', 10)]);
+    ctx.prisma.game.findMany.mockResolvedValue([jogo('g1', '!!!')]);
+
+    const [estranho] = await ctx.service.biblioteca(ANA, 'STEAM');
+
+    expect(estranho?.jogosParecidos).toEqual([]);
+  });
+
+  it('NUNCA vincula: só lê (nenhuma escrita no banco) (CA-34)', async () => {
+    const ctx = comBiblioteca([item('1', 'Celeste', 10)]);
+    ctx.prisma.game.findMany.mockResolvedValue([jogo('g1', 'Celeste')]);
+
+    await ctx.service.biblioteca(ANA, 'STEAM');
+
+    expect(ctx.prisma.contaVinculada.create).not.toHaveBeenCalled();
+    expect(ctx.prisma.contaVinculada.update).not.toHaveBeenCalled();
+    expect(ctx.prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('as consultas ao banco são só do usuário e do provedor', async () => {
+    const ctx = comBiblioteca([item('1', 'Celeste', 10)]);
+
+    await ctx.service.biblioteca(BIA, 'STEAM');
+
+    expect(ctx.prisma.game.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { userId: BIA } }),
+    );
+    expect(ctx.prisma.jogoPlataforma.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { userId: BIA, provedor: 'STEAM' } }),
+    );
+  });
+
+  it('usa o MESMO cache do cartão do perfil: perfil e biblioteca juntos chamam a Steam uma vez só', async () => {
+    const ctx = comBiblioteca([item('1', 'Celeste', 10)]);
+
+    await ctx.service.perfil(ANA, 'STEAM');
+    await ctx.service.biblioteca(ANA, 'STEAM');
+    await ctx.service.biblioteca(ANA, 'STEAM', { busca: 'cel' });
+
+    expect(ctx.provider.listarBiblioteca).toHaveBeenCalledTimes(1);
+  });
+
+  it('a biblioteca lida primeiro também serve o perfil; passados 10 min, consulta de novo', async () => {
+    const ctx = comBiblioteca([item('1', 'Celeste', 10)]);
+
+    await ctx.service.biblioteca(ANA, 'STEAM');
+    await ctx.service.perfil(ANA, 'STEAM');
+    expect(ctx.provider.listarBiblioteca).toHaveBeenCalledTimes(1);
+
+    jest.spyOn(Date, 'now').mockReturnValue(NOW + 10 * 60_000 + 1);
+    await ctx.service.biblioteca(ANA, 'STEAM');
+    expect(ctx.provider.listarBiblioteca).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([
+    ['perfil privado', new PerfilPrivadoError()],
+    ['Steam indisponível', new PlataformaIndisponivelError()],
+    ['Steam no limite', new PlataformaLimiteError()],
+  ])(
+    '%s sobe como erro de domínio e NÃO entra no cache (o "Tentar de novo" refaz) (CA-39)',
+    async (_nome, erro) => {
+      const ctx = comBiblioteca([]);
+      ctx.provider.listarBiblioteca.mockRejectedValueOnce(erro);
+
+      await expect(ctx.service.biblioteca(ANA, 'STEAM')).rejects.toBe(erro);
+
+      ctx.provider.listarBiblioteca.mockResolvedValueOnce({
+        itens: [item('1', 'A', 1)],
+        perfil: perfilBasico,
+      });
+      await expect(ctx.service.biblioteca(ANA, 'STEAM')).resolves.toHaveLength(1);
+    },
+  );
+
+  it('biblioteca pública e vazia: lista vazia, sem erro e sem tocar no banco', async () => {
+    const ctx = comBiblioteca([]);
+
+    await expect(ctx.service.biblioteca(ANA, 'STEAM')).resolves.toEqual([]);
+    expect(ctx.prisma.game.findMany).not.toHaveBeenCalled();
   });
 });

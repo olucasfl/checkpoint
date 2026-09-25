@@ -133,7 +133,10 @@ export type ApiErrorField =
   | 'email'
   | 'senha'
   | 'senhaAtual'
-  | 'novaSenha';
+  | 'novaSenha'
+  // Query da biblioteca de uma plataforma (spec integracao-plataformas): sem formulário, mas o erro aponta o campo.
+  | 'busca'
+  | 'limite';
 
 /**
  * Formato dos erros 400, 409, 413 e 502 (o 404 traz so `statusCode` e `message`).

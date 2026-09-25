@@ -120,6 +120,7 @@ describe('autenticação das rotas (CA-57)', () => {
     ['POST', '/integracoes/steam/vinculo'],
     ['DELETE', '/integracoes/steam'],
     ['GET', '/integracoes/steam/perfil'],
+    ['GET', '/integracoes/steam/biblioteca'],
     ['POST', '/integracoes/steam/perfil/atualizacao'],
   ])('%s %s sem token → 401', async (metodo, caminho) => {
     const response = await pedir(metodo, caminho);
@@ -652,5 +653,212 @@ describe('o redirecionamento e o log não vazam o SteamID nem o state (CA-58)', 
     }
     expect(logs).not.toContain('checkpoint_vinculo');
     expect(logs).not.toMatch(/key=[0-9a-f]{32}/i);
+  });
+});
+
+describe('GET /integracoes/:provedor/biblioteca (CA-23 a CA-25, CA-34)', () => {
+  const bibliotecaDeTres = {
+    privada: false,
+    total: 3,
+    jogos: [
+      {
+        appid: '504230',
+        nome: 'Celeste',
+        minutosJogados: 600,
+        ultimaVezJogadoEm: new Date('2026-02-01T00:00:00Z'),
+      },
+      { appid: '1145360', nome: 'Hades', minutosJogados: 1200, ultimaVezJogadoEm: null },
+      { appid: '2', nome: 'Pokémon™ Legends', minutosJogados: 0, ultimaVezJogadoEm: null },
+    ],
+  };
+
+  async function vinculada(userId: string): Promise<string> {
+    const token = await ctx.tokenFor(userId);
+    const ida = await iniciar(token);
+    await retornar(ida.state, ida.nonce);
+    ctx.client.listarJogos.mockResolvedValue(bibliotecaDeTres);
+    return token;
+  }
+
+  it('200 com os itens por horas (decrescente), só os campos do contrato (CA-23)', async () => {
+    const token = await vinculada(ANA_ID);
+
+    const response = await pedir('GET', '/integracoes/steam/biblioteca', token);
+    const corpo = (await response.json()) as Record<string, unknown>[];
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(corpo.map((item) => item.titulo)).toEqual(['Hades', 'Celeste', 'Pokémon™ Legends']);
+    expect(Object.keys(corpo[0] ?? {}).sort()).toEqual([
+      'capaUrl',
+      'idExterno',
+      'jogosParecidos',
+      'minutosJogados',
+      'titulo',
+      'ultimaVezJogadoEm',
+      'vinculadoA',
+    ]);
+    expect(JSON.stringify(corpo)).not.toContain(ANA_ID);
+  });
+
+  it('?busca=celeste (e "cel") acha sem caixa nem acento; ?busca=pokemon acha "Pokémon™" (CA-23)', async () => {
+    const token = await vinculada(ANA_ID);
+
+    for (const [query, esperado] of [
+      ['?busca=celeste', ['Celeste']],
+      ['?busca=CEL', ['Celeste']],
+      ['?busca=pokemon', ['Pokémon™ Legends']],
+      ['?busca=nao-existe', []],
+    ] as const) {
+      const response = await pedir('GET', `/integracoes/steam/biblioteca${query}`, token);
+      const corpo = (await response.json()) as { titulo: string }[];
+      expect(response.status).toBe(200);
+      expect(corpo.map((item) => item.titulo)).toEqual(esperado);
+    }
+  });
+
+  it('?limite=2 devolve os 2 mais jogados (CA-23)', async () => {
+    const token = await vinculada(ANA_ID);
+
+    const corpo = (await (
+      await pedir('GET', '/integracoes/steam/biblioteca?limite=2', token)
+    ).json()) as {
+      titulo: string;
+    }[];
+
+    expect(corpo.map((item) => item.titulo)).toEqual(['Hades', 'Celeste']);
+  });
+
+  it.each([
+    ['limite=51', '?limite=51', 'limite'],
+    ['limite=0', '?limite=0', 'limite'],
+    ['limite=abc', '?limite=abc', 'limite'],
+    ['limite=1.5', '?limite=1.5', 'limite'],
+    ['limite repetido', '?limite=1&limite=2', 'limite'],
+    ['busca de 101 caracteres', `?busca=${'a'.repeat(101)}`, 'busca'],
+  ])(
+    '%s → 400 VALIDACAO apontando o campo, sem a mensagem de "campos não permitidos" (CA-23)',
+    async (_nome, query, campo) => {
+      const token = await vinculada(ANA_ID);
+
+      const response = await pedir('GET', `/integracoes/steam/biblioteca${query}`, token);
+      const corpo = (await response.json()) as {
+        code: string;
+        message: string;
+        fields: Record<string, string>;
+      };
+
+      expect(response.status).toBe(400);
+      expect(corpo.code).toBe('VALIDACAO');
+      expect(corpo.fields[campo]).toEqual(expect.any(String));
+      expect(corpo.message).not.toContain('Campos não permitidos');
+    },
+  );
+
+  it('um parâmetro desconhecido → 400 (o pipe global recusa)', async () => {
+    const token = await vinculada(ANA_ID);
+
+    expect((await pedir('GET', '/integracoes/steam/biblioteca?userId=x', token)).status).toBe(400);
+  });
+
+  it('jogosParecidos: só os jogos do PRÓPRIO usuário, sem caixa nem acento, sem os já ligados (CA-24)', async () => {
+    const ana = await vinculada(ANA_ID);
+    ctx.db.games.push(
+      { id: 'g-ana', userId: ANA_ID, titulo: 'CELESTE', plataforma: 'PC' },
+      { id: 'g-ana-ligado', userId: ANA_ID, titulo: 'Celeste', plataforma: 'PS5' },
+      { id: 'g-bia', userId: BIA_ID, titulo: 'Celeste', plataforma: 'PC' },
+    );
+    ctx.db.jogos.push({
+      id: 'jp1',
+      userId: ANA_ID,
+      gameId: 'g-ana-ligado',
+      provedor: 'STEAM',
+      idExterno: '999',
+      conquistasTotal: null,
+      conquistasDesbloqueadas: null,
+    });
+
+    const corpo = (await (
+      await pedir('GET', '/integracoes/steam/biblioteca?busca=celeste', ana)
+    ).json()) as {
+      jogosParecidos: { id: string; titulo: string; plataforma: string | null }[];
+    }[];
+
+    expect(corpo[0]?.jogosParecidos).toEqual([
+      { id: 'g-ana', titulo: 'CELESTE', plataforma: 'PC' },
+    ]);
+  });
+
+  it('vinculadoA quando o item já está ligado a um jogo (CA-25)', async () => {
+    const ana = await vinculada(ANA_ID);
+    ctx.db.games.push({ id: 'g1', userId: ANA_ID, titulo: 'Celeste (PS5)', plataforma: 'PS5' });
+    ctx.db.jogos.push({
+      id: 'jp1',
+      userId: ANA_ID,
+      gameId: 'g1',
+      provedor: 'STEAM',
+      idExterno: '504230',
+      conquistasTotal: null,
+      conquistasDesbloqueadas: null,
+    });
+
+    const corpo = (await (
+      await pedir('GET', '/integracoes/steam/biblioteca?busca=celeste', ana)
+    ).json()) as {
+      vinculadoA: unknown;
+    }[];
+
+    expect(corpo[0]?.vinculadoA).toEqual({ id: 'g1', titulo: 'Celeste (PS5)', plataforma: 'PS5' });
+  });
+
+  it('só LISTA: nenhuma escrita, nem com um jogo de mesmo título no catálogo (CA-34)', async () => {
+    const ana = await vinculada(ANA_ID);
+    ctx.db.games.push({ id: 'g1', userId: ANA_ID, titulo: 'Celeste', plataforma: 'PC' });
+
+    await pedir('GET', '/integracoes/steam/biblioteca', ana);
+
+    expect(ctx.db.jogos).toHaveLength(0);
+  });
+
+  it('sem conta vinculada → 409 PLATAFORMA_NAO_VINCULADA', async () => {
+    const response = await pedir(
+      'GET',
+      '/integracoes/steam/biblioteca',
+      await ctx.tokenFor(ANA_ID),
+    );
+
+    expect(response.status).toBe(409);
+    expect(await json(response)).toMatchObject({ code: 'PLATAFORMA_NAO_VINCULADA' });
+  });
+
+  it('perfil privado → 409; Steam fora do ar ou no limite → 502, nunca 500 (CA-39)', async () => {
+    const token = await vinculada(ANA_ID);
+
+    ctx.client.obterPerfil.mockResolvedValue({ ...perfilPublico, visibilidade: 1 });
+    const privado = await pedir('GET', '/integracoes/steam/biblioteca', token);
+    expect(privado.status).toBe(409);
+    expect(await json(privado)).toMatchObject({ code: 'PLATAFORMA_PERFIL_PRIVADO' });
+
+    ctx.client.obterPerfil.mockResolvedValue(perfilPublico);
+    ctx.client.listarJogos.mockRejectedValue(new PlataformaIndisponivelError());
+    const fora = await pedir('GET', '/integracoes/steam/biblioteca', token);
+    expect(fora.status).toBe(502);
+    expect(await json(fora)).toMatchObject({ code: 'PLATAFORMA_INDISPONIVEL' });
+
+    ctx.client.listarJogos.mockRejectedValue(new PlataformaLimiteError());
+    expect((await pedir('GET', '/integracoes/steam/biblioteca', token)).status).toBe(502);
+    expect((await pedir('GET', '/integracoes', token)).status).toBe(200);
+  });
+
+  it('provedor desconhecido → 400; e a biblioteca usa o cache: a 2ª leitura não chama a Steam', async () => {
+    const token = await vinculada(ANA_ID);
+    expect((await pedir('GET', '/integracoes/xbox/biblioteca', token)).status).toBe(400);
+
+    ctx.client.listarJogos.mockClear();
+    await pedir('GET', '/integracoes/steam/biblioteca', token);
+    await pedir('GET', '/integracoes/steam/biblioteca?busca=hades', token);
+    await pedir('GET', '/integracoes/steam/perfil', token);
+
+    expect(ctx.client.listarJogos.mock.calls.length).toBeLessThanOrEqual(1);
   });
 });

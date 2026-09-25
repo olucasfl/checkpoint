@@ -3,8 +3,11 @@ import { ConfigService } from '@nestjs/config';
 import {
   ATUALIZACAO_MANUAL_MIN_MS,
   PROVEDOR_SLUG,
+  chaveDeTitulo,
   type ContaVinculada,
   type IniciarVinculoResponse,
+  type ItemBiblioteca,
+  type JogoParecido,
   type PerfilPlataforma,
   type Provedor,
 } from '@checkpoint/shared';
@@ -13,9 +16,11 @@ import { type EnvironmentVariables } from '../../config/env.validation';
 import { PrismaService } from '../../database/prisma.service';
 import { TtlCache } from './cache/ttl-cache';
 import {
+  BIBLIOTECA_LIMITE_PADRAO,
   CACHE_MAX_ENTRIES,
   LIBRARY_CACHE_TTL_MS,
   MAIS_JOGADOS_NO_CARTAO,
+  MAX_JOGOS_PARECIDOS,
 } from './integrations.constants';
 import { integracaoErrors } from './plataforma-http-errors';
 import { type ItemDaBiblioteca, type PerfilBasico } from './providers/game-provider';
@@ -36,6 +41,8 @@ export type ResultadoDoRetorno =
 
 interface BibliotecaEmCache {
   itens: ItemDaBiblioteca[];
+  /** `chaveDeTitulo` de cada item, na mesma ordem (calculada uma vez, na consulta). */
+  chaves: string[];
   perfil: PerfilBasico;
   consultadoEm: number;
 }
@@ -171,8 +178,8 @@ export class IntegrationsService {
 
   /**
    * O cartão do `/perfil`. A biblioteca vem da plataforma (cache de 10 min); as conquistas são a SOMA dos jogos
-   * vinculados, já gravada no banco, sem nenhuma chamada extra. Com `atualizar`, ignora o cache, mas no máximo
-   * uma consulta a cada 30 s: antes disso devolve o que já tem (sem gastar a cota).
+   * vinculados, já gravada no banco, sem chamada extra. Com `atualizar`, ignora o cache, mas no máximo uma
+   * consulta a cada 30 s: antes disso devolve o que já tem (sem gastar a cota).
    */
   async perfil(
     userId: string,
@@ -183,23 +190,7 @@ export class IntegrationsService {
     if (!conta) {
       throw integracaoErrors.naoVinculada();
     }
-    const provider = this.registry.porProvedor(provedor);
-
-    const chave = `${provedor}:${conta.idExterno}`;
-    const agora = Date.now();
-    let biblioteca = this.bibliotecas.get(chave);
-    const consultar =
-      !biblioteca ||
-      (opcoes.atualizar === true && agora - biblioteca.consultadoEm >= ATUALIZACAO_MANUAL_MIN_MS);
-    if (consultar) {
-      const { itens, perfil } = await provider.listarBiblioteca(conta.idExterno);
-      biblioteca = { itens, perfil, consultadoEm: agora };
-      this.bibliotecas.set(chave, biblioteca);
-      await this.corrigirNome(userId, provedor, conta.nomeExibicao, perfil.nomeExibicao);
-    }
-    if (!biblioteca) {
-      throw new Error('biblioteca ausente depois da consulta');
-    }
+    const biblioteca = await this.obterBiblioteca(userId, provedor, conta, opcoes);
 
     return {
       provedor,
@@ -212,6 +203,120 @@ export class IntegrationsService {
       conquistas: await this.conquistasDosJogosVinculados(userId, provedor),
       consultadoEm: new Date(biblioteca.consultadoEm).toISOString(),
     };
+  }
+
+  /**
+   * A biblioteca do diálogo "Buscar na Steam" (etapa 3). Usa o MESMO cache de 10 min do cartão do perfil:
+   * abrir o diálogo logo depois do `/perfil` não chama a plataforma. Sem paginação: `busca` (por trecho da
+   * `chaveDeTitulo`, sem caixa nem acento) e `limite` (padrão 30) mantêm a resposta pequena, ordenada por horas
+   * e, no empate, por título. Cada item traz os jogos do catálogo que PARECEM ser o mesmo (mesma chave de
+   * título, sem vínculo, até 3) e o jogo ao qual já está ligado. Nunca vincula nada: só informa.
+   */
+  async biblioteca(
+    userId: string,
+    provedor: Provedor,
+    query: { busca?: string; limite?: number } = {},
+  ): Promise<ItemBiblioteca[]> {
+    const conta = await this.contaDe(userId, provedor);
+    if (!conta) {
+      throw integracaoErrors.naoVinculada();
+    }
+    const biblioteca = await this.obterBiblioteca(userId, provedor, conta);
+
+    const buscada = chaveDeTitulo(query.busca ?? '');
+    const escolhidos = biblioteca.itens
+      .map((item, indice) => ({ item, chave: biblioteca.chaves[indice] ?? '' }))
+      .filter(({ chave }) => buscada === '' || chave.includes(buscada))
+      .sort(
+        (a, b) =>
+          b.item.minutosJogados - a.item.minutosJogados ||
+          a.item.titulo.localeCompare(b.item.titulo, 'pt-BR'),
+      )
+      .slice(0, query.limite ?? BIBLIOTECA_LIMITE_PADRAO);
+    if (escolhidos.length === 0) {
+      return [];
+    }
+
+    const [jogos, vinculos] = await Promise.all([
+      this.prisma.game.findMany({
+        where: { userId },
+        select: { id: true, titulo: true, plataforma: true },
+      }),
+      this.prisma.jogoPlataforma.findMany({
+        where: { userId, provedor },
+        select: { gameId: true, idExterno: true },
+      }),
+    ]);
+    const porId = new Map<string, JogoParecido>(
+      jogos.map((jogo) => [
+        jogo.id,
+        {
+          id: jogo.id,
+          titulo: jogo.titulo,
+          plataforma: jogo.plataforma === '' ? null : jogo.plataforma,
+        },
+      ]),
+    );
+    const gameDoItem = new Map(vinculos.map((vinculo) => [vinculo.idExterno, vinculo.gameId]));
+    const ligados = new Set(vinculos.map((vinculo) => vinculo.gameId));
+    const livresPorChave = new Map<string, JogoParecido[]>();
+    for (const jogo of porId.values()) {
+      if (ligados.has(jogo.id)) {
+        continue;
+      }
+      const chave = chaveDeTitulo(jogo.titulo);
+      livresPorChave.set(chave, [...(livresPorChave.get(chave) ?? []), jogo]);
+    }
+
+    return escolhidos.map(({ item, chave }) => {
+      const donoId = gameDoItem.get(item.idExterno);
+      const vinculadoA = donoId === undefined ? null : (porId.get(donoId) ?? null);
+      return {
+        idExterno: item.idExterno,
+        titulo: item.titulo,
+        capaUrl: item.capaUrl,
+        minutosJogados: item.minutosJogados,
+        ultimaVezJogadoEm: item.ultimaVezJogadoEm?.toISOString() ?? null,
+        // Um item já ligado não tem o que sugerir (é 1 para 1): "mover" é outro caminho.
+        jogosParecidos:
+          vinculadoA || chave === ''
+            ? []
+            : (livresPorChave.get(chave) ?? []).slice(0, MAX_JOGOS_PARECIDOS),
+        vinculadoA,
+      };
+    });
+  }
+
+  /**
+   * A biblioteca e o perfil da plataforma, do cache (10 min, por SteamID) ou consultando. Erro (privado, 502) não
+   * entra no cache. `atualizar` ignora o cache, mas no máximo uma consulta a cada 30 s.
+   */
+  private async obterBiblioteca(
+    userId: string,
+    provedor: Provedor,
+    conta: { idExterno: string; nomeExibicao: string },
+    opcoes: { atualizar?: boolean } = {},
+  ): Promise<BibliotecaEmCache> {
+    const provider = this.registry.porProvedor(provedor);
+    const chave = `${provedor}:${conta.idExterno}`;
+    const agora = Date.now();
+    const emCache = this.bibliotecas.get(chave);
+    if (
+      emCache &&
+      !(opcoes.atualizar === true && agora - emCache.consultadoEm >= ATUALIZACAO_MANUAL_MIN_MS)
+    ) {
+      return emCache;
+    }
+    const { itens, perfil } = await provider.listarBiblioteca(conta.idExterno);
+    const entrada: BibliotecaEmCache = {
+      itens,
+      chaves: itens.map((item) => chaveDeTitulo(item.titulo)),
+      perfil,
+      consultadoEm: agora,
+    };
+    this.bibliotecas.set(chave, entrada);
+    await this.corrigirNome(userId, provedor, conta.nomeExibicao, perfil.nomeExibicao);
+    return entrada;
   }
 
   /** Para onde o navegador volta depois do retorno: sem o SteamID, o `state` nem qualquer dado do usuário. */

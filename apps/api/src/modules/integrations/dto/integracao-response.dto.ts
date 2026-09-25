@@ -43,3 +43,31 @@ export class PerfilPlataformaDto {
   @ApiProperty({ description: 'Quando a biblioteca foi consultada na plataforma (ISO 8601)' })
   consultadoEm!: string;
 }
+
+class JogoParecidoDto {
+  @ApiProperty() id!: string;
+  @ApiProperty() titulo!: string;
+  @ApiPropertyOptional({ nullable: true, type: String }) plataforma!: string | null;
+}
+
+export class ItemBibliotecaDto {
+  @ApiProperty({ description: 'O identificador do item na plataforma (na Steam, o appid)' })
+  idExterno!: string;
+  @ApiProperty() titulo!: string;
+  @ApiPropertyOptional({ nullable: true, type: String }) capaUrl!: string | null;
+  @ApiProperty() minutosJogados!: number;
+  @ApiPropertyOptional({ nullable: true, type: String, description: 'ISO 8601' })
+  ultimaVezJogadoEm!: string | null;
+  @ApiProperty({
+    type: [JogoParecidoDto],
+    description:
+      'Jogos do catálogo com o mesmo título (sem caixa, acento nem pontuação) e ainda sem vínculo, até 3',
+  })
+  jogosParecidos!: JogoParecidoDto[];
+  @ApiPropertyOptional({
+    nullable: true,
+    type: JogoParecidoDto,
+    description: 'O jogo ao qual este item já está ligado',
+  })
+  vinculadoA!: JogoParecidoDto | null;
+}
