@@ -1,3 +1,4 @@
+import type { DadosJogoPlataforma } from './integracoes';
 /**
  * Contrato do catalogo de jogos, consumido pela API e pelo web.
  * Codigo puro: sem `window`, sem Node, sem `@prisma/client` (ARCHITECTURE.md §6).
@@ -84,6 +85,11 @@ export interface Game {
   criadoEm: string;
   /** ISO 8601. */
   atualizadoEm: string;
+  /**
+   * A camada de cada plataforma vinculada (spec `integracao-plataformas`): o ÚLTIMO valor consultado, sem
+   * chamar a plataforma. `[]` sem vínculo. Nunca substitui título, status, notas nem a capa enviada.
+   */
+  dadosPlataforma: DadosJogoPlataforma[];
 }
 
 /**
@@ -133,7 +139,13 @@ export type ApiErrorField =
   | 'email'
   | 'senha'
   | 'senhaAtual'
-  | 'novaSenha';
+  | 'novaSenha'
+  // Query da biblioteca de uma plataforma (spec integracao-plataformas): sem formulário, mas o erro aponta o campo.
+  | 'busca'
+  | 'limite'
+  // Corpo do vínculo de jogo (spec integracao-plataformas).
+  | 'idExterno'
+  | 'mover';
 
 /**
  * Formato dos erros 400, 409, 413 e 502 (o 404 traz so `statusCode` e `message`).

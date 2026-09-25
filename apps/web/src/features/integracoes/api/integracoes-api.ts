@@ -1,0 +1,96 @@
+import {
+  PROVEDOR_SLUG,
+  type ContaVinculada,
+  type DadosJogoPlataforma,
+  type DetalheJogoPlataforma,
+  type IniciarVinculoResponse,
+  type ItemBiblioteca,
+  type PerfilPlataforma,
+  type Provedor,
+  type VincularJogoRequest,
+} from '@checkpoint/shared';
+import { apiClient } from '@/shared/lib/api-client';
+
+const rota = (provedor: Provedor): string => `/integracoes/${PROVEDOR_SLUG[provedor]}`;
+
+/** Chamadas das integrações com plataformas, pelo `apiClient` (Bearer e renovação de sessão incluídos). */
+export const integracoesApi = {
+  /** `GET /api/integracoes`: as contas vinculadas do usuário. */
+  async listarContas(): Promise<ContaVinculada[]> {
+    const response = await apiClient.get<ContaVinculada[]>('/integracoes');
+    return response.data;
+  },
+
+  /**
+   * `POST /api/integracoes/:provedor/vinculo`: devolve para onde o navegador deve ir e grava o cookie
+   * `checkpoint_vinculo`. `withCredentials` só aqui: em produção o `/api` é do mesmo site (o rewrite da Vercel)
+   * e não muda nada, mas em dev (localhost:5173 → :3333) o navegador só aceita o cookie com ele.
+   */
+  async iniciarVinculo(provedor: Provedor): Promise<IniciarVinculoResponse> {
+    const response = await apiClient.post<IniciarVinculoResponse>(
+      `${rota(provedor)}/vinculo`,
+      undefined,
+      { withCredentials: true },
+    );
+    return response.data;
+  },
+
+  /** `GET /api/integracoes/:provedor/perfil`: o cartão (409 se privado ou não vinculado, 502 se a Steam falhou). */
+  async perfil(provedor: Provedor): Promise<PerfilPlataforma> {
+    const response = await apiClient.get<PerfilPlataforma>(`${rota(provedor)}/perfil`);
+    return response.data;
+  },
+
+  /** `POST /api/integracoes/:provedor/perfil/atualizacao`: ignora o cache (no máximo uma consulta a cada 30 s). */
+  async atualizarPerfil(provedor: Provedor): Promise<PerfilPlataforma> {
+    const response = await apiClient.post<PerfilPlataforma>(`${rota(provedor)}/perfil/atualizacao`);
+    return response.data;
+  },
+
+  /** `DELETE /api/integracoes/:provedor` (204): desvincula e apaga os dados da plataforma dos jogos. */
+  async desvincular(provedor: Provedor): Promise<void> {
+    await apiClient.delete(rota(provedor));
+  },
+
+  /** `GET /api/integracoes/:provedor/biblioteca`: a biblioteca do usuário (busca por título, até 50 itens). */
+  async biblioteca(provedor: Provedor, busca?: string): Promise<ItemBiblioteca[]> {
+    const response = await apiClient.get<ItemBiblioteca[]>(`${rota(provedor)}/biblioteca`, {
+      params: busca ? { busca } : undefined,
+    });
+    return response.data;
+  },
+
+  /** `PUT /api/integracoes/:provedor/jogos/:jogoId`: liga o jogo ao item (409 se já houver vínculo). */
+  async vincularJogo(
+    provedor: Provedor,
+    jogoId: string,
+    body: VincularJogoRequest,
+  ): Promise<DadosJogoPlataforma> {
+    const response = await apiClient.put<DadosJogoPlataforma>(
+      `${rota(provedor)}/jogos/${encodeURIComponent(jogoId)}`,
+      body,
+    );
+    return response.data;
+  },
+
+  /** `GET .../jogos/:jogoId`: horas e conquistas de um jogo ligado (nunca 502: a falha vem como `aviso`). */
+  async detalheDoJogo(provedor: Provedor, jogoId: string): Promise<DetalheJogoPlataforma> {
+    const response = await apiClient.get<DetalheJogoPlataforma>(
+      `${rota(provedor)}/jogos/${encodeURIComponent(jogoId)}`,
+    );
+    return response.data;
+  },
+
+  /** `POST .../jogos/:jogoId/atualizacao`: o "Atualizar" (no máximo uma consulta a cada 30 s; 502 se a plataforma falhar). */
+  async atualizarJogo(provedor: Provedor, jogoId: string): Promise<DetalheJogoPlataforma> {
+    const response = await apiClient.post<DetalheJogoPlataforma>(
+      `${rota(provedor)}/jogos/${encodeURIComponent(jogoId)}/atualizacao`,
+    );
+    return response.data;
+  },
+
+  /** `DELETE /api/integracoes/:provedor/jogos/:jogoId` (204): tira só a camada da plataforma do jogo. */
+  async desvincularJogo(provedor: Provedor, jogoId: string): Promise<void> {
+    await apiClient.delete(`${rota(provedor)}/jogos/${encodeURIComponent(jogoId)}`);
+  },
+};

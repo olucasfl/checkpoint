@@ -14,8 +14,9 @@ o que está em "Perguntar antes"; **não libera o que está em "Nunca"**.
 
 ## 1. Escopo do projeto
 
-checkpoint é um **esqueleto** — sem entidades de domínio, sem auth, sem PWA, sem deploy
-configurado (`ARCHITECTURE.md` §1). **Nunca invente regra de negócio de domínio** (formato de
+checkpoint já tem auth, catálogo de jogos, perfil, PWA, integração com a Steam e deploy em produção; o
+estado real está em `ARCHITECTURE.md` §1 e em `docs/specs/INDEX.md`. O que ainda não existe (CI, outras
+plataformas além da Steam, staging) é decisão de arquitetura própria. **Nunca invente regra de negócio de domínio** (formato de
 status de jogo, campos de uma entidade, fluxo de usuário) para "preencher" uma tarefa estrutural.
 Se uma tarefa pede algo que depende de uma decisão de domínio ainda não tomada, **pare e pergunte**
 em vez de assumir um design.

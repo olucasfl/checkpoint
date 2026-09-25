@@ -1,6 +1,8 @@
 import { GAME_RATING_CRITERIA, type Game } from '@checkpoint/shared';
 import { Icon } from '@/shared/components/Icon';
 import { LABEL } from '@/shared/components/form-parts';
+import { BlocoSteam } from '@/features/integracoes/components/BlocoSteam';
+import { capasDoJogo } from '@/features/integracoes/lib/capa';
 import { platformIcon } from '../lib/status-meta';
 import { GameCover } from './GameCover';
 import { RatingBar } from './RatingBar';
@@ -30,7 +32,12 @@ export function GameDetail({ game, onEdit }: GameDetailProps) {
       className="flex flex-col gap-6 lg:flex-row lg:items-start lg:gap-10"
     >
       <div className="flex justify-center lg:block lg:w-[320px] lg:shrink-0">
-        <GameCover titulo={game.titulo} capaUrl={game.capaUrl} variant="detalhe" />
+        <GameCover
+          titulo={game.titulo}
+          capaUrl={capasDoJogo(game)[0] ?? null}
+          alternativas={capasDoJogo(game).slice(1)}
+          variant="detalhe"
+        />
       </div>
 
       <div className="flex min-w-0 flex-1 flex-col gap-7">
@@ -67,6 +74,8 @@ export function GameDetail({ game, onEdit }: GameDetailProps) {
             </p>
           )}
         </section>
+
+        {game.dadosPlataforma.length > 0 && <BlocoSteam game={game} />}
 
         <section
           aria-labelledby="detalhe-criterios"

@@ -11,6 +11,11 @@ import {
   type UpdateGameRequest,
 } from '@checkpoint/shared';
 import { badRequestError, conflictError, type ApiFieldErrors } from '../../common/errors/api-error';
+import {
+  DADOS_JOGO_PLATAFORMA_SELECT,
+  toDadosJogoPlataforma,
+  type DadosJogoPlataformaRow,
+} from '../integrations/lib/dados-plataforma';
 import { PrismaService } from '../../database/prisma.service';
 import { COVER_INVALID_TYPE, COVER_MISSING } from './cover/cover-messages';
 import { detectImageType } from './cover/image-signature';
@@ -18,6 +23,16 @@ import { StorageService } from './cover/storage.service';
 import { columnsOfTenths, ratingsOfRow, tenthsOfRow, toTenths, type Tenths } from './lib/ratings';
 
 const GAME_NOT_FOUND = 'Jogo não encontrado';
+
+/**
+ * A camada de cada plataforma vinculada, lida junto do jogo (uma consulta a mais, sem chamar a plataforma).
+ * `dadosPlataforma` é opcional na linha: quem não faz o `include` (o `create`) devolve `[]`.
+ */
+export const DADOS_PLATAFORMA_INCLUDE = {
+  dadosPlataforma: { select: DADOS_JOGO_PLATAFORMA_SELECT, orderBy: { provedor: 'asc' } },
+} as const;
+
+type GameComPlataforma = GameRow & { dadosPlataforma?: DadosJogoPlataformaRow[] };
 const DUPLICATE_GAME = 'Já existe esse jogo nesta plataforma';
 const RATINGS_NOT_ALLOWED = 'Notas só podem ser preenchidas quando o status é Zerado ou Jogando';
 const ZERADO_NEEDS_RATING = 'Preencha ao menos um critério para marcar como Zerado';
@@ -68,6 +83,7 @@ export class GamesService {
     const rows = await this.prisma.game.findMany({
       where: { userId, ...(status && { status }) },
       orderBy: [{ atualizadoEm: 'desc' }, { criadoEm: 'desc' }],
+      include: DADOS_PLATAFORMA_INCLUDE,
     });
 
     return rows.map((row) => this.toGame(row));
@@ -146,6 +162,7 @@ export class GamesService {
           descricao,
           ...uniquenessKeys(titulo, plataforma),
         },
+        include: DADOS_PLATAFORMA_INCLUDE,
       });
       return this.toGame(row);
     } catch (error) {
@@ -191,7 +208,11 @@ export class GamesService {
 
     let updated: GameRow;
     try {
-      updated = await this.prisma.game.update({ where: { id, userId }, data: { capaPath } });
+      updated = await this.prisma.game.update({
+        where: { id, userId },
+        data: { capaPath },
+        include: DADOS_PLATAFORMA_INCLUDE,
+      });
     } catch (error) {
       await this.removeObjectQuietly(capaPath);
       throw this.translateDatabaseError(error);
@@ -221,6 +242,7 @@ export class GamesService {
       const updated = await this.prisma.game.update({
         where: { id, userId },
         data: { capaPath: null },
+        include: DADOS_PLATAFORMA_INCLUDE,
       });
       return this.toGame(updated);
     } catch (error) {
@@ -255,7 +277,7 @@ export class GamesService {
    * Sem plataforma = "" no banco (ver schema.prisma); a API expõe null. `capaPath` e `userId` nunca
    * saem: os campos da resposta são listados um a um.
    */
-  private toGame(row: GameRow): Game {
+  private toGame(row: GameComPlataforma): Game {
     const notas = ratingsOfRow(row);
     return {
       id: row.id,
@@ -268,11 +290,15 @@ export class GamesService {
       capaUrl: row.capaPath ? this.storage.publicUrl(row.capaPath) : null,
       criadoEm: row.criadoEm.toISOString(),
       atualizadoEm: row.atualizadoEm.toISOString(),
+      dadosPlataforma: (row.dadosPlataforma ?? []).map(toDadosJogoPlataforma),
     };
   }
 
-  private async findOrFail(userId: string, id: string): Promise<GameRow> {
-    const game = await this.prisma.game.findUnique({ where: { id, userId } });
+  private async findOrFail(userId: string, id: string): Promise<GameComPlataforma> {
+    const game = await this.prisma.game.findUnique({
+      where: { id, userId },
+      include: DADOS_PLATAFORMA_INCLUDE,
+    });
     if (!game) {
       throw new NotFoundException(GAME_NOT_FOUND);
     }

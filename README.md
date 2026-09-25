@@ -95,10 +95,10 @@ cp apps/api/.env.example apps/api/.env
 cp apps/web/.env.example apps/web/.env
 ```
 
-| Arquivo         | Para quê                                                                                                                                                                                                                                       |
-| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `apps/api/.env` | `PORT`, `DATABASE_URL`, `CORS_ORIGIN`, `NODE_ENV`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_STORAGE_BUCKET`, `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `AUTH_REGISTRATION_OPEN` e, opcional, `AUTH_REGISTRATION_LIMIT_PER_HOUR` |
-| `apps/web/.env` | `VITE_API_URL`                                                                                                                                                                                                                                 |
+| Arquivo         | Para quê                                                                                                                                                                                                                                                                                                                  |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/api/.env` | `PORT`, `DATABASE_URL`, `CORS_ORIGIN`, `NODE_ENV`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_STORAGE_BUCKET`, `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `AUTH_REGISTRATION_OPEN`, `STEAM_API_KEY`, `API_PUBLIC_URL`, `WEB_PUBLIC_URL` e, opcionais, `AUTH_REGISTRATION_LIMIT_PER_HOUR` e `TRUST_PROXY_HOPS` |
+| `apps/web/.env` | `VITE_API_URL`                                                                                                                                                                                                                                                                                                            |
 
 > As variáveis `SUPABASE_*` são **obrigatórias** (a API não sobe sem elas) e servem só às capas dos
 > jogos: `SUPABASE_URL` é a URL do projeto, `SUPABASE_STORAGE_BUCKET` é o bucket público `capas`, e
@@ -113,6 +113,14 @@ cp apps/web/.env.example apps/web/.env
 > `AUTH_REGISTRATION_LIMIT_PER_HOUR` é **opcional** e só serve para dev/teste (o padrão é 3 registros por
 > hora por IP): em ambiente exposto, deixe-a ausente. `CORS_ORIGIN` não aceita mais `*` (cookie de sessão):
 > liste as origens, ex.: `http://localhost:5173`.
+
+> As variáveis da integração com a Steam (spec `integracao-plataformas`) também são **obrigatórias**, e a API
+> não sobe sem elas: `STEAM_API_KEY` (32 hexadecimais, gerada em <https://steamcommunity.com/dev/apikey>; só o
+> backend a usa, nunca o web, um log ou um commit), `API_PUBLIC_URL` (o endereço em que o **navegador** alcança a
+> API, sem barra final: é o `return_to` do login da Steam) e `WEB_PUBLIC_URL` (a origem do web, para onde o retorno
+> redireciona, sem barra final). Em desenvolvimento: `http://localhost:3333` e `http://localhost:5173`.
+> `TRUST_PROXY_HOPS` é **opcional** (inteiro de 0 a 10; ausente = 0): quantos proxies confiáveis há entre o cliente e
+> a API. Em desenvolvimento não há proxy, deixe ausente; em produção use o número **medido** (ver "Produção" abaixo).
 
 > `DATABASE_URL` deve apontar para um PostgreSQL 16 acessível (instância local instalada na
 > máquina ou um serviço gerenciado, ex.: Supabase). Este projeto não usa Docker.
@@ -129,7 +137,7 @@ npm run db:migrate
 ```
 
 > Rode este comando toda vez que adicionar ou alterar um model: ele aplica as migrations
-> pendentes (hoje, o model `Game`) e gera uma nova quando o schema mudou.
+> pendentes (hoje, os models de usuário, sessão, jogo e integração com plataformas) e gera uma nova quando o schema mudou.
 
 ### 5. Suba a aplicação
 
@@ -146,6 +154,31 @@ npm run dev
 
 A página inicial (`/`) é o catálogo de jogos. O diagnóstico, que consulta o `/api/health` e mostra o
 status da API e do banco, fica em `/status`.
+
+### 6. (Opcional) Testar o vínculo com a Steam em localhost
+
+Os testes automatizados (`npm test`) **não** falam com a Steam: tudo é mockado. Para ver o fluxo de verdade:
+
+1. Gere a `STEAM_API_KEY` em <https://steamcommunity.com/dev/apikey> (o campo "domínio" é só informativo: a chave é do servidor e a Steam não o confere nas chamadas) e ponha em `apps/api/.env`, junto de `API_PUBLIC_URL=http://localhost:3333`,
+   `WEB_PUBLIC_URL=http://localhost:5173` e `CORS_ORIGIN=http://localhost:5173`. Não defina `TRUST_PROXY_HOPS`.
+2. Deixe **públicos**, no perfil Steam da conta de teste, o "Meu perfil" **e** os "Detalhes do jogo" (Steam →
+   Perfil → Editar perfil → Configurações de privacidade). Perfil privado é um estado tratado (o cartão mostra o
+   passo a passo), mas sem dados não há o que ver.
+3. `npm run dev`, entre com a sua conta em <http://localhost:5173>, abra **Perfil → Contas vinculadas** e clique em
+   **Vincular conta**. Depois de entrar na Steam, o navegador volta para
+   `http://localhost:5173/perfil?steam=vinculada` e o cartão mostra jogos, horas e conquistas.
+4. Em **Novo jogo → Buscar na Steam** (ou no **Vincular à Steam** da página de um jogo) ligue um jogo da biblioteca; a
+   página do jogo passa a mostrar o bloco **Steam** com as conquistas.
+
+Por dentro: o `POST /api/integracoes/steam/vinculo` grava o cookie `checkpoint_vinculo` (`HttpOnly`, `SameSite=Lax`,
+`Path=/api/integracoes`, sem `Domain`, 10 min) no host da API; cookie não separa portas, então o `localhost:5173` →
+`localhost:3333` funciona, e o web envia `withCredentials` só nessa chamada. A Steam devolve o navegador para
+`API_PUBLIC_URL/api/integracoes/steam/retorno`, que confere tudo e redireciona para `WEB_PUBLIC_URL/perfil`. O
+SteamID nunca aparece na URL final nem em log.
+
+Se a conta de teste não tiver conquistas negadas ou perfil privado à mão, o script
+`node apps/api/scripts/capturar-fixtures-steam.cjs <privado|detalhes-privados|vazio>` captura, **uma vez**, as
+respostas reais que ainda faltam como fixture (ele lê a chave do `apps/api/.env`, sanitiza e não grava o SteamID).
 
 ---
 
@@ -205,6 +238,26 @@ import { apiClient } from '@/shared/lib/api-client';
 
 O alias `@/` aponta para `apps/web/src` e está configurado tanto no `vite.config.ts` quanto no
 `tsconfig.app.json`.
+
+---
+
+## Produção (Vercel + Render + Supabase)
+
+O web está na **Vercel**, a API no **Render** e o banco e o bucket no **Supabase**. O `apps/web/vercel.json` reescreve
+`/api/*` para a API no Render (o cookie de sessão fica no mesmo site do web) e devolve o `index.html` para o resto. As
+variáveis da API ficam no painel do Render; **cadastre as novas antes do deploy**, porque a API não sobe sem elas.
+
+| Variável (Render)  | Valor em produção                                                                                |
+| ------------------ | ------------------------------------------------------------------------------------------------ |
+| `NODE_ENV`         | `production` (o cookie do vínculo passa a `Secure`)                                              |
+| `CORS_ORIGIN`      | `https://checkpoint-web-rust.vercel.app` (lista, nunca `*`)                                      |
+| `API_PUBLIC_URL`   | `https://checkpoint-web-rust.vercel.app` (o domínio da Vercel, não o do Render), sem barra final |
+| `WEB_PUBLIC_URL`   | `https://checkpoint-web-rust.vercel.app`, sem barra final                                        |
+| `STEAM_API_KEY`    | a chave gerada com o "domínio" `checkpoint-web-rust.vercel.app` (segredo)                        |
+| `TRUST_PROXY_HOPS` | o número **medido** de proxies (nunca um chute, nunca `true`)                                    |
+
+O passo a passo completo (medição do proxy, ordem do deploy, conferência da migration e o roteiro de verificação em
+produção) está em `ARCHITECTURE.md`, seção **Deploy**.
 
 ---
 

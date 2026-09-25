@@ -1,0 +1,20 @@
+{
+  "status": 200,
+  "body": {
+    "response": {
+      "players": [
+        {
+          "steamid": "STEAMID_SINTETICO",
+          "communityvisibilitystate": 3,
+          "profilestate": 1,
+          "personaname": "Jogador Sintetico",
+          "profileurl": "https://steamcommunity.com/profiles/STEAMID_SINTETICO/",
+          "avatar": "https://avatars.steamstatic.com/0000000000000000000000000000000000000000.jpg",
+          "avatarmedium": "https://avatars.steamstatic.com/0000000000000000000000000000000000000000_medium.jpg",
+          "avatarfull": "https://avatars.steamstatic.com/0000000000000000000000000000000000000000_full.jpg",
+          "personastate": 1
+        }
+      ]
+    }
+  }
+}

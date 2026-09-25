@@ -9,6 +9,10 @@ import { OFFLINE_NOT_SAVED } from '../lib/api-error';
 import { GameForm } from './GameForm';
 
 // Só a camada de API é falsa: o saveGame, os hooks e o formulário rodam de verdade.
+// Sem conta Steam nestes testes: a API de integrações não vai à rede.
+vi.mock('@/features/integracoes/api/integracoes-api', () => ({
+  integracoesApi: { listarContas: vi.fn().mockResolvedValue([]) },
+}));
 vi.mock('../api/games-api', () => ({
   gamesApi: {
     list: vi.fn(),
@@ -32,6 +36,7 @@ const game = (overrides: Partial<Game> = {}): Game => ({
   descricao: null,
   capaUrl: null,
   criadoEm: '2026-09-23T12:00:00.000Z',
+  dadosPlataforma: [],
   atualizadoEm: '2026-09-23T12:00:00.000Z',
   ...overrides,
 });

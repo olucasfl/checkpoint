@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Icon } from '@/shared/components/Icon';
 import { ModalDialog } from '@/shared/components/ModalDialog';
 import { useConnectivity } from '@/shared/hooks/use-connectivity';
@@ -8,6 +8,8 @@ import { DeleteGameDialog } from '@/features/games/components/DeleteGameDialog';
 import { DetailLoading, GameNotFound } from '@/features/games/components/DetailStates';
 import { GameDetail } from '@/features/games/components/GameDetail';
 import { GameForm } from '@/features/games/components/GameForm';
+import { useTemContaSteam } from '@/features/integracoes/api/use-integracoes';
+import { BibliotecaSteamDialog } from '@/features/integracoes/components/BibliotecaSteamDialog';
 import { ListError } from '@/features/games/components/ListStates';
 
 const ACAO =
@@ -27,6 +29,8 @@ export function GameDetailPage() {
   const { data, isPending, isError, refetch } = useGames();
   const [editing, setEditing] = useState(false);
   const [removing, setRemoving] = useState(false);
+  const [vinculando, setVinculando] = useState(false);
+  const temContaSteam = useTemContaSteam();
 
   const game = data?.find((candidate) => candidate.id === id);
 
@@ -55,6 +59,16 @@ export function GameDetailPage() {
 
           {game && (
             <div className="flex gap-2">
+              {temContaSteam === true && game.dadosPlataforma.length === 0 && (
+                <button
+                  type="button"
+                  onClick={() => setVinculando(true)}
+                  className={`${ACAO} border-borda-controle hover:bg-acao-hover`}
+                >
+                  <Icon name="link" size={20} />
+                  Vincular à Steam
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => setEditing(true)}
@@ -75,6 +89,15 @@ export function GameDetailPage() {
           )}
         </div>
 
+        {game && temContaSteam === false && game.dadosPlataforma.length === 0 && (
+          <p className="m-0 text-[16px] text-texto-suave">
+            <Link to="/perfil" className="font-semibold text-ciano underline">
+              Vincule sua Steam no perfil
+            </Link>{' '}
+            para ligar este jogo à sua biblioteca.
+          </p>
+        )}
+
         {isPending && <DetailLoading />}
         {/* Com a lista já carregada, um refetch que falha não esconde o jogo. */}
         {isError && data === undefined && (
@@ -93,6 +116,15 @@ export function GameDetailPage() {
           />
         )}
       </ModalDialog>
+
+      {game && (
+        <BibliotecaSteamDialog
+          open={vinculando}
+          modo={{ tipo: 'vincular', jogo: game }}
+          onClose={() => setVinculando(false)}
+          onVinculado={() => setVinculando(false)}
+        />
+      )}
 
       <DeleteGameDialog
         game={removing ? (game ?? null) : null}

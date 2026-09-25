@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { GAME_STATUS, type Game, type GameRatings, type GameStatus } from '@checkpoint/shared';
+import { DadosJogoPlataformaDto } from '../../integrations/dto/integracao-response.dto';
 
 /** Só existe para o Swagger mostrar as `notas` (cada critério de 0 a 10, ou null sem nota). */
 export class GameRatingsResponseDto implements GameRatings {
@@ -62,4 +63,11 @@ export class GameResponseDto implements Game {
 
   @ApiProperty({ format: 'date-time' })
   atualizadoEm!: string;
+
+  @ApiProperty({
+    type: [DadosJogoPlataformaDto],
+    description:
+      'A camada de cada plataforma vinculada (o último valor consultado, sem chamar a plataforma); [] sem vínculo.',
+  })
+  dadosPlataforma!: DadosJogoPlataformaDto[];
 }

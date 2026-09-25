@@ -6,8 +6,18 @@ import { createMemoryRouter, RouterProvider, useLocation } from 'react-router-do
 import { type Game } from '@checkpoint/shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { gamesApi } from '@/features/games/api/games-api';
+import { integracoesApi } from '@/features/integracoes/api/integracoes-api';
 import { GameDetailPage } from './GameDetailPage';
 
+// Sem conta Steam nestes testes: a API de integrações não vai à rede.
+vi.mock('@/features/integracoes/api/integracoes-api', () => ({
+  integracoesApi: {
+    listarContas: vi.fn().mockResolvedValue([]),
+    biblioteca: vi.fn(),
+    detalheDoJogo: vi.fn(),
+    desvincularJogo: vi.fn(),
+  },
+}));
 vi.mock('@/features/games/api/games-api', () => ({
   gamesApi: {
     list: vi.fn(),
@@ -40,6 +50,7 @@ const game = (overrides: Partial<Game> = {}): Game => ({
   descricao: null,
   capaUrl: null,
   criadoEm: '2026-09-23T12:00:00.000Z',
+  dadosPlataforma: [],
   atualizadoEm: '2026-09-23T12:00:00.000Z',
   ...overrides,
 });
@@ -386,5 +397,142 @@ describe('layout e acessibilidade (CA-30)', () => {
       'Avaliação',
       'Descrição',
     ]);
+  });
+});
+
+describe('Vincular à Steam (spec integracao-plataformas, etapa 3)', () => {
+  const conta = {
+    provedor: 'STEAM' as const,
+    idExterno: 'STEAMID_SINTETICO',
+    nomeExibicao: 'Jogador Sintetico',
+    vinculadaEm: '2026-09-25T12:00:00.000Z',
+  };
+  const dados = {
+    provedor: 'STEAM' as const,
+    idExterno: '1',
+    minutosJogados: 10,
+    ultimaVezJogadoEm: null,
+    conquistasTotal: null,
+    conquistasDesbloqueadas: null,
+    capaUrl: null,
+    atualizadoEm: '2026-09-25T12:00:00.000Z',
+  };
+
+  it('com conta Steam e jogo sem vínculo, o botão abre a biblioteca no modo vincular', async () => {
+    vi.mocked(integracoesApi.listarContas).mockResolvedValue([conta]);
+    vi.mocked(integracoesApi.biblioteca).mockResolvedValue([]);
+    const user = renderAt();
+
+    await user.click(await screen.findByRole('button', { name: 'Vincular à Steam' }));
+
+    expect(await screen.findByText('Escolha o jogo da Steam que é «Celeste».')).toBeInTheDocument();
+  });
+
+  it('sem conta Steam o botão não aparece', async () => {
+    vi.mocked(integracoesApi.listarContas).mockResolvedValue([]);
+    renderAt();
+    await screen.findByRole('heading', { level: 1, name: 'Celeste' });
+
+    await waitFor(() => expect(integracoesApi.listarContas).toHaveBeenCalled());
+    expect(screen.queryByRole('button', { name: 'Vincular à Steam' })).toBeNull();
+    expect(
+      await screen.findByRole('link', { name: 'Vincule sua Steam no perfil' }),
+    ).toHaveAttribute('href', '/perfil');
+  });
+
+  it('jogo que já tem vínculo não oferece "Vincular à Steam"', async () => {
+    vi.mocked(integracoesApi.listarContas).mockResolvedValue([conta]);
+    api.list.mockResolvedValue([game({ dadosPlataforma: [dados] })]);
+    renderAt();
+    await screen.findByRole('heading', { level: 1, name: 'Celeste' });
+
+    await waitFor(() => expect(integracoesApi.listarContas).toHaveBeenCalled());
+    expect(screen.queryByRole('button', { name: 'Vincular à Steam' })).toBeNull();
+  });
+});
+
+describe('bloco Steam na página do jogo (spec integracao-plataformas, etapa 4)', () => {
+  const dados = {
+    provedor: 'STEAM' as const,
+    idExterno: '504230',
+    minutosJogados: 2550,
+    ultimaVezJogadoEm: '2026-02-17T12:00:00.000Z',
+    conquistasTotal: 40,
+    conquistasDesbloqueadas: 12,
+    capaUrl: 'https://cdn.cloudflare.steamstatic.com/steam/apps/504230/library_600x900.jpg',
+    atualizadoEm: '2026-09-25T12:00:00.000Z',
+  };
+  const conta = {
+    provedor: 'STEAM' as const,
+    idExterno: 'STEAMID_SINTETICO',
+    nomeExibicao: 'Jogador Sintetico',
+    vinculadaEm: '2026-09-25T12:00:00.000Z',
+  };
+
+  it('jogo ligado mostra o bloco Steam; jogo sem ligação não pede o detalhe', async () => {
+    vi.mocked(integracoesApi.detalheDoJogo).mockResolvedValue({
+      dados,
+      conquistas: [],
+      aviso: null,
+    });
+    api.list.mockResolvedValue([game({ dadosPlataforma: [dados] })]);
+    renderAt();
+
+    const bloco = (await screen.findByRole('heading', { level: 2, name: 'Steam' })).closest(
+      'section',
+    );
+    expect(bloco).not.toBeNull();
+    expect(within(bloco as HTMLElement).getByText('42 h 30 min')).toBeInTheDocument();
+    expect(integracoesApi.detalheDoJogo).toHaveBeenCalledWith('STEAM', 'g1');
+  });
+
+  it('sem vínculo: nenhum bloco e nenhuma chamada de conquistas', async () => {
+    renderAt();
+    await screen.findByRole('heading', { level: 1, name: 'Celeste' });
+
+    expect(screen.queryByRole('heading', { level: 2, name: 'Steam' })).toBeNull();
+    expect(integracoesApi.detalheDoJogo).not.toHaveBeenCalled();
+  });
+
+  it('a capa oficial aparece quando não há capa enviada, e a enviada tem precedência (CA-42)', async () => {
+    api.list.mockResolvedValue([game({ capaUrl: null, dadosPlataforma: [dados] })]);
+    vi.mocked(integracoesApi.detalheDoJogo).mockResolvedValue({
+      dados,
+      conquistas: [],
+      aviso: null,
+    });
+    renderAt();
+
+    await screen.findByRole('heading', { level: 1, name: 'Celeste' });
+    const capa = document.querySelector('[data-cover="image"] img');
+    expect(capa).toHaveAttribute('src', dados.capaUrl);
+  });
+
+  it('Desvincular: o bloco some, o jogo segue com título, status e notas, e "Vincular à Steam" volta (CA-54)', async () => {
+    vi.mocked(integracoesApi.listarContas).mockResolvedValue([conta]);
+    vi.mocked(integracoesApi.detalheDoJogo).mockResolvedValue({
+      dados,
+      conquistas: [],
+      aviso: null,
+    });
+    vi.mocked(integracoesApi.desvincularJogo).mockResolvedValue(undefined);
+    api.list.mockResolvedValueOnce([game({ dadosPlataforma: [dados] })]);
+    api.list.mockResolvedValue([game({ dadosPlataforma: [] })]);
+    const user = renderAt();
+    await screen.findByRole('heading', { level: 2, name: 'Steam' });
+    expect(screen.queryByRole('button', { name: 'Vincular à Steam' })).toBeNull();
+
+    await user.click(screen.getByRole('button', { name: 'Desvincular' }));
+    await user.click(
+      within(await screen.findByRole('dialog')).getByRole('button', { name: 'Desvincular' }),
+    );
+
+    await waitFor(() =>
+      expect(screen.queryByRole('heading', { level: 2, name: 'Steam' })).toBeNull(),
+    );
+    expect(integracoesApi.desvincularJogo).toHaveBeenCalledWith('STEAM', 'g1');
+    expect(screen.getByRole('heading', { level: 1, name: 'Celeste' })).toBeInTheDocument();
+    expect(screen.getByText('Zerado')).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Vincular à Steam' })).toBeInTheDocument();
   });
 });

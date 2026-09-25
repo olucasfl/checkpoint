@@ -1,0 +1,54 @@
+{
+  "status": 200,
+  "body": {
+    "playerstats": {
+      "steamID": "STEAMID_SINTETICO",
+      "gameName": "Vampire Survivors",
+      "achievements": [
+        {
+          "apiname": "ReachLV5",
+          "achieved": 1,
+          "unlocktime": 1771352782,
+          "name": "Asas",
+          "description": "Alcance o nível 5."
+        },
+        {
+          "apiname": "ReachLV10",
+          "achieved": 1,
+          "unlocktime": 1771352782,
+          "name": "Coroa",
+          "description": "Alcance o nível 10."
+        },
+        {
+          "apiname": "Survive1Minute",
+          "achieved": 1,
+          "unlocktime": 1771351018,
+          "name": "Coração Vazio",
+          "description": "Sobreviva por 1 minuto com qualquer personagem."
+        },
+        {
+          "apiname": "FindAStoneMask",
+          "achieved": 0,
+          "unlocktime": 0,
+          "name": "Máscara de Pedra",
+          "description": "Encontre uma Máscara de Pedra."
+        },
+        {
+          "apiname": "EvolveCross",
+          "achieved": 0,
+          "unlocktime": 0,
+          "name": "Espada Celeste",
+          "description": "Evolua a Cruz."
+        },
+        {
+          "apiname": "Survive20MinutesWithCross",
+          "achieved": 0,
+          "unlocktime": 0,
+          "name": "Tiragisú",
+          "description": "Sobreviva por 20 minutos com Krochi."
+        }
+      ],
+      "success": true
+    }
+  }
+}
