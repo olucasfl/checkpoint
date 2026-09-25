@@ -85,10 +85,18 @@ export interface GameCapaRow {
   capaPath: string | null;
 }
 
+/** Só o dono: a exclusão de conta não lê nada da camada da plataforma, só precisa que ela suma junto. */
+export interface DonoRow {
+  userId: string;
+}
+
 export class FakeAuthPrisma {
   users: UserRow[] = [];
   sessions: SessionRow[] = [];
   games: GameCapaRow[] = [];
+  /** `ContaVinculada` e `JogoPlataforma` (spec `integracao-plataformas`): vão junto com o usuário, por cascade. */
+  contasVinculadas: DonoRow[] = [];
+  jogosPlataforma: DonoRow[] = [];
 
   /** Forma de array: as operações já foram disparadas; basta esperar todas (sem rollback, como teste). */
   $transaction = jest.fn(async (operations: Promise<unknown>[]): Promise<unknown[]> =>
@@ -133,7 +141,10 @@ export class FakeAuthPrisma {
         return project(row, args.select);
       },
     ),
-    /** Com o `onDelete: Cascade` do schema: as sessões e os jogos do usuário vão junto. */
+    /**
+     * Com o `onDelete: Cascade` do schema: as sessões, os jogos e a camada das plataformas (`ContaVinculada` e
+     * `JogoPlataforma`) do usuário vão junto.
+     */
     delete: jest.fn(
       async (args: {
         where: { id: string };
@@ -149,6 +160,8 @@ export class FakeAuthPrisma {
         this.users = this.users.filter((user) => user !== row);
         this.sessions = this.sessions.filter((session) => session.userId !== row.id);
         this.games = this.games.filter((game) => game.userId !== row.id);
+        this.contasVinculadas = this.contasVinculadas.filter((conta) => conta.userId !== row.id);
+        this.jogosPlataforma = this.jogosPlataforma.filter((jogo) => jogo.userId !== row.id);
         return project(row, args.select);
       },
     ),
