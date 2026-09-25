@@ -4,13 +4,14 @@ Mapa único de `spec ↔ status`. **Este arquivo é a fonte da verdade sobre o q
 confie em adivinhar nome de arquivo. Quem cria ou fecha uma spec atualiza esta tabela no mesmo
 commit — `/docs-sync` confere se ela bate com a realidade.
 
-| Feature            | Spec                                           | Status          |
-| ------------------ | ---------------------------------------------- | --------------- |
-| Catálogo de jogos  | [catalogo-jogos.md](catalogo-jogos.md)         | 🚧 em andamento |
-| PWA e mobile       | [pwa-e-mobile.md](pwa-e-mobile.md)             | 🚧 em andamento |
-| Autenticação       | [autenticacao.md](autenticacao.md)             | ✅ implementada |
-| Perfil             | [perfil.md](perfil.md)                         | 🚧 em andamento |
-| Avaliação de jogos | [avaliacao-de-jogos.md](avaliacao-de-jogos.md) | ✅ implementada |
+| Feature                            | Spec                                                   | Status          |
+| ---------------------------------- | ------------------------------------------------------ | --------------- |
+| Catálogo de jogos                  | [catalogo-jogos.md](catalogo-jogos.md)                 | 🚧 em andamento |
+| PWA e mobile                       | [pwa-e-mobile.md](pwa-e-mobile.md)                     | 🚧 em andamento |
+| Autenticação                       | [autenticacao.md](autenticacao.md)                     | ✅ implementada |
+| Perfil                             | [perfil.md](perfil.md)                                 | 🚧 em andamento |
+| Avaliação de jogos                 | [avaliacao-de-jogos.md](avaliacao-de-jogos.md)         | ✅ implementada |
+| Integração com plataformas (Steam) | [integracao-plataformas.md](integracao-plataformas.md) | ✅ aprovada     |
 
 ## Legenda de status
 
@@ -95,6 +96,31 @@ commit — `/docs-sync` confere se ela bate com a realidade.
       verificador externo. Pela fórmula WCAG sobre as cores computadas: 6,28, 7,47, 9,64 e 8,98:1.
 
 - [ ] titulo: null devolve mensagem de 120 caracteres (herdado do catálogo)
+
+**`integracao-plataformas` — chore de `trust proxy` (fora da spec; fazer ANTES da etapa 2):**
+
+- [ ] ⚠️ **O limite por IP já está quebrado em produção.** Sem `trust proxy`, atrás da Vercel (rewrite de `/api`)
+      e do Render o `req.ip` é o IP do proxy, então login (5/min), registro (3/h) e troca de senha usam **um
+      contador único para o site inteiro**: poucos logins de pessoas diferentes já dão 429 para todo mundo.
+- [ ] Fazer como chore própria (`fix(api)`), com o número de saltos do `X-Forwarded-For` **medido em
+      produção, não chutado** (um valor alto demais deixa o limite burlável por cabeçalho forjado; baixo demais
+      mantém o problema). Cobrir por teste e conferir o `req.ip` real depois do deploy. A spec
+      `integracao-plataformas` não depende dela (limite por usuário), mas a etapa 2 só começa depois.
+
+**`integracao-plataformas` — execução humana (etapa 1; ordem obrigatória):**
+
+- [ ] Gerar a `STEAM_API_KEY` em `steamcommunity.com/dev/apikey` (pede um "domínio": usar o da Vercel; exige uma
+      conta Steam sem restrições). Nunca commitar, nunca colar em log, spec ou PR.
+- [ ] Cadastrar **`STEAM_API_KEY`, `API_PUBLIC_URL` e `WEB_PUBLIC_URL` no Render ANTES do deploy** de qualquer
+      commit da etapa 1 (a API passa a exigi-las no boot e **não sobe** sem elas). Produção: as duas URLs são o
+      domínio da Vercel, sem barra final. Preencher também em `apps/api/.env` (dev: `http://localhost:3333` e
+      `http://localhost:5173`).
+- [ ] **Informar a conta Steam de teste** (pública, com jogos e conquistas) para a chamada real que fixa os
+      fixtures (perfil privado, biblioteca vazia, jogo sem conquistas, conquistas negadas, 403). Se possível,
+      também uma conta com perfil privado. O SteamID e o nome dessas contas não entram em fixture, teste, log
+      nem documentação (`RULES.md` §8).
+- [ ] Aplicar a migration aditiva no banco de produção antes ou junto do deploy da etapa 1 (confirmar qual
+      banco é o `DATABASE_URL`).
 
 Mudanças destrutivas de schema (`/db-change`) e outras aprovações explícitas exigidas por
 `.claude/rules/RULES.md` entram aqui quando existirem.
