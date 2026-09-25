@@ -10,10 +10,12 @@ interface DeleteGameDialogProps {
   /** Jogo a remover; `null` = diálogo fechado. */
   game: Game | null;
   onClose: () => void;
+  /** Chamado quando a remoção deu certo (antes de `onClose`): a página do jogo volta ao catálogo. */
+  onDeleted?: () => void;
 }
 
 /** Confirmação antes de remover (a remoção é definitiva, sem lixeira). */
-export function DeleteGameDialog({ game, onClose }: DeleteGameDialogProps) {
+export function DeleteGameDialog({ game, onClose, onDeleted }: DeleteGameDialogProps) {
   const mutation = useDeleteGame();
   const [error, setError] = useState('');
 
@@ -24,6 +26,7 @@ export function DeleteGameDialog({ game, onClose }: DeleteGameDialogProps) {
     setError('');
     try {
       await mutation.mutateAsync(game.id);
+      onDeleted?.();
       onClose();
     } catch (failure) {
       setError(describeError(failure).message);

@@ -74,7 +74,9 @@ Consequência prática: se você editar `packages/shared/src` e não ver o tipo/
 `apps/web/node_modules/.vite/deps/@checkpoint_shared.js`, um cache que ele só refaz quando o lockfile ou a
 config mudam. Se você acrescentar uma **exportação nova** ao `shared` e o app (só no `dev`) quebrar com
 "`X is not iterable`" ou "`X is not a function`" para algo que existe no `dist/`, apague esse diretório
-(`rm -rf apps/web/node_modules/.vite`) e reinicie o `dev`. O `build` de produção e os testes não usam esse cache.
+(`rm -rf apps/web/node_modules/.vite`) e reinicie o `dev`. O `build` de produção e os testes não usam esse cache. O Vite serve esses módulos como imutáveis, então **o
+navegador também pode guardar uma cópia velha**: depois de apagar o cache, recarregue a aba **sem cache**
+(Ctrl+Shift+R; ou, no console, `fetch(url, { cache: 'reload' })` na URL `@checkpoint_shared.js?v=…` e recarregue).
 
 `packages/shared` só pode conter código agnóstico de plataforma: tipos, contratos de request/
 response, enums, funções puras. Nada que dependa de `window`, do Node ou do `@prisma/client`.
@@ -109,7 +111,7 @@ checkpoint/
 │           ├── app/                    # providers.tsx (AppProviders) + routes.tsx (as rotas) + router.tsx (AppRouter)
 │           │   └── layout/             # AppLayout/AppFrame, AuthLayout, RequireAuth, LoadingScreen, Backdrop, BottomNav, TopNav, nav-items.ts
 │           ├── features/               # uma pasta por feature — hoje games/, auth/ e perfil/ (api/, lib/, session/, components/)
-│           ├── pages/                  # páginas de rota — GamesPage (/), PerfilPage (/perfil), TrocarSenhaPage (/perfil/senha), LoginPage, RegistroPage e StatusPage (/status)
+│           ├── pages/                  # páginas de rota — GamesPage (/), GameDetailPage (/jogos/:id), PerfilPage (/perfil), TrocarSenhaPage (/perfil/senha), LoginPage, RegistroPage e StatusPage (/status)
 │           ├── shared/
 │           │   ├── components/         # Icon (Material Symbols), ModalDialog (<dialog> nativo), OverlayPortal, ConnectionBanner, UpdatePrompt, InstallNudge
 │           │   ├── hooks/              # use-typing-outside-dialog (esconde a barra com o teclado aberto), use-connectivity, use-dialog-open, use-install-option
@@ -374,7 +376,7 @@ Registre o módulo novo em `app.module.ts` (`imports: [...]`).
 - `src/app/providers.tsx` — ponto único para providers globais: `QueryClientProvider`
   (`shared/lib/query-client.ts`) e o `AuthProvider` (§5.10); tema etc. entram aqui quando existirem.
 - `src/app/routes.tsx` — a lista de rotas (à parte do roteador para os testes usarem um roteador em
-  memória): `/` (`GamesPage`), `/perfil` (`PerfilPage`) e `/perfil/senha` (`TrocarSenhaPage`) dentro do
+  memória): `/` (`GamesPage`), `/jogos/:id` (`GameDetailPage`), `/perfil` (`PerfilPage`) e `/perfil/senha` (`TrocarSenhaPage`) dentro do
   **`RequireAuth`** e do `AppLayout`
   (§5.6, §5.10); `/status` (o diagnóstico de health) **público**, no `AppLayout`; `/login` e `/registro`
   no `AuthLayout` (sem barra). `src/app/router.tsx` só cria o `createBrowserRouter(routes)`. Registre
@@ -438,6 +440,18 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
   (`RatingBar`: barra de 10 segmentos que preenche `round(média)`, número com vírgula e 1 casa, `aria-label`
   "Nota 8,3 de 10"; "—" sem média) e o **título é um `<Link>` real** para `/jogos/:id`, esticado sobre a linha
   por `after:absolute after:inset-0` (sem `<a>` aninhado nem `onClick` no `<li>`), com as ações em `z-10` por cima.
+- **Página de detalhes** (spec `avaliacao-de-jogos`, etapa 3): **`/jogos/:id`** (`pages/GameDetailPage.tsx`) acha o jogo
+  na **mesma query `['games']`** do catálogo (`useGames`; **sem `GET /api/games/:id`**, um link direto carrega a lista
+  toda, como o catálogo já faz). `GameDetail` mostra a capa grande (`GameCover` `detalhe`, quadrada até 320 px, com o
+  fallback de cor + iniciais), título, plataforma e status; a **média em destaque** (`RatingBar` `grande`); os **5
+  critérios** de `GAME_RATING_CRITERIA` (rótulo, descrição curta e a nota com a barra, ou "sem nota"); e a
+  **descrição como texto** (`whitespace-pre-line`; nunca `dangerouslySetInnerHTML`) ou o convite "Adicionar
+  descrição", que abre o formulário. Coluna única no celular; a partir de `lg` (1024 px) a capa fica ao lado do
+  resto. **Editar** abre o mesmo `GameForm` no `ModalDialog` (a página se atualiza pela invalidação da query),
+  **Excluir** usa o `DeleteGameDialog` (com `onDeleted`, que leva ao catálogo) e **Voltar** desfaz a navegação
+  quando ela veio do app (o catálogo volta com o filtro) ou vai a `/` num link direto (`location.key === 'default'`).
+  Carregando: esqueleto (`DetailLoading`, `role="status"`); id inexistente **ou de outro usuário** (a lista só
+  traz os dele): "Jogo não encontrado" com link para `/`, a mesma mensagem nos dois casos, sem revelar o id.
 - **Plataforma** é uma seleção das plataformas mais usadas, agrupadas por família; a API continua
   aceitando texto livre, e uma plataforma antiga fora da lista vira opção extra na edição.
 - **Diálogos** são `<dialog>` nativo com `showModal()` (`shared/components/ModalDialog`): Esc fecha, o
@@ -467,7 +481,11 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
   rota. **Nenhuma página importa a navegação**
   (teste em `AppLayout.test.tsx`).
 - **`nav-items.ts`** é a fonte única dos destinos: "Jogos", "Adicionar" e "Perfil" (`/perfil`), nesta
-  ordem, na barra inferior e (os links) no topo em >= 768px. `/status` fica fora de propósito.
+  ordem, na barra inferior e (os links) no topo em >= 768px. `/status` fica fora de propósito. Um link pode
+  ter `ativoEm` (prefixo de caminho onde continua marcado): "Jogos" tem `/jogos/`, então segue ativo no detalhe de
+  um jogo. `isNavActive(item, pathname)` decide (caminho exato ou o prefixo); a barra e o topo usam `Link` com
+  `aria-current="page"` calculado por ela, e não o `NavLink`, que só marca o que casa com o próprio `to` (e com
+  `end` `/jogos/:id` deixaria "Jogos" apagado).
 - **`BottomNav`** (< 768px, o `md`): fixa embaixo, renderizada por portal (`OverlayPortal`) no
   `#overlay-root`, irmão do `#root` no `index.html`, para nenhum `transform` de ancestral prender o
   `position: fixed`. Some enquanto um campo **fora de diálogo** está focado

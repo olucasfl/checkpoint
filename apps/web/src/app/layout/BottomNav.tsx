@@ -1,9 +1,9 @@
-import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Icon } from '@/shared/components/Icon';
 import { OverlayPortal } from '@/shared/components/OverlayPortal';
 import { useTypingOutsideDialog } from '@/shared/hooks/use-typing-outside-dialog';
 import { newGameHref } from '@/features/games/lib/new-game';
-import { NAV_ITEMS } from './nav-items';
+import { isNavActive, NAV_ITEMS } from './nav-items';
 
 const ITEM =
   'flex min-h-11 min-w-11 flex-1 flex-col items-center justify-center gap-0.5 rounded-[4px] text-[13px] font-bold uppercase tracking-[0.1em]';
@@ -31,16 +31,16 @@ export function BottomNav() {
           {NAV_ITEMS.map((item) => (
             <li key={item.id} className="flex flex-1">
               {item.kind === 'link' ? (
-                <NavLink
+                <Link
                   to={item.to}
-                  end
-                  className={({ isActive }) =>
-                    `${ITEM} no-underline ${isActive ? 'text-ciano' : 'text-texto-suave'}`
-                  }
+                  aria-current={isNavActive(item, location.pathname) ? 'page' : undefined}
+                  className={`${ITEM} no-underline ${
+                    isNavActive(item, location.pathname) ? 'text-ciano' : 'text-texto-suave'
+                  }`}
                 >
                   <Icon name={item.icon} size={24} />
                   {item.label}
-                </NavLink>
+                </Link>
               ) : (
                 <button
                   type="button"

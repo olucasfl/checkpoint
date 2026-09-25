@@ -1,6 +1,6 @@
 # Spec: avaliacao-de-jogos
 
-> Status: em andamento (aprovada em 2026-09-25; etapas 1 e 2 feitas e verificadas: a migration foi aplicada com backup e "sim" explícito, e o formulário e a lista foram conferidos no navegador em 375 px e ≥ 1024 px; falta a etapa 3, a página de detalhes)
+> Status: em andamento (aprovada em 2026-09-25; as três etapas estão no código, nos testes e conferidas no navegador em 375 px e ≥ 1024 px, e a migration foi aplicada com backup e "sim" explícito; falta rodar `/qa-verify` e a conferência humana de Editar e Excluir na página, hoje só provadas por teste)
 
 ## Objetivo
 
@@ -244,13 +244,13 @@ campos, o `schema.prisma` descrito, o `CHECK` da decisão A, o campo Nota do for
 
 ### Etapa 3 — página de detalhes
 
-- [ ] **CA-25** — **Dado** um jogo Zerado com `gameplay 9,2`, `historia 8` e os outros vazios, **quando** abro `/jogos/<id>`, **então** vejo capa grande, título, plataforma, status, a média (`8,6`) em destaque e os cinco critérios: Gameplay `9,2` e História `8,0` com barra, e os outros três com "sem nota"; cada barra tem `aria-label` "<Rótulo> <nota> de 10".
-- [ ] **CA-26** — **Dado** um jogo sem descrição, **então** vejo o convite "Adicionar descrição", que abre o formulário; **dado** uma descrição `"<b>oi</b>\nlinha 2"`, **então** ela aparece como **texto** (`<b>oi</b>` literal, sem negrito) com a quebra de linha.
-- [ ] **CA-27** — **Dado** a página aberta, **quando** clico **Editar**, mudo uma nota e salvo, **então** o modal fecha e a página mostra a nota nova sem recarregar; **quando** clico **Excluir** e confirmo, **então** o jogo some e vou para `/`; **quando** clico **Voltar**, **então** volto ao catálogo.
-- [ ] **CA-28** — **Dado** um link direto, **quando** a lista ainda carrega, **então** vejo um esqueleto; **dado** um id inexistente ou de outro usuário, **então** vejo "Jogo não encontrado" com um link para `/` (sem revelar qual dos dois é).
-- [ ] **CA-29** — **Dado** `/jogos/<id>` (inclusive após recarregar), **então** o item "Jogos" da navegação (barra inferior e topo) está marcado como ativo.
-- [ ] **CA-30** — **Dado** 375 px, **então** não há rolagem horizontal, a coluna é única e todo botão, link e campo tem ≥ 44 px de alto; **dado** ≥ 1024 px, **então** a capa fica ao lado das notas.
-- [ ] **CA-31** — **Dado** o app, **então** nenhuma cor nova fora do `@theme` (`tokens.test.ts` verde), nenhuma animação nova sem a variante `movimento-reduzido`, e `package.json` não mudou.
+- [x] **CA-25** — **Dado** um jogo Zerado com `gameplay 9,2`, `historia 8` e os outros vazios, **quando** abro `/jogos/<id>`, **então** vejo capa grande, título, plataforma, status, a média (`8,6`) em destaque e os cinco critérios: Gameplay `9,2` e História `8,0` com barra, e os outros três com "sem nota"; cada barra tem `aria-label` "<Rótulo> <nota> de 10".
+- [x] **CA-26** — **Dado** um jogo sem descrição, **então** vejo o convite "Adicionar descrição", que abre o formulário; **dado** uma descrição `"<b>oi</b>\nlinha 2"`, **então** ela aparece como **texto** (`<b>oi</b>` literal, sem negrito) com a quebra de linha.
+- [x] **CA-27** — **Dado** a página aberta, **quando** clico **Editar**, mudo uma nota e salvo, **então** o modal fecha e a página mostra a nota nova sem recarregar; **quando** clico **Excluir** e confirmo, **então** o jogo some e vou para `/`; **quando** clico **Voltar**, **então** volto ao catálogo.
+- [x] **CA-28** — **Dado** um link direto, **quando** a lista ainda carrega, **então** vejo um esqueleto; **dado** um id inexistente ou de outro usuário, **então** vejo "Jogo não encontrado" com um link para `/` (sem revelar qual dos dois é).
+- [x] **CA-29** — **Dado** `/jogos/<id>` (inclusive após recarregar), **então** o item "Jogos" da navegação (barra inferior e topo) está marcado como ativo.
+- [x] **CA-30** — **Dado** 375 px, **então** não há rolagem horizontal, a coluna é única e todo botão, link e campo tem ≥ 44 px de alto; **dado** ≥ 1024 px, **então** a capa fica ao lado das notas.
+- [x] **CA-31** — **Dado** o app, **então** nenhuma cor nova fora do `@theme` (`tokens.test.ts` verde), nenhuma animação nova sem a variante `movimento-reduzido`, e `package.json` não mudou.
 
 ## Plano de testes
 

@@ -247,6 +247,45 @@ describe('AuthLayout — visitante e carregando', () => {
   });
 });
 
+describe('/jogos/:id (avaliacao-de-jogos CA-28, CA-29)', () => {
+  const jogo = {
+    id: 'g1',
+    titulo: 'Celeste',
+    plataforma: 'PC',
+    status: 'ZERADO' as const,
+    notas: { gameplay: 9.2, historia: null, graficos: null, trilhaSonora: null, performance: null },
+    notaMedia: 9.2,
+    descricao: null,
+    capaUrl: null,
+    criadoEm: '2026-09-23T12:00:00.000Z',
+    atualizadoEm: '2026-09-23T12:00:00.000Z',
+  };
+
+  it('logado: abre o detalhe dentro do AppLayout (com a navegação e Jogos ativo)', async () => {
+    games.list.mockResolvedValue([jogo]);
+    entrar(auth);
+
+    const { where } = renderAt('/jogos/g1');
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Celeste' })).toBeInTheDocument();
+    expect(where()).toBe('/jogos/g1');
+    const nav = document.querySelector('nav.bottom-nav') as HTMLElement;
+    expect(within(nav).getByRole('link', { name: 'Jogos' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+  });
+
+  it('visitante: vai para o login e volta ao jogo depois (RequireAuth)', async () => {
+    await asVisitor();
+
+    const { where } = renderAt('/jogos/g1');
+
+    await waitFor(() => expect(where()).toBe('/login?voltar=%2Fjogos%2Fg1'));
+    expect(games.list).not.toHaveBeenCalled();
+  });
+});
+
 describe('/perfil (CA-33, CA-34, CA-36)', () => {
   it('nome, e-mail com a legenda e Sair; a barra inferior tem o item Perfil (CA-36)', async () => {
     entrar(auth);

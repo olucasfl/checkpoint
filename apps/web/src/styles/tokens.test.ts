@@ -186,6 +186,14 @@ describe('cor de destaque e efeitos reduzidos (perfil, etapa 3)', () => {
     },
   );
 
+  it('o "Limpar" da seção Avaliação (texto-suave sobre o cartão painel-2) passa de 4,5:1, e no hover (ciano) também', () => {
+    const cartao = hexDoToken('painel-2');
+    expect(contraste(hexDoToken('texto-suave'), cartao)).toBeGreaterThanOrEqual(4.5);
+    expect(contraste(hexDoToken('ciano'), cartao)).toBeGreaterThanOrEqual(4.5);
+    // A descrição curta e o "sem nota" usam o mesmo par, sobre o cartão e sobre o painel.
+    expect(contraste(hexDoToken('texto-suave'), hexDoToken('painel'))).toBeGreaterThanOrEqual(4.5);
+  });
+
   it('os efeitos "Reduzidos" estão na MESMA variante das regras de movimento (um seletor a mais)', () => {
     const variante = css.match(/@custom-variant movimento-reduzido\s*\{[\s\S]*?\n\}/)?.[0] ?? '';
 

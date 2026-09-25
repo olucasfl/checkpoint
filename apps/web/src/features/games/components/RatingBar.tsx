@@ -11,6 +11,8 @@ interface RatingBarProps {
   rotulo?: string;
   /** Densidade compacta (preferência do /perfil): em >= 768px, sem a legenda, a barra fica numa linha só. */
   compacta?: boolean;
+  /** `grande`: a nota geral em destaque na página do jogo (número e barra maiores). */
+  tamanho?: 'normal' | 'grande';
   /** Sem nota: `traco` é o "—" discreto da lista; `texto` é o "sem nota" de um critério no detalhe. */
   vazio?: 'traco' | 'texto';
 }
@@ -23,7 +25,14 @@ const SEGMENTS = Array.from({ length: GAME_RATING_MAX }, (_, index) => index);
  * ambíguo). A nota é decimal (8,3): a barra preenche `round(nota)` segmentos e o número diz o valor exato.
  * Nota 0 = nenhum segmento e "0,0"; sem nota, o "—" ou o "sem nota" (segmentos vazios são só decorativos).
  */
-export function RatingBar({ nota, rotulo, compacta = false, vazio = 'traco' }: RatingBarProps) {
+export function RatingBar({
+  nota,
+  rotulo,
+  compacta = false,
+  vazio = 'traco',
+  tamanho = 'normal',
+}: RatingBarProps) {
+  const grande = tamanho === 'grande';
   if (nota === null) {
     return vazio === 'traco' ? (
       <span
@@ -46,14 +55,14 @@ export function RatingBar({ nota, rotulo, compacta = false, vazio = 'traco' }: R
 
   return (
     <div className="flex flex-col gap-1">
-      {rotulo === undefined && (
+      {rotulo === undefined && !grande && (
         <span
           className={`text-[11px] font-bold uppercase leading-none tracking-[0.22em] text-texto-suave ${compacta ? 'md:hidden' : ''}`}
         >
           Nota
         </span>
       )}
-      <div className="flex items-center gap-3">
+      <div className={`flex items-center gap-3 ${grande ? 'flex-wrap gap-y-2' : ''}`}>
         <div
           role="img"
           aria-label={`${rotulo ?? 'Nota'} ${texto} de ${GAME_RATING_MAX}`}
@@ -64,13 +73,17 @@ export function RatingBar({ nota, rotulo, compacta = false, vazio = 'traco' }: R
             <span
               key={index}
               data-segment={index < cheios ? 'on' : 'off'}
-              className={`h-4 w-[11px] rounded-[1px] ${index < cheios ? 'glow-seg bg-magenta' : 'bg-apagado'}`}
+              className={`${grande ? 'h-5 w-3 md:h-6 md:w-4' : 'h-4 w-[11px]'} rounded-[1px] ${index < cheios ? 'glow-seg bg-magenta' : 'bg-apagado'}`}
             />
           ))}
         </div>
         <span aria-hidden="true" className="flex items-center gap-1 font-corpo tabular-nums">
-          <Icon name="star" size={18} filled className="text-magenta" />
-          <span className="text-2xl font-bold leading-none">{texto}</span>
+          <Icon name="star" size={grande ? 28 : 18} filled className="text-magenta" />
+          <span
+            className={`${grande ? 'text-5xl md:text-[56px]' : 'text-2xl'} font-bold leading-none`}
+          >
+            {texto}
+          </span>
           <span className="text-base font-semibold leading-none text-texto-suave">
             /{GAME_RATING_MAX}
           </span>

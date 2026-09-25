@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, RouterProvider, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { gamesApi } from '@/features/games/api/games-api';
+import { GameDetailPage } from '@/pages/GameDetailPage';
 import { GamesPage } from '@/pages/GamesPage';
 import { AppLayout } from './AppLayout';
 
@@ -47,6 +48,8 @@ function renderAt(url: string) {
         ),
         children: [
           { path: '/', element: <GamesPage /> },
+          { path: '/jogos/:id', element: <GameDetailPage /> },
+          { path: '/perfil', element: <main>Perfil</main> },
           { path: '/status', element: <main>Diagnóstico</main> },
           { path: '/campo', element: <PageWithField /> },
         ],
@@ -93,6 +96,40 @@ describe('barra inferior (CA-02)', () => {
     );
     expect(within(nav).getByRole('button', { name: 'Adicionar' })).toBeInTheDocument();
     expect(within(nav).getByRole('link', { name: 'Perfil' })).toHaveAttribute('href', '/perfil');
+  });
+
+  it('em `/jogos/:id`, Jogos continua ativo na barra inferior e no topo; Perfil não (avaliacao-de-jogos CA-29)', async () => {
+    vi.mocked(gamesApi.list).mockResolvedValue([]);
+    renderAt('/jogos/g1');
+    await screen.findByRole('heading', { name: 'Jogo não encontrado' });
+
+    for (const nav of screen.getAllByRole('navigation', { name: 'Navegação principal' })) {
+      expect(within(nav).getByRole('link', { name: 'Jogos' })).toHaveAttribute(
+        'aria-current',
+        'page',
+      );
+      expect(within(nav).getByRole('link', { name: 'Perfil' })).not.toHaveAttribute('aria-current');
+    }
+  });
+
+  it('o Jogos ativo em `/jogos/:id` continua levando a `/` (href)', async () => {
+    vi.mocked(gamesApi.list).mockResolvedValue([]);
+    renderAt('/jogos/g1');
+    await screen.findByRole('heading', { name: 'Jogo não encontrado' });
+
+    expect(within(mainNav()).getByRole('link', { name: 'Jogos' })).toHaveAttribute('href', '/');
+  });
+
+  it('em `/perfil`, só Perfil está ativo (Jogos não casa com tudo)', () => {
+    renderAt('/perfil');
+
+    expect(within(mainNav()).getByRole('link', { name: 'Perfil' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    expect(within(mainNav()).getByRole('link', { name: 'Jogos' })).not.toHaveAttribute(
+      'aria-current',
+    );
   });
 
   it('em `/status`, Jogos não está ativo e /status não é um item (só Jogos e Perfil são links)', () => {

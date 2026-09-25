@@ -5,14 +5,15 @@ interface GameCoverProps {
   titulo: string;
   /** URL pública da capa enviada, ou `null` para mostrar a capa gerada. */
   capaUrl: string | null;
-  /** `row` = 52×52 da lista; `compacta` = 40×40 (densidade compacta); `preview` = 96×96 do formulário. */
-  variant?: 'row' | 'compacta' | 'preview';
+  /** `row` = 52×52 da lista; `compacta` = 40×40 (densidade compacta); `preview` = 96×96 do formulário; `detalhe` = a capa grande da página do jogo (quadrada, até 320 px). */
+  variant?: 'row' | 'compacta' | 'preview' | 'detalhe';
 }
 
 const SIZE = {
   row: 'size-[52px] text-[17px]',
   compacta: 'size-10 text-[14px]',
   preview: 'size-24 text-[30px]',
+  detalhe: 'aspect-square w-full max-w-[320px] text-[72px]',
 } as const;
 
 /**

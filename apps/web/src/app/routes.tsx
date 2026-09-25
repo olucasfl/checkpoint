@@ -2,6 +2,7 @@ import { type RouteObject } from 'react-router-dom';
 import { AppLayout } from '@/app/layout/AppLayout';
 import { AuthLayout } from '@/app/layout/AuthLayout';
 import { RequireAuth } from '@/app/layout/RequireAuth';
+import { GameDetailPage } from '@/pages/GameDetailPage';
 import { GamesPage } from '@/pages/GamesPage';
 import { LoginPage } from '@/pages/LoginPage';
 import { PerfilPage } from '@/pages/PerfilPage';
@@ -23,6 +24,7 @@ export const routes: RouteObject[] = [
         element: <AppLayout />,
         children: [
           { path: '/', element: <GamesPage /> },
+          { path: '/jogos/:id', element: <GameDetailPage /> },
           { path: '/perfil', element: <PerfilPage /> },
           { path: '/perfil/senha', element: <TrocarSenhaPage /> },
         ],
