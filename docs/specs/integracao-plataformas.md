@@ -161,8 +161,20 @@ do humano).
 - **Sugestão de status** ao criar da biblioteca (o usuário escolhe; a sugestão só pré-seleciona): 0 minutos →
   **Quero jogar**; mais de 0 → **Jogando**. **Nunca** sugere Zerado (a API exige nota para Zerado).
 - **1 para 1** — unicidade por (usuário, provedor, id externo) e por (jogo, provedor). Ligar um item já ligado
-  a outro jogo → 409 com o jogo atual; o web avisa e oferece **Mover o vínculo** (reenvia com `mover: true`; o
-  outro jogo perde só a camada Steam). Ligar um jogo que **já tem** vínculo → 409 (desvincule antes).
+  a outro jogo → 409 com o jogo atual; o web avisa ("«Celeste» já está ligado a «Celeste (PS5)». Mover o
+  vínculo?") e oferece **Mover o vínculo** (reenvia com `mover: true`). Ligar um jogo que **já tem** vínculo →
+  409 (desvincule antes; o "mover" **não** resolve este caso).
+  **A regra do "mover" (decisão de 2026-09-25):**
+  - O jogo **antigo** não perde nada do que é do usuário (título, status, notas, descrição, capa enviada): perde
+    só a camada da plataforma (horas, conquistas e a capa oficial de fallback), e pode ser ligado de novo depois.
+  - **Nada é copiado** do jogo antigo para o novo: os dados do novo vêm frescos da plataforma.
+  - **A ordem das checagens** poupa a cota: (1) o jogo é do usuário e a conta está vinculada; (2) o jogo não tem
+    vínculo; (3) o item já ligado a outro jogo (sem `mover` → 409 `PLATAFORMA_ITEM_JA_VINCULADO`, **sem chamar a
+    plataforma**); (4) só então a plataforma (o item está na biblioteca e o resumo dele); (5) grava numa transação
+    (com `mover`: apaga a linha do jogo antigo e cria a do novo). Se a plataforma falha no passo 4, **nada muda**:
+    o vínculo continua no jogo antigo.
+  - Uma corrida no banco (`P2002`) é traduzida pela restrição violada: `(gameId, provedor)` →
+    `PLATAFORMA_JOGO_JA_VINCULADO`; `(userId, provedor, idExterno)` → `PLATAFORMA_ITEM_JA_VINCULADO`.
 - **Só liga a item da biblioteca do usuário**: o `idExterno` é conferido contra `GetOwnedGames` (com
   `appids_filter`). Não dá para ligar um `appid` qualquer.
 - **`Game.plataforma` convive com o vínculo** (Q3, decidida): o vínculo **não** altera `plataforma`, e um
@@ -170,9 +182,13 @@ do humano).
   Quando a plataforma do jogo não é vazia nem "PC", o web pede **confirmação** antes de ligar: "Este jogo está
   cadastrado como PlayStation 5. As horas e conquistas mostradas serão as da Steam. Vincular mesmo assim?";
   cancelar não envia nada. Jogo novo criado da biblioteca começa com plataforma **"PC"** (editável). A
-  confirmação é de tela: a API não olha a `plataforma` e o `PUT` não depende dela.
+  confirmação é de tela: a API não olha a `plataforma` e o `PUT` não depende dela. No **formulário de novo jogo**, a mesma
+  confirmação vem **ao salvar**, antes de criar qualquer coisa, se a pessoa trocou a plataforma pré-preenchida
+  para algo diferente de vazio ou "PC" (decisão de 2026-09-25).
 - **Capa** — precedência: **1º a capa enviada pelo usuário** (`capaUrl`); **2º a capa oficial da Steam**
-  (fallback); **3º** a capa gerada (cor + iniciais). Remover a capa enviada faz a Steam voltar a aparecer.
+  (fallback); **3º** a capa gerada (cor + iniciais). Remover a capa enviada faz a Steam voltar a aparecer. **Na etapa 3 a capa oficial é só a prévia do formulário
+  de novo jogo** (nunca vai ao bucket, e um arquivo escolhido pela pessoa a substitui); a precedência na lista e
+  no detalhe é da **etapa 4** (CA-42).
 - **Catálogo (linha)** — só **horas** e **X/Y conquistas** (ex.: "42 h · 12/40"), vindas do último valor
   gravado, na mesma query `['games']`. Sem vínculo, nada muda. Sem conquistas no jogo (Y = 0) ou nunca
   consultadas, mostra só as horas.
@@ -241,6 +257,12 @@ Notas do contrato:
   foram negadas) e a lista vem vazia. Jogo sem conquistas: `aviso: 'SEM_CONQUISTAS'`, `conquistas: []`.
 - **`ItemBiblioteca`** traz `jogosParecidos` (jogos do catálogo com o mesmo título normalizado e **sem**
   vínculo Steam, no máximo 3) e `vinculadoA` (o jogo ao qual o item já está ligado, ou `null`).
+- **A biblioteca usa o MESMO cache de 10 min por SteamID do cartão do perfil** (a biblioteca inteira e o perfil):
+  abrir o diálogo logo depois do `/perfil` custa zero chamadas; erro (privado, 502) não entra no cache. Sem
+  paginação: `limite` (1 a 50, padrão 30) e `busca` (por trecho da `chaveDeTitulo`, até 100 caracteres) limitam a
+  resposta, ordenada por horas e, no empate, por título. O contrato é `ItemBiblioteca[]`, sem total: a tela diz
+  "Digite para buscar entre seus jogos", sem "30 de 312". Os `jogosParecidos` são por **igualdade** da chave,
+  nunca vinculam sozinhos, e um item com parecidos ainda oferece "Criar outro jogo".
 - **`avatarUrl`** só é devolvido se for `https` e o host terminar em `steamstatic.com` (senão `null`).
 - Erro de negócio de quem está logado **nunca é 401** (o web trata 401 como sessão perdida).
 
@@ -508,10 +530,15 @@ interface. A `SteamProvider` usa o **`SteamClient`** (`fetch` nativo, timeout de
 simples e **mockado nos testes**, como o `StorageService`) e o `SteamOpenId` (montagem da URL e
 `check_authentication`, também mockável). Passar a chave só por dentro do `SteamClient`.
 
+**`obterJogo` por etapas (decisão de 2026-09-25).** O CA-26 pede `conquistasTotal` na resposta do `PUT`, então
+a **etapa 3** implementa só o **resumo**: horas, última vez jogado, capa e as contagens (uma chamada a
+`GetPlayerAchievements`; `null` nas contagens se as conquistas forem negadas, `0` se o jogo não tiver) e o aviso
+de privacidade, com `conquistas: []`. A **lista completa** (schema e raridade, com cache) é da etapa 4.
+
 ## Critérios de aceite (testáveis, em BDD)
 
 A numeração segue a ordem de escrita; a tabela de "Etapas" diz a que etapa cada critério pertence (CA-60, CA-63 e
-CA-64 são da etapa 1; CA-61, CA-62 e CA-65, da etapa 2). O CA-63 só fecha quando os fixtures de perfil privado e
+CA-64 são da etapa 1; CA-61, CA-62 e CA-65, da etapa 2; CA-40, CA-66 e CA-67, da etapa 3). O CA-63 só fecha quando os fixtures de perfil privado e
 conquistas negadas forem capturados (a etapa 1 pode ter testes `todo` até lá); a biblioteca vazia, sem conta
 de teste, fica com `todo` até a etapa 4.
 
@@ -657,17 +684,27 @@ idExterno)` e `(gameId, provedor)`, e nenhuma coluna de `Game`, `User` ou `Refre
       **então** o web pede a confirmação com o texto da plataforma e só liga se eu confirmar; **cancelando**, nada
       é enviado; **e** a `plataforma` do jogo continua "PlayStation 5" depois de ligado. **Dado** um jogo com
       plataforma "PC" ou vazia, **então** liga sem confirmação. **Dado** o `PUT` da API para um jogo de qualquer
-      plataforma, **então** 200 (a API não olha a `plataforma`).
+      plataforma, **então** 200 (a API não olha a `plataforma`). **Dado** o formulário de novo jogo pré-preenchido
+      com "PC", **quando** troco a plataforma para "PlayStation 5" e salvo, **então** vejo a confirmação **antes** de
+      qualquer request; **cancelando**, nada é enviado (nem o jogo é criado); **confirmando**, cria o jogo e o liga.
 - [ ] **CA-38** — **Dado** a página de um jogo sem vínculo e a Steam vinculada, **então** vejo **Vincular à
       Steam** e o diálogo (modo vincular) sem **Criar jogo**; **sem** a conta vinculada, vejo o link "Vincule sua
       Steam no perfil".
 - [ ] **CA-39** — **Dado** o diálogo com perfil privado ou Steam fora do ar, **então** vejo o bloco de privacidade
       (com **Tentar de novo**) ou o erro, sem quebrar o formulário; **dado** 360×640, **então** sem rolagem horizontal e ações ≥ 44 px.
 
+- [ ] **CA-40** — _(puxado da etapa 4: o web precisa saber quais jogos já têm vínculo para os CA-35 e CA-38)_ **Dado** Ana com 1 jogo ligado e 1 sem ligação, **quando** `GET /api/games`, **então** o ligado traz
+      `dadosPlataforma` com 1 item e o outro traz `[]`; **e** nenhuma chamada à Steam foi feita (mock sem chamadas).
+- [ ] **CA-66** — **Dado** o item 504230 ligado ao jogo A e a plataforma **falhando** (timeout, 5xx, 429 ou perfil
+      privado), **quando** `PUT` no jogo B com `mover: true`, **então** 502 (ou 409 `PLATAFORMA_PERFIL_PRIVADO`) e
+      **nada muda**: o vínculo continua no jogo A e o jogo B segue sem vínculo.
+- [ ] **CA-67** — **Dado** o item 504230 ligado ao jogo A, **quando** `PUT` no jogo B **sem** `mover`, **então**
+      409 `PLATAFORMA_ITEM_JA_VINCULADO` com `jogoAtual` = A **e a plataforma NÃO é chamada** (as checagens de
+      banco vêm antes); **dado** o jogo B que já tem vínculo, **então** 409 `PLATAFORMA_JOGO_JA_VINCULADO` também sem
+      chamar a plataforma, mesmo com `mover: true`.
+
 ### Etapa 4 — horas, conquistas, atualização e privacidade
 
-- [ ] **CA-40** — **Dado** Ana com 1 jogo ligado e 1 sem ligação, **quando** `GET /api/games`, **então** o ligado traz
-      `dadosPlataforma` com 1 item e o outro traz `[]`; **e** nenhuma chamada à Steam foi feita (mock sem chamadas).
 - [ ] **CA-41** — **Dado** o catálogo (`/`), **então** a linha do jogo ligado mostra "42 h · 12/40" com o
       `aria-label` completo e a do jogo sem ligação não mostra nada; **dado** Y = 0, **então** só as horas; **dado**
       0 minutos, **então** "0 h".
@@ -749,13 +786,13 @@ Loop de verificação por tarefa: `npm run typecheck -w <workspace>` → `npm te
 
 Uma branch (`feat/integracao-plataformas`) e commits por etapa, parando para validação ao fim de cada uma.
 
-| Etapa | Entrega                                                                                                                                                                                                                                                                                                        | Depende de | Critérios                          |
-| ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- | ---------------------------------- |
-| 1     | contrato no `shared` · schema + migration (aditiva) · env (`STEAM_API_KEY`, `API_PUBLIC_URL`, `WEB_PUBLIC_URL`) · `GameProvider` + registro · `SteamClient` com mocks · **primeira tarefa: chamada real com conta Steam de teste para fixar os fixtures** · `.env.example` no mesmo commit da validação de env | —          | CA-01 a CA-05, CA-60, CA-63, CA-64 |
-| 2     | OpenID (`vinculo`, `retorno`, `state` + cookie) · `perfil`, `atualizacao`, `DELETE` da conta · seção "Contas vinculadas" com o cartão · **pré-requisito: a chore do `trust proxy` (fora desta spec) já feita**                                                                                                 | 1          | CA-06 a CA-22, CA-61, CA-62, CA-65 |
-| 3     | `biblioteca` · `PUT/DELETE .../jogos/:jogoId` · `BibliotecaSteamDialog` · Buscar na Steam, parecidos, "outro jogo", mover, confirmação de plataforma                                                                                                                                                           | 2          | CA-23 a CA-39                      |
-| 4     | `Game.dadosPlataforma` · linha do catálogo · precedência da capa · `GET/POST .../jogos/:jogoId` · bloco Steam, conquistas, atualização, privacidade                                                                                                                                                            | 3          | CA-40 a CA-55                      |
-| 5     | fechamento: `ARCHITECTURE.md` (ver abaixo), `INDEX.md`, exclusão de conta (CA-56 a CA-59), `/qa-verify` em produção, `/docs-sync`                                                                                                                                                                              | 4          | CA-56 a CA-59                      |
+| Etapa | Entrega                                                                                                                                                                                                                                                                                                              | Depende de | Critérios                          |
+| ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- | ---------------------------------- |
+| 1     | contrato no `shared` · schema + migration (aditiva) · env (`STEAM_API_KEY`, `API_PUBLIC_URL`, `WEB_PUBLIC_URL`) · `GameProvider` + registro · `SteamClient` com mocks · **primeira tarefa: chamada real com conta Steam de teste para fixar os fixtures** · `.env.example` no mesmo commit da validação de env       | —          | CA-01 a CA-05, CA-60, CA-63, CA-64 |
+| 2     | OpenID (`vinculo`, `retorno`, `state` + cookie) · `perfil`, `atualizacao`, `DELETE` da conta · seção "Contas vinculadas" com o cartão · **pré-requisito: a chore do `trust proxy` (fora desta spec) já feita**                                                                                                       | 1          | CA-06 a CA-22, CA-61, CA-62, CA-65 |
+| 3     | `biblioteca` · `PUT/DELETE .../jogos/:jogoId` · `BibliotecaSteamDialog` · Buscar na Steam, parecidos, "outro jogo", mover, confirmação de plataforma · `Game.dadosPlataforma` (CA-40, puxado da etapa 4) · resumo do jogo no `obterJogo` (horas, contagens, aviso) · a rota `DELETE` sai aqui; o botão só na etapa 4 | 2          | CA-23 a CA-40, CA-66, CA-67        |
+| 4     | linha do catálogo · precedência da capa · `GET/POST .../jogos/:jogoId` · bloco Steam, lista completa de conquistas (schema e raridade), botão Desvincular do jogo (CA-54), atualização, privacidade                                                                                                                  | 3          | CA-41 a CA-55                      |
+| 5     | fechamento: `ARCHITECTURE.md` (ver abaixo), `INDEX.md`, exclusão de conta (CA-56 a CA-59), `/qa-verify` em produção, `/docs-sync`                                                                                                                                                                                    | 4          | CA-56 a CA-59                      |
 
 **Ordem obrigatória de deploy (Q4).** A etapa 1 é a primeira a **exigir** as variáveis no boot
 (`env.validation.ts`), então:
@@ -766,6 +803,14 @@ Uma branch (`feat/integracao-plataformas`) e commits por etapa, parando para val
 3. A migration (aditiva) é aplicada no banco de produção antes ou junto desse deploy; o código antigo continua
    funcionando com as tabelas novas.
 4. Enquanto o item 1 não estiver feito, a etapa 1 fica **na branch**: não vai para `main` nem para o deploy.
+
+**As etapas 3 e 4 se implantam JUNTAS** (decisão de 2026-09-25). Só a etapa 3 deixaria a pessoa ligar jogos sem
+ver as horas e as conquistas na lista e no detalhe (CA-41, CA-42, CA-51), sem o botão de desvincular o jogo
+(CA-54; a rota `DELETE` já existe) e sem a capa oficial de fallback. Até a etapa 4, a etapa 3 fica na branch.
+
+**Os fixtures de perfil privado e de conquistas negadas vêm antes do commit das rotas de vínculo de jogo**
+(etapa 3, `PUT` e `DELETE`): uma captura por aviso, sem tentar em laço. Se o `GetPlayerAchievements` não responder
+403 quando os "detalhes do jogo" são privados, o `obterJogo` e os CA-30 e CA-47 são ajustados **antes** de seguir.
 
 **A chore do `trust proxy` não faz parte desta spec** (Q1): é feita **antes da etapa 2**, à parte, e está em
 `INDEX.md > Pendências`. Esta spec não a implementa nem depende do resultado dela.
