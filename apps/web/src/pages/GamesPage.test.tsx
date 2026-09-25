@@ -8,6 +8,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { gamesApi } from '@/features/games/api/games-api';
 import { OFFLINE_NOT_SAVED } from '@/features/games/lib/api-error';
 import { connectivity } from '@/shared/lib/connectivity';
+import { alterarPrefs, definirUsuario, resetPrefsForTests } from '@/shared/lib/prefs/prefs-store';
+import { storage } from '@/shared/lib/storage/storage';
 import { GamesPage } from './GamesPage';
 
 vi.mock('@/features/games/api/games-api', () => ({
@@ -80,6 +82,8 @@ const filterButton = (name: RegExp) =>
 beforeEach(() => {
   vi.resetAllMocks();
   api.list.mockResolvedValue(CATALOG);
+  storage.raw.removeAllWithPrefix('checkpoint:');
+  resetPrefsForTests();
 });
 
 describe('painéis de contagem (CA-79)', () => {
@@ -480,5 +484,63 @@ describe('sem conexão (pwa-e-mobile CA-23, CA-24)', () => {
     expect(
       within(screen.getByRole('list', { name: 'Jogos' })).getByText('Celeste'),
     ).toBeInTheDocument();
+  });
+});
+
+describe('preferências do /perfil no catálogo (perfil CA-16, CA-17)', () => {
+  function comPrefs(parcial: Parameters<typeof alterarPrefs>[0]) {
+    definirUsuario('u1');
+    alterarPrefs(parcial);
+  }
+
+  it('filtro inicial Jogando: "/" vira "/?status=JOGANDO" e só aparecem os jogando', async () => {
+    comPrefs({ filtroInicial: 'JOGANDO' });
+    renderPage('/');
+
+    await waitFor(() => expect(screen.getByTestId('search')).toHaveTextContent('?status=JOGANDO'));
+    expect(await screen.findByText('Hollow Knight')).toBeInTheDocument();
+    expect(titles()).toEqual(['Hollow Knight']);
+  });
+
+  it('com filtro inicial diferente de Todos, "Todos" grava ?status=TODOS e mostra todos', async () => {
+    comPrefs({ filtroInicial: 'JOGANDO' });
+    const user = renderPage('/');
+    await screen.findByText('Hollow Knight');
+
+    await user.click(filterButton(/Todos/));
+
+    await waitFor(() => expect(screen.getByTestId('search')).toHaveTextContent('?status=TODOS'));
+    expect(rows()).toHaveLength(4);
+  });
+
+  it('um link direto /?status=ZERADO é respeitado', async () => {
+    comPrefs({ filtroInicial: 'JOGANDO' });
+    renderPage('/?status=ZERADO');
+
+    await screen.findByText('Celeste');
+    expect(screen.getByTestId('search')).toHaveTextContent('?status=ZERADO');
+    expect(titles()).toEqual(['Celeste', 'Hades']);
+  });
+
+  it('densidade Compacta: capas 40x40 e ações ainda 44x44', async () => {
+    comPrefs({ densidade: 'compacta' });
+    renderPage('/');
+
+    await screen.findByText('Celeste');
+    for (const row of rows()) {
+      expect(row).toHaveAttribute('data-densidade', 'compacta');
+      expect(row.querySelector('[data-cover]')).toHaveClass('size-10');
+      for (const acao of within(row).getAllByRole('button')) {
+        expect(acao).toHaveClass('size-11');
+      }
+    }
+  });
+
+  it('densidade padrão (Confortável): capas 52x52', async () => {
+    renderPage('/');
+
+    await screen.findByText('Celeste');
+    expect(rows()[0]).toHaveAttribute('data-densidade', 'confortavel');
+    expect(rows()[0]?.querySelector('[data-cover]')).toHaveClass('size-[52px]');
   });
 });

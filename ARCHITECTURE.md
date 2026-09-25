@@ -396,7 +396,9 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
 - **Tema Neon arcade:** todos os tokens de cor (e os únicos hex do web) ficam no `@theme` de
   `src/styles/index.css`; componentes usam só as classes (`bg-fundo`, `text-ouro`...) e os brilhos são
   `color-mix()` dos tokens. Status: Zerado = `ouro`, Jogando = `ciano`, Quero jogar = `vermelho-neon`.
-  `prefers-reduced-motion: reduce` desliga todas as animações e transições. Fontes (Orbitron, Rajdhani)
+  O acento primário (logo, "Adicionar", diálogos, botões principais) é o token **`destaque`** (§5.12).
+  `prefers-reduced-motion: reduce` desliga todas as animações e transições (variante
+  `movimento-reduzido`, §5.12). Fontes (Orbitron, Rajdhani)
   e ícones (Material Symbols Rounded) vêm por `<link>` no `index.html`, sem pacote npm. O número da nota
   usa Rajdhani (a Orbitron deixa o 0 e o 8 ambíguos).
 - **Build de produção:** o `@checkpoint/shared/dist` é CommonJS e linkado; o `vite.config.ts` libera
@@ -569,12 +571,12 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
   (`lib/perfil-avisos.ts`: só um aviso conhecido é mostrado, em `role="status"`). As outras sessões caem no
   servidor; o outro navegador descobre na próxima request (401 → `/login?motivo=sessao`).
 
-### 5.11 Perfil (`features/perfil/`, `pages/PerfilPage.tsx`, spec `docs/specs/perfil.md`, etapas 1 e 2)
+### 5.11 Perfil (`features/perfil/`, `pages/PerfilPage.tsx`, spec `docs/specs/perfil.md`, etapas 1 a 3)
 
 - **`/perfil`** (dentro do `RequireAuth` + `AppLayout`): cabeçalho, seção **Conta** ("Salvo na sua conta":
-  Trocar senha → `/perfil/senha`, Sessões ativas, Sair; **sem repetir o nome**, que é editável no cabeçalho)
-  e seção **App** ("Instalar app", só quando dá). Empilhado abaixo de
-  1024px e em duas colunas (`lg:grid-cols-2`) a partir de 1024px.
+  Trocar senha → `/perfil/senha`, Sessões ativas, Sair; **sem repetir o nome**, que é editável no cabeçalho),
+  seção **App** ("Instalar app", só quando dá) e **Preferências deste aparelho** (§5.12). Empilhado abaixo de
+  1024px e em duas colunas (`lg:grid-cols-2`: conta e app | preferências) a partir de 1024px.
 - **Cabeçalho** (`PerfilCabecalho`): avatar de iniciais 64 × 64 com a mesma regra da capa gerada dos jogos
   aplicada ao nome (**`shared/lib/game-cover.ts`**, movido de `features/games/lib` por servir às duas
   features: cor da paleta `capa-1` a `capa-6` por hash FNV-1a do texto aparado e em minúsculas, e as
@@ -605,6 +607,50 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
   validação local, erros da API, instalar só quando aplicável, ordem da seção Conta),
   `features/perfil/components/SessoesAtivas.test.tsx` (selo, botão só nas outras, confirmação com N, escondido
   sem outras, erros por `code`), `features/perfil/lib/resumo.test.ts` e `features/perfil/lib/sessoes.test.ts`.
+
+### 5.12 Preferências deste aparelho (`shared/lib/prefs/`, spec `docs/specs/perfil.md`, etapa 3)
+
+- **Nunca vão para a API**: ficam só neste navegador, **por usuário**. Uma chave só, **`checkpoint:prefs`**
+  (`prefs.ts`, `defineKey`, escopo **`dispositivo`**: sobrevive ao logout), com o valor
+  `{ ultimoUsuario, porUsuario: { [userId]: Prefs } }`. O validador da chave só confere a forma; cada entrada é
+  validada na leitura (`prefsDoUsuario`): a entrada inválida de um usuário volta aos padrões **só para ele**.
+  JSON corrompido → padrões (a chave sai); armazenamento bloqueado → o módulo de storage guarda em memória e a
+  escolha vale até recarregar.
+- **As cinco** (padrão primeiro): cor de destaque (magenta, violeta, azul, laranja), filtro inicial (Todos,
+  Jogando, Quero jogar, Zerado), densidade (confortável, compacta), efeitos (completos, reduzidos) e até
+  **8** plataformas favoritas.
+- **Store** (`prefs-store.ts` + `shared/hooks/use-prefs.ts`, `useSyncExternalStore`): `iniciarPrefs()` roda no
+  `main.tsx` **depois das migrações e antes do `createRoot`** e aplica as de `ultimoUsuario` no `<html>`
+  (sem piscar em magenta); o **`app/PrefsSync.tsx`** (nos providers) chama `definirUsuario` quando a sessão
+  resolve, e aí valem as de quem entrou (que vira o `ultimoUsuario`). Sair não troca a aparência.
+  `alterarPrefs` só grava com alguém logado.
+- **Cor de destaque sem hex novo:** `@theme` tem `--color-destaque: var(--color-magenta)`, e
+  `html[data-destaque='violeta'|'azul'|'laranja']` o aponta para `capa-6`, `capa-1` e `capa-3`. Texto `fundo`
+  sobre o destaque: magenta 6,28:1, violeta 7,47:1, azul 9,64:1, laranja 8,98:1 (`tokens.test.ts` confere
+  ≥ 4,5:1). Usam `destaque`: logo (`glow-logo`, `glow-text-destaque`), "Adicionar" (barra e topo, pulso
+  `neon-pulse`), borda e brilho dos diálogos, botões principais (login/registro, Salvar). **Não** mudam: status,
+  o `ciano` do filtro ativo, a barra de nota e o orbe do fundo.
+- **Efeitos "Reduzidos":** as regras de movimento reduzido estão **uma vez só**, na variante do Tailwind
+  `@custom-variant movimento-reduzido` com dois ramos: `@media (prefers-reduced-motion: reduce)` e
+  `:root[data-efeitos='reduzidos'] &`. Além disso, `html[data-efeitos='reduzidos']` esconde `.orb` e
+  `.scanlines`. O ramo do atributo **não alcança `::before`/`::after`** (pseudo-elemento não entra no
+  `:is()` gerado); nenhum pseudo-elemento do app anima, e o `tokens.test.ts` falha se algum passar a animar.
+- **Filtro inicial** (`features/games/lib/initial-filter.ts`): abrir `/` sem `?status=` (inclusive pelo item
+  "Jogos") troca a URL por `/?status=<filtro>` com `replace`, no mesmo efeito da `GamesPage` que trata o
+  `?novo=1` (dois `setSearchParams` seguidos se sobrescreveriam), e o 1º render já filtra. Com filtro inicial
+  diferente de Todos, "Todos" grava `?status=TODOS` (lido como Todos). Parâmetro explícito é respeitado.
+- **Densidade compacta:** `GameRow` com `game-row-compacta` (capa `GameCover` `compacta` 40 × 40, menos espaço)
+  e a legenda "Nota" some em ≥ 768px (a barra fica numa linha); ações continuam 44 × 44.
+- **Favoritas:** `groupsWithFavorites` (`features/games/lib/platforms.ts`) põe o grupo "Favoritas" primeiro
+  e as tira do grupo da família (sem opção repetida); o `PlatformField` recebe as favoritas do `GameForm`.
+- **Tela** (`features/perfil/components/PreferenciasAparelho.tsx` + `GrupoOpcoes.tsx`): cada escolha é um
+  `radiogroup` de botões `role="radio"` com `aria-checked` (Tab só na marcada; setas trocam e marcam); as
+  plataformas são caixas de seleção por família, e a 9ª mostra "Até 8 favoritas" e não é marcada. Muda na
+  hora, sem Salvar.
+- **Testes:** `shared/lib/prefs/prefs.test.ts` (validador, por usuário, corrompido, bloqueado),
+  `apply-prefs.test.ts` (atributos no `<html>` antes do render, ordem no `main.tsx`), `app/PrefsSync.test.tsx`,
+  `features/games/lib/initial-filter.test.ts`, `features/games/components/PlatformField.test.tsx`,
+  acréscimos em `styles/tokens.test.ts`, `pages/PerfilPage.test.tsx` e `pages/GamesPage.test.tsx`.
 
 ---
 

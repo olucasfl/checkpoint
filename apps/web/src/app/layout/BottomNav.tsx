@@ -45,7 +45,7 @@ export function BottomNav() {
                 <button
                   type="button"
                   onClick={() => navigate(newGameHref(location.pathname, location.search))}
-                  className={`${ITEM} border-0 bg-transparent text-magenta`}
+                  className={`${ITEM} border-0 bg-transparent text-destaque`}
                 >
                   <Icon name={item.icon} size={26} filled />
                   {item.label}

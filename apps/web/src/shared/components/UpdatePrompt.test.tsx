@@ -127,8 +127,12 @@ describe('UpdatePrompt', () => {
 
     expect(css).toMatch(/\.update-in\s*\{[^}]*animation:\s*update-in/);
     expect(css).toMatch(/@keyframes update-in\b/);
+    // A regra global fica numa variante com dois gatilhos: o do sistema (este) e o do /perfil.
     expect(css).toMatch(
-      /@media \(prefers-reduced-motion: reduce\)\s*\{[^}]*\*,[^}]*animation:\s*none !important/,
+      /@custom-variant movimento-reduzido\s*\{\s*@media \(prefers-reduced-motion: reduce\)/,
+    );
+    expect(css).toMatch(
+      /\*,\s*\*::before,\s*\*::after\s*\{\s*@variant movimento-reduzido\s*\{[^}]*animation:\s*none !important/,
     );
   });
 });

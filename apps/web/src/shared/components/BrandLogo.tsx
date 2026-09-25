@@ -4,10 +4,10 @@ import { Icon } from '@/shared/components/Icon';
 export function BrandLogo() {
   return (
     <div className="flex items-center justify-center gap-3">
-      <div className="glow-logo grid size-10 place-items-center rounded-md border border-magenta text-magenta">
+      <div className="glow-logo grid size-10 place-items-center rounded-md border border-destaque text-destaque">
         <Icon name="flag" size={26} filled />
       </div>
-      <span className="glow-text-magenta font-display text-[22px] font-extrabold tracking-[0.14em]">
+      <span className="glow-text-destaque font-display text-[22px] font-extrabold tracking-[0.14em]">
         CHECKPOINT
       </span>
     </div>

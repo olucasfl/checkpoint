@@ -3,6 +3,8 @@ import { Icon } from '@/shared/components/Icon';
 
 interface RatingBarProps {
   nota: number | null;
+  /** Densidade compacta (preferência do /perfil): em >= 768px, sem a legenda, a barra fica numa linha só. */
+  compacta?: boolean;
 }
 
 const SEGMENTS = Array.from({ length: GAME_RATING_MAX }, (_, index) => index);
@@ -13,7 +15,7 @@ const SEGMENTS = Array.from({ length: GAME_RATING_MAX }, (_, index) => index);
  * barra e o 8 fica ambíguo). Nota 0 = nenhum segmento preenchido e o "0". Vazia = "SEM NOTA". Os
  * segmentos vazios usam `apagado` (só decorativo: o número diz a nota).
  */
-export function RatingBar({ nota }: RatingBarProps) {
+export function RatingBar({ nota, compacta = false }: RatingBarProps) {
   if (nota === null) {
     return (
       <span className="flex items-center gap-1.5 text-[15px] font-semibold tracking-[0.16em] text-texto-suave">
@@ -25,7 +27,9 @@ export function RatingBar({ nota }: RatingBarProps) {
 
   return (
     <div className="flex flex-col gap-1">
-      <span className="text-[11px] font-bold uppercase leading-none tracking-[0.22em] text-texto-suave">
+      <span
+        className={`text-[11px] font-bold uppercase leading-none tracking-[0.22em] text-texto-suave ${compacta ? 'md:hidden' : ''}`}
+      >
         Nota
       </span>
       <div className="flex items-center gap-3">

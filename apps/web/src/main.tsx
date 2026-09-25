@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { AppProviders } from '@/app/providers';
 import { AppRouter } from '@/app/router';
 import { connectivity } from '@/shared/lib/connectivity';
+import { iniciarPrefs } from '@/shared/lib/prefs/prefs-store';
 import { registrarDiaDeUso } from '@/shared/lib/pwa/usage-days';
 import { runStorageMigrations } from '@/shared/lib/storage/migrations';
 import '@/shared/lib/api-client';
@@ -17,6 +18,8 @@ if (!container) {
 
 // Antes do primeiro render: nenhuma tela lê o armazenamento local com o formato antigo.
 runStorageMigrations();
+// Cor de destaque e efeitos de quem usou por último, antes do 1º render: sem piscar em magenta.
+iniciarPrefs();
 // Depois das migrações (que podem apagar `checkpoint:*`) e antes do render, que lê a contagem.
 registrarDiaDeUso();
 connectivity.start();

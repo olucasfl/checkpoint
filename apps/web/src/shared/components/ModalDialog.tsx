@@ -38,7 +38,7 @@ export function ModalDialog({ open, onClose, labelledBy, children }: ModalDialog
       ref={ref}
       aria-labelledby={labelledBy}
       onClose={onClose}
-      className="modal glow-dialog border border-magenta bg-painel p-0 text-texto"
+      className="modal glow-dialog border border-destaque bg-painel p-0 text-texto"
     >
       {open ? children : null}
     </dialog>

@@ -141,3 +141,75 @@ describe('mobile-first (pwa-e-mobile, etapa 1)', () => {
     );
   });
 });
+
+describe('cor de destaque e efeitos reduzidos (perfil, etapa 3)', () => {
+  const theme = css.match(/@theme\s*\{[\s\S]*?\n\}/)?.[0] ?? '';
+  const hexDoToken = (nome: string) =>
+    theme.match(new RegExp(`--color-${nome}:\\s*(#[0-9a-fA-F]{6})`))?.[1] ?? '';
+
+  /** Contraste WCAG 2.x entre duas cores hex (a mesma fórmula da tabela da spec do catálogo). */
+  function contraste(a: string, b: string): number {
+    const luminancia = (hex: string) => {
+      const [r, g, bl] = [1, 3, 5].map((i) => {
+        const c = parseInt(hex.slice(i, i + 2), 16) / 255;
+        return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+      });
+      return 0.2126 * (r as number) + 0.7152 * (g as number) + 0.0722 * (bl as number);
+    };
+    const [claro, escuro] = [luminancia(a), luminancia(b)].sort((x, y) => y - x);
+    return ((claro as number) + 0.05) / ((escuro as number) + 0.05);
+  }
+
+  const DESTAQUES = { magenta: 'magenta', violeta: 'capa-6', azul: 'capa-1', laranja: 'capa-3' };
+
+  it('`destaque` só aponta para tokens que já existem no @theme (nenhum hex novo)', () => {
+    expect(theme).toMatch(/--color-destaque:\s*var\(--color-magenta\)/);
+    for (const [valor, token] of Object.entries(DESTAQUES).slice(1)) {
+      expect(css, valor).toMatch(
+        new RegExp(
+          `html\\[data-destaque='${valor}'\\]\\s*\\{\\s*--color-destaque:\\s*var\\(--color-${token}\\)`,
+        ),
+      );
+    }
+    const alvos = [...css.matchAll(/--color-destaque:\s*var\(--color-([a-z0-9-]+)\)/g)].map(
+      (m) => m[1],
+    );
+    for (const token of alvos) {
+      expect(hexDoToken(token as string), token).toMatch(/^#/);
+    }
+  });
+
+  it.each(Object.entries(DESTAQUES))(
+    'texto `fundo` sobre o destaque %s passa de 4,5:1 (CA-23)',
+    (_valor, token) => {
+      expect(contraste(hexDoToken('fundo'), hexDoToken(token))).toBeGreaterThanOrEqual(4.5);
+    },
+  );
+
+  it('os efeitos "Reduzidos" estão na MESMA variante das regras de movimento (um seletor a mais)', () => {
+    const variante = css.match(/@custom-variant movimento-reduzido\s*\{[\s\S]*?\n\}/)?.[0] ?? '';
+
+    expect(variante).toMatch(/@media \(prefers-reduced-motion: reduce\)\s*\{\s*@slot;/);
+    expect(variante).toMatch(/:root\[data-efeitos='reduzidos'\] &\s*\{\s*@slot;/);
+    expect(css).toMatch(
+      /\*,\s*\*::before,\s*\*::after\s*\{\s*@variant movimento-reduzido\s*\{[^}]*animation:\s*none !important;[^}]*transition:\s*none !important/,
+    );
+    expect(css).toMatch(/\.cta-pulse\s*\{\s*@variant movimento-reduzido\s*\{[^}]*box-shadow/);
+  });
+
+  it('efeitos "Reduzidos" escondem orbes e scanlines (CA-18)', () => {
+    expect(css).toMatch(
+      /html\[data-efeitos='reduzidos'\]\s*:is\(\.orb,\s*\.scanlines\)\s*\{\s*display:\s*none/,
+    );
+  });
+
+  it('nenhum pseudo-elemento anima: o ramo do atributo não os alcança', () => {
+    const regras = [...css.matchAll(/([^{}]*::?(?:before|after)[^{}]*)\{([^{}]*)\}/g)];
+    const animados = regras.filter(
+      ([, seletor, corpo]) =>
+        /animation|transition/.test(corpo as string) && !/\*::before/.test(seletor as string),
+    );
+
+    expect(animados.map(([, seletor]) => (seletor as string).trim())).toEqual([]);
+  });
+});

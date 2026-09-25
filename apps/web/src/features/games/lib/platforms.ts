@@ -37,6 +37,27 @@ export function isKnownPlatform(platform: string): boolean {
   return KNOWN.has(platform);
 }
 
+/** Rótulo do grupo das plataformas favoritas (preferência do /perfil), o primeiro da seleção. */
+export const FAVORITAS_LABEL = 'Favoritas';
+
+/**
+ * Os grupos da seleção com as favoritas primeiro. Cada favorita SAI do grupo da família dela (sem
+ * opção repetida); família que fica vazia some. Favorita fora da lista (não deveria acontecer) é
+ * ignorada: a lista é a fonte das opções.
+ */
+export function groupsWithFavorites(favoritas: readonly string[]): readonly PlatformGroup[] {
+  const escolhidas = favoritas.filter((p, i) => isKnownPlatform(p) && favoritas.indexOf(p) === i);
+  if (escolhidas.length === 0) {
+    return PLATFORM_GROUPS;
+  }
+  const marcadas = new Set(escolhidas);
+  const familias = PLATFORM_GROUPS.map((group) => ({
+    label: group.label,
+    platforms: group.platforms.filter((p) => !marcadas.has(p)),
+  })).filter((group) => group.platforms.length > 0);
+  return [{ label: FAVORITAS_LABEL, platforms: escolhidas }, ...familias];
+}
+
 /**
  * Plataformas de um jogo que já existe e não estão na lista (cadastradas como texto livre antes,
  * ou direto pela API): mantidas como opção extra para a edição não apagar o valor sem querer.

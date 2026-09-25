@@ -1,11 +1,13 @@
 import { Icon } from '@/shared/components/Icon';
-import { extraPlatform, PLATFORM_GROUPS } from '../lib/platforms';
+import { extraPlatform, groupsWithFavorites } from '../lib/platforms';
 import { Field, FieldError, inputClass, LABEL } from '@/shared/components/form-parts';
 
 interface PlatformFieldProps {
   value: string;
   error: string | undefined;
   onChange: (value: string) => void;
+  /** Plataformas favoritas (preferência do /perfil): vêm primeiro, num grupo próprio. */
+  favoritas?: readonly string[];
 }
 
 /**
@@ -13,8 +15,9 @@ interface PlatformFieldProps {
  * plataforma" é a primeira opção e o padrão. `<select>` nativo, sem biblioteca; a seta é própria
  * para combinar com o tema escuro.
  */
-export function PlatformField({ value, error, onChange }: PlatformFieldProps) {
+export function PlatformField({ value, error, onChange, favoritas = [] }: PlatformFieldProps) {
   const extra = extraPlatform(value);
+  const groups = groupsWithFavorites(favoritas);
 
   return (
     <Field>
@@ -32,7 +35,7 @@ export function PlatformField({ value, error, onChange }: PlatformFieldProps) {
           className={`${inputClass(Boolean(error))} w-full appearance-none pr-11`}
         >
           <option value="">Sem plataforma</option>
-          {PLATFORM_GROUPS.map((group) => (
+          {groups.map((group) => (
             <optgroup key={group.label} label={group.label}>
               {group.platforms.map((platform) => (
                 <option key={platform} value={platform}>

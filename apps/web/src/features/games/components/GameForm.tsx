@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { type Game, type GameStatus } from '@checkpoint/shared';
 import { Icon } from '@/shared/components/Icon';
+import { usePrefs } from '@/shared/hooks/use-prefs';
 import { useSaveGame } from '../api/use-games';
 import { describeError, forForm, type FormError } from '../lib/api-error';
 import {
@@ -40,6 +41,7 @@ export function GameForm({ game, onDone, onCancel }: GameFormProps) {
   const [removing, setRemoving] = useState(false);
   const [error, setError] = useState<FormError>(NO_ERROR);
   const mutation = useSaveGame();
+  const { plataformasFavoritas } = usePrefs();
 
   const editing = saved !== undefined;
   const { fields } = error;
@@ -116,7 +118,7 @@ export function GameForm({ game, onDone, onCancel }: GameFormProps) {
             name={editing ? 'edit_square' : 'add_box'}
             size={26}
             filled
-            className="text-magenta"
+            className="text-destaque"
           />
           {editing ? 'EDITAR JOGO' : 'NOVO JOGO'}
         </h2>
@@ -152,6 +154,7 @@ export function GameForm({ game, onDone, onCancel }: GameFormProps) {
         value={values.plataforma}
         error={fields.plataforma}
         onChange={(value) => setField('plataforma', value)}
+        favoritas={plataformasFavoritas}
       />
 
       <div className="flex flex-col gap-2">
@@ -197,7 +200,7 @@ export function GameForm({ game, onDone, onCancel }: GameFormProps) {
         <button
           type="submit"
           disabled={mutation.isPending}
-          className="glow-primary min-h-12 rounded-[4px] bg-magenta px-[22px] font-display text-[13px] font-extrabold tracking-[0.1em] text-fundo disabled:opacity-70"
+          className="glow-primary min-h-12 rounded-[4px] bg-destaque px-[22px] font-display text-[13px] font-extrabold tracking-[0.1em] text-fundo disabled:opacity-70"
         >
           {mutation.isPending ? 'SALVANDO…' : 'SALVAR'}
         </button>

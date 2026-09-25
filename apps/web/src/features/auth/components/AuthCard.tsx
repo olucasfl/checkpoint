@@ -19,9 +19,9 @@ export function AuthCard({ title, children }: AuthCardProps) {
   );
 }
 
-/** O botão principal do cartão: `magenta` com texto `fundo`, altura de 52 px. */
+/** O botão principal do cartão: `destaque` com texto `fundo`, altura de 52 px. */
 export const PRIMARY_BUTTON =
-  'h-[52px] w-full rounded-[4px] bg-magenta px-6 font-display text-sm font-extrabold uppercase tracking-[0.1em] text-fundo disabled:cursor-wait disabled:opacity-60';
+  'h-[52px] w-full rounded-[4px] bg-destaque px-6 font-display text-sm font-extrabold uppercase tracking-[0.1em] text-fundo disabled:cursor-wait disabled:opacity-60';
 
 /** Link secundário do cartão ("Criar conta", "Já tenho conta"), com alvo de 44 px. */
 export const SECONDARY_LINK =

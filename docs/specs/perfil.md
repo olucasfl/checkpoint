@@ -230,24 +230,24 @@ Ana; `C` = Bia). UI contra `http://localhost:5173`. Dados sintéticos.
 
 ### Etapa 2 — sessões ativas
 
-- [ ] **CA-08** — **Dado** Ana logada em A e B, **quando** `GET /api/auth/sessoes` pelo A, **então** 200 com 2 itens, o primeiro com `atual: true`, e cada item com exatamente as chaves `id`, `dispositivo`, `criadoEm`, `ultimoUsoEm`, `atual`.
-- [ ] **CA-09** — **Dado** o id da sessão B, **quando** `DELETE /api/auth/sessoes/<idB>` pelo A, **então** 204; em B, `GET /auth/me` → 401 `AUTH_SESSAO_ENCERRADA` imediatamente e `refresh` → 401.
-- [ ] **CA-10** — **Dado** Ana em A, **quando** `DELETE` no id da **própria** sessão A, **então** 400 `SESSAO_ATUAL`; **no id de uma sessão da Bia**, **então** 404 `SESSAO_NAO_ENCONTRADA` e a sessão da Bia continua; **em `abc`**, **então** 400.
-- [ ] **CA-11** — **Dado** Ana com 3 sessões, **quando** `DELETE /api/auth/sessoes` pelo A, **então** 200 `{"encerradas":2}` e só A continua; repetindo → `{"encerradas":0}`.
-- [ ] **CA-12** — **Dado** `/perfil` com duas sessões, **quando** olho a lista, **então** a atual tem "Este aparelho" e nenhum botão, a outra tem **Encerrar**; **quando** clico **Encerrar**, **então** ela some da lista, e o outro navegador vai para `/login?motivo=sessao` na próxima ação.
-- [ ] **CA-13** — **Dado** três sessões, **quando** clico **Encerrar todas as outras** e confirmo, **então** sobra só "Este aparelho" e o botão some; **quando** cancelo, **então** nada muda.
+- [x] **CA-08** — **Dado** Ana logada em A e B, **quando** `GET /api/auth/sessoes` pelo A, **então** 200 com 2 itens, o primeiro com `atual: true`, e cada item com exatamente as chaves `id`, `dispositivo`, `criadoEm`, `ultimoUsoEm`, `atual`.
+- [x] **CA-09** — **Dado** o id da sessão B, **quando** `DELETE /api/auth/sessoes/<idB>` pelo A, **então** 204; em B, `GET /auth/me` → 401 `AUTH_SESSAO_ENCERRADA` imediatamente e `refresh` → 401.
+- [x] **CA-10** — **Dado** Ana em A, **quando** `DELETE` no id da **própria** sessão A, **então** 400 `SESSAO_ATUAL`; **no id de uma sessão da Bia**, **então** 404 `SESSAO_NAO_ENCONTRADA` e a sessão da Bia continua; **em `abc`**, **então** 400.
+- [x] **CA-11** — **Dado** Ana com 3 sessões, **quando** `DELETE /api/auth/sessoes` pelo A, **então** 200 `{"encerradas":2}` e só A continua; repetindo → `{"encerradas":0}`.
+- [x] **CA-12** — **Dado** `/perfil` com duas sessões, **quando** olho a lista, **então** a atual tem "Este aparelho" e nenhum botão, a outra tem **Encerrar**; **quando** clico **Encerrar**, **então** ela some da lista, e o outro navegador vai para `/login?motivo=sessao` na próxima ação.
+- [x] **CA-13** — **Dado** três sessões, **quando** clico **Encerrar todas as outras** e confirmo, **então** sobra só "Este aparelho" e o botão some; **quando** cancelo, **então** nada muda.
 
 ### Etapa 3 — preferências do aparelho
 
-- [ ] **CA-14** — **Dado** `/perfil`, **quando** escolho Violeta, **então** o logo, o item "Adicionar" da barra (ou o botão "Adicionar jogo" em desktop) e a borda do diálogo ficam violeta na hora; os selos de status e o filtro ativo **não** mudam; **e** nenhuma request sai (Network).
-- [ ] **CA-15** — **Dado** Violeta escolhida, **quando** recarrego `/` com a rede em "Slow 4G", **então** o primeiro quadro já mostra o logo violeta (DevTools → Performance, capturas de tela), sem piscar em magenta.
-- [ ] **CA-16** — **Dado** filtro inicial "Jogando", **quando** toco em "Jogos" na barra ou abro `/`, **então** a URL vira `/?status=JOGANDO` e só aparecem jogos Jogando; **quando** clico em "Todos", **então** a URL vira `/?status=TODOS`, aparecem todos, e recarregar mantém Todos; **e** um link direto `/?status=ZERADO` é respeitado.
-- [ ] **CA-17** — **Dado** densidade Compacta e 10 jogos, **quando** abro `/`, **então** as capas medem 40 × 40, a lista fica mais baixa que na Confortável, e as ações da linha continuam com ≥ 44 × 44 px.
+- [x] **CA-14** — **Dado** `/perfil`, **quando** escolho Violeta, **então** o logo, o item "Adicionar" da barra (ou o botão "Adicionar jogo" em desktop) e a borda do diálogo ficam violeta na hora; os selos de status e o filtro ativo **não** mudam; **e** nenhuma request sai (Network).
+- [x] **CA-15** — **Dado** Violeta escolhida, **quando** recarrego `/` com a rede em "Slow 4G", **então** o primeiro quadro já mostra o logo violeta (DevTools → Performance, capturas de tela), sem piscar em magenta.
+- [x] **CA-16** — **Dado** filtro inicial "Jogando", **quando** toco em "Jogos" na barra ou abro `/`, **então** a URL vira `/?status=JOGANDO` e só aparecem jogos Jogando; **quando** clico em "Todos", **então** a URL vira `/?status=TODOS`, aparecem todos, e recarregar mantém Todos; **e** um link direto `/?status=ZERADO` é respeitado.
+- [x] **CA-17** — **Dado** densidade Compacta e 10 jogos, **quando** abro `/`, **então** as capas medem 40 × 40, a lista fica mais baixa que na Confortável, e as ações da linha continuam com ≥ 44 × 44 px.
 - [ ] **CA-18** — **Dado** efeitos Reduzidos e o sistema **sem** `prefers-reduced-motion`, **quando** abro `/`, **então** não há orbes nem _scanlines_, e nenhuma animação roda (o pulso do botão, o ponto do "Jogando", o tremor do campo com erro).
-- [ ] **CA-19** — **Dado** favoritas PS5 e Nintendo Switch, **quando** abro o formulário de jogo, **então** a Plataforma começa pelo grupo "Favoritas" com as duas, que não aparecem de novo nos grupos PlayStation e Nintendo; **quando** tento marcar a 9ª favorita, **então** vejo "Até 8 favoritas" e ela não é marcada.
-- [ ] **CA-20** — **Dado** Ana com Violeta, **quando** ela sai e Bia entra no mesmo navegador, **então** Bia vê Magenta (padrão); **quando** Bia sai e Ana entra, **então** Ana vê Violeta de novo.
-- [ ] **CA-21** — **Dado** `checkpoint:prefs` corrompida à mão, **quando** recarrego, **então** o app abre com os padrões, sem erro na tela.
-- [ ] **CA-22** — **Dado** o storage bloqueado no navegador, **quando** mudo a cor, **então** ela vale até recarregar, sem erro.
+- [x] **CA-19** — **Dado** favoritas PS5 e Nintendo Switch, **quando** abro o formulário de jogo, **então** a Plataforma começa pelo grupo "Favoritas" com as duas, que não aparecem de novo nos grupos PlayStation e Nintendo; **quando** tento marcar a 9ª favorita, **então** vejo "Até 8 favoritas" e ela não é marcada.
+- [x] **CA-20** — **Dado** Ana com Violeta, **quando** ela sai e Bia entra no mesmo navegador, **então** Bia vê Magenta (padrão); **quando** Bia sai e Ana entra, **então** Ana vê Violeta de novo.
+- [x] **CA-21** — **Dado** `checkpoint:prefs` corrompida à mão, **quando** recarrego, **então** o app abre com os padrões, sem erro na tela.
+- [x] **CA-22** — **Dado** o storage bloqueado no navegador, **quando** mudo a cor, **então** ela vale até recarregar, sem erro.
 - [ ] **CA-23** — **Dado** as quatro cores de destaque, **quando** confiro com um verificador de contraste o texto `fundo` sobre o preenchimento `destaque` (botão principal), **então** todas dão ≥ 4,5:1; **e** o CA-87 do catálogo continua passando (nenhum hex fora do `@theme`).
 
 ### Etapa 4 — excluir conta

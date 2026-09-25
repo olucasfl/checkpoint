@@ -9,6 +9,9 @@ import { entrar, getSession, resetSessionForTests } from '@/features/auth/sessio
 import { gamesApi } from '@/features/games/api/games-api';
 import { perfilApi } from '@/features/perfil/api/perfil-api';
 import { coverBackground } from '@/shared/lib/game-cover';
+import { PREFS } from '@/shared/lib/prefs/prefs';
+import { definirUsuario, resetPrefsForTests } from '@/shared/lib/prefs/prefs-store';
+import { storage } from '@/shared/lib/storage/storage';
 import { ehSafariIos, estaInstalado } from '@/shared/lib/pwa/display';
 import { pedirInstalacao, podeInstalar } from '@/shared/lib/pwa/install-prompt';
 import { PerfilPage } from './PerfilPage';
@@ -84,6 +87,10 @@ beforeEach(() => {
   vi.mocked(podeInstalar).mockReturnValue(false);
   vi.mocked(ehSafariIos).mockReturnValue(false);
   vi.mocked(estaInstalado).mockReturnValue(false);
+  storage.raw.removeAllWithPrefix('checkpoint:');
+  resetPrefsForTests();
+  // No app, o PrefsSync faz isto quando a sessão resolve.
+  definirUsuario(ANA.id);
 });
 
 describe('cabeçalho (CA-01)', () => {
@@ -304,5 +311,93 @@ describe('"Instalar app" só quando dá para instalar (CA-06)', () => {
 
     expect(screen.getByRole('status')).toHaveTextContent('Adicionar à Tela de Início');
     expect(pedirInstalacao).not.toHaveBeenCalled();
+  });
+});
+
+describe('preferências deste aparelho (perfil, etapa 3)', () => {
+  const secao = () => screen.getByRole('region', { name: 'Preferências deste aparelho' });
+  const grupo = (nome: string) => within(secao()).getByRole('radiogroup', { name: nome });
+
+  it('a seção com a legenda e as quatro escolhas nos padrões da spec', () => {
+    renderPerfil();
+
+    expect(within(secao()).getByText('Salvas só neste aparelho')).toBeInTheDocument();
+    const marcada = (nome: string) =>
+      within(grupo(nome)).getByRole('radio', { checked: true }).textContent;
+    expect(marcada('Cor de destaque')).toBe('Magenta');
+    expect(marcada('Filtro inicial do catálogo')).toBe('Todos');
+    expect(marcada('Densidade da lista')).toBe('Confortável');
+    expect(marcada('Efeitos visuais')).toBe('Completos');
+    expect(
+      within(grupo('Cor de destaque'))
+        .getAllByRole('radio')
+        .map((r) => r.textContent),
+    ).toEqual(['Magenta', 'Violeta', 'Azul', 'Laranja']);
+  });
+
+  it('escolher Violeta muda na hora (aria-checked e <html>) e NÃO faz nenhuma request (CA-14)', async () => {
+    const user = renderPerfil();
+    await within(cabecalho()).findByText(/3 jogos/);
+    const contagem = () =>
+      [perfil.atualizar, perfil.listarSessoes, games.list].map((fn) => fn.mock.calls.length);
+    const antes = contagem();
+
+    await user.click(within(grupo('Cor de destaque')).getByRole('radio', { name: 'Violeta' }));
+
+    expect(
+      within(grupo('Cor de destaque')).getByRole('radio', { name: 'Violeta' }),
+    ).toHaveAttribute('aria-checked', 'true');
+    expect(document.documentElement.dataset.destaque).toBe('violeta');
+    expect(contagem()).toEqual(antes);
+    expect(within(secao()).queryByRole('button', { name: /salvar/i })).not.toBeInTheDocument();
+  });
+
+  it('fica gravada neste navegador, na entrada DESTE usuário', async () => {
+    const user = renderPerfil();
+
+    await user.click(within(grupo('Efeitos visuais')).getByRole('radio', { name: 'Reduzidos' }));
+    await user.click(within(grupo('Densidade da lista')).getByRole('radio', { name: 'Compacta' }));
+
+    const guardadas = storage.get(PREFS);
+    expect(guardadas.ultimoUsuario).toBe(ANA.id);
+    expect(guardadas.porUsuario[ANA.id]).toMatchObject({
+      efeitos: 'reduzidos',
+      densidade: 'compacta',
+    });
+    expect(document.documentElement.dataset.efeitos).toBe('reduzidos');
+  });
+
+  it('as setas trocam a opção marcada, como num grupo de rádios', async () => {
+    const user = renderPerfil();
+    const filtro = () => grupo('Filtro inicial do catálogo');
+
+    within(filtro()).getByRole('radio', { name: 'Todos' }).focus();
+    await user.keyboard('{ArrowRight}');
+
+    expect(within(filtro()).getByRole('radio', { name: 'Jogando' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+    expect(within(filtro()).getByRole('radio', { name: 'Jogando' })).toHaveFocus();
+  });
+
+  it('plataformas favoritas: até 8; a 9ª mostra "Até 8 favoritas" e não é marcada (CA-19)', async () => {
+    const user = renderPerfil();
+    const caixa = (nome: string) => within(secao()).getByRole('checkbox', { name: nome });
+    const oito = ['PC', 'PS5', 'PS4', 'Xbox One', 'Nintendo Switch', 'Wii', 'Android', 'iOS'];
+
+    for (const p of oito) {
+      await user.click(caixa(p));
+    }
+    await user.click(caixa('Mega Drive'));
+
+    expect(within(secao()).getByText('Até 8 favoritas')).toBeInTheDocument();
+    expect(caixa('Mega Drive')).not.toBeChecked();
+    expect(caixa('PS5')).toBeChecked();
+    expect(storage.get(PREFS).porUsuario[ANA.id]).toMatchObject({ plataformasFavoritas: oito });
+
+    await user.click(caixa('PC'));
+    expect(within(secao()).queryByText('Até 8 favoritas')).not.toBeInTheDocument();
+    expect(caixa('PC')).not.toBeChecked();
   });
 });

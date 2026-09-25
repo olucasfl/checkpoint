@@ -24,6 +24,9 @@
   --color-apagado: #5d5080;
   --color-apagado-2: #6e6194;
   --color-magenta: #ff3ea5;
+  /* Acento primário (logo, "Adicionar", diálogos, botão principal). Padrão magenta; a pessoa troca no
+     /perfil, só para tokens que já existem (html[data-destaque], abaixo). */
+  --color-destaque: var(--color-magenta);
   --color-ciano: #22d3ee;
   /* Status: Zerado = ouro (conquista), Jogando = ciano (ciano neon), Quero jogar = vermelho neon. */
   --color-ouro: #ffd000;
@@ -39,6 +42,26 @@
 
   --font-display: 'Orbitron', system-ui, sans-serif;
   --font-corpo: 'Rajdhani', system-ui, sans-serif;
+}
+
+/* Cor de destaque escolhida no /perfil (spec perfil, etapa 3). Só tokens existentes, sem hex novo;
+   o texto `fundo` sobre cada um passa de 4,5:1 (tokens.test.ts). */
+html[data-destaque='violeta'] {
+  --color-destaque: var(--color-capa-6);
+}
+
+html[data-destaque='azul'] {
+  --color-destaque: var(--color-capa-1);
+}
+
+html[data-destaque='laranja'] {
+  --color-destaque: var(--color-capa-3);
+}
+
+/* Efeitos "Reduzidos" do /perfil: sem orbes nem scanlines (as animações saem pela variante
+   movimento-reduzido, no fim do arquivo). */
+html[data-efeitos='reduzidos'] :is(.orb, .scanlines) {
+  display: none;
 }
 
 /* Tira o atraso do toque duplo (zoom por toque duplo) sem travar o zoom por pinça. */
@@ -160,6 +183,10 @@ button:disabled {
       'capa texto acoes'
       'capa selo acoes'
       'nota nota nota';
+  }
+
+  .game-row-compacta {
+    grid-template-columns: 40px minmax(0, 1fr) auto;
   }
 
   .game-row > [data-area='capa'] {
@@ -296,12 +323,12 @@ button:disabled {
   /* ---- Brilhos (sempre color-mix dos tokens, nunca hex ou rgba solto) ---- */
   .glow-logo {
     box-shadow:
-      0 0 18px color-mix(in srgb, var(--color-magenta) 35%, transparent),
-      inset 0 0 12px color-mix(in srgb, var(--color-magenta) 25%, transparent);
+      0 0 18px color-mix(in srgb, var(--color-destaque) 35%, transparent),
+      inset 0 0 12px color-mix(in srgb, var(--color-destaque) 25%, transparent);
   }
 
-  .glow-text-magenta {
-    text-shadow: 0 0 20px color-mix(in srgb, var(--color-magenta) 55%, transparent);
+  .glow-text-destaque {
+    text-shadow: 0 0 20px color-mix(in srgb, var(--color-destaque) 55%, transparent);
   }
 
   .glow-text-ouro {
@@ -337,11 +364,11 @@ button:disabled {
   }
 
   .glow-primary {
-    box-shadow: 0 0 20px color-mix(in srgb, var(--color-magenta) 50%, transparent);
+    box-shadow: 0 0 20px color-mix(in srgb, var(--color-destaque) 50%, transparent);
   }
 
   .glow-dialog {
-    box-shadow: 0 0 40px color-mix(in srgb, var(--color-magenta) 35%, transparent);
+    box-shadow: 0 0 40px color-mix(in srgb, var(--color-destaque) 35%, transparent);
   }
 
   .glow-error {
@@ -461,13 +488,13 @@ button:disabled {
   0%,
   100% {
     box-shadow:
-      0 0 0 1px var(--color-magenta),
-      0 0 16px color-mix(in srgb, var(--color-magenta) 45%, transparent);
+      0 0 0 1px var(--color-destaque),
+      0 0 16px color-mix(in srgb, var(--color-destaque) 45%, transparent);
   }
   50% {
     box-shadow:
-      0 0 0 1px var(--color-magenta),
-      0 0 34px color-mix(in srgb, var(--color-magenta) 85%, transparent);
+      0 0 0 1px var(--color-destaque),
+      0 0 34px color-mix(in srgb, var(--color-destaque) 85%, transparent);
   }
 }
 
@@ -521,18 +548,32 @@ button:disabled {
 /*
  * Movimento reduzido: TODAS as animações e transições saem. O estado estático equivalente fica:
  * ponto fixo, brilho do botão sem pulso e campo com erro só com a borda `erro` (sem tremer).
+ * Dois gatilhos para as MESMAS regras (escritas uma vez): o sistema pedir menos movimento, ou a pessoa
+ * escolher efeitos "Reduzidos" no /perfil. O ramo do atributo não alcança ::before/::after (pseudo-
+ * elemento não entra em :is()); nenhum pseudo-elemento do app anima (tokens.test.ts vigia).
  */
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
+@custom-variant movimento-reduzido {
+  @media (prefers-reduced-motion: reduce) {
+    @slot;
+  }
+  :root[data-efeitos='reduzidos'] & {
+    @slot;
+  }
+}
+
+*,
+*::before,
+*::after {
+  @variant movimento-reduzido {
     animation: none !important;
     transition: none !important;
   }
+}
 
-  .cta-pulse {
+.cta-pulse {
+  @variant movimento-reduzido {
     box-shadow:
-      0 0 0 1px var(--color-magenta),
-      0 0 22px color-mix(in srgb, var(--color-magenta) 60%, transparent);
+      0 0 0 1px var(--color-destaque),
+      0 0 22px color-mix(in srgb, var(--color-destaque) 60%, transparent);
   }
 }

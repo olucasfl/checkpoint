@@ -127,7 +127,7 @@ export function NomeEditavel() {
         <button
           type="submit"
           disabled={salvando}
-          className={`${BUTTON} bg-magenta font-extrabold text-fundo`}
+          className={`${BUTTON} bg-destaque font-extrabold text-fundo`}
         >
           {salvando ? 'Salvando…' : 'Salvar'}
         </button>
