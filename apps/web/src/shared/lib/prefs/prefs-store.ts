@@ -75,6 +75,26 @@ export function alterarPrefs(parcial: Partial<Prefs>): void {
   notificar();
 }
 
+/**
+ * A conta foi excluída: some a entrada DESSE usuário (as dos outros ficam), e `ultimoUsuario` só
+ * vira `null` se era ele. Se as preferências em uso eram as dele, a aparência volta ao padrão: a tela
+ * de login não continua com as cores de uma conta que não existe mais.
+ */
+export function removerPrefsDoUsuario(userId: string): void {
+  const guardadas = storage.get(PREFS);
+  const porUsuario = Object.fromEntries(
+    Object.entries(guardadas.porUsuario).filter(([id]) => id !== userId),
+  );
+  const ultimoUsuario = guardadas.ultimoUsuario === userId ? null : guardadas.ultimoUsuario;
+  storage.set(PREFS, { ultimoUsuario, porUsuario });
+  if (usuarioAtual === userId) {
+    usuarioAtual = null;
+    atuais = PREFS_PADRAO;
+    aplicarNoHtml(atuais);
+    notificar();
+  }
+}
+
 /** Só para os testes. */
 export function resetPrefsForTests(): void {
   usuarioAtual = null;

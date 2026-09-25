@@ -15,8 +15,11 @@ import { SESSAO_ATIVA } from '../lib/session-keys';
  */
 export type SessionStatus = 'carregando' | 'autenticado' | 'visitante' | 'desconectado';
 
-/** Por que virou visitante: a sessão terminou (mostra o aviso), a pessoa saiu (sem aviso) ou nunca entrou. */
-export type SessionExit = 'sessao' | 'usuario' | null;
+/**
+ * Por que virou visitante: a sessão terminou (mostra o aviso), a pessoa saiu (sem aviso), excluiu a
+ * conta (mostra que foi excluída) ou nunca entrou.
+ */
+export type SessionExit = 'sessao' | 'usuario' | 'conta-excluida' | null;
 
 export interface SessionState {
   status: SessionStatus;
@@ -165,6 +168,16 @@ export function encerrarLocal(saida: Exclude<SessionExit, null>): void {
   queryClient.clear();
   storage.clearScope('usuario');
   setState({ status: 'visitante', usuario: null, saida });
+}
+
+/**
+ * A conta acabou de ser excluída no servidor: logout local já, SEM nenhuma request (o token dela não
+ * vale mais, e um 401 depois daqui mostraria "Sua sessão terminou" no lugar do aviso certo). As outras
+ * abas recebem o mesmo aviso de logout. Não há cookie para apagar: a própria exclusão já o limpou.
+ */
+export function encerrarContaExcluida(): void {
+  encerrarLocal('conta-excluida');
+  postToOtherTabs({ type: 'logout' });
 }
 
 export type SairResult = 'ok' | 'sem-conexao' | 'erro';

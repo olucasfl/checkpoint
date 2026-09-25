@@ -79,9 +79,16 @@ export function uniqueViolation(): Prisma.PrismaClientKnownRequestError {
   });
 }
 
+/** Só o que a exclusão de conta lê dos jogos: o dono e o caminho da capa. */
+export interface GameCapaRow {
+  userId: string;
+  capaPath: string | null;
+}
+
 export class FakeAuthPrisma {
   users: UserRow[] = [];
   sessions: SessionRow[] = [];
+  games: GameCapaRow[] = [];
 
   /** Forma de array: as operações já foram disparadas; basta esperar todas (sem rollback, como teste). */
   $transaction = jest.fn(async (operations: Promise<unknown>[]): Promise<unknown[]> =>
@@ -125,6 +132,38 @@ export class FakeAuthPrisma {
         Object.assign(row, args.data, { atualizadoEm: new Date() });
         return project(row, args.select);
       },
+    ),
+    /** Com o `onDelete: Cascade` do schema: as sessões e os jogos do usuário vão junto. */
+    delete: jest.fn(
+      async (args: {
+        where: { id: string };
+        select?: Record<string, boolean>;
+      }): Promise<unknown> => {
+        const row = this.users.find((user) => user.id === args.where.id);
+        if (!row) {
+          throw new Prisma.PrismaClientKnownRequestError('Record not found', {
+            code: 'P2025',
+            clientVersion: 'teste',
+          });
+        }
+        this.users = this.users.filter((user) => user !== row);
+        this.sessions = this.sessions.filter((session) => session.userId !== row.id);
+        this.games = this.games.filter((game) => game.userId !== row.id);
+        return project(row, args.select);
+      },
+    ),
+  };
+
+  game = {
+    findMany: jest.fn(
+      async (args: {
+        where: { userId: string; capaPath?: { not: null } };
+        select?: Record<string, boolean>;
+      }): Promise<unknown[]> =>
+        this.games
+          .filter((game) => game.userId === args.where.userId)
+          .filter((game) => !args.where.capaPath || game.capaPath !== null)
+          .map((game) => project(game, args.select)),
     ),
   };
 

@@ -6,5 +6,7 @@ import { GamesService } from './games.service';
 @Module({
   controllers: [GamesController],
   providers: [GamesService, StorageService],
+  // A exclusão de conta (`users`) lê e remove as capas pelo GamesService: o StorageService fica aqui.
+  exports: [GamesService],
 })
 export class GamesModule {}

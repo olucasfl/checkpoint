@@ -1,6 +1,7 @@
 import {
   type AtualizarPerfilRequest,
   type EncerrarOutrasSessoesResponse,
+  type ExcluirContaRequest,
   type SessaoAtiva,
   type Usuario,
 } from '@checkpoint/shared';
@@ -23,6 +24,11 @@ export const perfilApi = {
   /** `DELETE /api/auth/sessoes/:id`: encerra a sessão de outro aparelho. */
   async encerrarSessao(id: string): Promise<void> {
     await apiClient.delete(`/auth/sessoes/${encodeURIComponent(id)}`);
+  },
+
+  /** `POST /api/users/me/exclusao`: exclui a conta (204). Senha errada volta 400, nunca 401. */
+  async excluirConta(body: ExcluirContaRequest): Promise<void> {
+    await apiClient.post('/users/me/exclusao', body);
   },
 
   /** `DELETE /api/auth/sessoes`: encerra todas as outras; devolve quantas. */

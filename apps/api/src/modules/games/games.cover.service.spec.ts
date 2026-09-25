@@ -408,4 +408,45 @@ describe('GamesService — capa', () => {
       expect(created.capaUrl).toBeNull();
     });
   });
+
+  describe('capas na exclusão de conta (perfil CA-24, CA-26)', () => {
+    it('listarCapasDoUsuario: só os jogos do dono que têm capa, os dois formatos de caminho', async () => {
+      const { service, game } = setup();
+      game.findMany.mockResolvedValue([{ capaPath: OLD }, { capaPath: LEGACY }]);
+
+      await expect(service.listarCapasDoUsuario(USER)).resolves.toEqual([OLD, LEGACY]);
+      expect(game.findMany).toHaveBeenCalledWith({
+        where: { userId: USER, capaPath: { not: null } },
+        select: { capaPath: true },
+      });
+    });
+
+    it('removerCapasSemFalhar: remove cada caminho pelo nome exato', async () => {
+      const { service, storage } = setup();
+
+      await service.removerCapasSemFalhar([OLD, LEGACY]);
+
+      expect(storage.remove.mock.calls).toEqual([[OLD], [LEGACY]]);
+    });
+
+    it('a falha de um objeto não impede os outros nem lança; o warn traz só o caminho', async () => {
+      const { service, storage } = setup();
+      const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+      storage.remove.mockRejectedValueOnce(storageFailure()).mockResolvedValueOnce(undefined);
+
+      await expect(service.removerCapasSemFalhar([OLD, LEGACY])).resolves.toBeUndefined();
+
+      expect(storage.remove).toHaveBeenCalledTimes(2);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining(OLD));
+    });
+
+    it('lista vazia: não chama o storage', async () => {
+      const { service, storage } = setup();
+
+      await service.removerCapasSemFalhar([]);
+
+      expect(storage.remove).not.toHaveBeenCalled();
+    });
+  });
 });

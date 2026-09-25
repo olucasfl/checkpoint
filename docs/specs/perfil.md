@@ -1,6 +1,7 @@
 # Spec: perfil
 
-> Status: em andamento (aprovada pelo humano em 2026-09-24; etapa 1 em implementação)
+> Status: em andamento (aprovada pelo humano em 2026-09-24; etapas 1 a 4 implementadas; faltam as
+> conferências humanas de CA-06, CA-18 e CA-23: ver `INDEX.md`)
 
 ## Objetivo
 
@@ -252,13 +253,13 @@ Ana; `C` = Bia). UI contra `http://localhost:5173`. Dados sintéticos.
 
 ### Etapa 4 — excluir conta
 
-- [ ] **CA-24** — **Dado** Ana com 3 jogos, 2 deles com capa (uma de antes de `autenticacao` etapa 3, em `<gameId>/…`, e uma em `<userId>/<gameId>/…`), e duas sessões, **quando** `POST /api/users/me/exclusao` com a senha certa, **então** 204 com `Set-Cookie` limpando o cookie; o `User` some; `SELECT count(*) FROM "Game" WHERE "userId" = '<idDaAna>'` = 0; nenhuma `RefreshSession` dela; os dois objetos das capas não estão mais no bucket (listagem); login com `ana@exemplo.com` → 401 `AUTH_CREDENCIAIS_INVALIDAS`; e, com o registro aberto, `ana@exemplo.com` pode se registrar de novo.
-- [ ] **CA-25** — **Dado** a senha errada, **então** 400 `AUTH_SENHA_ATUAL_INCORRETA` com `fields.senha` e nada é apagado.
-- [ ] **CA-26** — **Dado** o storage falhando ao remover (mock no teste; manual: nome do bucket errado), **quando** excluo a conta, **então** ainda 204, a conta e os jogos somem do banco, e o log tem um aviso por objeto não removido, sem chave nem cabeçalho.
-- [ ] **CA-27** — **Dado** Ana e Bia com jogos e capas, **quando** Ana exclui a conta, **então** os jogos, as capas e as sessões da Bia continuam intactos.
-- [ ] **CA-28** — **Dado** `/perfil` na Zona de perigo, **quando** clico **Excluir conta**, **então** o diálogo mostra o número de jogos, o foco está em Cancelar e **Excluir conta** fica desabilitado até eu digitar a senha; **quando** confirmo, **então** vou para `/login` com "Sua conta foi excluída.", a entrada da Ana some de `checkpoint:prefs`, e outra aba logada da Ana vai para `/login`.
-- [ ] **CA-29** — **Dado** 6 pedidos de exclusão com senha errada em 15 min, **então** o 6º é 429.
-- [ ] **CA-30** — **Dado** o DevTools em "Offline", **quando** confirmo a exclusão, **então** vejo "Sem conexão. Nada foi excluído.", o diálogo continua aberto e a conta existe.
+- [x] **CA-24** — **Dado** Ana com 3 jogos, 2 deles com capa (uma de antes de `autenticacao` etapa 3, em `<gameId>/…`, e uma em `<userId>/<gameId>/…`), e duas sessões, **quando** `POST /api/users/me/exclusao` com a senha certa, **então** 204 com `Set-Cookie` limpando o cookie; o `User` some; `SELECT count(*) FROM "Game" WHERE "userId" = '<idDaAna>'` = 0; nenhuma `RefreshSession` dela; os dois objetos das capas não estão mais no bucket (listagem); login com `ana@exemplo.com` → 401 `AUTH_CREDENCIAIS_INVALIDAS`; e, com o registro aberto, `ana@exemplo.com` pode se registrar de novo.
+- [x] **CA-25** — **Dado** a senha errada, **então** 400 `AUTH_SENHA_ATUAL_INCORRETA` com `fields.senha` e nada é apagado.
+- [x] **CA-26** — **Dado** o storage **falhando de verdade** ao remover (mock no teste; manual: só no processo da API de teste, sem editar o `.env`, uma `SUPABASE_SERVICE_ROLE_KEY` inválida, e o Supabase responde 4xx, ou uma `SUPABASE_URL` num host inalcançável, sem resposta), **quando** excluo a conta, **então** ainda 204, a conta e os jogos somem do banco, e o log tem **um** aviso por objeto não removido, com o caminho e sem chave, cabeçalho nem corpo. _Nota: bucket inexistente ou objeto ausente **não** é falha: o Supabase responde `200 []`, e a remoção trata isso como sucesso (nada a apagar), sem aviso._
+- [x] **CA-27** — **Dado** Ana e Bia com jogos e capas, **quando** Ana exclui a conta, **então** os jogos, as capas e as sessões da Bia continuam intactos.
+- [x] **CA-28** — **Dado** `/perfil` na Zona de perigo, **quando** clico **Excluir conta**, **então** o diálogo mostra o número de jogos, o foco está em Cancelar e **Excluir conta** fica desabilitado até eu digitar a senha; **quando** confirmo, **então** vou para `/login` com "Sua conta foi excluída.", a entrada da Ana some de `checkpoint:prefs`, e outra aba logada da Ana vai para `/login`.
+- [x] **CA-29** — **Dado** 6 pedidos de exclusão com senha errada em 15 min, **então** o 6º é 429.
+- [x] **CA-30** — **Dado** o DevTools em "Offline", **quando** confirmo a exclusão, **então** vejo "Sem conexão. Nada foi excluído.", o diálogo continua aberto e a conta existe.
 
 ## Plano de testes
 
@@ -279,7 +280,8 @@ Ana; `C` = Bia). UI contra `http://localhost:5173`. Dados sintéticos.
   sem conexão); `styles/tokens.test.ts` (acréscimo: `destaque` mapeia só para tokens existentes;
   `data-efeitos="reduzidos"` no mesmo bloco das regras de movimento).
 - **Manual (`/qa-verify`):** CA-01, CA-04 a CA-07, CA-12 a CA-18, CA-23, CA-28, CA-30 no navegador;
-  CA-24 e CA-27 no banco e no bucket reais (com contas sintéticas criadas para isso).
+  CA-24, CA-26 (com a falha real do storage do próprio critério) e CA-27 no banco e no bucket reais (com
+  contas sintéticas criadas para isso).
 
 Loop de verificação por tarefa:
 `npm run typecheck -w <workspace>` → `npm test -w <workspace>` → `npm run lint` → `npm run build` →

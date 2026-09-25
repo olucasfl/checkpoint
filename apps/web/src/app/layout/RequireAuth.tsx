@@ -9,7 +9,8 @@ import { LoadingScreen } from './LoadingScreen';
  * - `carregando`: só o logo (o boot ainda não respondeu; nenhuma query da tela sai antes dele);
  * - `autenticado`: a rota;
  * - `visitante`: vai para `/login`, com `?voltar=` para a tela que tentou abrir e `?motivo=sessao` só
- *   se ele TINHA sessão e a perdeu (quem nunca entrou, ou saiu, não vê aviso);
+ *   se ele TINHA sessão e a perdeu (quem nunca entrou, ou saiu, não vê aviso); depois de excluir a
+ *   conta, `?motivo=conta-excluida` (sem `voltar`);
  * - `desconectado`: a moldura do app com a mensagem de sem conexão, SEM redirecionar (sem rede o app
  *   não desloga ninguém).
  */
@@ -33,11 +34,11 @@ export function RequireAuth() {
 
   if (status === 'visitante') {
     const params = new URLSearchParams();
-    if (saida === 'sessao') {
-      params.set('motivo', 'sessao');
+    if (saida === 'sessao' || saida === 'conta-excluida') {
+      params.set('motivo', saida);
     }
-    // Quem acabou de sair não precisa de "voltar": entrar de novo leva ao início.
-    if (saida !== 'usuario') {
+    // Quem acabou de sair (ou excluiu a conta) não precisa de "voltar": entrar de novo leva ao início.
+    if (saida !== 'usuario' && saida !== 'conta-excluida') {
       params.set('voltar', `${location.pathname}${location.search}`);
     }
     const query = params.toString();

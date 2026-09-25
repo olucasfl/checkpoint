@@ -92,6 +92,11 @@ export interface AtualizarPerfilRequest {
   nome: string;
 }
 
+/** Corpo de `POST /api/users/me/exclusao` (spec perfil): a senha atual confirma a exclusão. */
+export interface ExcluirContaRequest {
+  senha: string;
+}
+
 /**
  * Uma sessão (aparelho) do usuário logado, em `GET /api/auth/sessoes` (spec perfil). Só isto: nunca
  * os hashes do refresh, o vencimento nem o `userId`.

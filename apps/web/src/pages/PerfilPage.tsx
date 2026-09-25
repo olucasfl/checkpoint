@@ -8,13 +8,14 @@ import { InstalarApp } from '@/features/perfil/components/InstalarApp';
 import { PerfilCabecalho } from '@/features/perfil/components/PerfilCabecalho';
 import { PreferenciasAparelho } from '@/features/perfil/components/PreferenciasAparelho';
 import { SessoesAtivas } from '@/features/perfil/components/SessoesAtivas';
+import { ZonaDePerigo } from '@/features/perfil/components/ZonaDePerigo';
 
 const SEM_CONEXAO_PARA_SAIR = 'Sem conexão. Para sair, conecte-se.';
 
 /**
- * `/perfil` (spec perfil, etapas 1 a 3): cabeçalho (avatar de iniciais, nome editável, e-mail,
+ * `/perfil` (spec perfil, etapas 1 a 4): cabeçalho (avatar de iniciais, nome editável, e-mail,
  * "Membro desde", resumo do catálogo), a conta (Trocar senha, Sessões ativas, Sair), "Instalar app"
- * quando dá e as preferências deste aparelho. Empilhado no celular; duas colunas em >= 1024px. Mostra o aviso que a troca de senha deixa
+ * quando dá, as preferências deste aparelho e, por último, a Zona de perigo (excluir a conta). Empilhado no celular; duas colunas em >= 1024px. Mostra o aviso que a troca de senha deixa
  * no `state` da navegação. Sair sem conexão NÃO acontece: o cookie `HttpOnly` só o servidor apaga, e sair "só
  * localmente" deixaria a sessão voltar no próximo carregamento. Depois de sair, o `RequireAuth` leva
  * para `/login`.
@@ -98,6 +99,8 @@ export function PerfilPage() {
 
           <PreferenciasAparelho />
         </div>
+
+        <ZonaDePerigo />
       </main>
     </div>
   );

@@ -193,6 +193,29 @@ export class GamesService {
   }
 
   /**
+   * Os caminhos das capas de todos os jogos do usuário, lidos ANTES de excluir a conta: depois do
+   * cascade, os jogos (e os caminhos) não existem mais. Caminhos, e não "a pasta <userId>/": a REST do
+   * Storage remove por nome exato, e as capas anteriores ao dono dos jogos ficam em `<gameId>/…`.
+   */
+  async listarCapasDoUsuario(userId: string): Promise<string[]> {
+    const rows = await this.prisma.game.findMany({
+      where: { userId, capaPath: { not: null } },
+      select: { capaPath: true },
+    });
+    return rows.flatMap((row) => (row.capaPath ? [row.capaPath] : []));
+  }
+
+  /**
+   * Remove cada capa em best effort, uma a uma: a falha de um objeto (que fica órfão, com um aviso
+   * no log) não impede os demais nem o chamador.
+   */
+  async removerCapasSemFalhar(caminhos: readonly string[]): Promise<void> {
+    for (const caminho of caminhos) {
+      await this.removeObjectQuietly(caminho);
+    }
+  }
+
+  /**
    * Sem plataforma = "" no banco (ver schema.prisma); a API expõe null. `capaPath` e `userId` nunca
    * saem: os campos da resposta são listados um a um.
    */

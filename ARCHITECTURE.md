@@ -92,7 +92,7 @@ checkpoint/
 │   │       │   ├── health/             # GET /api/health → status da API + do banco
 │   │       │   ├── games/              # catálogo de jogos: GET/POST/PATCH/DELETE /api/games
 │   │       │   ├── auth/               # registro, login, refresh, logout, me; guard global de access token (§4.5)
-│   │       │   └── users/              # a conta do usuário logado: PATCH /api/users/me (nome); lista branca do Usuario
+│   │       │   └── users/              # a conta do usuário logado: PATCH /api/users/me (nome), POST /api/users/me/exclusao; lista branca do Usuario
 │   │       ├── app.module.ts           # inclui o guard global (APP_GUARD)
 │   │       ├── app.setup.ts            # setupApp(): prefixo /api, cookie-parser, CORS, ValidationPipe, Swagger (o main.ts e a verificação manual usam o mesmo)
 │   │       └── main.ts                 # bootstrap: cria o app, setupApp() e listen
@@ -265,16 +265,32 @@ apps/api/src/modules/games/
 └── testing/              # só para testes: o app HTTP com o guard global e tokens sintéticos
 ```
 
-- `users/` — a conta do usuário logado (spec `docs/specs/perfil.md`, etapa 1). Hoje só
+- `users/` — a conta do usuário logado (spec `docs/specs/perfil.md`, etapas 1 e 4). Importa o `AuthModule`
+  (que exporta o `PasswordHasher`) e o `GamesModule` (que exporta o `GamesService`).
   `PATCH /api/users/me` (protegida pelo guard global), corpo `AtualizarPerfilRequest { nome }` com a mesma
   regra do registro (`nomeProblem` de `auth/dto/field-rules.ts`: `trim`, 1 a 60). 200 + `Usuario`; 400
   `VALIDACAO` para nome vazio, 61 caracteres, `{}` ou campo desconhecido (**inclusive `email`**, que não é
   editável); 401 sem token; conta que sumiu (`P2025`) → 401 `AUTH_SESSAO_ENCERRADA`, como o `GET /auth/me`.
   `usuario-publico.ts` guarda a **lista branca** `USUARIO_PUBLICO_SELECT` (`id`, `nome`, `email`,
   `criadoEm`) e o `toUsuario`: uma definição só, usada também pelo `AuthService`, para nenhum `select`
-  devolver `senhaHash`. Testes: `users.service.spec.ts` (Prisma mockado), `dto/atualizar-perfil.dto.spec.ts`
-  (pelo pipe do `main.ts`) e `users.http.spec.ts` (porta local, com a auth de verdade e o Prisma falso de
-  `auth/testing/`).
+  devolver `senhaHash`.
+  - **Excluir conta** (`POST /api/users/me/exclusao`, etapa 4; `POST` com corpo porque alguns proxies descartam o
+    corpo de um `DELETE`): `ExcluirContaDto { senha }` com a regra do login (não vazia, até 72 bytes). **Ordem**
+    (`UsersService.excluirConta`): (1) confere a senha com o mesmo `PasswordHasher` da troca de senha, e errada é
+    400 `AUTH_SENHA_ATUAL_INCORRETA` em `fields.senha`, sem nada apagado; (2) lê os `capaPath` dos jogos
+    (`GamesService.listarCapasDoUsuario`); (3) apaga o `User` numa operação só, e o `onDelete: Cascade` leva os jogos
+    e as sessões; (4) **depois** remove cada capa **pelo caminho lido** (`GamesService.removerCapasSemFalhar`, com o
+    `removeObjectQuietly`: a REST do Storage apaga por nome exato, e as capas anteriores ao dono dos jogos estão em
+    `<gameId>/…`, fora de `<userId>/`); (5) **204** com o `Set-Cookie` que limpa `checkpoint_refresh` (`Max-Age=0`,
+    mesmos atributos). **Banco antes do bucket:** com o storage falhando, a conta já não existe e sobra no
+    máximo um objeto órfão, com um `warn` que traz só o caminho; o storage nunca impede o 204. Conta que sumiu
+    (`P2025`) → 401 `AUTH_SESSAO_ENCERRADA`. O `UsersService` não fala com o storage: o `StorageService` continua
+    dentro de `games`. Limite: `@UseGuards(AuthThrottlerGuard)` + `EXCLUSAO_CONTA_LIMIT` (5 a cada 15 min por IP),
+    com **contador próprio** (o throttler separa por controller e rota: não divide a cota com `PUT /auth/senha`).
+  - Testes: `users.service.spec.ts` (Prisma e storage mockados, com o `GamesService` de verdade: ordem, senha
+    errada, storage falhando com `warn` sem segredo, `P2025`), `dto/*.spec.ts` (pelo pipe do `main.ts`) e
+    `users.http.spec.ts` (porta local, com a auth de verdade e o Prisma falso de `auth/testing/`, que ganhou o
+    `user.delete` com o cascade: 204 e o cookie limpo, 400, 401, 429 no 6º pedido e o contador próprio).
 
 Registre o módulo novo em `app.module.ts` (`imports: [...]`).
 
@@ -571,12 +587,13 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
   (`lib/perfil-avisos.ts`: só um aviso conhecido é mostrado, em `role="status"`). As outras sessões caem no
   servidor; o outro navegador descobre na próxima request (401 → `/login?motivo=sessao`).
 
-### 5.11 Perfil (`features/perfil/`, `pages/PerfilPage.tsx`, spec `docs/specs/perfil.md`, etapas 1 a 3)
+### 5.11 Perfil (`features/perfil/`, `pages/PerfilPage.tsx`, spec `docs/specs/perfil.md`, etapas 1 a 4)
 
 - **`/perfil`** (dentro do `RequireAuth` + `AppLayout`): cabeçalho, seção **Conta** ("Salvo na sua conta":
   Trocar senha → `/perfil/senha`, Sessões ativas, Sair; **sem repetir o nome**, que é editável no cabeçalho),
-  seção **App** ("Instalar app", só quando dá) e **Preferências deste aparelho** (§5.12). Empilhado abaixo de
-  1024px e em duas colunas (`lg:grid-cols-2`: conta e app | preferências) a partir de 1024px.
+  seção **App** ("Instalar app", só quando dá), **Preferências deste aparelho** (§5.12) e, por último e em
+  largura total, a **Zona de perigo**. Empilhado abaixo de 1024px e em duas colunas (`lg:grid-cols-2`: conta e
+  app | preferências) a partir de 1024px.
 - **Cabeçalho** (`PerfilCabecalho`): avatar de iniciais 64 × 64 com a mesma regra da capa gerada dos jogos
   aplicada ao nome (**`shared/lib/game-cover.ts`**, movido de `features/games/lib` por servir às duas
   features: cor da paleta `capa-1` a `capa-6` por hash FNV-1a do texto aparado e em minúsculas, e as
@@ -603,10 +620,22 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
   outras. Toda mutação invalida a lista (inclusive no erro: um 404 também a deixa velha). Erros pelo `code`
   (`SESSAO_ATUAL`, `SESSAO_NAO_ENCONTRADA` e sem conexão). O aparelho encerrado descobre na próxima request (401
   `AUTH_SESSAO_ENCERRADA` → `/login?motivo=sessao`), pelo interceptor que já existia.
+- **Zona de perigo** (`ZonaDePerigo.tsx`, etapa 4): **Excluir conta** (contorno e texto `erro`, 44 × 44) abre o
+  `ExcluirContaDialog` (o `ModalDialog`, folha inferior no celular): "Isso apaga sua conta, seus N jogos e as
+  capas deles. Não dá para desfazer." (N da query `['games']`), campo Senha (`CampoSenha`,
+  `current-password`), **Cancelar** com o foco inicial e **Excluir conta** (`bg-erro`, texto `fundo`)
+  desabilitado com a senha vazia. Erros pelo `code`/`fields`; sem resposta → "Sem conexão. Nada foi excluído."
+  e o diálogo continua aberto. Sucesso: `removerPrefsDoUsuario` (§5.12) e **`encerrarContaExcluida()`** da
+  sessão, que faz o logout local **sem nenhuma request** (o token da conta já não vale, e um 401 mostraria
+  "Sua sessão terminou") e avisa as outras abas pelo `BroadcastChannel`. A navegação é a do `RequireAuth`: a
+  `saida` `conta-excluida` vira `/login?motivo=conta-excluida` (sem `voltar`), e o `LoginPage` mostra "Sua
+  conta foi excluída." pelo mesmo mapa de `motivo` do aviso de sessão.
 - **Testes:** `pages/PerfilPage.test.tsx` (cabeçalho e resumo, "—" carregando, edição com Esc sem request,
   validação local, erros da API, instalar só quando aplicável, ordem da seção Conta),
   `features/perfil/components/SessoesAtivas.test.tsx` (selo, botão só nas outras, confirmação com N, escondido
-  sem outras, erros por `code`), `features/perfil/lib/resumo.test.ts` e `features/perfil/lib/sessoes.test.ts`.
+  sem outras, erros por `code`), `features/perfil/components/ZonaDePerigo.test.tsx` (número de jogos, foco em
+  Cancelar, botão desabilitado sem senha, erros por `code`, sem conexão mantém aberto, e o fluxo de sucesso com a
+  sessão e o `RequireAuth` de verdade), `features/perfil/lib/resumo.test.ts` e `features/perfil/lib/sessoes.test.ts`.
 
 ### 5.12 Preferências deste aparelho (`shared/lib/prefs/`, spec `docs/specs/perfil.md`, etapa 3)
 
@@ -623,6 +652,9 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
   `main.tsx` **depois das migrações e antes do `createRoot`** e aplica as de `ultimoUsuario` no `<html>`
   (sem piscar em magenta); o **`app/PrefsSync.tsx`** (nos providers) chama `definirUsuario` quando a sessão
   resolve, e aí valem as de quem entrou (que vira o `ultimoUsuario`). Sair não troca a aparência.
+- **Exclusão da conta** (`removerPrefsDoUsuario`, etapa 4): some só a entrada desse usuário (as dos outros
+  ficam); `ultimoUsuario` vira `null` se era ele; e, se as preferências em uso eram as dele, a aparência volta ao
+  padrão (a tela de login não fica com as cores de uma conta que não existe mais).
   `alterarPrefs` só grava com alguém logado.
 - **Cor de destaque sem hex novo:** `@theme` tem `--color-destaque: var(--color-magenta)`, e
   `html[data-destaque='violeta'|'azul'|'laranja']` o aponta para `capa-6`, `capa-1` e `capa-3`. Texto `fundo`
@@ -667,6 +699,7 @@ antes de `api`/`web` (§2). Hoje tem:
   `GAME_COVER_MIME_TYPES`, `GAME_COVER_FIELD` (`arquivo`) e o campo `arquivo` em `ApiErrorField`.
 - `auth.ts` — contrato da autenticação e da conta: `Usuario`, `RegistroRequest`, `LoginRequest`,
   `AuthResponse`, `TrocarSenhaRequest`, **`AtualizarPerfilRequest`** (`{ nome }`, de `PATCH /api/users/me`),
+  **`ExcluirContaRequest`** (`{ senha }`, de `POST /api/users/me/exclusao`),
   **`SessaoAtiva`** (`{ id, dispositivo, criadoEm, ultimoUsoEm, atual }`, de `GET /api/auth/sessoes`),
   **`EncerrarOutrasSessoesResponse`** (`{ encerradas }`), os limites (`USER_NAME_MAX_LENGTH` etc.), as regras
   puras (`normalizeEmail`, `utf8ByteLength`, `passwordProblem`), `API_ERROR_CODES`/`ApiErrorCode` (com

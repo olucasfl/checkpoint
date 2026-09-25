@@ -7,6 +7,7 @@ import {
   definirUsuario,
   getPrefs,
   iniciarPrefs,
+  removerPrefsDoUsuario,
   resetPrefsForTests,
 } from './prefs-store';
 
@@ -149,5 +150,47 @@ describe('falhas do armazenamento', () => {
     expect(getPrefs().destaque).toBe('laranja');
     expect(document.documentElement.dataset.destaque).toBe('laranja');
     expect(document.documentElement.dataset.efeitos).toBe('reduzidos');
+  });
+});
+
+describe('exclusão de conta (perfil CA-28)', () => {
+  const AZUL: Prefs = { ...PREFS_PADRAO, destaque: 'azul' };
+
+  it('some só a entrada de quem excluiu; a da Bia fica, e a aparência volta ao padrão', () => {
+    storage.set(PREFS, { ultimoUsuario: 'bia', porUsuario: { bia: AZUL } });
+    definirUsuario('ana');
+    alterarPrefs({ destaque: 'violeta' });
+    expect(document.documentElement.dataset.destaque).toBe('violeta');
+
+    removerPrefsDoUsuario('ana');
+
+    const guardadas = storage.get(PREFS);
+    expect(guardadas.porUsuario).toEqual({ bia: AZUL });
+    // A Ana era a última: ninguém fica apontado para uma conta que não existe mais.
+    expect(guardadas.ultimoUsuario).toBeNull();
+    expect(getPrefs()).toEqual(PREFS_PADRAO);
+    expect(document.documentElement.dataset.destaque).toBe('magenta');
+  });
+
+  it('o próximo carregamento abre com os padrões (nada da conta excluída sobra)', () => {
+    definirUsuario('ana');
+    alterarPrefs({ destaque: 'violeta', efeitos: 'reduzidos' });
+
+    removerPrefsDoUsuario('ana');
+    resetPrefsForTests();
+    iniciarPrefs();
+
+    expect(getPrefs()).toEqual(PREFS_PADRAO);
+    expect(document.documentElement.dataset.efeitos).toBe('completos');
+  });
+
+  it('remover a entrada de outro usuário não mexe em quem está logado nem no ultimoUsuario', () => {
+    storage.set(PREFS, { ultimoUsuario: 'ana', porUsuario: { ana: VIOLETA, bia: AZUL } });
+    definirUsuario('ana');
+
+    removerPrefsDoUsuario('bia');
+
+    expect(storage.get(PREFS)).toEqual({ ultimoUsuario: 'ana', porUsuario: { ana: VIOLETA } });
+    expect(getPrefs().destaque).toBe('violeta');
   });
 });

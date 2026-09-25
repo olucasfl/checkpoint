@@ -102,5 +102,14 @@ foi marcado só por verificação manual. Faltam:
 - [ ] Gravar o resultado dos próximos `/qa-verify` num lugar versionado (ex.: uma seção
       "Verificação" na própria spec), para o fechamento não depender da conversa em que rodaram.
 
+**`perfil` — o que falta para ✅ implementada (etapas 1 a 4 feitas; só conferência humana):**
+
+- [ ] **CA-06** — "Instalar app" num Chrome real, com o app instalável (não dá para exercitar em
+      Chrome headless).
+- [ ] **CA-18** — conferência humana dos efeitos "Reduzidos": sem orbes, sem _scanlines_ e sem
+      animação, com o sistema **sem** `prefers-reduced-motion`. Os estilos computados já foram medidos.
+- [ ] **CA-23** — conferir o contraste do texto `fundo` sobre as quatro cores de destaque num
+      verificador externo. Pela fórmula WCAG sobre as cores computadas: 6,28, 7,47, 9,64 e 8,98:1.
+
 Mudanças destrutivas de schema (`/db-change`) e outras aprovações explícitas exigidas por
 `.claude/rules/RULES.md` entram aqui quando existirem.

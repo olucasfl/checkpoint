@@ -24,7 +24,8 @@ import { PasswordHasher, ScryptPasswordHasher } from './password-hasher';
     CsrfHeaderGuard,
     { provide: PasswordHasher, useClass: ScryptPasswordHasher },
   ],
-  // O guard global (`AccessTokenGuard`, registrado no `AppModule`) precisa dos tokens.
-  exports: [AuthTokensService],
+  // O guard global (`AccessTokenGuard`, registrado no `AppModule`) precisa dos tokens; a exclusão de
+  // conta (`users`) confere a senha com o MESMO hasher.
+  exports: [AuthTokensService, PasswordHasher],
 })
 export class AuthModule {}

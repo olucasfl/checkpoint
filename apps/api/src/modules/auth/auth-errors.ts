@@ -29,9 +29,10 @@ export const authErrors = {
   origemInvalida: () =>
     apiError(403, 'AUTH_ORIGEM_INVALIDA', 'Não foi possível completar a requisição.'),
   // 400, nunca 401: o web trata qualquer 401 como sessão perdida, e a pessoa continua logada.
-  senhaAtualIncorreta: () =>
+  // O campo muda com a rota: `senhaAtual` na troca de senha, `senha` na exclusão de conta.
+  senhaAtualIncorreta: (campo: 'senhaAtual' | 'senha' = 'senhaAtual') =>
     apiError(400, 'AUTH_SENHA_ATUAL_INCORRETA', 'Senha atual incorreta.', {
-      senhaAtual: 'Senha atual incorreta.',
+      [campo]: 'Senha atual incorreta.',
     }),
   senhaIgualAtual: () =>
     apiError(400, 'AUTH_SENHA_IGUAL_ATUAL', 'A nova senha precisa ser diferente da atual.', {

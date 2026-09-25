@@ -18,7 +18,9 @@ import { CsrfHeaderGuard } from '../auth/csrf-header.guard';
 import { FIELD_MESSAGES } from '../auth/dto/field-rules';
 import { PasswordHasher } from '../auth/password-hasher';
 import { FakeAuthPrisma, fakeHasher } from '../auth/testing/fake-auth-prisma';
-import { UsersController } from './users.controller';
+import { StorageService } from '../games/cover/storage.service';
+import { GamesService } from '../games/games.service';
+import { EXCLUSAO_CONTA_LIMIT, UsersController } from './users.controller';
 import { UsersService } from './users.service';
 
 /**
@@ -39,7 +41,11 @@ let db: FakeAuthPrisma;
 interface Reply {
   status: number;
   json: Record<string, unknown> | undefined;
+  setCookies: string[];
 }
+
+/** O bucket, mockado: nenhum teste fala com o Supabase. */
+const storage = { upload: jest.fn(), remove: jest.fn(), publicUrl: jest.fn() };
 
 async function call(
   method: string,
@@ -62,6 +68,7 @@ async function call(
   return {
     status: response.status,
     json: text ? (JSON.parse(text) as Record<string, unknown>) : undefined,
+    setCookies: response.headers.getSetCookie(),
   };
 }
 
@@ -74,6 +81,8 @@ async function registerAna(): Promise<string> {
 
 beforeEach(async () => {
   db = new FakeAuthPrisma();
+  Object.values(storage).forEach((fn) => fn.mockReset());
+  storage.remove.mockResolvedValue(undefined);
   const moduleRef = await Test.createTestingModule({
     imports: [
       ConfigModule.forRoot({ isGlobal: true, ignoreEnvFile: true, load: [() => ENV] }),
@@ -87,6 +96,8 @@ beforeEach(async () => {
       AuthThrottlerGuard,
       CsrfHeaderGuard,
       UsersService,
+      GamesService,
+      { provide: StorageService, useValue: storage },
       { provide: PasswordHasher, useValue: fakeHasher },
       { provide: PrismaService, useValue: db },
       { provide: APP_GUARD, useClass: AccessTokenGuard },
@@ -181,5 +192,141 @@ describe('PATCH /api/users/me (perfil CA-02, CA-03)', () => {
 
     expect(reply.status).toBe(401);
     expect(reply.json).toMatchObject({ code: 'AUTH_SESSAO_ENCERRADA' });
+  });
+});
+
+describe('POST /api/users/me/exclusao (perfil CA-24, CA-25, CA-29)', () => {
+  const excluir = (bearer: string | undefined, body: unknown) =>
+    call('POST', '/users/me/exclusao', { bearer, body });
+
+  it('204 sem corpo, cookie do refresh limpo (Max-Age=0, mesmo Path), e conta, jogos e sessões somem (CA-24)', async () => {
+    const token = await registerAna();
+    const anaId = db.users[0]?.id as string;
+    db.games.push(
+      { userId: anaId, capaPath: `${anaId}/g1/nova.png` },
+      { userId: anaId, capaPath: 'g2/antiga.webp' },
+      { userId: anaId, capaPath: null },
+    );
+
+    const reply = await excluir(token, { senha: 'segredo-forte' });
+
+    expect(reply.status).toBe(204);
+    expect(reply.json).toBeUndefined();
+    const cookie = reply.setCookies.find((c) => c.startsWith('checkpoint_refresh='));
+    expect(cookie).toMatch(/^checkpoint_refresh=;/);
+    expect(cookie).toContain('Max-Age=0');
+    expect(cookie).toContain('Path=/api/auth');
+    expect(cookie).toContain('HttpOnly');
+    expect(cookie).toContain('SameSite=Lax');
+    expect(db.users).toHaveLength(0);
+    expect(db.sessions).toHaveLength(0);
+    expect(db.games).toHaveLength(0);
+    expect(storage.remove.mock.calls).toEqual([[`${anaId}/g1/nova.png`], ['g2/antiga.webp']]);
+  });
+
+  it('depois, o mesmo token já não vale e o e-mail pode ser registrado de novo', async () => {
+    const token = await registerAna();
+    await excluir(token, { senha: 'segredo-forte' });
+
+    const me = await call('GET', '/auth/me', { bearer: token });
+    const login = await call('POST', '/auth/login', {
+      body: { email: 'ana@exemplo.com', senha: 'segredo-forte' },
+    });
+    const denovo = await call('POST', '/auth/registro', {
+      body: { nome: 'Ana Teste', email: 'ana@exemplo.com', senha: 'segredo-forte' },
+    });
+    expect(me.status).toBe(401);
+    expect(login.json).toMatchObject({ code: 'AUTH_CREDENCIAIS_INVALIDAS' });
+    expect(denovo.status).toBe(201);
+  });
+
+  it('senha errada → 400 AUTH_SENHA_ATUAL_INCORRETA com fields.senha e nada é apagado (CA-25)', async () => {
+    const token = await registerAna();
+
+    const reply = await excluir(token, { senha: 'nao-e-esta' });
+
+    expect(reply.status).toBe(400);
+    expect(reply.json).toMatchObject({
+      code: 'AUTH_SENHA_ATUAL_INCORRETA',
+      fields: { senha: 'Senha atual incorreta.' },
+    });
+    expect(reply.setCookies).toEqual([]);
+    expect(db.users).toHaveLength(1);
+    expect(db.sessions).toHaveLength(1);
+    expect(storage.remove).not.toHaveBeenCalled();
+  });
+
+  it('senha vazia → 400 VALIDACAO com fields.senha', async () => {
+    const token = await registerAna();
+
+    const reply = await excluir(token, { senha: '' });
+
+    expect(reply.status).toBe(400);
+    expect(reply.json).toMatchObject({
+      code: 'VALIDACAO',
+      fields: { senha: FIELD_MESSAGES.senhaLoginVazia },
+    });
+    expect(db.users).toHaveLength(1);
+  });
+
+  it('sem token → 401 AUTH_NAO_AUTENTICADO, sem tocar no banco', async () => {
+    await registerAna();
+
+    const reply = await excluir(undefined, { senha: 'segredo-forte' });
+
+    expect(reply.status).toBe(401);
+    expect(reply.json).toMatchObject({ code: 'AUTH_NAO_AUTENTICADO' });
+    expect(db.users).toHaveLength(1);
+  });
+
+  it('storage falhando: 204 mesmo assim, e a conta some (CA-26)', async () => {
+    const token = await registerAna();
+    const anaId = db.users[0]?.id as string;
+    db.games.push({ userId: anaId, capaPath: `${anaId}/g1/nova.png` });
+    storage.remove.mockRejectedValue(new Error('storage fora do ar'));
+
+    const reply = await excluir(token, { senha: 'segredo-forte' });
+
+    expect(reply.status).toBe(204);
+    expect(db.users).toHaveLength(0);
+  });
+
+  it('o 6º pedido em 15 min → 429 LIMITE_TENTATIVAS com Retry-After (CA-29)', async () => {
+    const token = await registerAna();
+    const statuses: number[] = [];
+    for (let i = 0; i < 6; i += 1) {
+      statuses.push((await excluir(token, { senha: 'errada-mesmo' })).status);
+    }
+
+    expect(statuses).toEqual([400, 400, 400, 400, 400, 429]);
+    expect(db.users).toHaveLength(1);
+  });
+
+  it('contador próprio: 5 trocas de senha erradas não gastam a cota da exclusão, e vice-versa', async () => {
+    const token = await registerAna();
+    const trocas: number[] = [];
+    for (let i = 0; i < 5; i += 1) {
+      trocas.push(
+        (
+          await call('PUT', '/auth/senha', {
+            bearer: token,
+            body: { senhaAtual: 'errada-mesmo', novaSenha: 'outra-senha-boa' },
+          })
+        ).status,
+      );
+    }
+    const exclusoes: number[] = [];
+    for (let i = 0; i < 5; i += 1) {
+      exclusoes.push((await excluir(token, { senha: 'errada-mesmo' })).status);
+    }
+
+    expect(trocas).toEqual([400, 400, 400, 400, 400]);
+    // Se a cota fosse dividida, a 1ª exclusão já seria 429.
+    expect(exclusoes).toEqual([400, 400, 400, 400, 400]);
+    expect((await excluir(token, { senha: 'errada-mesmo' })).status).toBe(429);
+  });
+
+  it('o limite é o da spec: 5 a cada 15 minutos', () => {
+    expect(EXCLUSAO_CONTA_LIMIT).toEqual({ limit: 5, ttl: 15 * 60 * 1000 });
   });
 });
