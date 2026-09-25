@@ -1,9 +1,12 @@
 import {
   PROVEDOR_SLUG,
   type ContaVinculada,
+  type DadosJogoPlataforma,
   type IniciarVinculoResponse,
+  type ItemBiblioteca,
   type PerfilPlataforma,
   type Provedor,
+  type VincularJogoRequest,
 } from '@checkpoint/shared';
 import { apiClient } from '@/shared/lib/api-client';
 
@@ -46,5 +49,31 @@ export const integracoesApi = {
   /** `DELETE /api/integracoes/:provedor` (204): desvincula e apaga os dados da plataforma dos jogos. */
   async desvincular(provedor: Provedor): Promise<void> {
     await apiClient.delete(rota(provedor));
+  },
+
+  /** `GET /api/integracoes/:provedor/biblioteca`: a biblioteca do usuário (busca por título, até 50 itens). */
+  async biblioteca(provedor: Provedor, busca?: string): Promise<ItemBiblioteca[]> {
+    const response = await apiClient.get<ItemBiblioteca[]>(`${rota(provedor)}/biblioteca`, {
+      params: busca ? { busca } : undefined,
+    });
+    return response.data;
+  },
+
+  /** `PUT /api/integracoes/:provedor/jogos/:jogoId`: liga o jogo ao item (409 se já houver vínculo). */
+  async vincularJogo(
+    provedor: Provedor,
+    jogoId: string,
+    body: VincularJogoRequest,
+  ): Promise<DadosJogoPlataforma> {
+    const response = await apiClient.put<DadosJogoPlataforma>(
+      `${rota(provedor)}/jogos/${encodeURIComponent(jogoId)}`,
+      body,
+    );
+    return response.data;
+  },
+
+  /** `DELETE /api/integracoes/:provedor/jogos/:jogoId` (204): tira só a camada da plataforma do jogo. */
+  async desvincularJogo(provedor: Provedor, jogoId: string): Promise<void> {
+    await apiClient.delete(`${rota(provedor)}/jogos/${encodeURIComponent(jogoId)}`);
   },
 };
