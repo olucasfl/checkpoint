@@ -302,6 +302,27 @@ button:disabled {
     background: color-mix(in srgb, var(--color-fundo) 85%, transparent);
   }
 
+  /* Capa gerada em pé: brilho diagonal (28% de `texto` no canto), anel decorativo e iniciais escuras. Iniciais: 6,12 a
+     8,06:1 sobre as seis cores no canto com brilho (spec troca-de-design-estante). */
+  .capa-brilho {
+    background: linear-gradient(
+      160deg,
+      color-mix(in srgb, var(--color-texto) 28%, transparent),
+      transparent 40%,
+      color-mix(in srgb, var(--color-fundo) 45%, transparent)
+    );
+  }
+
+  .capa-anel {
+    border-style: solid;
+    border-color: color-mix(in srgb, var(--color-texto) 16%, transparent);
+    border-radius: 50%;
+  }
+
+  .capa-iniciais {
+    color: color-mix(in srgb, var(--color-fundo) 78%, transparent);
+  }
+
   /* Halo estático atrás do topo (direção "Estante de console"): um degradê radial na cor do destaque. Nada anima. */
   .halo {
     position: absolute;

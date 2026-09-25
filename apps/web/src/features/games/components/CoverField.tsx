@@ -77,7 +77,10 @@ export function CoverField({
         }`}
       >
         {previewUrl ? (
-          <div className="size-24 shrink-0 overflow-hidden rounded-[4px]" data-cover="preview">
+          <div
+            className="aspect-[3/4] w-[72px] shrink-0 overflow-hidden rounded-lg"
+            data-cover="preview"
+          >
             <img
               src={previewUrl}
               alt="Prévia da capa selecionada"
@@ -100,6 +103,9 @@ export function CoverField({
             </button>
           </div>
           <span className="text-[15px] text-texto-suave">JPEG, PNG ou WebP, até 2 MB</span>
+          <span className="text-[15px] text-texto-suave">
+            A capa aparece em pé (3:4); imagens de outra proporção são cortadas no centro.
+          </span>
         </div>
 
         <input

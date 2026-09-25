@@ -185,8 +185,8 @@ describe('conteúdo (CA-25)', () => {
     const gerada = document.querySelector('[data-cover="generated"]') as HTMLElement;
 
     expect(gerada).toHaveTextContent('C');
-    expect(gerada).toHaveClass('max-w-[320px]');
-    expect(gerada).toHaveClass('aspect-square');
+    expect(gerada).toHaveClass('max-w-[300px]');
+    expect(gerada).toHaveClass('aspect-[3/4]');
   });
 
   it('com capa enviada mostra a imagem', async () => {
