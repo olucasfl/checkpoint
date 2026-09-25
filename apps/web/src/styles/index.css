@@ -319,6 +319,14 @@ button:disabled {
     border-radius: 50%;
   }
 
+  /* Anel da média: arco `texto` sobre trilho escuro (fundo a 60%: >= 4,49:1 até sobre uma imagem branca). */
+  .anel-nota {
+    background: conic-gradient(
+      var(--color-texto) calc(var(--pct) * 1%),
+      color-mix(in srgb, var(--color-fundo) 60%, transparent) 0
+    );
+  }
+
   .capa-iniciais {
     color: color-mix(in srgb, var(--color-fundo) 78%, transparent);
   }

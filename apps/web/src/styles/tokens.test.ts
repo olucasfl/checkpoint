@@ -345,3 +345,20 @@ describe('contrastes da spec troca-de-design-estante (CA-03)', () => {
     expect(contraste(t('apagado-2'), t('painel'))).toBeLessThan(4.5);
   });
 });
+
+describe('estante: anel da nota e capa gerada (F2)', () => {
+  it('o anel da média é um conic-gradient com o arco em `texto` e o trilho em color-mix do fundo (sem hex)', () => {
+    const regra = css.match(/\.anel-nota\s*\{[^}]*\}/)?.[0] ?? '';
+
+    expect(regra).toContain('conic-gradient');
+    expect(regra).toContain('var(--color-texto)');
+    expect(regra).toMatch(/color-mix\(in srgb, var\(--color-fundo\) 60%, transparent\)/);
+  });
+
+  it('a capa gerada tem brilho, anel e iniciais só com tokens', () => {
+    for (const classe of ['capa-brilho', 'capa-anel', 'capa-iniciais']) {
+      expect(css, classe).toContain(`.${classe} {`);
+    }
+    expect(css).toMatch(/\.capa-iniciais\s*\{[^}]*var\(--color-fundo\) 78%/);
+  });
+});
