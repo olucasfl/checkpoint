@@ -18,16 +18,20 @@ afterEach(() => {
 });
 
 // O jsdom nao implementa `<dialog>.showModal()/close()`. Este polyfill minimo reproduz o que os testes
-// observam: o atributo `open` e o evento `close`, que o React entrega em `onClose`.
+// observam: o atributo `open` e o evento `close`, que o React entrega em `onClose`, e a volta do foco ao
+// elemento que abriu (o navegador faz isso ao fechar um diálogo modal).
+const abriuComFoco = new WeakMap<HTMLDialogElement, Element | null>();
 const dialog = globalThis.HTMLDialogElement?.prototype;
 if (dialog) {
   dialog.showModal = function showModal(this: HTMLDialogElement) {
+    abriuComFoco.set(this, document.activeElement);
     this.setAttribute('open', '');
   };
   dialog.close = function close(this: HTMLDialogElement) {
     if (this.hasAttribute('open')) {
       this.removeAttribute('open');
       this.dispatchEvent(new Event('close'));
+      (abriuComFoco.get(this) as HTMLElement | null | undefined)?.focus?.();
     }
   };
 }

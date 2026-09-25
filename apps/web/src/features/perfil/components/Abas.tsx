@@ -63,6 +63,7 @@ export function Abas({ base, rotulo, abas, ativa, onChange }: AbasProps) {
             role="tab"
             aria-selected={marcada}
             aria-controls={idDoPainel(base, aba.id)}
+            data-autofocus={marcada ? '' : undefined}
             tabIndex={marcada ? 0 : -1}
             onClick={() => onChange(aba.id)}
             onKeyDown={(event) => onKeyDown(event, indice)}

@@ -1,21 +1,22 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { AxiosError } from 'axios';
 import { MemoryRouter } from 'react-router-dom';
 import { type Game, type Usuario } from '@checkpoint/shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { entrar, getSession, resetSessionForTests } from '@/features/auth/session/session';
+import { authApi } from '@/features/auth/api/auth-api';
 import { gamesApi } from '@/features/games/api/games-api';
 import { perfilApi } from '@/features/perfil/api/perfil-api';
 import { coverBackground } from '@/shared/lib/game-cover';
-import { PREFS } from '@/shared/lib/prefs/prefs';
 import { definirUsuario, resetPrefsForTests } from '@/shared/lib/prefs/prefs-store';
 import { storage } from '@/shared/lib/storage/storage';
 import { ehSafariIos, estaInstalado } from '@/shared/lib/pwa/display';
 import { pedirInstalacao, podeInstalar } from '@/shared/lib/pwa/install-prompt';
 import { PerfilPage } from './PerfilPage';
 
+vi.mock('@/features/auth/api/auth-api', () => ({ authApi: { logout: vi.fn() } }));
 vi.mock('@/features/games/api/games-api', () => ({ gamesApi: { list: vi.fn() } }));
 vi.mock('@/features/perfil/api/perfil-api', () => ({
   perfilApi: {
@@ -34,6 +35,7 @@ vi.mock('@/shared/lib/pwa/display', () => ({ estaInstalado: vi.fn(), ehSafariIos
 
 const games = vi.mocked(gamesApi);
 const perfil = vi.mocked(perfilApi);
+const auth = vi.mocked(authApi);
 
 const ANA: Usuario = {
   id: 'u1',
@@ -238,18 +240,63 @@ describe('nome editável (CA-04)', () => {
   });
 });
 
-describe('conta (CA-05)', () => {
-  it('"Trocar senha" leva a /perfil/senha e Sair continua', () => {
+describe('estrutura da página (CA-31, CA-33)', () => {
+  const conta = () => screen.getByRole('region', { name: 'Conta' });
+
+  it('Conta em linhas: Trocar senha, Sessões ativas e Sair, nesta ordem, sem repetir o nome', () => {
     renderPerfil();
 
-    expect(screen.getByRole('link', { name: 'Trocar senha' })).toHaveAttribute(
+    const ordem = [
+      within(conta()).getByRole('link', { name: 'Trocar senha' }),
+      within(conta()).getByRole('button', { name: 'Sessões ativas' }),
+      within(conta()).getByRole('button', { name: 'Sair' }),
+    ];
+    for (let i = 1; i < ordem.length; i++) {
+      expect(
+        (ordem[i - 1] as HTMLElement).compareDocumentPosition(ordem[i] as HTMLElement) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    }
+    expect(within(conta()).getByRole('link', { name: 'Trocar senha' })).toHaveAttribute(
       'href',
       '/perfil/senha',
     );
-    expect(screen.getByRole('button', { name: 'Sair' })).toBeInTheDocument();
+    expect(within(conta()).queryByText('Ana Teste')).not.toBeInTheDocument();
   });
 
-  it('a seção Conta tem Trocar senha, Sessões ativas e Sair, nesta ordem, sem repetir o nome (etapa 2)', async () => {
+  it('as seções vêm na ordem: cabeçalho, Conta, Preferências, Zona de perigo', () => {
+    renderPerfil();
+
+    const secoes = [
+      cabecalho(),
+      conta(),
+      screen.getByRole('region', { name: 'Preferências' }),
+      screen.getByRole('region', { name: 'Zona de perigo' }),
+    ];
+    for (let i = 1; i < secoes.length; i++) {
+      expect(
+        (secoes[i - 1] as HTMLElement).compareDocumentPosition(secoes[i] as HTMLElement) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    }
+  });
+
+  it('as preferências saíram da página: só a linha que abre o modal (com o resumo)', () => {
+    renderPerfil();
+
+    const linha = screen.getByRole('button', { name: /Preferências do aparelho/ });
+    expect(linha).toHaveTextContent('Magenta · Confortável');
+    expect(screen.queryByRole('radiogroup')).not.toBeInTheDocument();
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+  });
+
+  it('uma coluna só: sem o grid de duas colunas', () => {
+    renderPerfil();
+
+    expect(document.querySelector('[class*="grid-cols-2"]')).toBeNull();
+  });
+
+  it('Sessões ativas expande no lugar (aria-expanded) e mostra a lista (CA-12)', async () => {
     perfil.listarSessoes.mockResolvedValue([
       {
         id: 's-a',
@@ -259,22 +306,81 @@ describe('conta (CA-05)', () => {
         atual: true,
       },
     ]);
-    renderPerfil();
+    const user = renderPerfil();
+    const linha = screen.getByRole('button', { name: 'Sessões ativas' });
+    expect(linha).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByText('Este aparelho')).not.toBeInTheDocument();
 
-    const conta = screen.getByRole('region', { name: 'Conta' });
-    await within(conta).findByText('Este aparelho');
-    const ordem = [
-      within(conta).getByRole('link', { name: 'Trocar senha' }),
-      within(conta).getByRole('heading', { name: 'Sessões ativas' }),
-      within(conta).getByRole('button', { name: 'Sair' }),
-    ];
-    for (let i = 1; i < ordem.length; i++) {
-      expect(
-        (ordem[i - 1] as HTMLElement).compareDocumentPosition(ordem[i] as HTMLElement) &
-          Node.DOCUMENT_POSITION_FOLLOWING,
-      ).toBeTruthy();
-    }
-    expect(within(conta).queryByText('Ana Teste')).not.toBeInTheDocument();
+    await user.click(linha);
+
+    expect(linha).toHaveAttribute('aria-expanded', 'true');
+    expect(await screen.findByText('Este aparelho')).toBeInTheDocument();
+    await user.click(linha);
+    expect(screen.queryByText('Este aparelho')).not.toBeInTheDocument();
+  });
+
+  it('Sair chama o logout e a sessão local termina (CA-33)', async () => {
+    auth.logout.mockResolvedValue(undefined);
+    const user = renderPerfil();
+
+    await user.click(screen.getByRole('button', { name: 'Sair' }));
+
+    await waitFor(() => expect(auth.logout).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(getSession().status).not.toBe('autenticado'));
+  });
+
+  it('Sair sem conexão avisa e NÃO sai (CA-33)', async () => {
+    auth.logout.mockRejectedValue(new AxiosError('rede', 'ERR_NETWORK'));
+    const user = renderPerfil();
+
+    await user.click(screen.getByRole('button', { name: 'Sair' }));
+
+    expect(await screen.findByText('Sem conexão. Para sair, conecte-se.')).toBeInTheDocument();
+    expect(getSession().status).toBe('autenticado');
+  });
+
+  it('Excluir conta abre o diálogo da etapa 4, inalterado (CA-33)', async () => {
+    const user = renderPerfil();
+
+    await user.click(screen.getByRole('button', { name: 'Excluir conta' }));
+
+    expect(await screen.findByRole('heading', { name: 'Excluir conta' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Cancelar' })).toBeInTheDocument();
+  });
+});
+
+describe('linha de Preferências abre o modal (CA-34)', () => {
+  it('abre na aba Aparência com o foco dentro; Esc/Concluído fecham e o foco volta à linha', async () => {
+    const user = renderPerfil();
+    const linha = screen.getByRole('button', { name: /Preferências do aparelho/ });
+
+    await user.click(linha);
+
+    const modal = screen.getByRole('dialog', { name: 'Preferências' });
+    expect(within(modal).getByRole('tab', { name: 'Aparência', selected: true })).toHaveFocus();
+
+    await user.click(within(modal).getByRole('button', { name: 'Concluído' }));
+    expect(screen.queryByRole('dialog', { name: 'Preferências' })).not.toBeInTheDocument();
+    expect(linha).toHaveFocus();
+
+    await user.click(linha);
+    expect(screen.getByRole('dialog', { name: 'Preferências' })).toBeInTheDocument();
+    // O Esc nativo do <dialog> não existe no jsdom: o navegador responde a ele com `close()`.
+    act(() => (screen.getByRole('dialog', { name: 'Preferências' }) as HTMLDialogElement).close());
+    expect(linha).toHaveFocus();
+  });
+
+  it('o resumo da linha acompanha a escolha feita no modal', async () => {
+    const user = renderPerfil();
+
+    await user.click(screen.getByRole('button', { name: /Preferências do aparelho/ }));
+    await user.click(screen.getByRole('radio', { name: 'Violeta' }));
+    await user.click(screen.getByRole('radio', { name: 'Compacta' }));
+    await user.click(screen.getByRole('button', { name: 'Concluído' }));
+
+    expect(screen.getByRole('button', { name: /Preferências do aparelho/ })).toHaveTextContent(
+      'Violeta · Compacta',
+    );
   });
 });
 
@@ -311,93 +417,5 @@ describe('"Instalar app" só quando dá para instalar (CA-06)', () => {
 
     expect(screen.getByRole('status')).toHaveTextContent('Adicionar à Tela de Início');
     expect(pedirInstalacao).not.toHaveBeenCalled();
-  });
-});
-
-describe('preferências deste aparelho (perfil, etapa 3)', () => {
-  const secao = () => screen.getByRole('region', { name: 'Preferências deste aparelho' });
-  const grupo = (nome: string) => within(secao()).getByRole('radiogroup', { name: nome });
-
-  it('a seção com a legenda e as quatro escolhas nos padrões da spec', () => {
-    renderPerfil();
-
-    expect(within(secao()).getByText('Salvas só neste aparelho')).toBeInTheDocument();
-    const marcada = (nome: string) =>
-      within(grupo(nome)).getByRole('radio', { checked: true }).textContent;
-    expect(marcada('Cor de destaque')).toBe('Magenta');
-    expect(marcada('Filtro inicial do catálogo')).toBe('Todos');
-    expect(marcada('Densidade da lista')).toBe('Confortável');
-    expect(marcada('Efeitos visuais')).toBe('Completos');
-    expect(
-      within(grupo('Cor de destaque'))
-        .getAllByRole('radio')
-        .map((r) => r.textContent),
-    ).toEqual(['Magenta', 'Violeta', 'Azul', 'Laranja']);
-  });
-
-  it('escolher Violeta muda na hora (aria-checked e <html>) e NÃO faz nenhuma request (CA-14)', async () => {
-    const user = renderPerfil();
-    await within(cabecalho()).findByText(/3 jogos/);
-    const contagem = () =>
-      [perfil.atualizar, perfil.listarSessoes, games.list].map((fn) => fn.mock.calls.length);
-    const antes = contagem();
-
-    await user.click(within(grupo('Cor de destaque')).getByRole('radio', { name: 'Violeta' }));
-
-    expect(
-      within(grupo('Cor de destaque')).getByRole('radio', { name: 'Violeta' }),
-    ).toHaveAttribute('aria-checked', 'true');
-    expect(document.documentElement.dataset.destaque).toBe('violeta');
-    expect(contagem()).toEqual(antes);
-    expect(within(secao()).queryByRole('button', { name: /salvar/i })).not.toBeInTheDocument();
-  });
-
-  it('fica gravada neste navegador, na entrada DESTE usuário', async () => {
-    const user = renderPerfil();
-
-    await user.click(within(grupo('Efeitos visuais')).getByRole('radio', { name: 'Reduzidos' }));
-    await user.click(within(grupo('Densidade da lista')).getByRole('radio', { name: 'Compacta' }));
-
-    const guardadas = storage.get(PREFS);
-    expect(guardadas.ultimoUsuario).toBe(ANA.id);
-    expect(guardadas.porUsuario[ANA.id]).toMatchObject({
-      efeitos: 'reduzidos',
-      densidade: 'compacta',
-    });
-    expect(document.documentElement.dataset.efeitos).toBe('reduzidos');
-  });
-
-  it('as setas trocam a opção marcada, como num grupo de rádios', async () => {
-    const user = renderPerfil();
-    const filtro = () => grupo('Filtro inicial do catálogo');
-
-    within(filtro()).getByRole('radio', { name: 'Todos' }).focus();
-    await user.keyboard('{ArrowRight}');
-
-    expect(within(filtro()).getByRole('radio', { name: 'Jogando' })).toHaveAttribute(
-      'aria-checked',
-      'true',
-    );
-    expect(within(filtro()).getByRole('radio', { name: 'Jogando' })).toHaveFocus();
-  });
-
-  it('plataformas favoritas: até 8; a 9ª mostra "Até 8 favoritas" e não é marcada (CA-19)', async () => {
-    const user = renderPerfil();
-    const caixa = (nome: string) => within(secao()).getByRole('checkbox', { name: nome });
-    const oito = ['PC', 'PS5', 'PS4', 'Xbox One', 'Nintendo Switch', 'Wii', 'Android', 'iOS'];
-
-    for (const p of oito) {
-      await user.click(caixa(p));
-    }
-    await user.click(caixa('Mega Drive'));
-
-    expect(within(secao()).getByText('Até 8 favoritas')).toBeInTheDocument();
-    expect(caixa('Mega Drive')).not.toBeChecked();
-    expect(caixa('PS5')).toBeChecked();
-    expect(storage.get(PREFS).porUsuario[ANA.id]).toMatchObject({ plataformasFavoritas: oito });
-
-    await user.click(caixa('PC'));
-    expect(within(secao()).queryByText('Até 8 favoritas')).not.toBeInTheDocument();
-    expect(caixa('PC')).not.toBeChecked();
   });
 });
