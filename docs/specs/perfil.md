@@ -1,7 +1,8 @@
 # Spec: perfil
 
 > Status: em andamento (aprovada pelo humano em 2026-09-24; etapas 1 a 4 implementadas; faltam as
-> conferências humanas de CA-06, CA-18 e CA-23: ver `INDEX.md`)
+> conferências humanas de CA-06, CA-18 e CA-23: ver `INDEX.md`). **Etapa 5 (redesenho da página e
+> preferências em modal com abas) aprovada e implementada em 2026-09-25 (CA-31 a CA-41 por teste; CA-31 a CA-36 conferidos também no navegador; efeitos "Reduzidos" da prévia e CA-41 só por teste).**
 
 ## Objetivo
 
@@ -15,8 +16,10 @@ Toca `apps/api` (rota de nome e de exclusão em `modules/users/`, rotas de sess�
 (contratos). **Nenhuma mudança de schema.** É a **terceira** spec da rodada (ver "Dependências entre
 specs").
 
-Implementada em **quatro etapas**, cada uma parando para validação. A etapa 4 (excluir conta) entra
-nesta rodada (Q8, decidida em 2026-09-23).
+Implementada em **cinco etapas**, cada uma parando para validação. A etapa 4 (excluir conta) entra
+nesta rodada (Q8, decidida em 2026-09-23). A etapa 5 (2026-09-25) é **só frontend**: enxuga e
+redesenha `/perfil` e move as preferências do aparelho para um modal com abas. Não muda o modelo das
+preferências, o `prefs-store`, as chaves de storage, `apps/api` nem `packages/shared`.
 
 ## Stack
 
@@ -120,7 +123,14 @@ proxies descartam).
 
 ### Web — `/perfil` (`AppLayout`, `RequireAuth`)
 
-Seções, nesta ordem, empilhadas em < 768 px e em duas colunas (conta | preferências) em ≥ 1024 px:
+> **Etapa 5 (2026-09-25) substitui o layout desta seção:** um **único container centralizado**
+> (largura máxima confortável no desktop, sem duas colunas), seções separadas por espaço e divisores
+> finos (não mais cartões com borda empilhados), cantos com raios maiores e consistentes, título de
+> seção pequeno em caixa alta e espaçado. Ordem: Cabeçalho, Conta (linhas), Preferências (uma linha que
+> abre o modal), Instalar app, Zona de perigo. Detalhe em "Etapa 5 — redesenho" abaixo; onde o texto
+> antigo abaixo diverge, vale a etapa 5.
+
+Seções, nesta ordem (etapas 1 a 4; ver o aviso acima):
 
 1. **Cabeçalho:** avatar de iniciais 64 × 64 (cor da paleta `capa-*` por hash do nome normalizado,
    iniciais em `fundo`, Orbitron: reaproveita `features/games/lib/game-cover`, movida para `shared/lib`
@@ -155,6 +165,47 @@ apaga sua conta, seus N jogos e as capas deles. Não dá para desfazer."; campo 
 **desse usuário** do aparelho, avisa as outras abas (`BroadcastChannel` de `autenticacao`) e vai para
 `/login?motivo=conta-excluida` ("Sua conta foi excluída."). Sem conexão → "Sem conexão. Nada foi
 excluído." e o diálogo continua aberto.
+
+### Etapa 5 — redesenho da página e modal de preferências
+
+Só frontend, mesmo tema Neon: **só classes de token** (`bg-fundo`, `text-ouro`, `destaque`…), nenhum
+hex novo fora do `@theme` (`tokens.test.ts`). Nenhuma dependência nova: `Icon` (Material Symbols),
+Tailwind e o `ModalDialog` existentes.
+
+**Página `/perfil`** (um container centralizado, `max-w` confortável), nesta ordem:
+
+1. **Cabeçalho:** o de hoje (avatar de iniciais, nome editável, e-mail, "Membro desde…", resumo do
+   catálogo), sem cartão em volta. Nome e e-mail aparecem **uma vez só** na tela.
+2. **Conta:** lista compacta de **linhas** (ícone, rótulo, seta; ≥ 44 px de altura, divisor fino entre
+   elas), sem repetir o nome: **Trocar senha** (link para `/perfil/senha`), **Sessões ativas** (a linha
+   expande no lugar, `aria-expanded`, e mostra a lista e o **Encerrar todas as outras** da etapa 2, sem
+   mudar o comportamento dela) e **Sair** (botão; mesmas mensagens de erro/sem conexão de hoje).
+3. **Preferências:** **uma** linha, "Preferências do aparelho", com um resumo curto do que está ativo
+   (cor e densidade, ex.: "Magenta · Confortável"), que **abre o modal**.
+4. **Instalar app:** só quando `use-install-option` indicar que dá (igual hoje).
+5. **Zona de perigo:** **Excluir conta**, discreta, no fim (o diálogo de exclusão não muda).
+
+Alvos de toque de 44 × 44 mantidos; sem rolagem horizontal em 360 px.
+
+**Modal "Preferências do aparelho"** (`ModalDialog` existente: `<dialog>` nativo, Esc fecha, foco preso,
+volta à linha que abriu; folha inferior no celular, centralizado em ≥ 768 px). Nenhum outro mecanismo de
+modal.
+
+- **Abas** (`role="tablist"`/`tab`/`tabpanel`; `aria-selected`; Tab só na aba ativa; setas ← → trocam
+  e ativam; Home/End vão à primeira/última): **Aparência** (cor de destaque, densidade, efeitos),
+  **Catálogo** (filtro inicial) e **Plataformas** (até 8 favoritas, chips por família).
+- **Prévia ao vivo, sem Salvar** (o comportamento de hoje: muda na hora e grava por usuário em
+  `checkpoint:prefs`, sem request):
+  - **Cor de destaque:** bolinhas clicáveis (`role="radio"`, `aria-checked`, nome acessível "Magenta",
+    "Violeta"…); a escolha aplica no app por trás **e no próprio modal** (que usa o token `destaque`).
+  - **Densidade e efeitos:** uma **mini-prévia** com duas linhas de jogo **sintéticas** no formato
+    compacto ou confortável, e uma amostra que mostra se orbes e _scanlines_ estão ligados.
+  - **Plataformas:** chips selecionáveis agrupados por família (`aria-pressed`); a 9ª mostra "Até 8
+    favoritas" e não marca.
+- Botão único **Concluído** fecha. **Restaurar padrões** por aba (sem regra nova: volta ao padrão só as
+  preferências daquela aba).
+- `prefers-reduced-motion` e os efeitos "Reduzidos" desligam toda animação nova (variante
+  `movimento-reduzido`). Contraste ≥ 4,5:1 nas quatro cores de destaque. Sem `maximum-scale`.
 
 ### Preferências do aparelho (etapa 3)
 
@@ -235,17 +286,17 @@ Ana; `C` = Bia). UI contra `http://localhost:5173`. Dados sintéticos.
 - [x] **CA-09** — **Dado** o id da sessão B, **quando** `DELETE /api/auth/sessoes/<idB>` pelo A, **então** 204; em B, `GET /auth/me` → 401 `AUTH_SESSAO_ENCERRADA` imediatamente e `refresh` → 401.
 - [x] **CA-10** — **Dado** Ana em A, **quando** `DELETE` no id da **própria** sessão A, **então** 400 `SESSAO_ATUAL`; **no id de uma sessão da Bia**, **então** 404 `SESSAO_NAO_ENCONTRADA` e a sessão da Bia continua; **em `abc`**, **então** 400.
 - [x] **CA-11** — **Dado** Ana com 3 sessões, **quando** `DELETE /api/auth/sessoes` pelo A, **então** 200 `{"encerradas":2}` e só A continua; repetindo → `{"encerradas":0}`.
-- [x] **CA-12** — **Dado** `/perfil` com duas sessões, **quando** olho a lista, **então** a atual tem "Este aparelho" e nenhum botão, a outra tem **Encerrar**; **quando** clico **Encerrar**, **então** ela some da lista, e o outro navegador vai para `/login?motivo=sessao` na próxima ação.
+- [x] **CA-12** — **Dado** `/perfil` com duas sessões, **quando** abro a linha "Sessões ativas" (etapa 5) e olho a lista, **então** a atual tem "Este aparelho" e nenhum botão, a outra tem **Encerrar**; **quando** clico **Encerrar**, **então** ela some da lista, e o outro navegador vai para `/login?motivo=sessao` na próxima ação.
 - [x] **CA-13** — **Dado** três sessões, **quando** clico **Encerrar todas as outras** e confirmo, **então** sobra só "Este aparelho" e o botão some; **quando** cancelo, **então** nada muda.
 
 ### Etapa 3 — preferências do aparelho
 
-- [x] **CA-14** — **Dado** `/perfil`, **quando** escolho Violeta, **então** o logo, o item "Adicionar" da barra (ou o botão "Adicionar jogo" em desktop) e a borda do diálogo ficam violeta na hora; os selos de status e o filtro ativo **não** mudam; **e** nenhuma request sai (Network).
+- [x] **CA-14** — **Dado** o modal de preferências aberto na aba Aparência (etapa 5; antes, `/perfil`), **quando** escolho Violeta, **então** o logo, o item "Adicionar" da barra (ou o botão "Adicionar jogo" em desktop) e a borda do diálogo ficam violeta na hora; os selos de status e o filtro ativo **não** mudam; **e** nenhuma request sai (Network).
 - [x] **CA-15** — **Dado** Violeta escolhida, **quando** recarrego `/` com a rede em "Slow 4G", **então** o primeiro quadro já mostra o logo violeta (DevTools → Performance, capturas de tela), sem piscar em magenta.
 - [x] **CA-16** — **Dado** filtro inicial "Jogando", **quando** toco em "Jogos" na barra ou abro `/`, **então** a URL vira `/?status=JOGANDO` e só aparecem jogos Jogando; **quando** clico em "Todos", **então** a URL vira `/?status=TODOS`, aparecem todos, e recarregar mantém Todos; **e** um link direto `/?status=ZERADO` é respeitado.
 - [x] **CA-17** — **Dado** densidade Compacta e 10 jogos, **quando** abro `/`, **então** as capas medem 40 × 40, a lista fica mais baixa que na Confortável, e as ações da linha continuam com ≥ 44 × 44 px.
 - [ ] **CA-18** — **Dado** efeitos Reduzidos e o sistema **sem** `prefers-reduced-motion`, **quando** abro `/`, **então** não há orbes nem _scanlines_, e nenhuma animação roda (o pulso do botão, o ponto do "Jogando", o tremor do campo com erro).
-- [x] **CA-19** — **Dado** favoritas PS5 e Nintendo Switch, **quando** abro o formulário de jogo, **então** a Plataforma começa pelo grupo "Favoritas" com as duas, que não aparecem de novo nos grupos PlayStation e Nintendo; **quando** tento marcar a 9ª favorita, **então** vejo "Até 8 favoritas" e ela não é marcada.
+- [x] **CA-19** — **Dado** favoritas PS5 e Nintendo Switch, **quando** abro o formulário de jogo, **então** a Plataforma começa pelo grupo "Favoritas" com as duas, que não aparecem de novo nos grupos PlayStation e Nintendo; **quando** tento marcar a 9ª favorita (aba Plataformas do modal, etapa 5), **então** vejo "Até 8 favoritas" e ela não é marcada.
 - [x] **CA-20** — **Dado** Ana com Violeta, **quando** ela sai e Bia entra no mesmo navegador, **então** Bia vê Magenta (padrão); **quando** Bia sai e Ana entra, **então** Ana vê Violeta de novo.
 - [x] **CA-21** — **Dado** `checkpoint:prefs` corrompida à mão, **quando** recarrego, **então** o app abre com os padrões, sem erro na tela.
 - [x] **CA-22** — **Dado** o storage bloqueado no navegador, **quando** mudo a cor, **então** ela vale até recarregar, sem erro.
@@ -261,6 +312,20 @@ Ana; `C` = Bia). UI contra `http://localhost:5173`. Dados sintéticos.
 - [x] **CA-29** — **Dado** 6 pedidos de exclusão com senha errada em 15 min, **então** o 6º é 429.
 - [x] **CA-30** — **Dado** o DevTools em "Offline", **quando** confirmo a exclusão, **então** vejo "Sem conexão. Nada foi excluído.", o diálogo continua aberto e a conta existe.
 
+### Etapa 5 — redesenho da página e modal de preferências
+
+- [x] **CA-31** — **Dado** Ana logada, **quando** abro `/perfil`, **então** vejo, nesta ordem, Cabeçalho (nome e e-mail **uma vez só**), Conta com três **linhas** (Trocar senha, Sessões ativas, Sair), a linha "Preferências do aparelho" com o resumo (ex.: "Magenta · Confortável"), Instalar app (só se aplicável) e Excluir conta no fim; **e** não há mais as preferências (grupos de opções nem lista de plataformas) na página.
+- [x] **CA-32** — **Dado** ≥ 1024 px, **então** o conteúdo é **uma coluna** centralizada com largura máxima; **dado** 375 px (e 360 px), **então** não há rolagem horizontal e todo botão e linha tem ≥ 44 × 44 px.
+- [x] **CA-33** — **Dado** `/perfil`, **quando** clico em "Trocar senha", **então** vou para `/perfil/senha`; **quando** clico em "Sair", **então** saio como antes (e sem conexão vejo "Sem conexão. Para sair, conecte-se."); **quando** clico em "Excluir conta", **então** abre o diálogo de exclusão da etapa 4, inalterado.
+- [x] **CA-34** — **Dado** `/perfil`, **quando** ativo a linha "Preferências do aparelho", **então** abre o modal na aba **Aparência** com o foco dentro; **quando** aperto Esc ou **Concluído**, **então** fecha e o foco volta à linha; **e** no celular ele é folha inferior e em ≥ 768 px é centralizado.
+- [x] **CA-35** — **Dado** o modal aberto, **então** há três abas (Aparência, Catálogo, Plataformas) com `role="tab"`, só a ativa com `aria-selected="true"` e Tab só nela (`tabIndex` 0, as outras -1); **quando** aperto → ou ←, **então** a aba vizinha ativa, recebe o foco e mostra seu `tabpanel` (com volta circular); Home/End vão à primeira/última.
+- [x] **CA-36** — **Dado** a aba Aparência, **quando** escolho Violeta (bolinha `role="radio"` "Violeta"), **então** `html[data-destaque]` vira `violeta` **na hora**, o próprio modal (borda e bolinha marcada) fica violeta, `aria-checked` muda, a escolha fica em `checkpoint:prefs` **do usuário** (Bia, no mesmo navegador, continua Magenta) e **nenhuma request** sai; **e** o contraste do texto `fundo` sobre as quatro cores continua ≥ 4,5:1.
+- [x] **CA-37** — **Dado** a aba Aparência, **quando** troco Densidade e Efeitos, **então** a mini-prévia (duas linhas de jogo sintéticas) muda entre compacta e confortável e a amostra mostra orbes e _scanlines_ ligados ou desligados, **na hora**, e o catálogo por trás usa a mesma escolha.
+- [x] **CA-38** — **Dado** a aba Catálogo, **quando** escolho "Jogando", **então** o filtro inicial vira JOGANDO (CA-16 continua valendo) sem request.
+- [x] **CA-39** — **Dado** a aba Plataformas, **quando** marco 8 chips, **então** todos ficam marcados (`aria-pressed`); **quando** tento a 9ª, **então** vejo "Até 8 favoritas" e ela não marca; **quando** desmarco uma, **então** o aviso some; os chips estão agrupados por família.
+- [x] **CA-40** — **Dado** o modal, **quando** uso **Restaurar padrões** numa aba, **então** só as preferências daquela aba voltam ao padrão (Aparência: Magenta, Confortável, Completos; Catálogo: Todos; Plataformas: nenhuma) e as das outras abas ficam como estavam.
+- [x] **CA-41** — **Dado** efeitos "Reduzidos" ou `prefers-reduced-motion`, **então** nenhuma animação nova do modal ou da página roda (variante `movimento-reduzido`); **e** `tokens.test.ts` continua verde (nenhum hex fora do `@theme`).
+
 ## Plano de testes
 
 - **Unitário — API (Jest, Prisma e `StorageService` mockados):**
@@ -275,7 +340,12 @@ Ana; `C` = Bia). UI contra `http://localhost:5173`. Dados sintéticos.
   exclusão, CA-20 a CA-22); `apply-prefs.test.ts` (`data-destaque`/`data-efeitos` no `<html>` antes do
   render); `initial-filter.test.ts` (sem parâmetro → filtro inicial; `TODOS`; parâmetro explícito
   respeitado, CA-16); `PlatformField.test.tsx` (grupo Favoritas sem repetição, CA-19);
-  `PerfilPage.test.tsx` (resumo, edição de nome com Esc, sessões, instalar só quando aplicável);
+  `PerfilPage.test.tsx` (resumo, edição de nome com Esc, sessões, instalar só quando aplicável; **etapa 5:**
+  nova estrutura, linha de Preferências abre o modal, Sair e Zona de perigo intactos);
+  **etapa 5:** `PreferenciasModal.test.tsx` (abas: teclado, aba ativa, foco ao abrir e ao fechar;
+  prévia ao vivo: escolher a cor muda `data-destaque` na hora e persiste por usuário; limite de 8
+  favoritas; Restaurar padrões por aba). Os testes das preferências que estavam em `PerfilPage.test.tsx`
+  **migram** para lá, sem perder cobertura;
   `ExcluirContaDialog.test.tsx` (botão desabilitado sem senha, foco em Cancelar, mensagens por `code`,
   sem conexão); `styles/tokens.test.ts` (acréscimo: `destaque` mapeia só para tokens existentes;
   `data-efeitos="reduzidos"` no mesmo bloco das regras de movimento).
@@ -289,7 +359,8 @@ commit.
 
 ## Ordem de implementação
 
-Quatro etapas, cada uma parando para validação. Branch sugerida: `feat/perfil`.
+Cinco etapas, cada uma parando para validação. Branch sugerida: `feat/perfil` (a etapa 5 sai de
+`develop` numa branch nova, `feat/perfil-redesenho`).
 
 | Etapa | Entrega                                                                                                  | Depende de                                                                                                            | Critérios     |
 | ----- | -------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ------------- |
@@ -297,6 +368,7 @@ Quatro etapas, cada uma parando para validação. Branch sugerida: `feat/perfil`
 | 2     | rotas de sessões + seção "Sessões ativas"                                                                | `autenticacao` etapa 1                                                                                                | CA-08 a CA-13 |
 | 3     | `checkpoint:prefs` · token `destaque` · aplicação antes do render · as cinco preferências                | `pwa-e-mobile` etapas 1 e 2 (Q7 decidida)                                                                             | CA-14 a CA-23 |
 | 4     | `POST /users/me/exclusao` · Zona de perigo · diálogo                                                     | `autenticacao` etapa 4 (dono obrigatório, cascade; Q5 decidida em 2026-09-24: descartar os jogos)                     | CA-24 a CA-30 |
+| 5     | `/perfil` enxuta (linhas, um container) · preferências em modal com abas e prévia ao vivo (só web)       | etapas 3 e 4 (o `prefs-store`, o `ModalDialog` e a Zona de perigo já existem)                                         | CA-31 a CA-41 |
 
 `ARCHITECTURE.md` muda junto: §3/§4.4 (módulo `users`, rotas de sessões no `auth`), §5 (página
 `/perfil`, `checkpoint:prefs`, token `destaque`, `game-cover` em `shared/lib`), §6 (contratos novos).

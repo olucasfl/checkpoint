@@ -587,13 +587,16 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
   (`lib/perfil-avisos.ts`: só um aviso conhecido é mostrado, em `role="status"`). As outras sessões caem no
   servidor; o outro navegador descobre na próxima request (401 → `/login?motivo=sessao`).
 
-### 5.11 Perfil (`features/perfil/`, `pages/PerfilPage.tsx`, spec `docs/specs/perfil.md`, etapas 1 a 4)
+### 5.11 Perfil (`features/perfil/`, `pages/PerfilPage.tsx`, spec `docs/specs/perfil.md`, etapas 1 a 5)
 
-- **`/perfil`** (dentro do `RequireAuth` + `AppLayout`): cabeçalho, seção **Conta** ("Salvo na sua conta":
-  Trocar senha → `/perfil/senha`, Sessões ativas, Sair; **sem repetir o nome**, que é editável no cabeçalho),
-  seção **App** ("Instalar app", só quando dá), **Preferências deste aparelho** (§5.12) e, por último e em
-  largura total, a **Zona de perigo**. Empilhado abaixo de 1024px e em duas colunas (`lg:grid-cols-2`: conta e
-  app | preferências) a partir de 1024px.
+- **`/perfil`** (dentro do `RequireAuth` + `AppLayout`; etapa 5): **uma coluna** centralizada (`max-w-[640px]`, sem
+  grid de duas colunas), seções separadas por espaço e divisores finos, contêineres `rounded-2xl` sem borda. Ordem:
+  **Cabeçalho**; **Conta** (`ListaDeLinhas` de `LinhaConta.tsx`: **Trocar senha** → `/perfil/senha`, **Sessões ativas**
+  e **Sair**, linhas de 56 px com ícone, rótulo e seta; **sem repetir o nome**); **Preferências** (uma linha,
+  "Preferências do aparelho", com o resumo "Cor · Densidade" de `resumoDasPreferencias`, que abre o modal de
+  §5.12); **Instalar app** (só quando dá); **Zona de perigo** (discreta, no fim). **Sessões ativas** é uma linha
+  que se expande no lugar (`aria-expanded`, `aria-controls`): `SessoesAtivas` só monta aberta, então a lista
+  só é buscada quando a pessoa a abre.
 - **Cabeçalho** (`PerfilCabecalho`): avatar de iniciais 64 × 64 com a mesma regra da capa gerada dos jogos
   aplicada ao nome (**`shared/lib/game-cover.ts`**, movido de `features/games/lib` por servir às duas
   features: cor da paleta `capa-1` a `capa-6` por hash FNV-1a do texto aparado e em minúsculas, e as
@@ -607,7 +610,7 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
   sucesso chama `atualizarUsuario` da sessão (`features/auth/session/session.ts`, exposto no `useAuth`), que
   troca o `usuario` só se for a mesma conta ainda autenticada: o nome muda na tela toda sem recarregar. Erros
   pelo `code`/`fields` (`describeAuthError`); o foco volta ao Editar ao fechar.
-- **Instalar app** (`InstalarApp` + `shared/hooks/use-install-option.ts`): `nativo` quando o Chrome/Edge
+- **Instalar app** (`InstalarApp`, uma linha da `ListaDeLinhas`, + `shared/hooks/use-install-option.ts`): `nativo` quando o Chrome/Edge
   guardou o convite (`podeInstalar()`), `ios` no Safari do iPhone/iPad (mostra o passo a passo), e nada quando
   já instalado (`estaInstalado()` ou a chave `instalacao:instalado`). Sem as regras de intervalo do
   `InstallNudge`: é um botão sempre disponível.
@@ -631,13 +634,14 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
   `saida` `conta-excluida` vira `/login?motivo=conta-excluida` (sem `voltar`), e o `LoginPage` mostra "Sua
   conta foi excluída." pelo mesmo mapa de `motivo` do aviso de sessão.
 - **Testes:** `pages/PerfilPage.test.tsx` (cabeçalho e resumo, "—" carregando, edição com Esc sem request,
-  validação local, erros da API, instalar só quando aplicável, ordem da seção Conta),
+  validação local, erros da API, instalar só quando aplicável, estrutura em linhas e ordem das seções, Sessões
+  expansível, Sair com e sem conexão, a linha de Preferências abre o modal e o foco volta a ela),
   `features/perfil/components/SessoesAtivas.test.tsx` (selo, botão só nas outras, confirmação com N, escondido
   sem outras, erros por `code`), `features/perfil/components/ZonaDePerigo.test.tsx` (número de jogos, foco em
   Cancelar, botão desabilitado sem senha, erros por `code`, sem conexão mantém aberto, e o fluxo de sucesso com a
   sessão e o `RequireAuth` de verdade), `features/perfil/lib/resumo.test.ts` e `features/perfil/lib/sessoes.test.ts`.
 
-### 5.12 Preferências deste aparelho (`shared/lib/prefs/`, spec `docs/specs/perfil.md`, etapa 3)
+### 5.12 Preferências deste aparelho (`shared/lib/prefs/`, spec `docs/specs/perfil.md`, etapas 3 e 5)
 
 - **Nunca vão para a API**: ficam só neste navegador, **por usuário**. Uma chave só, **`checkpoint:prefs`**
   (`prefs.ts`, `defineKey`, escopo **`dispositivo`**: sobrevive ao logout), com o valor
@@ -675,14 +679,24 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
   e a legenda "Nota" some em ≥ 768px (a barra fica numa linha); ações continuam 44 × 44.
 - **Favoritas:** `groupsWithFavorites` (`features/games/lib/platforms.ts`) põe o grupo "Favoritas" primeiro
   e as tira do grupo da família (sem opção repetida); o `PlatformField` recebe as favoritas do `GameForm`.
-- **Tela** (`features/perfil/components/PreferenciasAparelho.tsx` + `GrupoOpcoes.tsx`): cada escolha é um
-  `radiogroup` de botões `role="radio"` com `aria-checked` (Tab só na marcada; setas trocam e marcam); as
-  plataformas são caixas de seleção por família, e a 9ª mostra "Até 8 favoritas" e não é marcada. Muda na
-  hora, sem Salvar.
+- **Tela** (etapa 5: `features/perfil/components/PreferenciasModal.tsx`, aberto pela linha de Preferências do
+  `/perfil`): o `ModalDialog` existente (Esc, foco preso, volta à linha que abriu; folha inferior no celular), com
+  três abas em `Abas.tsx` (`tablist`/`tab`/`tabpanel`, ativação automática, setas com volta circular, Home/End, Tab só
+  na ativa, foco inicial na aba ativa): **Aparência** (cor de destaque em bolinhas `role="radio"` com nome
+  acessível, pela variante `bolinha` do `GrupoOpcoes`; densidade e efeitos, cada um com sua prévia em
+  `PreviasAparencia.tsx`: duas linhas de jogo sintéticas nas medidas da `GameRow`, e um quadro com `.orb` e
+  `.scanlines` reais mais um texto do estado), **Catálogo** (filtro inicial) e **Plataformas** (`ChipsPlataformas`:
+  chips `aria-pressed` por família; a 9ª mostra "Até 8 favoritas" e não marca). **Sem Salvar**: cada escolha chama
+  `alterarPrefs`, que aplica no `<html>` e grava por usuário, e o próprio modal usa o token `destaque`, então a cor
+  nova aparece nele também. "Restaurar padrões" volta só as preferências da aba ativa (`PADROES_DA_ABA`, a partir
+  de `PREFS_PADRAO`); **Concluído** fecha. O conteúdo só existe aberto, então cada abertura começa em Aparência.
+  Nenhum formato de storage mudou.
 - **Testes:** `shared/lib/prefs/prefs.test.ts` (validador, por usuário, corrompido, bloqueado),
   `apply-prefs.test.ts` (atributos no `<html>` antes do render, ordem no `main.tsx`), `app/PrefsSync.test.tsx`,
+  `features/perfil/components/PreferenciasModal.test.tsx` (abas e teclado, prévia ao vivo por usuário, limite de 8
+  favoritas, Restaurar padrões por aba; o Esc nativo do `<dialog>` não existe no jsdom e é simulado com `close()`),
   `features/games/lib/initial-filter.test.ts`, `features/games/components/PlatformField.test.tsx`,
-  acréscimos em `styles/tokens.test.ts`, `pages/PerfilPage.test.tsx` e `pages/GamesPage.test.tsx`.
+  acréscimos em `styles/tokens.test.ts` e `pages/GamesPage.test.tsx`.
 
 ---
 

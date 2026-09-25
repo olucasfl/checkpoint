@@ -84,7 +84,7 @@ commit — `/docs-sync` confere se ela bate com a realidade.
 - [x] Gerar `JWT_ACCESS_SECRET` e `JWT_REFRESH_SECRET` (diferentes) e definir `AUTH_REGISTRATION_OPEN`
       em `apps/api/.env`.
 
-**`perfil` — o que falta para ✅ implementada (etapas 1 a 4 feitas; só conferência humana):**
+**`perfil` — o que falta para ✅ implementada (etapas 1 a 4 feitas; só conferência humana; etapa 5, redesenho e modal de preferências, feita: CA-31 a CA-41):**
 
 - [ ] **CA-06** — "Instalar app" num Chrome real, com o app instalável (não dá para exercitar em
       Chrome headless).
