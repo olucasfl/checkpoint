@@ -10,7 +10,7 @@ commit — `/docs-sync` confere se ela bate com a realidade.
 | PWA e mobile       | [pwa-e-mobile.md](pwa-e-mobile.md)             | 🚧 em andamento |
 | Autenticação       | [autenticacao.md](autenticacao.md)             | ✅ implementada |
 | Perfil             | [perfil.md](perfil.md)                         | 🚧 em andamento |
-| Avaliação de jogos | [avaliacao-de-jogos.md](avaliacao-de-jogos.md) | 🚧 em andamento |
+| Avaliação de jogos | [avaliacao-de-jogos.md](avaliacao-de-jogos.md) | ✅ implementada |
 
 ## Legenda de status
 
@@ -93,6 +93,8 @@ commit — `/docs-sync` confere se ela bate com a realidade.
       animação, com o sistema **sem** `prefers-reduced-motion`. Os estilos computados já foram medidos.
 - [ ] **CA-23** — conferir o contraste do texto `fundo` sobre as quatro cores de destaque num
       verificador externo. Pela fórmula WCAG sobre as cores computadas: 6,28, 7,47, 9,64 e 8,98:1.
+
+- [ ] titulo: null devolve mensagem de 120 caracteres (herdado do catálogo)
 
 Mudanças destrutivas de schema (`/db-change`) e outras aprovações explícitas exigidas por
 `.claude/rules/RULES.md` entram aqui quando existirem.

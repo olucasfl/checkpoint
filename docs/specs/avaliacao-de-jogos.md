@@ -1,6 +1,6 @@
 # Spec: avaliacao-de-jogos
 
-> Status: em andamento (aprovada em 2026-09-25; as três etapas estão no código, nos testes e conferidas no navegador em 375 px e ≥ 1024 px, e a migration foi aplicada com backup e "sim" explícito; falta rodar `/qa-verify` e a conferência humana de Editar e Excluir na página, hoje só provadas por teste)
+> Status: implementada (2026-09-25). As três etapas estão feitas, a migration foi aplicada com backup e "sim" explícito, e o `/qa-verify` conferiu **29 de 32 critérios ao vivo**, sem nenhuma falha. Os outros três (CA-13, CA-20 e CA-28) têm a prova em Jest/Vitest, por decisão do dono do produto em 2026-09-25: a conferência ao vivo deles pede uma segunda conta (ver "Critérios provados só por teste").
 
 ## Objetivo
 
@@ -224,7 +224,7 @@ campos, o `schema.prisma` descrito, o `CHECK` da decisão A, o campo Nota do for
 - [x] **CA-10** — **Dado** o jogo do CA-09, **quando** `PATCH` com `{"gameplay":null}`, **então** 200, `notas.gameplay: null` e `notaMedia` recalculada só com os quatro restantes (6,35 → `6.4`); **e** dado um jogo `ZERADO` com um único critério, **quando** `PATCH` que o limpa (`null`) sem mudar o status, **então** 400 com `fields.notas`; **e** `PATCH` com `{"titulo":null}` ou `{"status":null}` continua 400 com `fields.titulo`/`fields.status`.
 - [x] **CA-11** — **Dado** `PATCH`/`POST` com `descricao` `"  Ótimo\n\njogo  "`, **então** a resposta traz `"Ótimo\n\njogo"` (aparada, quebras preservadas); com `""`, `"   "` ou `null`, **então** `descricao: null`; com 1000 caracteres, **então** aceita; com 1001, **então** 400 com `fields.descricao` = `"A descrição deve ter no máximo 1000 caracteres"`.
 - [x] **CA-12** — **Dado** o corpo antigo `{"titulo":"X","status":"ZERADO","nota":8}`, **então** 400 (campo desconhecido) e nenhum jogo criado; **e** nenhum response de `GET/POST/PATCH` contém `nota` nem `capaPath`.
-- [x] **CA-13** — **Dado** dois usuários com jogos, **quando** o segundo faz `GET` na lista, `PATCH` ou `DELETE` num id do primeiro, **então** a lista só traz os dele e o `PATCH`/`DELETE` dão 404; **sem** token, 401.
+- [x] **CA-13** — **Dado** dois usuários com jogos, **quando** o segundo faz `GET` na lista, `PATCH` ou `DELETE` num id do primeiro, **então** a lista só traz os dele e o `PATCH`/`DELETE` dão 404; **sem** token, 401. _(Prova do "outro usuário → 404": Jest, `games.http.spec.ts`, bloco "jogo de outro usuário". Ao vivo foram conferidos 401 sem credencial, 404 para id inexistente e a lista só do dono.)_
 - [x] **CA-14** — **Dado** a migration aplicada, **quando** um `INSERT` direto em `"Game"` grava `notaGameplay = 101`, `-1`, ou qualquer nota com `status = 'QUERO_JOGAR'`, **então** o banco rejeita (`CHECK`). _Verificação manual._
 - [x] **CA-15** — **Dado** o banco com N jogos antes da migration, **quando** ela é aplicada, **então** continuam N jogos, com os mesmos `titulo`, `plataforma`, `status`, `capaPath` e `userId`; as notas antigas não existem mais; e `\d "Game"` não tem a coluna `nota`. _Verificação manual, com a contagem antes e depois._
 
@@ -236,7 +236,7 @@ campos, o `schema.prisma` descrito, o `CHECK` da decisão A, o campo Nota do for
 - [x] **CA-17** — **Dado** um jogo novo em Jogando, **então** os cinco campos começam vazios e o slider mostra "sem nota" (`aria-valuetext`); **quando** mexo o slider do Gameplay até 0, **então** o campo mostra `0` e o envio leva `gameplay: 0`; **quando** clico em **Limpar**, **então** volta a vazio e o envio leva `gameplay: null`.
 - [x] **CA-18** — **Dado** o campo do Gameplay, **quando** digito `8,7` ou `8.7`, **então** o slider vai a 8,7 e o envio leva o número `8.7` (JSON); **quando** movo o slider para 8,7, **então** o campo mostra `8,7` (vírgula).
 - [x] **CA-19** — **Dado** critérios preenchidos com `9`, `8,5` e dois vazios, **então** a média ao vivo mostra `8,8`; **quando** limpo um deles, **então** a média se recalcula na hora; sem nenhum, mostra "—".
-- [x] **CA-20** — **Dado** o campo com `10,5` ou `7,55`, **então** o campo mostra o erro do critério na hora e o formulário **não envia**; **dado** o 400 da API com `fields.historia`, **então** a mensagem aparece junto da História; **dado** `fields.notas` (Zerado sem critério), **então** aparece na seção Avaliação.
+- [x] **CA-20** — **Dado** o campo com `10,5` ou `7,55`, **então** o campo mostra o erro do critério na hora e o formulário **não envia**; **dado** o 400 da API com `fields.historia`, **então** a mensagem aparece junto da História; **dado** `fields.notas` (Zerado sem critério), **então** aparece na seção Avaliação. _(Prova do `fields.<critério>` vindo da API: Vitest, `GameForm.test.tsx`; ao vivo a validação local barra antes de enviar, e só o `fields.notas` da API foi visto na tela.)_
 - [x] **CA-21** — **Dado** um jogo Zerado com notas, **quando** troco o status para Quero jogar, **então** o formulário avisa que as notas serão limpas e, ao salvar, a request leva `null` nos cinco critérios; **e** o jogo fica sem notas.
 - [x] **CA-22** — **Dado** o campo Descrição, **quando** digito, **então** o contador mostra `n/1000` e não passa de 1000; **quando** salvo com quebras de linha, **então** reabrir o formulário mostra as mesmas quebras.
 - [x] **CA-23** — **Dado** um jogo com média 8,3 e outro sem notas, **quando** a lista carrega, **então** a linha do primeiro mostra `8,3` com a barra (8 segmentos) e `aria-label` "Nota 8,3 de 10", e a do segundo mostra "—".
@@ -247,10 +247,24 @@ campos, o `schema.prisma` descrito, o `CHECK` da decisão A, o campo Nota do for
 - [x] **CA-25** — **Dado** um jogo Zerado com `gameplay 9,2`, `historia 8` e os outros vazios, **quando** abro `/jogos/<id>`, **então** vejo capa grande, título, plataforma, status, a média (`8,6`) em destaque e os cinco critérios: Gameplay `9,2` e História `8,0` com barra, e os outros três com "sem nota"; cada barra tem `aria-label` "<Rótulo> <nota> de 10".
 - [x] **CA-26** — **Dado** um jogo sem descrição, **então** vejo o convite "Adicionar descrição", que abre o formulário; **dado** uma descrição `"<b>oi</b>\nlinha 2"`, **então** ela aparece como **texto** (`<b>oi</b>` literal, sem negrito) com a quebra de linha.
 - [x] **CA-27** — **Dado** a página aberta, **quando** clico **Editar**, mudo uma nota e salvo, **então** o modal fecha e a página mostra a nota nova sem recarregar; **quando** clico **Excluir** e confirmo, **então** o jogo some e vou para `/`; **quando** clico **Voltar**, **então** volto ao catálogo.
-- [x] **CA-28** — **Dado** um link direto, **quando** a lista ainda carrega, **então** vejo um esqueleto; **dado** um id inexistente ou de outro usuário, **então** vejo "Jogo não encontrado" com um link para `/` (sem revelar qual dos dois é).
+- [x] **CA-28** — **Dado** um link direto, **quando** a lista ainda carrega, **então** vejo um esqueleto; **dado** um id inexistente ou de outro usuário, **então** vejo "Jogo não encontrado" com um link para `/` (sem revelar qual dos dois é). _(Prova do "de outro usuário": Vitest, `GameDetailPage.test.tsx`, "id inexistente (ou de outro usuário)"; ao vivo foram vistos o esqueleto e o id inexistente.)_
 - [x] **CA-29** — **Dado** `/jogos/<id>` (inclusive após recarregar), **então** o item "Jogos" da navegação (barra inferior e topo) está marcado como ativo.
 - [x] **CA-30** — **Dado** 375 px, **então** não há rolagem horizontal, a coluna é única e todo botão, link e campo tem ≥ 44 px de alto; **dado** ≥ 1024 px, **então** a capa fica ao lado das notas.
 - [x] **CA-31** — **Dado** o app, **então** nenhuma cor nova fora do `@theme` (`tokens.test.ts` verde), nenhuma animação nova sem a variante `movimento-reduzido`, e `package.json` não mudou.
+
+## Critérios provados só por teste
+
+Aceitos pelo dono do produto em 2026-09-25 (depois do `/qa-verify` e do `/review-pr`), porque a conferência ao
+vivo deles exige uma **segunda conta**, e o agente não cria conta:
+
+| Critério | O que fica só no teste                                               | Onde                                                                               |
+| -------- | -------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| CA-13    | PATCH/DELETE de um jogo de **outro usuário** → 404                   | `games.http.spec.ts` (bloco "jogo de outro usuário") e `games.service.spec.ts`     |
+| CA-20    | `fields.<critério>` **devolvido pela API** aparece junto do critério | `GameForm.test.tsx` ("400 de um critério aparece junto do campo daquele critério") |
+| CA-28    | "Jogo não encontrado" para o jogo de **outro usuário**               | `GameDetailPage.test.tsx` ("id inexistente (ou de outro usuário …)")               |
+
+O resto desses três critérios foi visto ao vivo (401 sem credencial, 404 para id inexistente, a lista só do dono, a
+validação de digitação, o `fields.notas` da API na tela, o esqueleto e o "não encontrado").
 
 ## Plano de testes
 
