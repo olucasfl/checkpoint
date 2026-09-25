@@ -196,8 +196,8 @@ describe('mobile-first (pwa-e-mobile, etapa 1)', () => {
 });
 
 describe('cor de destaque e efeitos reduzidos (perfil, etapa 3)', () => {
-  // Até o commit das novas cores (F1, commit 4) os valores gravados ainda são os antigos; `magenta` já é o acento novo.
-  const DESTAQUES = { magenta: 'acento', violeta: 'capa-6', azul: 'capa-1', laranja: 'capa-3' };
+  // Azul é o padrão (`acento`); as outras três só apontam para tokens da capa (nenhum hex novo).
+  const DESTAQUES = { azul: 'acento', violeta: 'capa-6', rosa: 'capa-2', laranja: 'capa-3' };
 
   it('`destaque` só aponta para tokens que já existem no @theme (nenhum hex novo)', () => {
     expect(theme).toMatch(/--color-destaque:\s*var\(--color-acento\)/);

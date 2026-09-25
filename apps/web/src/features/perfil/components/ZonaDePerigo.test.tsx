@@ -214,7 +214,7 @@ describe('sucesso (perfil CA-28)', () => {
     api.excluirConta.mockResolvedValue(undefined);
     storage.set(PREFS, {
       ultimoUsuario: 'u-bia',
-      porUsuario: { 'u-bia': { ...PREFS_PADRAO, destaque: 'azul' } },
+      porUsuario: { 'u-bia': { ...PREFS_PADRAO, destaque: 'rosa' } },
     });
     definirUsuario(ANA_ID);
     alterarPrefs({ destaque: 'violeta' });
@@ -244,9 +244,9 @@ describe('sucesso (perfil CA-28)', () => {
     // A Ana era a última a usar o aparelho: ninguém fica apontado para a conta excluída.
     expect(storage.get(PREFS)).toEqual({
       ultimoUsuario: null,
-      porUsuario: { 'u-bia': { ...PREFS_PADRAO, destaque: 'azul' } },
+      porUsuario: { 'u-bia': { ...PREFS_PADRAO, destaque: 'rosa' } },
     });
-    expect(document.documentElement.dataset.destaque).toBe('magenta');
+    expect(document.documentElement.dataset.destaque).toBe('azul');
     await waitFor(() => expect(recebidas).toEqual([{ type: 'logout' }]));
     outraAba.close();
   });

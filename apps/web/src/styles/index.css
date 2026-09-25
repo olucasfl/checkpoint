@@ -55,14 +55,15 @@
   --font-corpo: 'Manrope', system-ui, sans-serif;
 }
 
-/* Cor de destaque escolhida no /perfil (spec perfil, etapa 3). Só tokens existentes, sem hex novo;
-   o texto `fundo` sobre cada um passa de 4,5:1 (tokens.test.ts). */
+/* Cor de destaque escolhida no /perfil (spec perfil, etapa 3; cores novas na troca de design). Azul é o padrão
+   (`--color-destaque: var(--color-acento)` no @theme). Só tokens existentes, sem hex novo; o texto `fundo` sobre cada
+   um passa de 4,5:1 (tokens.test.ts). */
 html[data-destaque='violeta'] {
   --color-destaque: var(--color-capa-6);
 }
 
-html[data-destaque='azul'] {
-  --color-destaque: var(--color-capa-1);
+html[data-destaque='rosa'] {
+  --color-destaque: var(--color-capa-2);
 }
 
 html[data-destaque='laranja'] {

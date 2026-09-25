@@ -18,7 +18,7 @@ if (!container) {
 
 // Antes do primeiro render: nenhuma tela lê o armazenamento local com o formato antigo.
 runStorageMigrations();
-// Cor de destaque e efeitos de quem usou por último, antes do 1º render: sem piscar em magenta.
+// Cor de destaque e efeitos de quem usou por último, antes do 1º render: sem piscar na cor padrão.
 iniciarPrefs();
 // Depois das migrações (que podem apagar `checkpoint:*`) e antes do render, que lê a contagem.
 registrarDiaDeUso();

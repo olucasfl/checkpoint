@@ -29,8 +29,8 @@ describe('PrefsSync (perfil CA-15, CA-20)', () => {
 
     act(() => entrar(usuario('bia')));
 
-    expect(getPrefs().destaque).toBe('magenta');
-    expect(document.documentElement.dataset.destaque).toBe('magenta');
+    expect(getPrefs().destaque).toBe('azul');
+    expect(document.documentElement.dataset.destaque).toBe('azul');
     expect(storage.get(PREFS).ultimoUsuario).toBe('bia');
   });
 

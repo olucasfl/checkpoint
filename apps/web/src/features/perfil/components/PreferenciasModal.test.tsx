@@ -142,14 +142,14 @@ describe('aparência: prévia ao vivo (CA-36, CA-37)', () => {
   it('abre com os padrões da spec', async () => {
     await abrir();
 
-    expect(selecionada('Cor de destaque')).toBe('Magenta');
+    expect(selecionada('Cor de destaque')).toBe('Azul');
     expect(selecionada('Densidade da lista')).toBe('Confortável');
-    expect(selecionada('Efeitos visuais')).toBe('Completos');
+    expect(selecionada('Animações')).toBe('Completas');
     expect(
       within(grupo('Cor de destaque'))
         .getAllByRole('radio')
         .map((r) => r.getAttribute('aria-label')),
-    ).toEqual(['Magenta', 'Violeta', 'Azul', 'Laranja']);
+    ).toEqual(['Azul', 'Violeta', 'Rosa', 'Laranja']);
   });
 
   it('escolher Violeta muda o <html> na hora, sem Salvar e sem nenhuma request', async () => {
@@ -171,7 +171,7 @@ describe('aparência: prévia ao vivo (CA-36, CA-37)', () => {
     const user = await abrir();
 
     await user.click(within(grupo('Cor de destaque')).getByRole('radio', { name: 'Violeta' }));
-    await user.click(within(grupo('Efeitos visuais')).getByRole('radio', { name: 'Reduzidos' }));
+    await user.click(within(grupo('Animações')).getByRole('radio', { name: 'Reduzidas' }));
 
     const guardadas = storage.get(PREFS);
     expect(guardadas.ultimoUsuario).toBe(ANA_ID);
@@ -182,7 +182,7 @@ describe('aparência: prévia ao vivo (CA-36, CA-37)', () => {
     expect(document.documentElement.dataset.efeitos).toBe('reduzidos');
 
     definirUsuario(BIA_ID);
-    expect(document.documentElement.dataset.destaque).toBe('magenta');
+    expect(document.documentElement.dataset.destaque).toBe('azul');
     definirUsuario(ANA_ID);
     expect(document.documentElement.dataset.destaque).toBe('violeta');
   });
@@ -190,7 +190,7 @@ describe('aparência: prévia ao vivo (CA-36, CA-37)', () => {
   it('as setas trocam a cor marcada, como num grupo de rádios', async () => {
     const user = await abrir();
 
-    within(grupo('Cor de destaque')).getByRole('radio', { name: 'Magenta' }).focus();
+    within(grupo('Cor de destaque')).getByRole('radio', { name: 'Azul' }).focus();
     await user.keyboard('{ArrowRight}');
 
     expect(within(grupo('Cor de destaque')).getByRole('radio', { name: 'Violeta' })).toHaveFocus();
@@ -214,7 +214,7 @@ describe('aparência: prévia ao vivo (CA-36, CA-37)', () => {
     const user = await abrir();
     expect(within(modal()).getByText('Animações ligadas')).toBeInTheDocument();
 
-    await user.click(within(grupo('Efeitos visuais')).getByRole('radio', { name: 'Reduzidos' }));
+    await user.click(within(grupo('Animações')).getByRole('radio', { name: 'Reduzidas' }));
 
     expect(within(modal()).getByText('Animações desligadas, sem movimento')).toBeInTheDocument();
   });
@@ -272,7 +272,7 @@ describe('Restaurar padrões por aba (CA-40)', () => {
 
     await user.click(screen.getByRole('button', { name: 'Restaurar padrões' }));
     expect(storage.get(PREFS).porUsuario[ANA_ID]).toMatchObject({
-      destaque: 'magenta',
+      destaque: 'azul',
       densidade: 'confortavel',
       efeitos: 'completos',
       filtroInicial: 'ZERADO',

@@ -22,19 +22,19 @@ describe('aplicar no <html> antes do render (CA-15)', () => {
     expect(document.documentElement.dataset.efeitos).toBe('reduzidos');
   });
 
-  it('sem preferências guardadas → padrões (magenta, completos)', () => {
+  it('sem preferências guardadas → padrões (azul, completos)', () => {
     iniciarPrefs();
 
-    expect(document.documentElement.dataset.destaque).toBe('magenta');
+    expect(document.documentElement.dataset.destaque).toBe('azul');
     expect(document.documentElement.dataset.efeitos).toBe('completos');
   });
 
   it('aplicarNoHtml escreve nos atributos que o CSS lê', () => {
     const raiz = document.createElement('html');
 
-    aplicarNoHtml({ ...PREFS_PADRAO, destaque: 'azul' }, raiz);
+    aplicarNoHtml({ ...PREFS_PADRAO, destaque: 'rosa' }, raiz);
 
-    expect(raiz.getAttribute('data-destaque')).toBe('azul');
+    expect(raiz.getAttribute('data-destaque')).toBe('rosa');
     expect(raiz.getAttribute('data-efeitos')).toBe('completos');
   });
 
