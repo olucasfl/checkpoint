@@ -101,7 +101,7 @@ checkpoint/
 │   │       │   ├── games/              # catálogo de jogos: GET/POST/PATCH/DELETE /api/games
 │   │       │   ├── auth/               # registro, login, refresh, logout, me; guard global de access token (§4.5)
 │   │       │   ├── users/              # a conta do usuário logado: PATCH /api/users/me (nome), POST /api/users/me/exclusao; lista branca do Usuario
-│   │       │   └── integrations/       # integrações com plataformas de jogos (Steam): interface GameProvider, registro e SteamClient; ainda sem rota (§4.4)
+│   │       │   └── integrations/       # integrações com plataformas de jogos (Steam): vínculo por OpenID, cartão do perfil, GameProvider/SteamClient (§4.4)
 │   │       ├── app.module.ts           # inclui o guard global (APP_GUARD)
 │   │       ├── app.setup.ts            # setupApp(): prefixo /api, cookie-parser, CORS, ValidationPipe, Swagger (o main.ts e a verificação manual usam o mesmo)
 │   │       └── main.ts                 # bootstrap: cria o app, setupApp() e listen
@@ -111,7 +111,7 @@ checkpoint/
 │       └── src/
 │           ├── app/                    # providers.tsx (AppProviders) + routes.tsx (as rotas) + router.tsx (AppRouter)
 │           │   └── layout/             # AppLayout/AppFrame, AuthLayout, RequireAuth, LoadingScreen, Backdrop, BottomNav, TopNav, nav-items.ts
-│           ├── features/               # uma pasta por feature — hoje games/, auth/ e perfil/ (api/, lib/, session/, components/)
+│           ├── features/               # uma pasta por feature — hoje games/, auth/, perfil/ e integracoes/ (api/, lib/, session/, components/)
 │           ├── pages/                  # páginas de rota — GamesPage (/), GameDetailPage (/jogos/:id), PerfilPage (/perfil), TrocarSenhaPage (/perfil/senha), LoginPage, RegistroPage e StatusPage (/status)
 │           ├── shared/
 │           │   ├── components/         # Icon (Material Symbols), ModalDialog (<dialog> nativo), OverlayPortal, ConnectionBanner, UpdatePrompt, InstallNudge
@@ -340,18 +340,24 @@ apps/api/src/modules/games/
     `users.http.spec.ts` (porta local, com a auth de verdade e o Prisma falso de `auth/testing/`, que ganhou o
     `user.delete` com o cascade: 204 e o cookie limpo, 400, 401, 429 no 6º pedido e o contador próprio).
 
-- `integrations/` — integrações com plataformas de jogos (spec `docs/specs/integracao-plataformas.md`, **etapa
-  1: só a base**, ainda sem controller nem rota; o vínculo, a biblioteca e os dados por jogo chegam nas etapas
-  2 a 4). O módulo exporta o `SteamClient` e o `ProviderRegistry`.
+- `integrations/` — integrações com plataformas de jogos (spec `docs/specs/integracao-plataformas.md`, **etapas
+  1 e 2**: a base e o **vínculo da conta com o cartão do perfil**; a biblioteca, o vínculo de jogos e os dados por
+  jogo chegam nas etapas 3 e 4). Prefixo `/api/integracoes`, tag Swagger `integracoes`. Rotas (todas protegidas
+  pelo guard global, **exceto o retorno**): `GET /` (contas vinculadas), `POST :provedor/vinculo`,
+  `GET :provedor/retorno` (`@Public()`), `DELETE :provedor`, `GET :provedor/perfil` e
+  `POST :provedor/perfil/atualizacao`. O `:provedor` é o _slug_ minúsculo (`steam`), validado pelo
+  `ProvedorSlugPipe` (400 `VALIDACAO`).
   - **`GameProvider`** (`providers/game-provider.ts`) é a interface que cada plataforma implementa
     (`iniciarVinculo`, `concluirVinculo`, `listarBiblioteca` — que devolve também o perfil, porque o cartão do
     `/perfil` precisa dos dois e a detecção de privacidade cruza as duas chamadas —, e `obterJogo`). A Steam é
     a primeira implementação; PlayStation, Xbox e Epic entram implementando a interface e acrescentando um
     valor a `Provedor`. O **`ProviderRegistry`** acha o provider pelo `:provedor` da rota (o _slug_ em
-    minúsculas, `steam`) ou pelo enum; a lista vem do token `GAME_PROVIDERS` (vazia até a etapa 2). Os erros de
+    minúsculas, `steam`) ou pelo enum; a lista vem do token `GAME_PROVIDERS` (hoje só a Steam). Os erros de
     domínio (`providers/plataforma-errors.ts`: `PlataformaIndisponivelError`, `PlataformaLimiteError`,
-    `PerfilPrivadoError`, `IdExternoInvalidoError`, `ProvedorNaoSuportadoError`) **não** são `HttpException`:
-    carregam o `code` estável (`ApiErrorCode`), e quem responde HTTP os mapeia.
+    `PerfilPrivadoError`, `IdExternoInvalidoError`, `ProvedorNaoSuportadoError`, `VinculoCanceladoError`,
+    `VinculoRecusadoError`) **não** são `HttpException`: carregam o `code` estável (`ApiErrorCode`), e quem
+    responde HTTP os mapeia (`plataforma-http-errors.ts`: `PlataformaExceptionFilter` no controller; falha da
+    plataforma é **502**, nunca 500; perfil privado é 409; ID malformado e provedor desconhecido são 400).
   - **`SteamClient`** (`steam/steam.client.ts`) fala com a Steam Web API (`api.steampowered.com`) pelo `fetch`
     nativo, **sem SDK**, no padrão do `StorageService`: timeout de 8 s, sem _retry_, isolado atrás de métodos
     simples (`obterPerfil`, `listarJogos`, `obterConquistasDoJogador`, `obterSchema`,
@@ -364,13 +370,63 @@ apps/api/src/modules/games/
     `PlataformaIndisponivelError`; biblioteca sem `game_count` = privada (`game_count: 0` = vazia); jogo sem
     conquistas (400 "no stats") e conquistas negadas são **estados**, não erros; `percent` (texto) vira número
     com 1 casa e `rtime_last_played: 0` vira `null`.
-  - **Números nomeados** em `integrations.constants.ts` (timeout, host, TTLs e teto do cache em memória da
-    spec; o cache em si chega com quem o consome). Os intervalos de atualização (1 h e 30 s) ficam no `shared`.
+  - **Números nomeados** em `integrations.constants.ts` (timeout, host, TTLs e teto do cache em memória, vida do
+    `state`, emissor e nome do cookie, limites por usuário). Os intervalos de atualização (1 h e 30 s) ficam no
+    `shared`. O cache (`cache/ttl-cache.ts`, `TtlCache`, com validade e teto que descarta o mais antigo) guarda a
+    biblioteca **por SteamID** por 10 min (dado público: duas contas do checkpoint com a mesma Steam dividem a consulta).
+  - **Vínculo da conta (Steam OpenID 2.0, só para vincular; o login do app continua e-mail e senha)**:
+    - **`SteamOpenId`** (`steam/steam-open-id.ts`, código próprio, `fetch` nativo): `montarUrl` (`checkid_setup`
+      com `return_to` e `realm`) e `validarRetorno`, cujas checagens **locais vêm primeiro e não gastam rede**
+      (`mode`, `ns`, `op_endpoint`, `return_to` idêntico, `claimed_id` em https com 17 dígitos `7656`, `identity`
+      igual, `signed` cobrindo `claimed_id`, `identity`, `return_to`, `op_endpoint` e `response_nonce`, parâmetro
+      `openid.*` repetido) e só então o `POST check_authentication` (sem seguir redirecionamento, sem _retry_,
+      timeout de 8 s). O SteamID só é aceito depois de a Steam confirmar; a Steam invalida o _nonce_ na primeira
+      checagem (barra o replay).
+    - **`state` e cookie** (`vinculo/`): o retorno da Steam é um GET do navegador sem `Authorization` e o cookie
+      do refresh tem `Path=/api/auth`, então o `POST vinculo` emite um **`state`** (JWT HS256, **10 min**,
+      `typ: 'vinculo'`, `prov`, `nonce` de 256 bits; assinado com o `JWT_ACCESS_SECRET`, sem segredo novo, mas com
+      **emissor próprio** `checkpoint-api:vinculo`) e grava o cookie **`checkpoint_vinculo`** com o mesmo `nonce`
+      (`HttpOnly`, `SameSite=Lax`, `Path=/api/integracoes`, 10 min, sem `Domain`, `Secure` em produção). O retorno
+      só vale se o `state` conferir **e** o nonce do cookie for o dele (comparação em tempo constante): sem o cookie,
+      o link de outra pessoa, aberto no navegador da vítima, vincularia a Steam da vítima à conta do atacante. Como
+      o segredo é reaproveitado, os **dois sentidos são travados por teste**: o guard global recusa um `state` como
+      access token (emissor e `typ`) e o serviço recusa um access token ou refresh token como `state`.
+    - **O retorno** (`GET :provedor/retorno`, `@Public()`) **nunca responde JSON de erro**: todo desfecho é um
+      **302** para `${WEB_PUBLIC_URL}/perfil?steam=vinculada` ou `?steam=erro&motivo=cancelado|invalido|expirado|
+indisponivel|ja-vinculada`, sem SteamID nem `state` na URL. A ordem é a defesa: `state` → nonce do cookie →
+      só então a Steam; um `state` ruim nunca gasta rede. Sem DTO de propósito (o `ValidationPipe` global recusaria
+      as chaves `openid.*` com `forbidNonWhitelisted`); quem valida é o provider. O cookie é limpo em toda volta.
+      Em produção o `return_to` e o `realm` são `API_PUBLIC_URL` (o domínio da **Vercel**, por causa do rewrite de
+      `/api`: o cookie é gravado nesse host e só volta para ele), nunca o do Render.
+    - **Regras de gravação**: mesmo SteamID já vinculado → sucesso sem duplicar (atualiza o nome); outro SteamID →
+      `ja-vinculada`; falha ao ler o nome (`GetPlayerSummaries`) **não** desfaz o vínculo (o nome vira "Conta Steam").
+      **A mesma conta Steam pode ser vinculada por mais de um usuário do checkpoint** (a unicidade é por usuário,
+      provedor e id externo): cada vínculo é isolado. Desvincular apaga a `ContaVinculada` e todos os
+      `JogoPlataforma` do provedor **do usuário**, numa transação, sem tocar em jogo, nota, status ou capa.
+  - **`SteamProvider`** (`steam/steam.provider.ts`) junta `SteamOpenId` e `SteamClient`: `listarBiblioteca` trata
+    visibilidade diferente de 3 ou falta de `game_count` como `PerfilPrivadoError` (biblioteca **vazia** não é
+    erro); avatar e link do perfil só saem se forem https em host da Steam (`steam/steam-urls.ts`); a capa oficial
+    é `cdn.cloudflare.steamstatic.com/steam/apps/<appid>/library_600x900.jpg` (404 em alguns apps: o web cai em
+    `header.jpg`). `obterJogo` ainda não existe (etapa 4).
+  - **Limite por USUÁRIO, não por IP** (`IntegrationsThrottlerGuard`, contador por rota e por usuário, em memória):
+    30 por minuto, 5 por minuto em `POST vinculo`; 429 `LIMITE_TENTATIVAS` com `Retry-After`. Não depende do
+    `TRUST_PROXY_HOPS`. O retorno usa `@SkipThrottle()`: quem o protege é o `state`, o cookie e a Steam.
+  - **O cartão do perfil** (`GET :provedor/perfil`): total de jogos, horas totais e os 3 mais jogados vêm da
+    biblioteca (cache de 10 min); as **conquistas são a soma dos jogos vinculados, já gravada no banco**, sem
+    chamada extra (`{ desbloqueadas, total, jogosVinculados }`). `POST .../perfil/atualizacao` ignora o cache, mas
+    no máximo uma consulta a cada 30 s: antes disso devolve o que tem, sem chamar a Steam.
   - **Testes** (Jest, sem rede e sem banco): `steam/steam.client.spec.ts` (com **fixtures reais e
     sanitizados** em `steam/__fixtures__/`: respostas de uma conta de teste com SteamID, nome e avatar
-    sintéticos; `steam/fixtures.spec.ts` falha se um SteamID ou uma chave passar), `providers/provider-registry.spec.ts`,
-    `integrations.module.spec.ts` (a injeção resolve) e `chave-de-titulo.spec.ts`. Perfil privado, conquistas
-    negadas e biblioteca vazia estão como `it.todo` até a captura dos fixtures reais.
+    sintéticos; `steam/fixtures.spec.ts` falha se um SteamID ou uma chave passar), `steam/steam-open-id.spec.ts`,
+    `steam/steam.provider.spec.ts`, `steam/steam-urls.spec.ts`, `vinculo/vinculo-state.service.spec.ts` (os dois
+    sentidos do `state`) e `vinculo-cookie.spec.ts`, `integrations.service.spec.ts` (Prisma e provider mockados),
+    `integrations.http.spec.ts` (**porta local com o guard global real**, cookie, redirecionamento, limite por
+    usuário e o SteamID e o `state` fora do redirecionamento e do log; o Prisma em memória e o `SteamClient` falso
+    ficam em `testing/integrations-http-app.ts`), `access-token.guard.spec.ts` (o `state` não vale como access
+    token), `cache/ttl-cache.spec.ts`, `provedor-slug.pipe.spec.ts`, `plataforma-http-errors.spec.ts`,
+    `providers/provider-registry.spec.ts`, `integrations.module.spec.ts` (a injeção resolve) e
+    `chave-de-titulo.spec.ts`. Perfil privado real, conquistas negadas e biblioteca vazia estão como `it.todo`
+    até a captura dos fixtures reais.
 
 Registre o módulo novo em `app.module.ts` (`imports: [...]`).
 
@@ -706,7 +762,8 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
 - **`/perfil`** (dentro do `RequireAuth` + `AppLayout`; etapa 5): **uma coluna** centralizada (`max-w-[640px]`, sem
   grid de duas colunas), seções separadas por espaço e divisores finos, contêineres `rounded-2xl` sem borda. Ordem:
   **Cabeçalho**; **Conta** (`ListaDeLinhas` de `LinhaConta.tsx`: **Trocar senha** → `/perfil/senha`, **Sessões ativas**
-  e **Sair**, linhas de 56 px com ícone, rótulo e seta; **sem repetir o nome**); **Preferências** (uma linha,
+  e **Sair**, linhas de 56 px com ícone, rótulo e seta; **sem repetir o nome**); **Contas vinculadas** (o cartão Steam, §5.13; spec `integracao-plataformas`);
+  **Preferências** (uma linha,
   "Preferências do aparelho", com o resumo "Cor · Densidade" de `resumoDasPreferencias`, que abre o modal de
   §5.12); **Instalar app** (só quando dá); **Zona de perigo** (discreta, no fim). **Sessões ativas** é uma linha
   que se expande no lugar (`aria-expanded`, `aria-controls`): `SessoesAtivas` só monta aberta, então a lista
@@ -811,6 +868,36 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
   favoritas, Restaurar padrões por aba; o Esc nativo do `<dialog>` não existe no jsdom e é simulado com `close()`),
   `features/games/lib/initial-filter.test.ts`, `features/games/components/PlatformField.test.tsx`,
   acréscimos em `styles/tokens.test.ts` e `pages/GamesPage.test.tsx`.
+
+### 5.13 Integrações no web (`features/integracoes/`, spec `docs/specs/integracao-plataformas.md`, etapa 2)
+
+- **`/perfil`** ganha a seção **Contas vinculadas** (`ContasVinculadas`, entre "Conta" e "Preferências"), com o
+  **cartão Steam** (`ContaSteamCard`). Dados pelo `apiClient` (`api/integracoes-api.ts`) e TanStack Query
+  (`['integracoes', 'contas']` e `['integracoes', 'perfil', provedor]`, esta só habilitada com conta vinculada e
+  **sem _retry_**: 409 e 502 se resolvem com "Tentar de novo", não com repetição automática).
+- **Estados do cartão**: carregando (esqueleto com `role="status"`); sem vínculo (**Vincular conta**); vinculado
+  (nome, avatar, jogos, horas, "X conquistas em N jogos vinculados" e os 3 mais jogados, com **Atualizar** e
+  **Desvincular**, este com confirmação no `<dialog>` e o foco em Cancelar); **perfil privado** ("Seu perfil Steam
+  está privado", passo a passo numerado e **Tentar de novo**); falha da Steam e sem conexão (mensagem própria e
+  **Tentar de novo**; o nome gravado, Atualizar e Desvincular seguem na tela). Biblioteca vazia: "Nenhum jogo na sua
+  biblioteca". Falha ao atualizar mantém os números que já estavam. Botões com `min-h-11`; avatar decorativo
+  (`alt=""`, `referrerPolicy="no-referrer"`, `width`/`height`); só classes de token do tema (nenhum hex novo).
+- **Vincular**: `POST vinculo` com **`withCredentials: true` só nesta chamada** (em produção o `/api` é do mesmo
+  site pelo rewrite da Vercel e não muda nada; em dev, localhost:5173 → :3333, o navegador só aceita o cookie
+  `checkpoint_vinculo` com ele). O navegador só vai à URL devolvida se ela for a tela de login da Steam
+  (`lib/steam-url.ts`: `https`, `steamcommunity.com`, sem porta nem usuário, `/openid/login`); qualquer outra é
+  recusada com uma mensagem. A navegação passa por `lib/navegar.ts` (`irPara`), que os testes mockam.
+- **Aviso do retorno**: a API redireciona para `/perfil?steam=vinculada` ou `?steam=erro&motivo=…` (um
+  redirecionamento externo não carrega o `state` da navegação, então o aviso vem na query). A `PerfilPage` o lê
+  **uma vez** (`useState`), mostra (sucesso em `role="status"`, erro em `role="alert"`) e limpa só `steam` e
+  `motivo` da URL com `replace`. Parâmetro desconhecido é ignorado (`lib/avisos-steam.ts`).
+- **Formatação** (`lib/format.ts`): `horasCurtas` ("45 min", "1,5 h", "42 h", "1.234 h", arredondando para baixo) e
+  `textoDasConquistas` (singular e plural). `lib/estado-do-cartao.ts` classifica a falha (`privado`, `sem-conexao`,
+  `erro`).
+- **Testes** (Vitest): `components/ContaSteamCard.test.tsx` (todos os estados, o desvio da URL fora da Steam, o
+  diálogo, Atualizar, privacidade), `lib/lib.test.ts` (URL da Steam, avisos, horas, classificação),
+  `pages/PerfilPage.test.tsx` (a seção entre Conta e Preferências e os avisos do retorno; a API de integrações é
+  mockada).
 
 ---
 

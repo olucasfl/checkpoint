@@ -1,7 +1,9 @@
 # Spec: integracao-plataformas
 
-> Status: ✅ aprovada (2026-09-25). As Q1 a Q6 foram decididas pelo humano (ver "Questões em aberto").
-> Nada foi implementado; o próximo passo é `/implement-story`.
+> Status: 🚧 em andamento (aprovada em 2026-09-25). **Etapa 1 implementada**, com o CA-63 parcial (faltam os
+> fixtures de perfil privado e de conquistas negadas, que dependem de a conta de teste trocar a privacidade). **Etapa 2
+> implementada**, com o CA-15 e o CA-22 só prováveis depois do deploy (fluxo real com a Steam e 360 px no
+> navegador). Etapas 3 a 5 não começaram.
 
 ## Objetivo
 
@@ -519,28 +521,28 @@ Steam de teste (pública, com jogos e conquistas) e outra privada. Dados de exem
 
 ### Etapa 1 — base
 
-- [ ] **CA-01** — **Dado** o esquema aplicado, **quando** rodo a migration num banco limpo, **então** existem
+- [x] **CA-01** — **Dado** o esquema aplicado, **quando** rodo a migration num banco limpo, **então** existem
       `ContaVinculada` e `JogoPlataforma` com os índices únicos `(userId, provedor)`, `(userId, provedor,
 idExterno)` e `(gameId, provedor)`, e nenhuma coluna de `Game`, `User` ou `RefreshSession` mudou (`git diff`
       do `schema.prisma` só tem adições).
-- [ ] **CA-02** — **Dado** a API sem `STEAM_API_KEY`, ou com valor fora de 32 hexadecimais, ou sem
+- [x] **CA-02** — **Dado** a API sem `STEAM_API_KEY`, ou com valor fora de 32 hexadecimais, ou sem
       `API_PUBLIC_URL`/`WEB_PUBLIC_URL` (URL `http(s)` sem barra final), **quando** ela sobe, **então** o boot falha com a
       lista de erros; **e** com tudo certo, o valor da chave não aparece em nenhum log de boot.
-- [ ] **CA-03** — **Dado** um `SteamClient` com `fetch` mockado, **quando** a Steam responde 429, **401** (o corpo
+- [x] **CA-03** — **Dado** um `SteamClient` com `fetch` mockado, **quando** a Steam responde 429, **401** (o corpo
       real: HTML "Unauthorized"), 403 (fora de `GetPlayerAchievements`), 500, demora mais de 8 s, devolve um 200 sem
       `content-type` JSON ou JSON inválido, **então** ele lança o erro tipado (`PLATAFORMA_LIMITE` para o 429,
       `PLATAFORMA_INDISPONIVEL` para os demais, sem tentar ler HTML como JSON) **e** o log do 401 é um `error`
       ("chave recusada") e todos os logs têm só o nome da chamada e o status, sem a URL nem a chave.
-- [ ] **CA-64** — **Dado** um SteamID malformado (`""`, `"abc"`, 16 ou 18 dígitos, prefixo diferente de `7656`) ou um
+- [x] **CA-64** — **Dado** um SteamID malformado (`""`, `"abc"`, 16 ou 18 dígitos, prefixo diferente de `7656`) ou um
       appid malformado (`""`, `"12a"`, `"1; drop"`), **quando** chamo qualquer método do `SteamClient`, **então** ele
       lança o erro de **validação** (não o de perfil privado) **e** o `fetch` **não** é chamado; **dado** um
       `percent` `"40.7"` nos globais, **então** o cliente devolve o número 40,7; **dado** `rtime_last_played: 0`,
       **então** a última vez jogado é `null`.
-- [ ] **CA-04** — **Dado** `chaveDeTitulo`, **quando** comparo "Pokémon™: Legends – Arceus", "pokemon legends arceus" e
+- [x] **CA-04** — **Dado** `chaveDeTitulo`, **quando** comparo "Pokémon™: Legends – Arceus", "pokemon legends arceus" e
       " POKEMON Legends Arceus ", **então** as três chaves são iguais; "Celeste" e "Celeste 64" são diferentes.
-- [ ] **CA-05** — **Dado** o `shared` buildado, **quando** rodo `npm run typecheck`, **então** passa, **e** o
+- [x] **CA-05** — **Dado** o `shared` buildado, **quando** rodo `npm run typecheck`, **então** passa, **e** o
       `Record<ApiErrorCode, string>` do web tem texto para cada `PLATAFORMA_*`.
-- [ ] **CA-63** — **Dado** o fim da etapa 1, **então** existem fixtures **sanitizados** de respostas reais da Steam
+- [ ] **CA-63** — _(Parcial: existem os fixtures de perfil público, sem conquistas, oculta e chave inválida; faltam perfil privado e conquistas negadas, que dependem de a conta de teste trocar a privacidade.)_ **Dado** o fim da etapa 1, **então** existem fixtures **sanitizados** de respostas reais da Steam
       para perfil privado, biblioteca pública vazia, jogo sem conquistas, conquistas negadas e chave inválida (401); **e** nenhum
       contém SteamID, nome de exibição ou URL de avatar reais (um teste falha se algum valor tem 17 dígitos começando
       com `7656`); **e** cada critério da lista de dependentes (CA-03, CA-16, CA-20, CA-30, CA-47, CA-48, CA-50) foi
@@ -548,65 +550,65 @@ idExterno)` e `(gameId, provedor)`, e nenhuma coluna de `Game`, `User` ou `Refre
 
 ### Etapa 2 — vínculo OpenID e cartão
 
-- [ ] **CA-06** — **Dado** Ana logada sem vínculo, **quando** `POST /api/integracoes/steam/vinculo`, **então** 200
+- [x] **CA-06** — **Dado** Ana logada sem vínculo, **quando** `POST /api/integracoes/steam/vinculo`, **então** 200
       com `{ url }` apontando para `https://steamcommunity.com/openid/login` com `openid.return_to` =
       `${API_PUBLIC_URL}/api/integracoes/steam/retorno?state=…`, `openid.realm` = `API_PUBLIC_URL`, `openid.mode=checkid_setup`; **e** um
       `Set-Cookie: checkpoint_vinculo` `HttpOnly; SameSite=Lax; Path=/api/integracoes`.
-- [ ] **CA-07** — **Dado** o `POST .../vinculo` sem token, **então** 401; **com** `:provedor` = `xbox`, **então**
+- [x] **CA-07** — **Dado** o `POST .../vinculo` sem token, **então** 401; **com** `:provedor` = `xbox`, **então**
       400 `VALIDACAO`; **com** Ana já vinculada a outro SteamID, **então** 409 `PLATAFORMA_JA_VINCULADA`; **na 6ª
       chamada em 1 min**, **então** 429 `LIMITE_TENTATIVAS`.
-- [ ] **CA-08** — **Dado** uma resposta OpenID válida (Steam mockada com `is_valid:true`), o `state` de Ana e o
+- [x] **CA-08** — **Dado** uma resposta OpenID válida (Steam mockada com `is_valid:true`), o `state` de Ana e o
       cookie com o mesmo nonce, **quando** `GET .../retorno`, **então** 302 para `${WEB_PUBLIC_URL}/perfil?steam=vinculada`, existe
       uma `ContaVinculada` (`STEAM`, o SteamID do `claimed_id`, o nome de `GetPlayerSummaries`), e o cookie é limpo.
-- [ ] **CA-09** — **Dado** o retorno **sem** o cookie, **ou** com nonce diferente do `state` (o link do atacante
+- [x] **CA-09** — **Dado** o retorno **sem** o cookie, **ou** com nonce diferente do `state` (o link do atacante
       aberto no navegador da vítima), **então** 302 `?steam=erro&motivo=invalido` e **nada** é gravado.
-- [ ] **CA-10** — **Dado** o retorno com `state` adulterado (assinatura inválida) ou vencido (> 10 min), **então**
+- [x] **CA-10** — **Dado** o retorno com `state` adulterado (assinatura inválida) ou vencido (> 10 min), **então**
       302 `motivo=invalido` (ou `expirado` no vencido) e nada é gravado.
-- [ ] **CA-11** — **Dado** o retorno com `return_to` diferente do montado, `op_endpoint` que não é o da Steam,
+- [x] **CA-11** — **Dado** o retorno com `return_to` diferente do montado, `op_endpoint` que não é o da Steam,
       `claimed_id` fora do formato, `claimed_id` ≠ `identity`, ou a Steam respondendo `is_valid:false`, **então**
       302 `motivo=invalido`, nada gravado; **e** com `is_valid:false` o `SteamOpenId` **não** é chamado uma 2ª vez
       (sem _retry_).
-- [ ] **CA-12** — **Dado** o retorno com `openid.mode=cancel`, **então** 302 `motivo=cancelado`; **dado** a
+- [x] **CA-12** — **Dado** o retorno com `openid.mode=cancel`, **então** 302 `motivo=cancelado`; **dado** a
       Steam fora do ar no `check_authentication`, **então** 302 `motivo=indisponivel`, sem 500.
-- [ ] **CA-13** — **Dado** Ana com outro SteamID vinculado, **quando** o retorno traz um SteamID diferente,
+- [x] **CA-13** — **Dado** Ana com outro SteamID vinculado, **quando** o retorno traz um SteamID diferente,
       **então** 302 `motivo=ja-vinculada` e o vínculo original fica; **com o mesmo SteamID**, **então** sucesso sem
       duplicar a linha.
-- [ ] **CA-14** — **Dado** o retorno válido mas `GetPlayerSummaries` falhando, **então** o vínculo é gravado com
+- [x] **CA-14** — **Dado** o retorno válido mas `GetPlayerSummaries` falhando, **então** o vínculo é gravado com
       `nomeExibicao` "Conta Steam" e o redirecionamento é `?steam=vinculada`.
-- [ ] **CA-15** — **Dado** `/perfil` sem vínculo, **quando** clico em **Vincular conta**, **então** o navegador
+- [ ] **CA-15** — _(A tela com o clique real na Steam só dá para provar depois do deploy: o teste cobre o cartão, o desvio de URL e o aviso do retorno.)_ **Dado** `/perfil` sem vínculo, **quando** clico em **Vincular conta**, **então** o navegador
       vai para a URL devolvida pela API; **dado** `/perfil?steam=vinculada`, **então** vejo o aviso de sucesso, o
       cartão carrega e a URL vira `/perfil`; **dado** `?steam=erro&motivo=cancelado`, **então** vejo o texto do
       cancelamento; **dado** `?steam=qualquer`, **então** nada aparece.
-- [ ] **CA-16** — **Dado** Ana vinculada e a Steam pública (mock), **quando** `GET /api/integracoes/steam/perfil`,
+- [x] **CA-16** — **Dado** Ana vinculada e a Steam pública (mock), **quando** `GET /api/integracoes/steam/perfil`,
       **então** 200 `PerfilPlataforma` com `totalJogos`, `minutosTotais` (soma dos `playtime_forever`), os 3
       `maisJogados` por horas, `avatarUrl` só `https` da `steamstatic.com`, e `conquistas` com a soma **dos jogos vinculados**
       gravados (`jogosVinculados` = N), **sem** nenhuma chamada à Steam além de `GetPlayerSummaries` e
       `GetOwnedGames`; **e** o cartão do web mostra os números e o texto "X conquistas em N jogos vinculados". Uma 2ª chamada em menos de 10 min **não** chama a Steam.
-- [ ] **CA-17** — **Dado** Ana sem vínculo, **quando** `GET .../perfil`, **então** 409 `PLATAFORMA_NAO_VINCULADA`.
-- [ ] **CA-18** — **Dado** o cartão vinculado, **quando** clico **Atualizar** duas vezes em menos de 30 s, **então**
+- [x] **CA-17** — **Dado** Ana sem vínculo, **quando** `GET .../perfil`, **então** 409 `PLATAFORMA_NAO_VINCULADA`.
+- [x] **CA-18** — **Dado** o cartão vinculado, **quando** clico **Atualizar** duas vezes em menos de 30 s, **então**
       a 2ª não chama a Steam (200 com o mesmo `consultadoEm`); **e** uma 3ª chamada da API em 1 min acima do limite dá 429.
-- [ ] **CA-19** — **Dado** Ana vinculada com 2 jogos ligados, **quando** clico **Desvincular** e confirmo,
+- [x] **CA-19** — **Dado** Ana vinculada com 2 jogos ligados, **quando** clico **Desvincular** e confirmo,
       **então** 204, `ContaVinculada` e os 2 `JogoPlataforma` somem, os 2 `Game` continuam **idênticos** (título,
       status, notas, descrição, capa) e o cartão volta a "Vincular conta"; **quando** cancelo, **então** nada muda;
       **repetindo** o `DELETE`, **então** 409 `PLATAFORMA_NAO_VINCULADA`.
-- [ ] **CA-20** — **Dado** o `GET .../perfil` com perfil privado (mock: visibilidade ≠ 3, ou `GetOwnedGames`
+- [x] **CA-20** — **Dado** o `GET .../perfil` com perfil privado (mock: visibilidade ≠ 3, ou `GetOwnedGames`
       sem `game_count`), **então** 409 `PLATAFORMA_PERFIL_PRIVADO` e o cartão mostra "Seu perfil Steam está privado", os
       passos numerados e **Tentar de novo**, que refaz a consulta; **dado** `game_count: 0`, **então** 200 com
       `totalJogos: 0` (o cartão diz "Nenhum jogo na sua biblioteca").
-- [ ] **CA-21** — **Dado** a Steam com timeout (mock), **quando** `GET .../perfil`, **então** 502
+- [x] **CA-21** — **Dado** a Steam com timeout (mock), **quando** `GET .../perfil`, **então** 502
       `PLATAFORMA_INDISPONIVEL` (nunca 500) e o cartão mostra o erro com **Tentar de novo**, **e** o resto do `/perfil` e
       o catálogo funcionam.
-- [ ] **CA-22** — **Dado** 360×640 e 1024 px, **quando** abro `/perfil` com o cartão, **então** não há rolagem
+- [ ] **CA-22** — _(Só provável depois do deploy: 360 px e 1024 px no navegador. O teste confere `min-h-11`, mas não mede pixels.)_ **Dado** 360×640 e 1024 px, **quando** abro `/perfil` com o cartão, **então** não há rolagem
       horizontal e todo botão tem ≥ 44 × 44 px.
-- [ ] **CA-61** — **Dado** um `state` válido (`typ: 'vinculo'`, emitido pelo `POST .../vinculo` de Ana), **quando** o
+- [x] **CA-61** — **Dado** um `state` válido (`typ: 'vinculo'`, emitido pelo `POST .../vinculo` de Ana), **quando** o
       envio como `Authorization: Bearer` em `GET /api/auth/me`, `GET /api/games` e `POST /api/integracoes/steam/vinculo`,
       **então** 401 nas três (o mesmo de um token inválido) e nada é executado; **e** o `access-token.guard.spec.ts` tem
       esse caso (o guard rejeita o `typ` diferente de `access` mesmo com assinatura válida).
-- [ ] **CA-62** — **Dado** um access token válido de Ana (`typ: 'access'`, assinado com o mesmo segredo), **quando** o
+- [x] **CA-62** — **Dado** um access token válido de Ana (`typ: 'access'`, assinado com o mesmo segredo), **quando** o
       envio como `state` em `GET .../retorno` (com o cookie do mesmo nonce e uma resposta OpenID válida), **então** 302
       `motivo=invalido`, nada é gravado e o `check_authentication` da Steam **não** é chamado; **e** o mesmo resultado
       com um refresh token no lugar (assinatura de outro segredo).
-- [ ] **CA-65** — **Dado** Ana e Bia (duas contas do checkpoint) provando ser donas do MESMO SteamID, **quando** cada
+- [x] **CA-65** — **Dado** Ana e Bia (duas contas do checkpoint) provando ser donas do MESMO SteamID, **quando** cada
       uma conclui o vínculo, **então** as duas têm uma `ContaVinculada` (mesmo `idExterno`, um `userId` cada), sem
       409; **e** `GET /api/integracoes` de cada uma devolve só a dela; **e** desvincular a da Ana (`DELETE`) não
       apaga a `ContaVinculada` nem os `JogoPlataforma` da Bia.
@@ -721,7 +723,7 @@ idExterno)` e `(gameId, provedor)`, e nenhuma coluna de `Game`, `User` ou `Refre
       **então** nenhum contém o valor de `STEAM_API_KEY`, o `state`, o cookie `checkpoint_vinculo` nem uma URL da Steam com `key=`.
 - [ ] **CA-59** — **Dado** `git grep STEAM_API_KEY apps/web`, **então** sem resultado; **e** o bundle do web
       (`npm run build`) não contém o valor da chave.
-- [ ] **CA-60** — **Dado** o `.env.example` da API, **então** tem `STEAM_API_KEY`, `API_PUBLIC_URL` e `WEB_PUBLIC_URL`
+- [x] **CA-60** — **Dado** o `.env.example` da API, **então** tem `STEAM_API_KEY`, `API_PUBLIC_URL` e `WEB_PUBLIC_URL`
       documentadas e **sem valor real**.
 
 ## Plano de testes
