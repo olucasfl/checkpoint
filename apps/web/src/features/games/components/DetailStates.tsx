@@ -41,7 +41,7 @@ export function GameNotFound() {
       </p>
       <Link
         to="/"
-        className="flex min-h-11 items-center gap-2 rounded-xl border border-borda-controle px-5 text-[16px] font-semibold text-ciano no-underline hover:bg-acao-hover"
+        className="flex min-h-11 items-center gap-2 rounded-xl border border-borda-controle px-5 text-[16px] font-semibold text-destaque no-underline hover:bg-acao-hover"
       >
         <Icon name="arrow_back" size={20} />
         Voltar para os jogos

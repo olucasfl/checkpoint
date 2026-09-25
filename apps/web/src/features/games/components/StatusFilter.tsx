@@ -23,7 +23,7 @@ function countOf(filter: Filter, counts: StatusCounts): number {
 }
 
 /**
- * Botões de filtro com ícone, rótulo e contagem. O ativo fica ciano, com brilho e aria-pressed.
+ * Botões de filtro com ícone, rótulo e contagem. O ativo fica na cor do destaque, com aria-pressed.
  * No celular é uma fileira só que rola na horizontal dentro dela mesma (a página não rola de lado).
  */
 export function StatusFilter({ filter, counts, onChange }: StatusFilterProps) {
@@ -57,8 +57,8 @@ export function StatusFilter({ filter, counts, onChange }: StatusFilterProps) {
             onClick={() => onChange(option)}
             className={`flex min-h-11 shrink-0 snap-start items-center gap-2 whitespace-nowrap rounded-[4px] border px-4 text-[17px] font-bold uppercase tracking-[0.08em] transition-colors md:px-[18px] ${
               active
-                ? 'glow-ciano border-ciano bg-ciano text-fundo'
-                : 'border-borda-controle bg-painel-2 text-texto-suave hover:border-ciano hover:text-texto'
+                ? 'border-destaque bg-destaque text-fundo'
+                : 'border-borda-controle bg-painel-2 text-texto-suave hover:border-destaque hover:text-texto'
             }`}
           >
             <Icon name={iconOf(option)} size={20} />

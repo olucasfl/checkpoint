@@ -73,12 +73,12 @@ export function RatingBar({
             <span
               key={index}
               data-segment={index < cheios ? 'on' : 'off'}
-              className={`${grande ? 'h-5 w-3 md:h-6 md:w-4' : 'h-4 w-[11px]'} rounded-[1px] ${index < cheios ? 'glow-seg bg-magenta' : 'bg-apagado'}`}
+              className={`${grande ? 'h-5 w-3 md:h-6 md:w-4' : 'h-4 w-[11px]'} rounded-[1px] ${index < cheios ? 'bg-destaque' : 'bg-apagado'}`}
             />
           ))}
         </div>
         <span aria-hidden="true" className="flex items-center gap-1 font-corpo tabular-nums">
-          <Icon name="star" size={grande ? 28 : 18} filled className="text-magenta" />
+          <Icon name="star" size={grande ? 28 : 18} filled className="text-ouro" />
           <span
             className={`${grande ? 'text-5xl md:text-[56px]' : 'text-2xl'} font-bold leading-none`}
           >

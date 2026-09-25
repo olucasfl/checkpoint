@@ -90,7 +90,7 @@ export function GameRow({ game, onEdit, onRemove, compacta = false }: GameRowPro
           type="button"
           aria-label={`Editar ${game.titulo}`}
           onClick={() => onEdit(game)}
-          className={`${ACTION} hover:text-ciano`}
+          className={`${ACTION} hover:text-destaque`}
         >
           <Icon name="edit" size={22} />
         </button>

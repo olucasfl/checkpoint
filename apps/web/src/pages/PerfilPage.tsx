@@ -72,7 +72,7 @@ export function PerfilPage() {
         {avisoRecebido && (
           <p
             role="status"
-            className="m-0 rounded-2xl bg-painel px-4 py-3 text-[16px] font-semibold text-ciano"
+            className="m-0 rounded-2xl bg-painel px-4 py-3 text-[16px] font-semibold text-destaque"
           >
             {avisoRecebido}
           </p>
@@ -81,7 +81,7 @@ export function PerfilPage() {
         {avisoSteam?.tipo === 'sucesso' && (
           <p
             role="status"
-            className="m-0 rounded-2xl bg-painel px-4 py-3 text-[16px] font-semibold text-ciano"
+            className="m-0 rounded-2xl bg-painel px-4 py-3 text-[16px] font-semibold text-destaque"
           >
             {avisoSteam.texto}
           </p>

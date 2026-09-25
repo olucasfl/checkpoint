@@ -127,7 +127,7 @@ export function GameDetail({ game, onEdit }: GameDetailProps) {
             <button
               type="button"
               onClick={onEdit}
-              className="flex min-h-11 items-center gap-2 self-start rounded-xl px-1 text-[17px] font-semibold text-texto-suave underline underline-offset-4 hover:text-ciano"
+              className="flex min-h-11 items-center gap-2 self-start rounded-xl px-1 text-[17px] font-semibold text-texto-suave underline underline-offset-4 hover:text-destaque"
             >
               <Icon name="add" size={20} />
               Adicionar descrição

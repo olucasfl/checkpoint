@@ -51,7 +51,7 @@ export function GameDetailPage() {
           <button
             type="button"
             onClick={voltar}
-            className="flex min-h-11 items-center gap-2 rounded-xl px-2 text-[16px] font-semibold text-texto-suave hover:text-ciano"
+            className="flex min-h-11 items-center gap-2 rounded-xl px-2 text-[16px] font-semibold text-texto-suave hover:text-destaque"
           >
             <Icon name="arrow_back" size={22} />
             Voltar
@@ -91,7 +91,7 @@ export function GameDetailPage() {
 
         {game && temContaSteam === false && game.dadosPlataforma.length === 0 && (
           <p className="m-0 text-[16px] text-texto-suave">
-            <Link to="/perfil" className="font-semibold text-ciano underline">
+            <Link to="/perfil" className="font-semibold text-destaque underline">
               Vincule sua Steam no perfil
             </Link>{' '}
             para ligar este jogo à sua biblioteca.

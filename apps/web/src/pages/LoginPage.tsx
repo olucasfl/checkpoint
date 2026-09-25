@@ -20,7 +20,7 @@ export function LoginPage() {
       {aviso && (
         <p
           role="status"
-          className="m-0 rounded-[4px] border border-ciano px-3.5 py-2.5 text-[16px] text-texto"
+          className="m-0 rounded-[4px] border border-destaque px-3.5 py-2.5 text-[16px] text-texto"
         >
           {aviso}
         </p>

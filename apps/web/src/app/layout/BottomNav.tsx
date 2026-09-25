@@ -35,7 +35,7 @@ export function BottomNav() {
                   to={item.to}
                   aria-current={isNavActive(item, location.pathname) ? 'page' : undefined}
                   className={`${ITEM} no-underline ${
-                    isNavActive(item, location.pathname) ? 'text-ciano' : 'text-texto-suave'
+                    isNavActive(item, location.pathname) ? 'text-destaque' : 'text-texto-suave'
                   }`}
                 >
                   <Icon name={item.icon} size={24} />

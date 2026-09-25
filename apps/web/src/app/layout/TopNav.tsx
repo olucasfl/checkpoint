@@ -25,7 +25,7 @@ export function TopNav() {
                 to={item.to}
                 aria-current={isActive ? 'page' : undefined}
                 className={`flex min-h-11 items-center gap-2 rounded-[4px] px-3 text-[15px] font-bold uppercase tracking-[0.1em] no-underline ${
-                  isActive ? 'text-ciano' : 'text-texto-suave hover:text-texto'
+                  isActive ? 'text-destaque' : 'text-texto-suave hover:text-texto'
                 }`}
               >
                 <Icon name={item.icon} size={20} />

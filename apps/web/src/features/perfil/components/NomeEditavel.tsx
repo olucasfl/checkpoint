@@ -91,7 +91,7 @@ export function NomeEditavel() {
           type="button"
           aria-label="Editar nome"
           onClick={abrir}
-          className="grid size-11 shrink-0 place-items-center rounded-xl text-texto-suave transition-colors hover:bg-acao-hover hover:text-ciano"
+          className="grid size-11 shrink-0 place-items-center rounded-xl text-texto-suave transition-colors hover:bg-acao-hover hover:text-destaque"
         >
           <Icon name="edit" size={22} />
         </button>

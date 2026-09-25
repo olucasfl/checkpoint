@@ -386,6 +386,19 @@ button:disabled {
     box-shadow: 0 0 14px color-mix(in srgb, var(--color-erro) 35%, transparent);
   }
 
+  /* Chips de status: 18% da cor do status sobre a superfície (>= 4,5:1 do texto na cor do status). */
+  .tint-status-jogando {
+    background: color-mix(in srgb, var(--color-status-jogando) 18%, transparent);
+  }
+
+  .tint-status-quero-jogar {
+    background: color-mix(in srgb, var(--color-status-quero-jogar) 18%, transparent);
+  }
+
+  .tint-status-zerado {
+    background: color-mix(in srgb, var(--color-status-zerado) 18%, transparent);
+  }
+
   .tint-ouro {
     background: color-mix(in srgb, var(--color-ouro) 8%, transparent);
   }
@@ -457,8 +470,8 @@ button:disabled {
   @media (hover: hover) {
     .row-hover:hover {
       transform: translateX(6px);
-      border-color: var(--color-ciano);
-      background: var(--color-painel-hover);
+      border-color: var(--color-destaque);
+      background: var(--color-painel-3);
     }
   }
 }

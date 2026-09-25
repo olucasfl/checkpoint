@@ -36,7 +36,7 @@ function LinhaSessao({
         <span className="text-[16px] text-texto-suave">{ultimoUso(sessao.ultimoUsoEm)}</span>
       </div>
       {sessao.atual ? (
-        <span className="shrink-0 rounded-xl border border-ciano px-2 py-1 text-[13px] font-bold uppercase tracking-[0.08em] text-ciano">
+        <span className="shrink-0 rounded-xl border border-destaque px-2 py-1 text-[13px] font-bold uppercase tracking-[0.08em] text-destaque">
           Este aparelho
         </span>
       ) : (

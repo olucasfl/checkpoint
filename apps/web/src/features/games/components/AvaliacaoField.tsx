@@ -110,7 +110,7 @@ function Criterio({ chave, rotulo, descricao, texto, error, onChange }: Criterio
           aria-label={`Limpar ${rotulo}`}
           disabled={texto === ''}
           onClick={() => onChange('')}
-          className="min-h-11 min-w-11 rounded-[4px] px-2 text-[15px] font-semibold text-texto-suave underline underline-offset-4 hover:text-ciano disabled:cursor-default disabled:no-underline disabled:opacity-40"
+          className="min-h-11 min-w-11 rounded-[4px] px-2 text-[15px] font-semibold text-texto-suave underline underline-offset-4 hover:text-destaque disabled:cursor-default disabled:no-underline disabled:opacity-40"
         >
           Limpar
         </button>

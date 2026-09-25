@@ -2,8 +2,8 @@ import { type GameStatus } from '@checkpoint/shared';
 
 /**
  * Textos, ícones e cores de tela por status. O contrato usa só os códigos (ZERADO, JOGANDO,
- * QUERO_JOGAR); "Quero jogar" existe só aqui, no web. Zerado é ouro (conquista), Jogando é ciano (azul neon) e
- * Quero jogar é vermelho neon. As classes ficam escritas por extenso para o Tailwind achá-las.
+ * QUERO_JOGAR); "Quero jogar" existe só aqui, no web. Zerado é verde, Jogando é azul claro e Quero jogar é ouro
+ * (tokens `status-*`). As classes ficam escritas por extenso para o Tailwind achá-las.
  */
 export interface StatusMeta {
   /** Singular: selo da linha e botão do formulário ("Quero jogar"). */
@@ -11,12 +11,11 @@ export interface StatusMeta {
   /** Rótulo do painel de contagem ("Zerados"). */
   panelLabel: string;
   icon: string;
+  /** Texto e ícone na cor do status (>= 4,5:1 sobre painel). */
   text: string;
-  glowText: string;
   border: string;
+  /** Fundo de 18% do status (chip e botão de status marcado). */
   tint: string;
-  tintStrong: string;
-  glowSoft: string;
 }
 
 export const STATUS_META: Record<GameStatus, StatusMeta> = {
@@ -24,34 +23,25 @@ export const STATUS_META: Record<GameStatus, StatusMeta> = {
     label: 'Zerado',
     panelLabel: 'Zerados',
     icon: 'emoji_events',
-    text: 'text-ouro',
-    glowText: 'glow-text-ouro',
-    border: 'border-ouro',
-    tint: 'tint-ouro',
-    tintStrong: 'tint-ouro-strong',
-    glowSoft: 'glow-ouro-soft',
+    text: 'text-status-zerado',
+    border: 'border-status-zerado',
+    tint: 'tint-status-zerado',
   },
   JOGANDO: {
     label: 'Jogando',
     panelLabel: 'Jogando',
     icon: 'sports_esports',
-    text: 'text-ciano',
-    glowText: 'glow-text-ciano',
-    border: 'border-ciano',
-    tint: 'tint-ciano',
-    tintStrong: 'tint-ciano-strong',
-    glowSoft: 'glow-ciano-soft',
+    text: 'text-status-jogando',
+    border: 'border-status-jogando',
+    tint: 'tint-status-jogando',
   },
   QUERO_JOGAR: {
     label: 'Quero jogar',
     panelLabel: 'Quero jogar',
     icon: 'bookmark',
-    text: 'text-vermelho-neon',
-    glowText: 'glow-text-vermelho-neon',
-    border: 'border-vermelho-neon',
-    tint: 'tint-vermelho-neon',
-    tintStrong: 'tint-vermelho-neon-strong',
-    glowSoft: 'glow-vermelho-neon-soft',
+    text: 'text-status-quero-jogar',
+    border: 'border-status-quero-jogar',
+    tint: 'tint-status-quero-jogar',
   },
 };
 

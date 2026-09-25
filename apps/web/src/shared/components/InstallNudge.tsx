@@ -81,12 +81,12 @@ export function InstallNudge() {
         className="install-nudge pointer-events-none fixed z-40"
       >
         {mostrar && (
-          <div className="update-in pointer-events-auto flex items-center gap-3 rounded-md border border-ciano bg-painel px-3.5 py-2.5 text-[16px] text-texto">
+          <div className="update-in pointer-events-auto flex items-center gap-3 rounded-md border border-destaque bg-painel px-3.5 py-2.5 text-[16px] text-texto">
             <Icon
               name={ios ? 'add_to_home_screen' : 'install_mobile'}
               size={22}
               filled
-              className="text-ciano"
+              className="text-destaque"
             />
             <span className="flex-1">
               {ios ? (
@@ -103,7 +103,7 @@ export function InstallNudge() {
               <button
                 type="button"
                 onClick={() => void instalar()}
-                className={`${BUTTON} bg-ciano font-extrabold text-fundo`}
+                className={`${BUTTON} bg-destaque font-extrabold text-fundo`}
               >
                 Instalar
               </button>

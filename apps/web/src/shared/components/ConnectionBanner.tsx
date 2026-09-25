@@ -46,15 +46,15 @@ export function ConnectionBanner() {
         style={{ top: 'calc(env(safe-area-inset-top) + 8px)' }}
       >
         {state === 'offline' && (
-          <div className={`${BOX} border-vermelho-neon`} data-connection="offline">
-            <Icon name="wifi_off" size={22} filled className="text-vermelho-neon" />
+          <div className={`${BOX} border-erro`} data-connection="offline">
+            <Icon name="wifi_off" size={22} filled className="text-erro" />
             <span>Você está offline. O que já está na tela continua visível.</span>
           </div>
         )}
 
         {state === 'sem-servidor' && (
-          <div className={`${BOX} border-vermelho-neon`} data-connection="sem-servidor">
-            <Icon name="cloud_off" size={22} filled className="text-vermelho-neon" />
+          <div className={`${BOX} border-erro`} data-connection="sem-servidor">
+            <Icon name="cloud_off" size={22} filled className="text-erro" />
             <span className="flex-1">Não foi possível falar com o servidor. Tentando de novo…</span>
             <button
               type="button"
@@ -67,8 +67,8 @@ export function ConnectionBanner() {
         )}
 
         {state === 'online' && restored && (
-          <div className={`${BOX} border-ciano`} data-connection="restored">
-            <Icon name="wifi" size={22} filled className="text-ciano" />
+          <div className={`${BOX} border-destaque`} data-connection="restored">
+            <Icon name="wifi" size={22} filled className="text-destaque" />
             <span>Conexão restabelecida</span>
           </div>
         )}

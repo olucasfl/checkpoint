@@ -28,7 +28,7 @@ export function StatusPicker({ value, onChange }: StatusPickerProps) {
               onClick={() => onChange(status)}
               className={`flex min-h-16 flex-col items-center justify-center gap-1 rounded-[4px] border text-[15px] font-bold uppercase tracking-[0.08em] ${
                 pressed
-                  ? `${meta.border} ${meta.text} ${meta.tintStrong} ${meta.glowSoft}`
+                  ? `${meta.border} ${meta.text} ${meta.tint}`
                   : 'border-borda-controle bg-fundo text-texto-suave hover:text-texto'
               }`}
             >

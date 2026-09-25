@@ -25,4 +25,4 @@ export const PRIMARY_BUTTON =
 
 /** Link secundário do cartão ("Criar conta", "Já tenho conta"), com alvo de 44 px. */
 export const SECONDARY_LINK =
-  'flex min-h-11 items-center justify-center rounded-[4px] text-[16px] font-semibold text-ciano underline underline-offset-4';
+  'flex min-h-11 items-center justify-center rounded-[4px] text-[16px] font-semibold text-destaque underline underline-offset-4';

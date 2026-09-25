@@ -29,14 +29,14 @@ export function StatPanels({ counts }: { counts: StatusCounts }) {
                 {status === 'JOGANDO' && (
                   <span
                     aria-hidden="true"
-                    className="dot-blink size-2 shrink-0 rounded-full bg-ciano shadow-[0_0_10px_var(--color-ciano)]"
+                    className="size-2 shrink-0 rounded-full bg-status-jogando"
                   />
                 )}
               </div>
               <span
                 role="img"
                 aria-label={String(counts[status])}
-                className={`block font-display text-2xl font-extrabold md:text-[42px] ${meta.text} ${meta.glowText}`}
+                className={`block font-display text-2xl font-extrabold md:text-[42px] ${meta.text}`}
               >
                 {padCount(counts[status])}
               </span>

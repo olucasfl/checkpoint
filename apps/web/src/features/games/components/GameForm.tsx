@@ -225,7 +225,7 @@ export function GameForm({ game, onDone, onCancel, onLinkedExisting }: GameFormP
           type="button"
           aria-label="Fechar"
           onClick={onCancel}
-          className="grid size-11 place-items-center rounded-[4px] text-texto-suave transition-colors hover:bg-acao-hover hover:text-ciano"
+          className="grid size-11 place-items-center rounded-[4px] text-texto-suave transition-colors hover:bg-acao-hover hover:text-destaque"
         >
           <Icon name="close" size={24} />
         </button>
@@ -278,7 +278,7 @@ export function GameForm({ game, onDone, onCancel, onLinkedExisting }: GameFormP
       {!editing && temContaSteam === false && (
         <p className="m-0 text-[16px] text-texto-suave">
           {noRouter ? (
-            <Link to="/perfil" className="font-semibold text-ciano underline">
+            <Link to="/perfil" className="font-semibold text-destaque underline">
               Vincule sua Steam no perfil
             </Link>
           ) : (
