@@ -99,7 +99,7 @@ function Conteudo({ onConcluir }: { onConcluir: () => void }) {
     role: 'tabpanel' as const,
     'aria-labelledby': idDaAba(BASE, id),
     hidden: aba !== id,
-    className: 'flex flex-col gap-6 pt-5',
+    className: 'flex flex-col gap-6 pb-1 pt-5',
   });
 
   return (
@@ -124,52 +124,59 @@ function Conteudo({ onConcluir }: { onConcluir: () => void }) {
         onChange={(id) => setAba(id as AbaId)}
       />
 
-      <div {...painel('aparencia')}>
-        <GrupoOpcoes
-          id="pref-destaque"
-          titulo="Cor de destaque"
-          variante="bolinha"
-          opcoes={DESTAQUE}
-          valor={prefs.destaque}
-          onChange={(destaque) => alterarPrefs({ destaque })}
-        />
-        <div className="flex flex-col gap-2.5">
+      {/* Altura fixa, e a rolagem só aqui: trocar de aba não faz o modal pular, e o rodapé fica sempre
+          à vista, até em janela baixa (o quadro encolhe com a tela, de 14rem a 32rem). */}
+      <div
+        data-painel-rolavel
+        className="h-[clamp(14rem,calc(100dvh-19rem),32rem)] overflow-y-auto overscroll-contain pr-1"
+      >
+        <div {...painel('aparencia')}>
           <GrupoOpcoes
-            id="pref-densidade"
-            titulo="Densidade da lista"
-            opcoes={DENSIDADE}
-            valor={prefs.densidade}
-            onChange={(densidade) => alterarPrefs({ densidade })}
+            id="pref-destaque"
+            titulo="Cor de destaque"
+            variante="bolinha"
+            opcoes={DESTAQUE}
+            valor={prefs.destaque}
+            onChange={(destaque) => alterarPrefs({ destaque })}
           />
-          <PreviaDensidade densidade={prefs.densidade} />
+          <div className="flex flex-col gap-2.5">
+            <GrupoOpcoes
+              id="pref-densidade"
+              titulo="Densidade da lista"
+              opcoes={DENSIDADE}
+              valor={prefs.densidade}
+              onChange={(densidade) => alterarPrefs({ densidade })}
+            />
+            <PreviaDensidade densidade={prefs.densidade} />
+          </div>
+          <div className="flex flex-col gap-2.5">
+            <GrupoOpcoes
+              id="pref-efeitos"
+              titulo="Efeitos visuais"
+              opcoes={EFEITOS}
+              valor={prefs.efeitos}
+              onChange={(efeitos) => alterarPrefs({ efeitos })}
+            />
+            <PreviaEfeitos efeitos={prefs.efeitos} />
+          </div>
         </div>
-        <div className="flex flex-col gap-2.5">
+
+        <div {...painel('catalogo')}>
           <GrupoOpcoes
-            id="pref-efeitos"
-            titulo="Efeitos visuais"
-            opcoes={EFEITOS}
-            valor={prefs.efeitos}
-            onChange={(efeitos) => alterarPrefs({ efeitos })}
+            id="pref-filtro"
+            titulo="Filtro inicial do catálogo"
+            opcoes={FILTRO}
+            valor={prefs.filtroInicial}
+            onChange={(filtroInicial) => alterarPrefs({ filtroInicial })}
           />
-          <PreviaEfeitos efeitos={prefs.efeitos} />
+          <p className="m-0 text-[15px] text-texto-suave">
+            Vale ao abrir o catálogo sem escolher um filtro na URL.
+          </p>
         </div>
-      </div>
 
-      <div {...painel('catalogo')}>
-        <GrupoOpcoes
-          id="pref-filtro"
-          titulo="Filtro inicial do catálogo"
-          opcoes={FILTRO}
-          valor={prefs.filtroInicial}
-          onChange={(filtroInicial) => alterarPrefs({ filtroInicial })}
-        />
-        <p className="m-0 text-[15px] text-texto-suave">
-          Vale ao abrir o catálogo sem escolher um filtro na URL.
-        </p>
-      </div>
-
-      <div {...painel('plataformas')}>
-        <ChipsPlataformas favoritas={favoritas} aviso={aviso} onAlternar={alternarFavorita} />
+        <div {...painel('plataformas')}>
+          <ChipsPlataformas favoritas={favoritas} aviso={aviso} onAlternar={alternarFavorita} />
+        </div>
       </div>
 
       <div className="flex items-center justify-between gap-3 border-t border-borda pt-4">

@@ -9,7 +9,7 @@ const LINHA =
 interface ConteudoProps {
   icone: string;
   rotulo: string;
-  /** Um resumo curto à direita do rótulo (ex.: "Magenta · Confortável"). */
+  /** Um resumo curto embaixo do rótulo (ex.: "Magenta · Confortável"). */
   detalhe?: string;
   /** O glifo da ponta; `null` quando a linha não leva a lugar nenhum (Sair). */
   seta?: string | null;
@@ -19,10 +19,15 @@ function Conteudo({ icone, rotulo, detalhe, seta = 'chevron_right' }: ConteudoPr
   return (
     <>
       <Icon name={icone} size={22} className="shrink-0 text-texto-suave" />
-      <span className="min-w-0 flex-1">{rotulo}</span>
-      {detalhe && (
-        <span className="min-w-0 truncate text-[16px] font-medium text-texto-suave">{detalhe}</span>
-      )}
+      {/* O resumo vai embaixo do rótulo: ao lado, em 375 px, o rótulo quebrava em duas linhas. */}
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span>{rotulo}</span>
+        {detalhe && (
+          <span data-detalhe className="truncate text-[15px] font-medium text-texto-suave">
+            {detalhe}
+          </span>
+        )}
+      </span>
       {seta && <Icon name={seta} size={22} className="shrink-0 text-texto-suave" />}
     </>
   );

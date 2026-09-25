@@ -286,6 +286,11 @@ describe('estrutura da página (CA-31, CA-33)', () => {
 
     const linha = screen.getByRole('button', { name: /Preferências do aparelho/ });
     expect(linha).toHaveTextContent('Magenta · Confortável');
+    // Embaixo do rótulo, e não ao lado dele: em 375 px o rótulo quebrava em duas linhas.
+    const detalhe = linha.querySelector('[data-detalhe]');
+    expect(detalhe).toHaveTextContent('Magenta · Confortável');
+    expect(detalhe?.parentElement).toHaveClass('flex-col');
+    expect(detalhe?.parentElement).toHaveTextContent(/^Preferências do aparelho/);
     expect(screen.queryByRole('radiogroup')).not.toBeInTheDocument();
     expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
   });

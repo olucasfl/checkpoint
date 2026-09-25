@@ -106,6 +106,38 @@ describe('abas (CA-35)', () => {
   });
 });
 
+/** A classe de altura do quadro (`h-[…]`), sem depender da ordem das outras classes. */
+const alturaDe = (el: HTMLElement) => el.className.split(' ').find((c) => c.startsWith('h-['));
+
+describe('layout do modal (altura fixa, rodapé sempre visível)', () => {
+  it('a rolagem é só do quadro das abas, com altura fixa igual em todas', async () => {
+    const user = await abrir();
+    const quadro = modal().querySelector('[data-painel-rolavel]') as HTMLElement;
+    const altura = alturaDe(quadro);
+
+    expect(quadro).toHaveClass('overflow-y-auto');
+    expect(altura).toBeDefined();
+    // Os três painéis moram no mesmo quadro: trocar de aba não muda a altura dele.
+    for (const nome of ['Catálogo', 'Plataformas', 'Aparência']) {
+      await user.click(aba(nome));
+      expect(alturaDe(quadro)).toBe(altura);
+      expect(quadro).toContainElement(within(modal()).getByRole('tabpanel', { name: nome }));
+    }
+  });
+
+  it('as abas e o rodapé (Restaurar padrões, Concluído) ficam FORA do quadro que rola', () => {
+    return abrir().then(() => {
+      const quadro = modal().querySelector('[data-painel-rolavel]') as HTMLElement;
+
+      expect(quadro).not.toContainElement(
+        screen.getByRole('button', { name: 'Restaurar padrões' }),
+      );
+      expect(quadro).not.toContainElement(screen.getByRole('button', { name: 'Concluído' }));
+      expect(quadro).not.toContainElement(aba('Aparência'));
+    });
+  });
+});
+
 describe('aparência: prévia ao vivo (CA-36, CA-37)', () => {
   it('abre com os padrões da spec', async () => {
     await abrir();
