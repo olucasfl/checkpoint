@@ -23,3 +23,19 @@ export const PLAYER_ACHIEVEMENTS_CACHE_TTL_MS = 5 * 60 * 1000;
 
 /** Teto de entradas de cada cache: passou disso, descarta a mais antiga. */
 export const CACHE_MAX_ENTRIES = 500;
+
+// Vínculo da conta (OpenID): o `state` amarra o retorno da Steam ao usuário, e o cookie, ao navegador.
+/** Vida do `state` e do cookie do vínculo: o tempo de ir à Steam, entrar e voltar. */
+export const VINCULO_STATE_TTL_SECONDS = 10 * 60;
+
+/**
+ * Emissor PRÓPRIO do `state`, diferente do dos tokens de acesso (`checkpoint-api`). O `state` reaproveita o
+ * segredo do access token, então o emissor e o `typ` são o que impede um valer no lugar do outro: um `state`
+ * apresentado como access token falha na verificação do emissor (e, se passasse, no `typ`).
+ */
+export const VINCULO_STATE_ISSUER = 'checkpoint-api:vinculo';
+
+export const VINCULO_COOKIE_NAME = 'checkpoint_vinculo';
+
+/** O cookie só viaja para as rotas de integração (o `retorno` e o `vinculo` estão sob este caminho). */
+export const VINCULO_COOKIE_PATH = '/api/integracoes';
