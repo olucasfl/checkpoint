@@ -28,12 +28,28 @@ describe('describeError — mapeia fields da ApiErrorResponse para os campos (CA
     expect(error.fields).toEqual({ titulo: 'Já existe esse jogo nesta plataforma' });
   });
 
-  it('400 da regra da nota aponta o campo Nota', () => {
-    const error = describeError(
-      httpError(400, { statusCode: 400, message: 'x', fields: { nota: 'Nota só com Zerado' } }),
+  it('400 das notas aponta o campo do critério, e o de "Zerado sem critério" aponta `notas` (a seção)', () => {
+    const criterio = describeError(
+      httpError(400, {
+        statusCode: 400,
+        message: 'x',
+        fields: { historia: 'Notas só com Zerado ou Jogando' },
+      }),
+    );
+    const secao = describeError(
+      httpError(400, {
+        statusCode: 400,
+        message: 'x',
+        fields: { notas: 'Preencha ao menos um critério' },
+      }),
+    );
+    const descricao = describeError(
+      httpError(400, { statusCode: 400, message: 'x', fields: { descricao: 'Longa demais' } }),
     );
 
-    expect(error.fields).toEqual({ nota: 'Nota só com Zerado' });
+    expect(criterio.fields).toEqual({ historia: 'Notas só com Zerado ou Jogando' });
+    expect(secao.fields).toEqual({ notas: 'Preencha ao menos um critério' });
+    expect(descricao.fields).toEqual({ descricao: 'Longa demais' });
   });
 
   it('`arquivo` da API vira o campo `capa` do formulário', () => {
@@ -123,10 +139,10 @@ describe('describeError — falhas sem corpo da API', () => {
 
   it('ignora valores de fields que não são texto', () => {
     const error = describeError(
-      httpError(400, { statusCode: 400, message: 'x', fields: { titulo: 42, nota: 'ok' } }),
+      httpError(400, { statusCode: 400, message: 'x', fields: { titulo: 42, gameplay: 'ok' } }),
     );
 
-    expect(error.fields).toEqual({ nota: 'ok' });
+    expect(error.fields).toEqual({ gameplay: 'ok' });
   });
 });
 

@@ -207,6 +207,43 @@ describe('GamesService', () => {
       });
     });
 
+    it('os cinco critérios juntos: cada um na sua coluna, em décimos, e a média de 7,1 na resposta (CA-09)', async () => {
+      const { service, game } = setup();
+      game.findFirst.mockResolvedValue(null);
+      game.create.mockImplementation(({ data }: { data: Partial<GameRow> }) =>
+        Promise.resolve(row({ ...data, status: 'JOGANDO' })),
+      );
+
+      const result = await service.create(USER, {
+        titulo: 'Hades',
+        status: 'JOGANDO',
+        gameplay: 10,
+        historia: 9.9,
+        graficos: 8,
+        trilhaSonora: 7.5,
+        performance: 0,
+      });
+
+      expect(game.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          notaGameplay: 100,
+          notaHistoria: 99,
+          notaGraficos: 80,
+          notaTrilhaSonora: 75,
+          notaPerformance: 0,
+        }),
+      });
+      // (10 + 9,9 + 8 + 7,5 + 0) / 5 = 7,08 -> 7,1; o 0 entra na média.
+      expect(result.notaMedia).toBe(7.1);
+      expect(result.notas).toEqual({
+        gameplay: 10,
+        historia: 9.9,
+        graficos: 8,
+        trilhaSonora: 7.5,
+        performance: 0,
+      });
+    });
+
     it('7,3 vira 73 sem erro de ponto flutuante (CA-04)', async () => {
       const { service, game } = setup();
       game.findFirst.mockResolvedValue(null);

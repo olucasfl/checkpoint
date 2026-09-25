@@ -293,6 +293,72 @@ describe('POST /api/games', () => {
     expect(json).not.toHaveProperty('nota');
   });
 
+  it('201 com os cinco critérios: a média 7,1 sai calculada, e o 0 entra nela (CA-09)', async () => {
+    game.findFirst.mockResolvedValue(null);
+    game.create.mockImplementation(({ data }: { data: Partial<GameRow> }) =>
+      Promise.resolve(row({ ...data, status: 'JOGANDO' })),
+    );
+
+    const { status, json } = await call('POST', '/games', {
+      body: {
+        titulo: 'Hades',
+        status: 'JOGANDO',
+        gameplay: 10,
+        historia: 9.9,
+        graficos: 8,
+        trilhaSonora: 7.5,
+        performance: 0,
+      },
+    });
+
+    expect(status).toBe(201);
+    expect(json).toMatchObject({
+      notas: { gameplay: 10, historia: 9.9, graficos: 8, trilhaSonora: 7.5, performance: 0 },
+      notaMedia: 7.1,
+    });
+  });
+
+  it.each([
+    ['7,55 (2 casas)', 7.55],
+    ['10,1', 10.1],
+    ['-0,1', -0.1],
+    ['texto "7,3"', '7,3'],
+    ['texto "8"', '8'],
+  ])(
+    '400 com fields.gameplay para a nota %s, e NADA é criado nem consultado (CA-04)',
+    async (_nome, gameplay) => {
+      const { status, json } = await call('POST', '/games', {
+        body: { titulo: 'Hades', status: 'JOGANDO', gameplay },
+      });
+
+      expect(status).toBe(400);
+      expect(json).toMatchObject({
+        statusCode: 400,
+        fields: {
+          gameplay: 'A nota de Gameplay deve ser um número de 0 a 10, com no máximo 1 casa decimal',
+        },
+      });
+      expect(game.findFirst).not.toHaveBeenCalled();
+      expect(game.create).not.toHaveBeenCalled();
+    },
+  );
+
+  it('a resposta do POST nunca traz nota nem capaPath: só capaUrl (CA-12)', async () => {
+    game.findFirst.mockResolvedValue(null);
+    game.create.mockResolvedValue(row({ capaPath: 'u/g/a.png' }));
+    storage.publicUrl.mockReturnValue('https://storage.teste/capas/u/g/a.png');
+
+    const { status, json } = await call('POST', '/games', {
+      body: { titulo: 'Hollow Knight', status: 'JOGANDO' },
+    });
+
+    expect(status).toBe(201);
+    expect(json).not.toHaveProperty('nota');
+    expect(json).not.toHaveProperty('capaPath');
+    expect(json).not.toHaveProperty('userId');
+    expect(json).toMatchObject({ capaUrl: 'https://storage.teste/capas/u/g/a.png' });
+  });
+
   it('409 com a mensagem literal em fields.titulo quando já existe (CA-30)', async () => {
     game.findFirst.mockResolvedValue({ id: 'outro' });
 
@@ -356,6 +422,27 @@ describe('PATCH /api/games/:id', () => {
     expect(json).toMatchObject({ id: ID, status: 'JOGANDO' });
     expect(json).not.toHaveProperty('userId');
     expect(game.findUnique).toHaveBeenCalledWith({ where: { id: ID, userId: ANA_ID } });
+  });
+
+  it('a resposta do PATCH nunca traz nota nem capaPath: só capaUrl (CA-12)', async () => {
+    game.findUnique.mockResolvedValue(row({ capaPath: 'u/g/a.png' }));
+    game.findFirst.mockResolvedValue(null);
+    game.update.mockResolvedValue(
+      row({ capaPath: 'u/g/a.png', notaGameplay: 80, status: 'JOGANDO' }),
+    );
+    storage.publicUrl.mockReturnValue('https://storage.teste/capas/u/g/a.png');
+
+    const { status, json } = await call('PATCH', `/games/${ID}`, { body: { gameplay: 8 } });
+
+    expect(status).toBe(200);
+    expect(json).not.toHaveProperty('nota');
+    expect(json).not.toHaveProperty('capaPath');
+    expect(json).not.toHaveProperty('userId');
+    expect(json).toMatchObject({
+      capaUrl: 'https://storage.teste/capas/u/g/a.png',
+      notas: { gameplay: 8 },
+      notaMedia: 8,
+    });
   });
 
   it('400 para userId no corpo, sem consultar o banco (CA-46)', async () => {

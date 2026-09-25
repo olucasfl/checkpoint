@@ -39,10 +39,13 @@ const CONTROLE =
   'min-h-11 rounded-[4px] border bg-fundo px-2.5 font-corpo text-[19px] font-semibold';
 
 /**
- * Um critério: rótulo e descrição curta, o slider (0 a 10, passo 0,1) e o campo numérico, sincronizados
- * pelo mesmo texto. "Sem nota" (texto vazio) NÃO é 0: o slider fica apagado e só passa a valer depois que a
- * pessoa mexe nele (ou solta o dedo nele, para poder escolher justamente o ponto onde ele está) ou digita.
- * O campo aceita vírgula e ponto. Limpar volta a "sem nota".
+ * Um critério, com o slider e o campo lendo o MESMO texto: assim não há dois estados para dessincronizar, e o
+ * que a API recebe é sempre o que está no campo.
+ *
+ * "Sem nota" (texto vazio) NÃO é 0, porque 0 é uma nota e entra na média. O slider nativo não tem "vazio", e
+ * seu `change` não dispara se o dedo solta onde ele já está (o 0 de "sem nota"): sem o `pointerup`, não
+ * haveria como dar nota 0 por ele. O erro de digitação aparece na hora (e não só ao enviar) porque o campo é
+ * texto livre; o da API, que só chega no envio, tem prioridade quando existe.
  */
 function Criterio({ chave, rotulo, descricao, texto, error, onChange }: CriterioProps) {
   const parsed = parseRatingInput(texto);
@@ -119,8 +122,10 @@ function Criterio({ chave, rotulo, descricao, texto, error, onChange }: Criterio
 }
 
 /**
- * A seção Avaliação do formulário (só com Zerado ou Jogando): os cinco critérios, todos opcionais, e a média
- * ao vivo do que já foi preenchido. A nota geral nunca é digitada: é a média (spec avaliacao-de-jogos).
+ * A seção Avaliação do formulário. A nota geral NUNCA é digitada: mostrar a média ao vivo, calculada pela mesma
+ * `notaMedia` que a API usa, evita que a tela prometa um número e o servidor devolva outro. Todos os critérios
+ * são opcionais; quem exige "ao menos um" para um Zerado é a API (o erro volta em `sectionError`), porque só
+ * ela sabe se o valor mudou em relação ao gravado (os jogos Zerado antigos não têm nota e continuam editáveis).
  */
 export function AvaliacaoField({
   notas,

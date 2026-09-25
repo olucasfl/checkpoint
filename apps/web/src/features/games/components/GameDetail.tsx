@@ -13,10 +13,15 @@ interface GameDetailProps {
 }
 
 /**
- * O corpo da página `/jogos/:id` (spec avaliacao-de-jogos, etapa 3): capa grande, título, plataforma e status;
- * a média em destaque; os cinco critérios, cada um com a nota e a barra ou "sem nota"; e a descrição. Coluna
- * única no celular; em >= 1024 px a capa fica ao lado do resto. A descrição é TEXTO (o React a escapa, e
- * `whitespace-pre-line` preserva as quebras): nunca `dangerouslySetInnerHTML`.
+ * O corpo da página `/jogos/:id`, separado da página para ela cuidar só de carregar, editar e excluir.
+ *
+ * A descrição é texto digitado por quem usa o app, então entra como TEXTO: o React a escapa (um `<b>` ou
+ * `<script>` aparece literal) e `whitespace-pre-line` preserva as quebras de linha, que é tudo o que a
+ * descrição promete (sem Markdown nem HTML). `dangerouslySetInnerHTML` aqui abriria XSS.
+ *
+ * Cada critério mostra "sem nota" quando vazio, em vez de esconder a linha: o 0 é uma nota, e omitir o vazio
+ * faria a lista mudar de tamanho conforme o que foi preenchido. No celular a coluna é única (a capa sozinha
+ * já ocupa a largura); só a partir de 1024 px sobra espaço para a capa ao lado das notas.
  */
 export function GameDetail({ game, onEdit }: GameDetailProps) {
   return (

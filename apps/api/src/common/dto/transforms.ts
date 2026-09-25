@@ -3,7 +3,7 @@ import { Transform, Type, type TransformFnParams } from 'class-transformer';
 
 /**
  * O ValidationPipe global usa `enableImplicitConversion` (ARCHITECTURE.md §4.1), que converte por
- * tipo antes da validação: `titulo: ["a"]` viraria "a" e `nota: "7"` viraria 7, e ambos passariam.
+ * tipo antes da validação: `titulo: ["a"]` viraria "a" e `gameplay: "7"` viraria 7, e ambos passariam.
  * Estes decorators leem o valor CRU do body (`obj[key]`), então o tipo enviado é o tipo validado.
  *
  * `@Type(() => Object)` desliga a conversão implícita da propriedade: sem ele, um body como
