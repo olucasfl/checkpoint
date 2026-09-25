@@ -1,4 +1,6 @@
-import { type INestApplication } from '@nestjs/common';
+import { RequestMethod, type INestApplication } from '@nestjs/common';
+import { METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants';
+import { IntegrationsController } from './integrations.controller';
 import {
   IdExternoInvalidoError,
   PerfilPrivadoError,
@@ -1632,5 +1634,165 @@ describe('GET e POST /integracoes/:provedor/jogos/:jogoId[/atualizacao] (etapa 4
       iconeUrl: null,
       raridadePercentual: null,
     });
+  });
+});
+
+describe('todas as rotas exigem token, menos o retorno (CA-57)', () => {
+  const UUID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+
+  /** As rotas do controller, lidas dos metadados do Nest: uma rota nova entra aqui sozinha. */
+  function rotasDoControlador(): { metodo: string; caminho: string; molde: string }[] {
+    const prefixo = String(Reflect.getMetadata(PATH_METADATA, IntegrationsController));
+    const proto = IntegrationsController.prototype as unknown as Record<string, unknown>;
+    return Object.getOwnPropertyNames(proto)
+      .filter((nome) => nome !== 'constructor')
+      .flatMap((nome) => {
+        const manipulador = proto[nome] as object;
+        const metodo = Reflect.getMetadata(METHOD_METADATA, manipulador) as number | undefined;
+        const caminho = Reflect.getMetadata(PATH_METADATA, manipulador) as string | undefined;
+        if (metodo === undefined || caminho === undefined) {
+          return [];
+        }
+        const molde = `/${prefixo}/${caminho}`.replace(/\/+/g, '/').replace(/\/$/, '');
+        return [
+          {
+            metodo: RequestMethod[metodo] as string,
+            molde,
+            caminho: molde.replace(':provedor', 'steam').replace(':jogoId', UUID),
+          },
+        ];
+      });
+  }
+
+  it('o levantamento acha as rotas conhecidas (senão o teste abaixo não provaria nada)', () => {
+    const moldes = rotasDoControlador().map((rota) => `${rota.metodo} ${rota.molde}`);
+
+    expect(moldes).toEqual(
+      expect.arrayContaining([
+        'GET /integracoes',
+        'POST /integracoes/:provedor/vinculo',
+        'GET /integracoes/:provedor/retorno',
+        'DELETE /integracoes/:provedor',
+        'GET /integracoes/:provedor/perfil',
+        'POST /integracoes/:provedor/perfil/atualizacao',
+        'GET /integracoes/:provedor/biblioteca',
+        'PUT /integracoes/:provedor/jogos/:jogoId',
+        'GET /integracoes/:provedor/jogos/:jogoId',
+        'POST /integracoes/:provedor/jogos/:jogoId/atualizacao',
+        'DELETE /integracoes/:provedor/jogos/:jogoId',
+      ]),
+    );
+    expect(moldes).toHaveLength(11);
+  });
+
+  it('cada rota sem Authorization dá 401 AUTH_NAO_AUTENTICADO; só o retorno responde 302', async () => {
+    for (const rota of rotasDoControlador()) {
+      const response = await pedir(rota.metodo, rota.caminho);
+
+      if (rota.molde === '/integracoes/:provedor/retorno') {
+        expect(response.status).toBe(302);
+      } else {
+        expect(response.status).toBe(401);
+        expect(await json(response)).toMatchObject({ code: 'AUTH_NAO_AUTENTICADO' });
+      }
+    }
+  });
+
+  it('um token que não é de acesso (o state do vínculo) também dá 401 em todas elas (CA-61)', async () => {
+    const ida = await iniciar(await ctx.tokenFor(ANA_ID));
+
+    for (const rota of rotasDoControlador()) {
+      if (rota.molde === '/integracoes/:provedor/retorno') {
+        continue;
+      }
+      const response = await pedir(rota.metodo, rota.caminho, ida.state);
+      expect(response.status).toBe(401);
+    }
+  });
+});
+
+describe('nenhum log com segredo numa execução completa, com sucesso e com todas as falhas (CA-58)', () => {
+  const G = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const APP = '504230';
+
+  it('a chave, o SteamID, o state, o cookie, o token e as URLs da Steam nunca aparecem', async () => {
+    const ana = await ctx.tokenFor(ANA_ID);
+    const segredos: string[] = [ana];
+    ctx.db.games.push({ id: G, userId: ANA_ID, titulo: 'Celeste', plataforma: 'PC' });
+    const falhas = [
+      new PlataformaIndisponivelError(),
+      new PlataformaLimiteError(),
+      new PerfilPrivadoError(),
+    ];
+
+    // 1) Vínculo: sucesso e todas as falhas do retorno (cancelado, recusado, state ruim, sem cookie).
+    const ida = await iniciar(ana);
+    segredos.push(ida.state ?? '', ida.nonce ?? '');
+    for (const erro of [new VinculoCanceladoError(), new VinculoRecusadoError()]) {
+      const outra = await iniciar(ana);
+      segredos.push(outra.state ?? '', outra.nonce ?? '');
+      ctx.openId.validarRetorno.mockRejectedValueOnce(erro);
+      await retornar(outra.state, outra.nonce);
+    }
+    await retornar('state.invalido.qualquer', ida.nonce);
+    await retornar(ida.state, undefined);
+    expect((await retornar(ida.state, ida.nonce)).status).toBe(302);
+
+    // 2) Perfil e biblioteca: cada falha da Steam, depois o sucesso (erro não entra no cache).
+    ctx.client.obterPerfil.mockResolvedValue(perfilPublico);
+    for (const erro of falhas) {
+      ctx.client.listarJogos.mockRejectedValueOnce(erro);
+      await pedir('GET', '/integracoes/steam/perfil', ana);
+    }
+    ctx.client.listarJogos.mockResolvedValue({
+      privada: false,
+      total: 1,
+      jogos: [{ appid: APP, nome: 'Celeste', minutosJogados: 600, ultimaVezJogadoEm: null }],
+    });
+    await pedir('GET', '/integracoes/steam/perfil', ana);
+    await pedir('GET', '/integracoes/steam/biblioteca?busca=cel', ana);
+
+    // 3) Vínculo do jogo: cada falha e o sucesso; detalhe e atualização, com falhas e sucesso.
+    ctx.client.obterConquistasDoJogador.mockResolvedValue({ tipo: 'sem-conquistas' });
+    const enviar = (metodo: string, caminho: string, corpo?: unknown) =>
+      fetch(`${ctx.baseUrl}${caminho}`, {
+        method: metodo,
+        headers: { authorization: `Bearer ${ana}`, 'content-type': 'application/json' },
+        body: corpo === undefined ? undefined : JSON.stringify(corpo),
+      });
+    for (const erro of falhas) {
+      ctx.client.listarJogos.mockRejectedValueOnce(erro);
+      await enviar('PUT', `/integracoes/steam/jogos/${G}`, { idExterno: APP });
+    }
+    expect((await enviar('PUT', `/integracoes/steam/jogos/${G}`, { idExterno: APP })).status).toBe(
+      200,
+    );
+    ctx.db.jogos[0]!.atualizadoEm = new Date(0);
+    for (const erro of falhas) {
+      ctx.client.listarJogos.mockRejectedValueOnce(erro);
+      await enviar('GET', `/integracoes/steam/jogos/${G}`);
+    }
+    ctx.db.jogos[0]!.atualizadoEm = new Date(0);
+    for (const erro of falhas) {
+      ctx.client.listarJogos.mockRejectedValueOnce(erro);
+      await enviar('POST', `/integracoes/steam/jogos/${G}/atualizacao`);
+    }
+    await enviar('GET', `/integracoes/steam/jogos/${G}`);
+    await enviar('POST', `/integracoes/steam/jogos/${G}/atualizacao`);
+    await enviar('DELETE', `/integracoes/steam/jogos/${G}`);
+    await enviar('DELETE', '/integracoes/steam');
+
+    const logs = ctx.logger.lines.join('\n');
+    // Prova de que as falhas passaram pelos logs (senão a ausência de segredo seria vazia).
+    expect(logs).toMatch(/PlataformaIndisponivelError|PlataformaLimiteError|PerfilPrivadoError/);
+    expect(logs).not.toContain(STEAM_ID);
+    expect(logs).not.toContain('ABCDEF0123456789ABCDEF0123456789');
+    for (const segredo of segredos) {
+      expect(segredo).not.toBe('');
+      expect(logs).not.toContain(segredo);
+    }
+    expect(logs).not.toContain('checkpoint_vinculo');
+    expect(logs).not.toMatch(/key=|state=|openid\./i);
+    expect(logs).not.toMatch(/https?:\/\/(steamcommunity|api\.steampowered|store\.steampowered)/i);
   });
 });
