@@ -8,6 +8,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { authApi } from '../api/auth-api';
 import { entrar, resetSessionForTests } from '../session/session';
 import { gamesApi } from '@/features/games/api/games-api';
+import { integracoesApi } from '@/features/integracoes/api/integracoes-api';
 import { perfilApi } from '@/features/perfil/api/perfil-api';
 import { PerfilPage } from '@/pages/PerfilPage';
 import { TrocarSenhaForm } from './TrocarSenhaForm';
@@ -27,6 +28,10 @@ vi.mock('@/features/games/api/games-api', () => ({ gamesApi: { list: vi.fn() } }
 // E a lista de sessões da seção Conta (vazia aqui).
 vi.mock('@/features/perfil/api/perfil-api', () => ({
   perfilApi: { atualizar: vi.fn(), listarSessoes: vi.fn() },
+}));
+// E a seção "Contas vinculadas" (nenhuma conta vinculada aqui).
+vi.mock('@/features/integracoes/api/integracoes-api', () => ({
+  integracoesApi: { listarContas: vi.fn() },
 }));
 const api = vi.mocked(authApi);
 
@@ -79,6 +84,7 @@ beforeEach(() => {
   vi.resetAllMocks();
   vi.mocked(gamesApi.list).mockResolvedValue([]);
   vi.mocked(perfilApi.listarSessoes).mockResolvedValue([]);
+  vi.mocked(integracoesApi.listarContas).mockResolvedValue([]);
   resetSessionForTests();
   entrar({
     accessToken: 'token',
@@ -213,7 +219,7 @@ describe('/perfil e a troca de senha', () => {
     );
   });
 
-  it('sem o aviso no state da navegação, nenhuma mensagem de sucesso aparece', () => {
+  it('sem o aviso no state da navegação, nenhuma mensagem de sucesso aparece', async () => {
     render(
       comQuery(
         <MemoryRouter
@@ -223,6 +229,9 @@ describe('/perfil e a troca de senha', () => {
         </MemoryRouter>,
       ),
     );
+    // A seção "Contas vinculadas" carrega de forma assíncrona e o esqueleto dela também é um `status`:
+    // espera terminar para afirmar que nenhum `status` (mensagem de sucesso) sobrou.
+    await screen.findByRole('button', { name: 'Vincular conta' });
 
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
     expect(within(document.body).queryByText('qualquer texto')).not.toBeInTheDocument();
