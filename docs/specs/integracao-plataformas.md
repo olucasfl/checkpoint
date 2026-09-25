@@ -54,7 +54,8 @@ spec assume (a confirmar):
 - Perfil ou "detalhes do jogo" privados: `GetOwnedGames` responde 200 com `{"response":{}}` (sem
   `game_count`); biblioteca pública e realmente vazia traz `game_count: 0`. Sem `game_count` = privado.
 - `GetPlayerAchievements`: jogo sem conquistas → 400 com `playerstats.success = false` ("no stats"); perfil
-  privado → 403 ou `success = false`. Os dois viram estados, não erro (ver "Erros").
+  com "detalhes do jogo" privados → **a confirmar** com o fixture de "conquistas negadas" (403 ou `success =
+false`?). Vira estado, não erro (ver "Erros").
 - `GetSchemaForGame` de um jogo sem conquistas vem sem `availableGameStats.achievements`.
 - Conquista oculta (`hidden = 1`) vem sem descrição até ser desbloqueada.
 - Capa oficial sem chamada de API, pela CDN da Steam por `appid`: `library_600x900.jpg` (retrato); se a
@@ -63,10 +64,31 @@ spec assume (a confirmar):
 - Cota: o limite documentado por chave é da ordem de 100 mil chamadas por dia (confirmar). Um usuário
   abrindo um detalhe gasta de 1 a 4 chamadas (ver "Custo e cache"), e a resposta 429 da Steam é tratada.
 
+**Resultado da chamada real (2026-09-25, conta de teste com perfil público, sem gravar o SteamID).**
+
+- **Confirmado como assumido:** jogo sem conquistas → HTTP 400 com
+  `{"playerstats":{"error":"Requested app has no stats","success":false}}`; o schema de um jogo sem conquistas
+  traz `availableGameStats` vazio, sem `achievements`; a conquista **oculta** vem **sem** `description` no
+  schema e com `""` na resposta do jogador; `GetOwnedGames` de perfil público traz `game_count` e `games`
+  (`appid`, `name`, `playtime_forever` em minutos, `rtime_last_played`).
+- **Diferiu do assumido (spec ajustada em 2026-09-25):**
+  1. **Chave inválida devolve HTTP 401, não 403**, com corpo **HTML** ("Unauthorized… verify your `key=`
+     parameter"), não JSON. O `SteamClient` não pode fazer `JSON.parse` cego: confere status e `content-type`.
+  2. **`percent` dos globais vem como string** (`"40.7"`): o cliente converte para número (1 casa decimal).
+  3. **SteamID malformado devolve 400 HTML** ("Missing required routing parameter"): o cliente valida o
+     formato (17 dígitos, prefixo `7656`) **antes** de chamar a Steam, e um ID malformado é **erro de
+     validação**, nunca "perfil privado".
+  4. "Nunca jogado" vem como `playtime_forever: 0` **e** `rtime_last_played: 0` (chave presente): `0` vira
+     `null` em `ultimaVezJogadoEm`.
+  5. Os ícones das conquistas vêm de `steamcdn-a.akamaihd.net` (não de `steamstatic.com`).
+- **Ainda pendente (fixtures da etapa 1, CA-63):** perfil **privado** e conquistas **negadas** (a conta de teste
+  troca a privacidade e avisa; o código exato de "negado", 403 ou `success:false`, sai desse fixture).
+  **Biblioteca vazia**: sem conta para capturar, fica pendente para a etapa 4, com teste `todo`.
+
 **Dependência dos fixtures (decisão de 2026-09-25).** A **primeira tarefa da etapa 1** é uma chamada real,
 com uma conta Steam de teste, que grava respostas **sanitizadas** (sem SteamID, nome de exibição nem avatar
 reais; `RULES.md` §8) como fixtures dos testes, para: perfil privado, biblioteca pública **vazia**, jogo
-**sem conquistas**, conquistas **negadas** e **403** (este, com uma chave inválida, não precisa de conta).
+**sem conquistas**, conquistas **negadas** e **chave inválida (401)** (este, com uma chave inválida, não precisa de conta).
 Os critérios de privacidade e de mapeamento de erro **dependem** desses fixtures: **CA-03, CA-16, CA-20,
 CA-30, CA-47, CA-48 e CA-50**, e as duas tabelas de mapeamento de erro. Se a resposta real **diferir do que
 está assumido acima**, a spec é revista (`/spec-sync`) **antes** de seguir com a implementação, em vez de
@@ -227,17 +249,17 @@ decidida no web). Nenhum campo existente muda.
 
 ### Códigos de erro novos (`API_ERROR_CODES`; o `Record<ApiErrorCode, string>` do web quebra o typecheck se faltar texto)
 
-| `code`                              | HTTP | Quando                                                                                      |
-| ----------------------------------- | ---- | ------------------------------------------------------------------------------------------- |
-| `PLATAFORMA_NAO_VINCULADA`          | 409  | rota que precisa da conta vinculada                                                         |
-| `PLATAFORMA_JA_VINCULADA`           | 409  | iniciar/concluir com conta já vinculada a **outro** ID                                      |
-| `PLATAFORMA_PERFIL_PRIVADO`         | 409  | biblioteca sem `game_count`, ou visibilidade ≠ pública                                      |
-| `PLATAFORMA_ITEM_NAO_ENCONTRADO`    | 404  | `idExterno` fora da biblioteca do usuário                                                   |
-| `PLATAFORMA_ITEM_JA_VINCULADO`      | 409  | item já ligado a outro jogo (corpo com `jogoAtual: { id, titulo }`); com `mover: true` move |
-| `PLATAFORMA_JOGO_JA_VINCULADO`      | 409  | o jogo já tem vínculo com o provedor                                                        |
-| `PLATAFORMA_VINCULO_NAO_ENCONTRADO` | 404  | o jogo não tem vínculo com o provedor                                                       |
-| `PLATAFORMA_INDISPONIVEL`           | 502  | timeout, 5xx, 403 (chave recusada, logado como erro) e resposta ilegível da Steam           |
-| `PLATAFORMA_LIMITE`                 | 502  | a Steam respondeu 429 ("muitas consultas, tente em alguns minutos")                         |
+| `code`                              | HTTP | Quando                                                                                                                                   |
+| ----------------------------------- | ---- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `PLATAFORMA_NAO_VINCULADA`          | 409  | rota que precisa da conta vinculada                                                                                                      |
+| `PLATAFORMA_JA_VINCULADA`           | 409  | iniciar/concluir com conta já vinculada a **outro** ID                                                                                   |
+| `PLATAFORMA_PERFIL_PRIVADO`         | 409  | biblioteca sem `game_count`, ou visibilidade ≠ pública                                                                                   |
+| `PLATAFORMA_ITEM_NAO_ENCONTRADO`    | 404  | `idExterno` fora da biblioteca do usuário                                                                                                |
+| `PLATAFORMA_ITEM_JA_VINCULADO`      | 409  | item já ligado a outro jogo (corpo com `jogoAtual: { id, titulo }`); com `mover: true` move                                              |
+| `PLATAFORMA_JOGO_JA_VINCULADO`      | 409  | o jogo já tem vínculo com o provedor                                                                                                     |
+| `PLATAFORMA_VINCULO_NAO_ENCONTRADO` | 404  | o jogo não tem vínculo com o provedor                                                                                                    |
+| `PLATAFORMA_INDISPONIVEL`           | 502  | timeout, 5xx, **401** (chave recusada, logado como erro), 403 fora do caso de conquistas negadas, resposta sem JSON ou ilegível da Steam |
+| `PLATAFORMA_LIMITE`                 | 502  | a Steam respondeu 429 ("muitas consultas, tente em alguns minutos")                                                                      |
 
 Mapeamento por chamada da Steam (`SteamClient`; cada uma com timeout de **8 s**, sem _retry_ automático):
 
@@ -245,12 +267,24 @@ Mapeamento por chamada da Steam (`SteamClient`; cada uma com timeout de **8 s**,
 | ------------------------------------ | ------------------------------------------------------------ | ---------------------------------------- | --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
 | perfil privado                       | visibilidade ≠ 3 → estado privado                            | `{}` sem `game_count` → `PERFIL_PRIVADO` | 403 / `success:false` → `CONQUISTAS_PRIVADAS` | n/a (dado do jogo, não do usuário)                                                                                                 |
 | jogo sem conquistas                  | n/a                                                          | n/a                                      | 400 "no stats" → `SEM_CONQUISTAS`             | sem `achievements` → `SEM_CONQUISTAS`                                                                                              |
-| 403                                  | `PLATAFORMA_INDISPONIVEL` (+ `error` no log: chave inválida) | idem                                     | idem                                          | idem                                                                                                                               |
+| 401 (chave inválida) e 403           | `PLATAFORMA_INDISPONIVEL` (+ `error` no log: chave inválida) | idem                                     | idem                                          | idem                                                                                                                               |
 | 429                                  | `PLATAFORMA_LIMITE`                                          | idem                                     | idem                                          | idem                                                                                                                               |
 | timeout / 5xx / rede / JSON inválido | `PLATAFORMA_INDISPONIVEL`                                    | idem                                     | idem                                          | falha de schema/porcentagem **não** derruba o detalhe: a lista vem sem raridade (e sem nome, ver abaixo) ou o aviso `INDISPONIVEL` |
 
 Os logs têm só o **nome da chamada e o status HTTP** — **nunca a URL** (a chave da Steam viaja na query
 string), nem a chave, nem cabeçalhos, nem o corpo.
+
+Regras do `SteamClient` (decisões de 2026-09-25, a partir da chamada real):
+
+- **Sem `JSON.parse` cego:** só lê o corpo como JSON quando o `content-type` é JSON; erro da Steam pode vir em
+  HTML (o 401 e o 400 de ID malformado vêm). Resposta 200 sem JSON, ou HTML onde se esperava JSON, é
+  `PLATAFORMA_INDISPONIVEL`.
+- **401** = chave recusada: `PLATAFORMA_INDISPONIVEL`, com `error` no log (é problema de configuração).
+- **403** em `GetPlayerAchievements` é tratado como "conquistas negadas" **até o fixture real dizer outra
+  coisa** (a confirmar); nas demais chamadas, `PLATAFORMA_INDISPONIVEL`.
+- **Valida antes de chamar:** SteamID (`^7656\d{13}$`) e appid (`^\d{1,10}$`). Malformado lança um erro de
+  **validação** (na rota vira 400 `VALIDACAO`) e **não** chama a Steam.
+- **`percent` string → número** com 1 casa; `rtime_last_played` `0` → `null`.
 
 ### Custo e cache (protege a cota)
 
@@ -467,8 +501,10 @@ simples e **mockado nos testes**, como o `StorageService`) e o `SteamOpenId` (mo
 
 ## Critérios de aceite (testáveis, em BDD)
 
-A numeração segue a ordem de escrita; a tabela de "Etapas" diz a que etapa cada critério pertence (CA-60 e
-CA-63 são da etapa 1; CA-61 e CA-62, da etapa 2).
+A numeração segue a ordem de escrita; a tabela de "Etapas" diz a que etapa cada critério pertence (CA-60, CA-63 e
+CA-64 são da etapa 1; CA-61 e CA-62, da etapa 2). O CA-63 só fecha quando os fixtures de perfil privado e
+conquistas negadas forem capturados (a etapa 1 pode ter testes `todo` até lá); a biblioteca vazia, sem conta
+de teste, fica com `todo` até a etapa 4.
 
 `curl` contra `http://localhost:3333/api` com os jars de `autenticacao` (Ana e Bia, contas sintéticas). UI em
 `http://localhost:5173`. A Steam é **mockada** em todo teste automatizado; a verificação manual usa uma conta
@@ -483,16 +519,22 @@ idExterno)` e `(gameId, provedor)`, e nenhuma coluna de `Game`, `User` ou `Refre
 - [ ] **CA-02** — **Dado** a API sem `STEAM_API_KEY`, ou com valor fora de 32 hexadecimais, ou sem
       `API_PUBLIC_URL`/`WEB_PUBLIC_URL` (URL `http(s)` sem barra final), **quando** ela sobe, **então** o boot falha com a
       lista de erros; **e** com tudo certo, o valor da chave não aparece em nenhum log de boot.
-- [ ] **CA-03** — **Dado** um `SteamClient` com `fetch` mockado, **quando** a Steam responde 429, 403, 500,
-      demora mais de 8 s, ou devolve JSON inválido, **então** ele lança o erro tipado (`PLATAFORMA_LIMITE` para o
-      429, `PLATAFORMA_INDISPONIVEL` para os demais) **e** o log tem só o nome da chamada e o status, sem a URL nem a
-      chave.
+- [ ] **CA-03** — **Dado** um `SteamClient` com `fetch` mockado, **quando** a Steam responde 429, **401** (o corpo
+      real: HTML "Unauthorized"), 403 (fora de `GetPlayerAchievements`), 500, demora mais de 8 s, devolve um 200 sem
+      `content-type` JSON ou JSON inválido, **então** ele lança o erro tipado (`PLATAFORMA_LIMITE` para o 429,
+      `PLATAFORMA_INDISPONIVEL` para os demais, sem tentar ler HTML como JSON) **e** o log do 401 é um `error`
+      ("chave recusada") e todos os logs têm só o nome da chamada e o status, sem a URL nem a chave.
+- [ ] **CA-64** — **Dado** um SteamID malformado (`""`, `"abc"`, 16 ou 18 dígitos, prefixo diferente de `7656`) ou um
+      appid malformado (`""`, `"12a"`, `"1; drop"`), **quando** chamo qualquer método do `SteamClient`, **então** ele
+      lança o erro de **validação** (não o de perfil privado) **e** o `fetch` **não** é chamado; **dado** um
+      `percent` `"40.7"` nos globais, **então** o cliente devolve o número 40,7; **dado** `rtime_last_played: 0`,
+      **então** a última vez jogado é `null`.
 - [ ] **CA-04** — **Dado** `chaveDeTitulo`, **quando** comparo "Pokémon™: Legends – Arceus", "pokemon legends arceus" e
       " POKEMON Legends Arceus ", **então** as três chaves são iguais; "Celeste" e "Celeste 64" são diferentes.
 - [ ] **CA-05** — **Dado** o `shared` buildado, **quando** rodo `npm run typecheck`, **então** passa, **e** o
       `Record<ApiErrorCode, string>` do web tem texto para cada `PLATAFORMA_*`.
 - [ ] **CA-63** — **Dado** o fim da etapa 1, **então** existem fixtures **sanitizados** de respostas reais da Steam
-      para perfil privado, biblioteca pública vazia, jogo sem conquistas, conquistas negadas e 403; **e** nenhum
+      para perfil privado, biblioteca pública vazia, jogo sem conquistas, conquistas negadas e chave inválida (401); **e** nenhum
       contém SteamID, nome de exibição ou URL de avatar reais (um teste falha se algum valor tem 17 dígitos começando
       com `7656`); **e** cada critério da lista de dependentes (CA-03, CA-16, CA-20, CA-30, CA-47, CA-48, CA-50) foi
       conferido contra eles, com a spec revista (`/spec-sync`) **antes** de seguir se a resposta real difere do assumido.
@@ -635,7 +677,7 @@ idExterno)` e `(gameId, provedor)`, e nenhuma coluna de `Game`, `User` ou `Refre
 - [ ] **CA-48** — **Dado** um jogo sem conquistas (mock 400 "no stats"), **então** 200 com `aviso: 'SEM_CONQUISTAS'`,
       `conquistas: []`, `conquistasTotal: 0`; a página não mostra barra de progresso e diz "Este jogo não tem
       conquistas".
-- [ ] **CA-49** — **Dado** a Steam fora do ar (timeout, 5xx, 429, 403), **quando** `GET .../jogos/<id>`, **então**
+- [ ] **CA-49** — **Dado** a Steam fora do ar (timeout, 5xx, 429, 401, 403), **quando** `GET .../jogos/<id>`, **então**
       **200** com o valor gravado e `aviso: 'INDISPONIVEL'` (nunca 502 nem 500), e a página mostra o bloco com "Não foi
       possível atualizar agora" e o valor antigo; **quando** `POST .../atualizacao`, **então** 502
       `PLATAFORMA_INDISPONIVEL` (429 da Steam: 502 `PLATAFORMA_LIMITE`).
@@ -674,7 +716,7 @@ idExterno)` e `(gameId, provedor)`, e nenhuma coluna de `Game`, `User` ou `Refre
 ## Plano de testes
 
 - **API (Jest; Prisma, `SteamClient` e `SteamOpenId` mockados, nunca a rede):**
-  - `steam.client.spec.ts` (fixtures das respostas reais da etapa 1, mapeamento de erros, timeout, log sem URL/chave: CA-03, CA-58, CA-63; os fixtures sanitizados moram ao lado do spec).
+  - `steam.client.spec.ts` (fixtures das respostas reais da etapa 1, mapeamento de erros, timeout, log sem URL/chave: CA-03, CA-58, CA-63, CA-64; os fixtures sanitizados moram ao lado do spec).
   - `steam-open-id.spec.ts` (URL de saída; todas as validações de retorno: CA-06, CA-09 a CA-12).
   - `steam.provider.spec.ts` (privado × vazio, sem conquistas, oculta, raridade, avatar só `steamstatic.com`: CA-16, CA-20, CA-47, CA-48, CA-50).
   - `integrations.service.spec.ts` (1 para 1, mover, jogo de outro usuário, conferência contra a biblioteca, intervalos de 1 h e 30 s, cache, desvincular em transação: CA-13, CA-19, CA-24 a CA-31, CA-43 a CA-49).
@@ -694,13 +736,13 @@ Loop de verificação por tarefa: `npm run typecheck -w <workspace>` → `npm te
 
 Uma branch (`feat/integracao-plataformas`) e commits por etapa, parando para validação ao fim de cada uma.
 
-| Etapa | Entrega                                                                                                                                                                                                                                                                                                        | Depende de | Critérios                   |
-| ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- | --------------------------- |
-| 1     | contrato no `shared` · schema + migration (aditiva) · env (`STEAM_API_KEY`, `API_PUBLIC_URL`, `WEB_PUBLIC_URL`) · `GameProvider` + registro · `SteamClient` com mocks · **primeira tarefa: chamada real com conta Steam de teste para fixar os fixtures** · `.env.example` no mesmo commit da validação de env | —          | CA-01 a CA-05, CA-60, CA-63 |
-| 2     | OpenID (`vinculo`, `retorno`, `state` + cookie) · `perfil`, `atualizacao`, `DELETE` da conta · seção "Contas vinculadas" com o cartão · **pré-requisito: a chore do `trust proxy` (fora desta spec) já feita**                                                                                                 | 1          | CA-06 a CA-22, CA-61, CA-62 |
-| 3     | `biblioteca` · `PUT/DELETE .../jogos/:jogoId` · `BibliotecaSteamDialog` · Buscar na Steam, parecidos, "outro jogo", mover, confirmação de plataforma                                                                                                                                                           | 2          | CA-23 a CA-39               |
-| 4     | `Game.dadosPlataforma` · linha do catálogo · precedência da capa · `GET/POST .../jogos/:jogoId` · bloco Steam, conquistas, atualização, privacidade                                                                                                                                                            | 3          | CA-40 a CA-55               |
-| 5     | fechamento: `ARCHITECTURE.md` (ver abaixo), `INDEX.md`, exclusão de conta (CA-56 a CA-59), `/qa-verify` em produção, `/docs-sync`                                                                                                                                                                              | 4          | CA-56 a CA-59               |
+| Etapa | Entrega                                                                                                                                                                                                                                                                                                        | Depende de | Critérios                          |
+| ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- | ---------------------------------- |
+| 1     | contrato no `shared` · schema + migration (aditiva) · env (`STEAM_API_KEY`, `API_PUBLIC_URL`, `WEB_PUBLIC_URL`) · `GameProvider` + registro · `SteamClient` com mocks · **primeira tarefa: chamada real com conta Steam de teste para fixar os fixtures** · `.env.example` no mesmo commit da validação de env | —          | CA-01 a CA-05, CA-60, CA-63, CA-64 |
+| 2     | OpenID (`vinculo`, `retorno`, `state` + cookie) · `perfil`, `atualizacao`, `DELETE` da conta · seção "Contas vinculadas" com o cartão · **pré-requisito: a chore do `trust proxy` (fora desta spec) já feita**                                                                                                 | 1          | CA-06 a CA-22, CA-61, CA-62        |
+| 3     | `biblioteca` · `PUT/DELETE .../jogos/:jogoId` · `BibliotecaSteamDialog` · Buscar na Steam, parecidos, "outro jogo", mover, confirmação de plataforma                                                                                                                                                           | 2          | CA-23 a CA-39                      |
+| 4     | `Game.dadosPlataforma` · linha do catálogo · precedência da capa · `GET/POST .../jogos/:jogoId` · bloco Steam, conquistas, atualização, privacidade                                                                                                                                                            | 3          | CA-40 a CA-55                      |
+| 5     | fechamento: `ARCHITECTURE.md` (ver abaixo), `INDEX.md`, exclusão de conta (CA-56 a CA-59), `/qa-verify` em produção, `/docs-sync`                                                                                                                                                                              | 4          | CA-56 a CA-59                      |
 
 **Ordem obrigatória de deploy (Q4).** A etapa 1 é a primeira a **exigir** as variáveis no boot
 (`env.validation.ts`), então:
