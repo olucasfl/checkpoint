@@ -546,6 +546,9 @@ de teste, fica com `todo` até a etapa 4.
 `http://localhost:5173`. A Steam é **mockada** em todo teste automatizado; a verificação manual usa uma conta
 Steam de teste (pública, com jogos e conquistas) e outra privada. Dados de exemplo sintéticos.
 
+> **Legenda:** `[x]` = verificado; `[~]` = verificado só com **resposta simulada, sem fixture real** (não é
+> ✅ completo: o motivo está escrito no critério e fecha com o CA-63); `[ ]` = aberto.
+
 ### Etapa 1 — base
 
 - [x] **CA-01** — **Dado** o esquema aplicado, **quando** rodo a migration num banco limpo, **então** existem
@@ -574,6 +577,11 @@ idExterno)` e `(gameId, provedor)`, e nenhuma coluna de `Game`, `User` ou `Refre
       contém SteamID, nome de exibição ou URL de avatar reais (um teste falha se algum valor tem 17 dígitos começando
       com `7656`); **e** cada critério da lista de dependentes (CA-03, CA-16, CA-20, CA-30, CA-47, CA-48, CA-50) foi
       conferido contra eles, com a spec revista (`/spec-sync`) **antes** de seguir se a resposta real difere do assumido.
+      _Pendente, para uma próxima janela (2026-09-25):_ faltam perfil privado, conquistas negadas e biblioteca vazia. Cada um
+      tem um `it.todo` em `steam/steam.client.spec.ts` com o comando: deixe a conta no estado certo no site da Steam, espere alguns
+      minutos e rode `node apps/api/scripts/capturar-fixtures-steam.cjs privado`, `... detalhes-privados` ou `... vazio` (uma
+      captura por execução, sanitizada; só grava se o estado for o esperado e nunca grava o ID). Depois troque as respostas
+      simuladas pelos fixtures e reveja CA-20, CA-30 e CA-47.
 
 ### Etapa 2 — vínculo OpenID e cartão
 
@@ -618,10 +626,14 @@ idExterno)` e `(gameId, provedor)`, e nenhuma coluna de `Game`, `User` ou `Refre
       **então** 204, `ContaVinculada` e os 2 `JogoPlataforma` somem, os 2 `Game` continuam **idênticos** (título,
       status, notas, descrição, capa) e o cartão volta a "Vincular conta"; **quando** cancelo, **então** nada muda;
       **repetindo** o `DELETE`, **então** 409 `PLATAFORMA_NAO_VINCULADA`.
-- [x] **CA-20** — **Dado** o `GET .../perfil` com perfil privado (mock: visibilidade ≠ 3, ou `GetOwnedGames`
-      sem `game_count`), **então** 409 `PLATAFORMA_PERFIL_PRIVADO` e o cartão mostra "Seu perfil Steam está privado", os
-      passos numerados e **Tentar de novo**, que refaz a consulta; **dado** `game_count: 0`, **então** 200 com
-      `totalJogos: 0` (o cartão diz "Nenhum jogo na sua biblioteca").
+- [~] **CA-20** — **Dado** o `GET .../perfil` com perfil privado (mock: visibilidade ≠ 3, ou `GetOwnedGames`
+  sem `game_count`), **então** 409 `PLATAFORMA_PERFIL_PRIVADO` e o cartão mostra "Seu perfil Steam está privado", os
+  passos numerados e **Tentar de novo**, que refaz a consulta; **dado** `game_count: 0`, **então** 200 com
+  `totalJogos: 0` (o cartão diz "Nenhum jogo na sua biblioteca").
+  _Verificado com resposta simulada, sem fixture real (decisão de 2026-09-25):_ a conta de teste não ficou
+  privada a tempo (a Steam continuou devolvendo visibilidade 3), então "perfil privado" (visibilidade ≠ 3 ou biblioteca sem `game_count`) e "biblioteca vazia" (`game_count: 0`) é suposição do formato da
+  resposta e os testes o chamam de "SIMULADO". **Não é ✅ completo:** fecha com
+  `node apps/api/scripts/capturar-fixtures-steam.cjs privado` e `... vazio` e a revisão do CA-63.
 - [x] **CA-21** — **Dado** a Steam com timeout (mock), **quando** `GET .../perfil`, **então** 502
       `PLATAFORMA_INDISPONIVEL` (nunca 500) e o cartão mostra o erro com **Tentar de novo**, **e** o resto do `/perfil` e
       o catálogo funcionam.
@@ -642,66 +654,92 @@ idExterno)` e `(gameId, provedor)`, e nenhuma coluna de `Game`, `User` ou `Refre
 
 ### Etapa 3 — biblioteca e vínculo de jogo
 
-- [ ] **CA-23** — **Dado** Ana vinculada com biblioteca de 3 jogos, **quando** `GET .../biblioteca`, **então** 200
+- [x] **CA-23** — **Dado** Ana vinculada com biblioteca de 3 jogos, **quando** `GET .../biblioteca`, **então** 200
       com 3 `ItemBiblioteca` por horas decrescente; **com** `?busca=celeste` (sem caixa nem acento), **então** só os
       que batem; **com** `limite=51` ou `busca` de 101 caracteres, **então** 400 `VALIDACAO`.
-- [ ] **CA-24** — **Dado** Ana com o jogo "Celeste" (PC) no catálogo e "Celeste" na biblioteca, **quando** listo
+- [x] **CA-24** — **Dado** Ana com o jogo "Celeste" (PC) no catálogo e "Celeste" na biblioteca, **quando** listo
       a biblioteca, **então** o item traz `jogosParecidos` com esse jogo; **e** se o jogo já estiver ligado à Steam,
       ele **não** aparece em `jogosParecidos`.
-- [ ] **CA-25** — **Dado** o item já ligado a um jogo da Ana, **quando** listo a biblioteca, **então** o item
+- [x] **CA-25** — **Dado** o item já ligado a um jogo da Ana, **quando** listo a biblioteca, **então** o item
       traz `vinculadoA` com esse jogo.
-- [ ] **CA-26** — **Dado** o jogo "Celeste" sem vínculo, **quando** `PUT .../jogos/<id>` com `{"idExterno":"504230"}`
+- [x] **CA-26** — **Dado** o jogo "Celeste" sem vínculo, **quando** `PUT .../jogos/<id>` com `{"idExterno":"504230"}`
       (item da biblioteca), **então** 200 `DadosJogoPlataforma` (`minutosJogados`, `conquistasTotal`, `capaUrl`,
       `atualizadoEm`), uma linha `JogoPlataforma`, e `status`, notas e `plataforma` do jogo **inalterados**.
-- [ ] **CA-27** — **Dado** o `PUT` com `idExterno` que **não** está na biblioteca, **então** 404
+- [x] **CA-27** — **Dado** o `PUT` com `idExterno` que **não** está na biblioteca, **então** 404
       `PLATAFORMA_ITEM_NAO_ENCONTRADO`; com `{}`, `{"idExterno":""}`, `{"idExterno":"abc; drop"}` ou campo extra, **então** 400
       `VALIDACAO`; com `:jogoId` que não é UUID, **então** 400; com o jogo de **Bia**, **então** 404 (o mesmo do
       catálogo); sem token, **então** 401; sem conta vinculada, **então** 409 `PLATAFORMA_NAO_VINCULADA`.
-- [ ] **CA-28** — **Dado** o item 504230 já ligado ao jogo A, **quando** `PUT` no jogo B com o mesmo item **sem**
+- [x] **CA-28** — **Dado** o item 504230 já ligado ao jogo A, **quando** `PUT` no jogo B com o mesmo item **sem**
       `mover`, **então** 409 `PLATAFORMA_ITEM_JA_VINCULADO` com `jogoAtual` = A e nada muda; **com** `mover: true`, **então**
       200, o vínculo passa a B, A **não** tem mais camada Steam e A segue intacto.
-- [ ] **CA-29** — **Dado** o jogo B que já tem vínculo, **quando** `PUT` com outro item, **então** 409
+- [x] **CA-29** — **Dado** o jogo B que já tem vínculo, **quando** `PUT` com outro item, **então** 409
       `PLATAFORMA_JOGO_JA_VINCULADO`.
-- [ ] **CA-30** — **Dado** o `PUT` com perfil privado, **então** 409 `PLATAFORMA_PERFIL_PRIVADO`; com a Steam fora do ar,
-      **então** 502 `PLATAFORMA_INDISPONIVEL`, e **nenhuma** linha é criada.
-- [ ] **CA-31** — **Dado** o vínculo de um jogo, **quando** `DELETE .../jogos/<id>`, **então** 204 e a camada some;
+- [~] **CA-30** — **Dado** o `PUT` com perfil privado, **então** 409 `PLATAFORMA_PERFIL_PRIVADO`; com a Steam fora do ar,
+  **então** 502 `PLATAFORMA_INDISPONIVEL`, e **nenhuma** linha é criada.
+  _Verificado com resposta simulada, sem fixture real (decisão de 2026-09-25):_ a conta de teste não ficou
+  privada a tempo (a Steam continuou devolvendo visibilidade 3), então "perfil privado" e "conquistas negadas" (403 ou `success:false` do `GetPlayerAchievements`; o 400 "Requested app has no stats" é jogo sem conquistas, fixture REAL) é suposição do formato da
+  resposta e os testes o chamam de "SIMULADO". **Não é ✅ completo:** fecha com
+  `node apps/api/scripts/capturar-fixtures-steam.cjs privado` / `... detalhes-privados` e a revisão do CA-63.
+- [x] **CA-31** — **Dado** o vínculo de um jogo, **quando** `DELETE .../jogos/<id>`, **então** 204 e a camada some;
       **repetindo**, **então** 404 `PLATAFORMA_VINCULO_NAO_ENCONTRADO`.
-- [ ] **CA-32** — **Dado** o formulário de novo jogo com a Steam vinculada, **quando** clico **Buscar na Steam**,
-      digito "cel" e escolho **Criar jogo** num item com 0 min, **então** o formulário abre com título e capa
-      preenchidos, plataforma "PC", status **Quero jogar** pré-selecionado; **com** 120 min, **Jogando**; **em nenhum caso**
+- [x] **CA-32** — **Dado** o formulário de novo jogo com a Steam vinculada, **quando** clico **Buscar na Steam**,
+      digito "cel" e escolho **Criar jogo** num item com 0 min, **então** o formulário abre com o título preenchido e a capa oficial
+      **só como prévia** (decisão do plano: não é salva com o jogo; o CA-42 da etapa 4 trata da capa), plataforma "PC", status **Quero jogar** pré-selecionado; **com** 120 min, **Jogando**; **em nenhum caso**
       Zerado; **e** salvar cria o jogo e o liga (2 requests, nessa ordem).
-- [ ] **CA-33** — **Dado** o jogo criado mas a ligação falhando, **quando** salvo, **então** o jogo existe, o
+- [x] **CA-33** — **Dado** o jogo criado mas a ligação falhando, **quando** salvo, **então** o jogo existe, o
       formulário passa a editá-lo e mostra o erro da ligação (o próximo Salvar é `PATCH`, não `POST`).
-- [ ] **CA-34** — **Dado** o diálogo com um item cujo nome bate com um jogo do catálogo, **então** o item mostra "já
+- [x] **CA-34** — **Dado** o diálogo com um item cujo nome bate com um jogo do catálogo, **então** o item mostra "já
       no seu catálogo" e **Vincular a este**; **quando** clico, **então** o jogo é ligado **sem** criar outro, o
       formulário fecha e vou para `/jogos/<id>`; **e** nada é ligado sem um clique.
-- [ ] **CA-35** — **Dado** qualquer item (com ou sem nome parecido), **então** existe **Vincular a outro jogo que já
+- [x] **CA-35** — **Dado** qualquer item (com ou sem nome parecido), **então** existe **Vincular a outro jogo que já
       tenho**, com um seletor só dos jogos **sem** vínculo Steam; escolher um e confirmar liga o item a ele.
-- [ ] **CA-36** — **Dado** um item já ligado a outro jogo, **então** o diálogo mostra "Já ligado a «X»" e não
+- [x] **CA-36** — **Dado** um item já ligado a outro jogo, **então** o diálogo mostra "Já ligado a «X»" e não
       oferece **Criar jogo**; **e** ao tentar **Vincular a outro jogo** ele, o web mostra o aviso do 409 com **Mover o vínculo**, que
       reenvia com `mover: true`.
-- [ ] **CA-37** — **Dado** um jogo com `plataforma` "PlayStation 5", **quando** tento **Vincular à Steam**,
+- [x] **CA-37** — **Dado** um jogo com `plataforma` "PlayStation 5", **quando** tento **Vincular à Steam**,
       **então** o web pede a confirmação com o texto da plataforma e só liga se eu confirmar; **cancelando**, nada
       é enviado; **e** a `plataforma` do jogo continua "PlayStation 5" depois de ligado. **Dado** um jogo com
       plataforma "PC" ou vazia, **então** liga sem confirmação. **Dado** o `PUT` da API para um jogo de qualquer
       plataforma, **então** 200 (a API não olha a `plataforma`). **Dado** o formulário de novo jogo pré-preenchido
       com "PC", **quando** troco a plataforma para "PlayStation 5" e salvo, **então** vejo a confirmação **antes** de
       qualquer request; **cancelando**, nada é enviado (nem o jogo é criado); **confirmando**, cria o jogo e o liga.
-- [ ] **CA-38** — **Dado** a página de um jogo sem vínculo e a Steam vinculada, **então** vejo **Vincular à
+- [x] **CA-38** — **Dado** a página de um jogo sem vínculo e a Steam vinculada, **então** vejo **Vincular à
       Steam** e o diálogo (modo vincular) sem **Criar jogo**; **sem** a conta vinculada, vejo o link "Vincule sua
       Steam no perfil".
 - [ ] **CA-39** — **Dado** o diálogo com perfil privado ou Steam fora do ar, **então** vejo o bloco de privacidade
       (com **Tentar de novo**) ou o erro, sem quebrar o formulário; **dado** 360×640, **então** sem rolagem horizontal e ações ≥ 44 px.
+      _Parcial (2026-09-25):_ o bloco de privacidade, o erro e **Tentar de novo** têm teste (`BibliotecaSteamDialog.test.tsx`, com privacidade
+      **simulada**) e as ações usam `min-h-11`; a checagem em 360×640 só vale no navegador, **após o deploy** (`/qa-verify`).
 
-- [ ] **CA-40** — _(puxado da etapa 4: o web precisa saber quais jogos já têm vínculo para os CA-35 e CA-38)_ **Dado** Ana com 1 jogo ligado e 1 sem ligação, **quando** `GET /api/games`, **então** o ligado traz
+- [x] **CA-40** — _(puxado da etapa 4: o web precisa saber quais jogos já têm vínculo para os CA-35 e CA-38)_ **Dado** Ana com 1 jogo ligado e 1 sem ligação, **quando** `GET /api/games`, **então** o ligado traz
       `dadosPlataforma` com 1 item e o outro traz `[]`; **e** nenhuma chamada à Steam foi feita (mock sem chamadas).
-- [ ] **CA-66** — **Dado** o item 504230 ligado ao jogo A e a plataforma **falhando** (timeout, 5xx, 429 ou perfil
+- [x] **CA-66** — **Dado** o item 504230 ligado ao jogo A e a plataforma **falhando** (timeout, 5xx, 429 ou perfil
       privado), **quando** `PUT` no jogo B com `mover: true`, **então** 502 (ou 409 `PLATAFORMA_PERFIL_PRIVADO`) e
       **nada muda**: o vínculo continua no jogo A e o jogo B segue sem vínculo.
-- [ ] **CA-67** — **Dado** o item 504230 ligado ao jogo A, **quando** `PUT` no jogo B **sem** `mover`, **então**
+- [x] **CA-67** — **Dado** o item 504230 ligado ao jogo A, **quando** `PUT` no jogo B **sem** `mover`, **então**
       409 `PLATAFORMA_ITEM_JA_VINCULADO` com `jogoAtual` = A **e a plataforma NÃO é chamada** (as checagens de
       banco vêm antes); **dado** o jogo B que já tem vínculo, **então** 409 `PLATAFORMA_JOGO_JA_VINCULADO` também sem
       chamar a plataforma, mesmo com `mover: true`.
+
+#### Evidência da etapa 3 (2026-09-25)
+
+| CA                  | Evidência (teste que o prova)                                                                                                                                                                                         |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| CA-23               | `integrations.http.spec.ts` (GET biblioteca: ordem, busca sem caixa/acento, `limite=51` e busca de 101 → 400), `integrations.service.spec.ts` (biblioteca), `dto/biblioteca-query.dto.spec.ts`                        |
+| CA-24, CA-25        | `integrations.service.spec.ts` e `integrations.http.spec.ts` (`jogosParecidos` por `chaveDeTitulo`, sem os já ligados; `vinculadoA`)                                                                                  |
+| CA-26 a CA-29       | `integrations.http.spec.ts` (PUT: 200, 404, 400, 409 com `jogoAtual`, `mover`), `integrations.service.spec.ts` (ordem das checagens, transação), `dto/vincular-jogo.dto.spec.ts`                                      |
+| CA-30               | `integrations.http.spec.ts` e `integrations.service.spec.ts`: 502 e "nenhuma linha criada" (mock); **privado e conquistas negadas: SIMULADO, sem fixture real** → `[~]`                                               |
+| CA-31               | `integrations.http.spec.ts` (DELETE: 204, depois 404)                                                                                                                                                                 |
+| CA-32, CA-33        | `GameForm.steam.test.tsx` (preenchimento, status pelas horas nunca Zerado, cria e SÓ DEPOIS liga; ligação falha → jogo salvo, formulário passa a editar, sem novo POST)                                               |
+| CA-34, CA-35, CA-36 | `BibliotecaSteamDialog.test.tsx` e `GameForm.steam.test.tsx` (parecidos, "outro jogo que já tenho" só sem vínculo, "Já ligado a «X»", aviso do 409 e "Mover o vínculo" com `mover: true`)                             |
+| CA-37               | `BibliotecaSteamDialog.test.tsx` (confirmação e "Voltar"), `GameForm.steam.test.tsx` (confirmação antes de criar qualquer coisa), `lib/biblioteca.test.ts`; a API não olha a plataforma (`integrations.http.spec.ts`) |
+| CA-38               | `GameDetailPage.test.tsx` (botão com conta e sem vínculo; sem conta: link "Vincule sua Steam no perfil"), `GameForm.steam.test.tsx`                                                                                   |
+| CA-39               | **aberto**: erro e privacidade testados (privacidade simulada); 360×640 só após o deploy                                                                                                                              |
+| CA-40               | `games.service.spec.ts` (describe do CA-40: `dadosPlataforma` lido com `include`, sem chamar a Steam), `games.http.spec.ts`                                                                                           |
+| CA-66, CA-67        | `integrations.http.spec.ts` e `integrations.service.spec.ts` (falha da Steam com `mover` não muda nada; 409 sem chamar a plataforma)                                                                                  |
+
+**Abertos após a etapa 3:** CA-15 e CA-22 (só após o deploy), CA-39 (360×640, só após o deploy), CA-63 (fixtures reais) e,
+como `[~]`, CA-20 e CA-30 (respostas simuladas).
 
 ### Etapa 4 — horas, conquistas, atualização e privacidade
 
@@ -724,6 +762,9 @@ idExterno)` e `(gameId, provedor)`, e nenhuma coluna de `Game`, `User` ou `Refre
 'CONQUISTAS_PRIVADAS'`, `conquistas: []`, horas atualizadas e as contagens gravadas **inalteradas**, e a página mantém as horas e mostra o aviso
       discreto de conquistas privadas (não o bloco grande de perfil privado); **dado**
       biblioteca privada, **então** 200 com `aviso: 'PERFIL_PRIVADO'` e o valor gravado.
+      _Nota (2026-09-25):_ quando a etapa 4 o implementar, este critério só pode ficar `[~]`: "conquistas negadas" é
+      resposta **simulada, sem fixture real**. O `obterJogo` da etapa 3 já trata 403 e `success:false` como "negado" (aviso
+      `CONQUISTAS_PRIVADAS`), com teste "SIMULADO"; fecha com `node apps/api/scripts/capturar-fixtures-steam.cjs detalhes-privados`.
 - [ ] **CA-48** — **Dado** um jogo sem conquistas (mock 400 "no stats"), **então** 200 com `aviso: 'SEM_CONQUISTAS'`,
       `conquistas: []`, `conquistasTotal: 0`; a página não mostra barra de progresso e diz "Este jogo não tem
       conquistas".

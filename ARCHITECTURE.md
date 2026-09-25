@@ -341,11 +341,12 @@ apps/api/src/modules/games/
     `user.delete` com o cascade: 204 e o cookie limpo, 400, 401, 429 no 6º pedido e o contador próprio).
 
 - `integrations/` — integrações com plataformas de jogos (spec `docs/specs/integracao-plataformas.md`, **etapas
-  1 e 2**: a base e o **vínculo da conta com o cartão do perfil**; a biblioteca, o vínculo de jogos e os dados por
-  jogo chegam nas etapas 3 e 4). Prefixo `/api/integracoes`, tag Swagger `integracoes`. Rotas (todas protegidas
+  1 a 3**: a base, o **vínculo da conta com o cartão do perfil**, a **biblioteca** e o **vínculo de jogo**; a lista de
+  conquistas por jogo é da etapa 4). Prefixo `/api/integracoes`, tag Swagger `integracoes`. Rotas (todas protegidas
   pelo guard global, **exceto o retorno**): `GET /` (contas vinculadas), `POST :provedor/vinculo`,
   `GET :provedor/retorno` (`@Public()`), `DELETE :provedor`, `GET :provedor/perfil` e
-  `POST :provedor/perfil/atualizacao`. O `:provedor` é o _slug_ minúsculo (`steam`), validado pelo
+  `POST :provedor/perfil/atualizacao`, `GET :provedor/biblioteca`, `PUT :provedor/jogos/:jogoId` (200) e
+  `DELETE :provedor/jogos/:jogoId` (204). O `:provedor` é o _slug_ minúsculo (`steam`), validado pelo
   `ProvedorSlugPipe` (400 `VALIDACAO`).
   - **`GameProvider`** (`providers/game-provider.ts`) é a interface que cada plataforma implementa
     (`iniciarVinculo`, `concluirVinculo`, `listarBiblioteca` — que devolve também o perfil, porque o cartão do
@@ -407,7 +408,12 @@ indisponivel|ja-vinculada`, sem SteamID nem `state` na URL. A ordem é a defesa:
     visibilidade diferente de 3 ou falta de `game_count` como `PerfilPrivadoError` (biblioteca **vazia** não é
     erro); avatar e link do perfil só saem se forem https em host da Steam (`steam/steam-urls.ts`); a capa oficial
     é `cdn.cloudflare.steamstatic.com/steam/apps/<appid>/library_600x900.jpg` (404 em alguns apps: o web cai em
-    `header.jpg`). `obterJogo` ainda não existe (etapa 4).
+    `header.jpg`). `obterJogo` (etapa 3) devolve só o **resumo**: a biblioteca filtrada pelo appid (`appids_filter`, confere que o jogo é do
+    usuário) e depois `GetPlayerAchievements` para as contagens; conquistas negadas não derrubam (contagens `null` e
+    aviso `CONQUISTAS_PRIVADAS`), jogo sem conquistas dá `0` de `0` (o 400 "no stats" é fixture real); a lista completa é da
+    etapa 4. **"Negado" (403 ou `success:false`) e "perfil privado" (visibilidade ≠ 3, biblioteca sem `game_count`) são
+    suposições SEM fixture real (CA-63)**: os testes as chamam de "SIMULADO" e `apps/api/scripts/capturar-fixtures-steam.cjs`
+    (modos `privado`, `detalhes-privados`, `vazio`; uma captura, sanitizada, sem gravar o ID) as troca por fixtures reais.
   - **Limite por USUÁRIO, não por IP** (`IntegrationsThrottlerGuard`, contador por rota e por usuário, em memória):
     30 por minuto, 5 por minuto em `POST vinculo`; 429 `LIMITE_TENTATIVAS` com `Retry-After`. Não depende do
     `TRUST_PROXY_HOPS`. O retorno usa `@SkipThrottle()`: quem o protege é o `state`, o cookie e a Steam.
@@ -415,6 +421,17 @@ indisponivel|ja-vinculada`, sem SteamID nem `state` na URL. A ordem é a defesa:
     biblioteca (cache de 10 min); as **conquistas são a soma dos jogos vinculados, já gravada no banco**, sem
     chamada extra (`{ desbloqueadas, total, jogosVinculados }`). `POST .../perfil/atualizacao` ignora o cache, mas
     no máximo uma consulta a cada 30 s: antes disso devolve o que tem, sem chamar a Steam.
+  - **Biblioteca e vínculo de jogo (etapa 3)**: `GET :provedor/biblioteca?busca=&limite=` (padrão 30, máximo 50, busca de
+    até 100 caracteres, sem paginação) lê a biblioteca do **mesmo cache de 10 min por SteamID** do cartão do perfil
+    (`obterBiblioteca`; erro não entra no cache), ordena por horas e traz `jogosParecidos` (mesma `chaveDeTitulo`, até 3,
+    sem vínculo) e `vinculadoA`. `PUT :provedor/jogos/:jogoId` (`{ idExterno, mover? }`, DTO com regex e `mover` booleano
+    estrito) segue **esta ordem**: (1) o jogo é do usuário e há conta vinculada; (2) o jogo já tem vínculo → mesmo item
+    responde 200 idempotente, outro item é 409 `PLATAFORMA_JOGO_JA_VINCULADO` (mesmo com `mover`); (3) o item está ligado a
+    outro jogo → sem `mover`, 409 `PLATAFORMA_ITEM_JA_VINCULADO` com `jogoAtual`, **sem chamar a Steam**; (4) a Steam
+    (`obterJogo`); (5) grava, e com `mover` numa `$transaction([deleteMany, create])`. Falha da Steam não muda nada
+    (CA-66/67); o jogo antigo perde só a camada e **nada é copiado**; P2002 é traduzido pelo `meta.target`. `DELETE
+.../jogos/:jogoId` tira só a camada (404 `PLATAFORMA_VINCULO_NAO_ENCONTRADO` se não há). O `games` devolve
+    `Game.dadosPlataforma` (lista, lida com `include`, **sem chamar a Steam**) para o web saber quais jogos já têm vínculo.
   - **Testes** (Jest, sem rede e sem banco): `steam/steam.client.spec.ts` (com **fixtures reais e
     sanitizados** em `steam/__fixtures__/`: respostas de uma conta de teste com SteamID, nome e avatar
     sintéticos; `steam/fixtures.spec.ts` falha se um SteamID ou uma chave passar), `steam/steam-open-id.spec.ts`,
@@ -869,7 +886,7 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
   `features/games/lib/initial-filter.test.ts`, `features/games/components/PlatformField.test.tsx`,
   acréscimos em `styles/tokens.test.ts` e `pages/GamesPage.test.tsx`.
 
-### 5.13 Integrações no web (`features/integracoes/`, spec `docs/specs/integracao-plataformas.md`, etapa 2)
+### 5.13 Integrações no web (`features/integracoes/`, spec `docs/specs/integracao-plataformas.md`, etapas 2 e 3)
 
 - **`/perfil`** ganha a seção **Contas vinculadas** (`ContasVinculadas`, entre "Conta" e "Preferências"), com o
   **cartão Steam** (`ContaSteamCard`). Dados pelo `apiClient` (`api/integracoes-api.ts`) e TanStack Query
@@ -894,7 +911,18 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
 - **Formatação** (`lib/format.ts`): `horasCurtas` ("45 min", "1,5 h", "42 h", "1.234 h", arredondando para baixo) e
   `textoDasConquistas` (singular e plural). `lib/estado-do-cartao.ts` classifica a falha (`privado`, `sem-conexao`,
   `erro`).
-- **Testes** (Vitest): `components/ContaSteamCard.test.tsx` (todos os estados, o desvio da URL fora da Steam, o
+- **Biblioteca e vínculo de jogo (etapa 3)**: `BibliotecaSteamDialog` (dois modos: `novo` e `vincular`, num `ModalDialog`;
+  busca com _debounce_ de 300 ms; estados carregando, vazia, privada e erro com **Tentar de novo**). No modo `novo`, cada item
+  é **Criar jogo** (ou **Criar outro jogo**, quando há parecidos, que ganham **Vincular a este**), mais **Vincular a outro
+  jogo que já tenho** (seletor só dos jogos sem `dadosPlataforma`); item já ligado mostra "Já ligado a «X»" e não cria. Nunca
+  vincula sozinho. Jogo de plataforma ≠ vazio/"PC" pede **confirmação** ("horas e conquistas são as da Steam"); o 409
+  `PLATAFORMA_ITEM_JA_VINCULADO` mostra o aviso com **Mover o vínculo**, que reenvia com `mover: true`. `GameForm` (jogo novo)
+  ganha **Buscar na Steam** (só com conta vinculada; senão o link "Vincule sua Steam no perfil"): preenche título, "PC" e o
+  status sugerido (`lib/biblioteca.ts`: 0 min = Quero jogar, >0 = Jogando, **nunca** Zerado), a capa oficial é só **prévia**;
+  ao salvar cria o jogo e **só depois** liga (falha da ligação: jogo salvo, formulário passa a editar, o próximo Salvar
+  reenvia sem 409); a confirmação de plataforma vem **antes** de criar qualquer coisa. A página do jogo tem **Vincular à
+  Steam** (modo `vincular`). Ligar invalida `['games']` e o cartão do perfil.
+- **Testes** (Vitest): `components/BibliotecaSteamDialog.test.tsx`, `lib/biblioteca.test.ts`, `games/components/GameForm.steam.test.tsx`, `components/ContaSteamCard.test.tsx` (todos os estados, o desvio da URL fora da Steam, o
   diálogo, Atualizar, privacidade), `lib/lib.test.ts` (URL da Steam, avisos, horas, classificação),
   `pages/PerfilPage.test.tsx` (a seção entre Conta e Preferências e os avisos do retorno; a API de integrações é
   mockada).
