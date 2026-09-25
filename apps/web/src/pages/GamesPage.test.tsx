@@ -6,6 +6,7 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { type Game } from '@checkpoint/shared';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { gamesApi } from '@/features/games/api/games-api';
+import { integracoesApi } from '@/features/integracoes/api/integracoes-api';
 import { OFFLINE_NOT_SAVED } from '@/features/games/lib/api-error';
 import { connectivity } from '@/shared/lib/connectivity';
 import { alterarPrefs, definirUsuario, resetPrefsForTests } from '@/shared/lib/prefs/prefs-store';
@@ -14,7 +15,7 @@ import { GamesPage } from './GamesPage';
 
 // Sem conta Steam nestes testes: a API de integrações não vai à rede.
 vi.mock('@/features/integracoes/api/integracoes-api', () => ({
-  integracoesApi: { listarContas: vi.fn().mockResolvedValue([]) },
+  integracoesApi: { listarContas: vi.fn().mockResolvedValue([]), detalheDoJogo: vi.fn() },
 }));
 vi.mock('@/features/games/api/games-api', () => ({
   gamesApi: {
@@ -629,5 +630,52 @@ describe('preferências do /perfil no catálogo (perfil CA-16, CA-17)', () => {
     await screen.findByText('Celeste');
     expect(rows()[0]).toHaveAttribute('data-densidade', 'confortavel');
     expect(rows()[0]?.querySelector('[data-cover]')).toHaveClass('size-[52px]');
+  });
+});
+
+describe('linha do catálogo com a Steam (spec integracao-plataformas, CA-41)', () => {
+  const dados = {
+    provedor: 'STEAM' as const,
+    idExterno: '504230',
+    minutosJogados: 2550,
+    ultimaVezJogadoEm: null,
+    conquistasTotal: 40,
+    conquistasDesbloqueadas: 12,
+    capaUrl: 'https://cdn.cloudflare.steamstatic.com/steam/apps/504230/library_600x900.jpg',
+    atualizadoEm: '2026-09-25T12:00:00.000Z',
+  };
+
+  it('o jogo ligado mostra "42 h · 12/40" e o sem ligação não mostra nada; abrir "/" NÃO consulta conquistas', async () => {
+    api.list.mockResolvedValue([
+      game({ id: 'a', titulo: 'Ligado', dadosPlataforma: [dados] }),
+      game({ id: 'b', titulo: 'Solto', dadosPlataforma: [] }),
+    ]);
+    renderPage();
+
+    const resumo = await screen.findByRole('img', {
+      name: 'Tempo jogado na Steam: 42 horas, 12 de 40 conquistas',
+    });
+    expect(resumo).toHaveTextContent('42 h · 12/40');
+    expect(document.querySelectorAll('[data-steam-resumo]')).toHaveLength(1);
+    expect(integracoesApi.detalheDoJogo).not.toHaveBeenCalled();
+  });
+
+  it('a capa da linha é a oficial quando não há capa enviada, e a enviada quando há (CA-42)', async () => {
+    api.list.mockResolvedValue([
+      game({ id: 'a', titulo: 'Sem capa enviada', dadosPlataforma: [dados] }),
+      game({
+        id: 'b',
+        titulo: 'Com capa enviada',
+        capaUrl: 'https://bucket/enviada.jpg',
+        dadosPlataforma: [dados],
+      }),
+    ]);
+    renderPage();
+
+    await screen.findByText('Sem capa enviada');
+    const srcs = Array.from(document.querySelectorAll('[data-cover="image"] img')).map((img) =>
+      img.getAttribute('src'),
+    );
+    expect(srcs).toEqual([dados.capaUrl, 'https://bucket/enviada.jpg']);
   });
 });

@@ -111,3 +111,33 @@ export function comDadosAtualizados(
       : jogo,
   );
 }
+
+/**
+ * O resumo curto da linha do catálogo: "42 h · 12/40" e o `aria-label` completo. Só as horas quando não há total de
+ * conquistas (negado, nunca consultado ou o jogo não tem: total 0). Horas inteiras ("42 h"; 0 minutos é "0 h");
+ * abaixo de 1 h, em minutos, para não mostrar "0 h" de quem jogou 45 min. `null` para jogo sem vínculo.
+ */
+export function resumoDoCatalogo(
+  dados: readonly DadosJogoPlataforma[],
+): { texto: string; rotulo: string } | null {
+  const doProvedor = dados[0];
+  if (!doProvedor) {
+    return null;
+  }
+  const minutos = Math.max(0, Math.floor(doProvedor.minutosJogados));
+  const horas = Math.floor(minutos / 60);
+  const curto = minutos > 0 && horas === 0 ? `${minutos} min` : `${horas} h`;
+  const longo =
+    minutos > 0 && horas === 0
+      ? `${minutos} ${minutos === 1 ? 'minuto' : 'minutos'}`
+      : `${horas} ${horas === 1 ? 'hora' : 'horas'}`;
+
+  const { conquistasTotal: total, conquistasDesbloqueadas: desbloqueadas } = doProvedor;
+  if (total === null || total <= 0 || desbloqueadas === null) {
+    return { texto: curto, rotulo: `Tempo jogado na Steam: ${longo}` };
+  }
+  return {
+    texto: `${curto} · ${desbloqueadas}/${total}`,
+    rotulo: `Tempo jogado na Steam: ${longo}, ${desbloqueadas} de ${total} ${total === 1 ? 'conquista' : 'conquistas'}`,
+  };
+}

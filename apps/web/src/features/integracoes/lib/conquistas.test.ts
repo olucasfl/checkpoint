@@ -7,6 +7,7 @@ import {
   horasEMinutos,
   progressoDasConquistas,
   raridadeTexto,
+  resumoDoCatalogo,
   separarConquistas,
   ultimoJogoTexto,
 } from './conquistas';
@@ -157,5 +158,60 @@ describe('comDadosAtualizados (o detalhe atualiza o catálogo sem refazer a list
     const sem = jogo('a', []);
     expect(comDadosAtualizados([sem], 'a', dados(1))?.[0]?.dadosPlataforma).toEqual([]);
     expect(comDadosAtualizados(undefined, 'a', dados(1))).toBeUndefined();
+  });
+});
+
+describe('resumoDoCatalogo (CA-41)', () => {
+  const dados = (extra: Partial<DadosJogoPlataforma> = {}): DadosJogoPlataforma => ({
+    provedor: 'STEAM',
+    idExterno: '1',
+    minutosJogados: 2550,
+    ultimaVezJogadoEm: null,
+    conquistasTotal: 40,
+    conquistasDesbloqueadas: 12,
+    capaUrl: null,
+    atualizadoEm: '2026-09-25T12:00:00.000Z',
+    ...extra,
+  });
+
+  it('"42 h · 12/40" com o aria-label completo', () => {
+    expect(resumoDoCatalogo([dados()])).toEqual({
+      texto: '42 h · 12/40',
+      rotulo: 'Tempo jogado na Steam: 42 horas, 12 de 40 conquistas',
+    });
+  });
+
+  it('sem total de conquistas (Y = 0, negado ou nunca consultado): só as horas', () => {
+    expect(
+      resumoDoCatalogo([dados({ conquistasTotal: 0, conquistasDesbloqueadas: 0 })])?.texto,
+    ).toBe('42 h');
+    expect(
+      resumoDoCatalogo([dados({ conquistasTotal: null, conquistasDesbloqueadas: null })]),
+    ).toEqual({
+      texto: '42 h',
+      rotulo: 'Tempo jogado na Steam: 42 horas',
+    });
+  });
+
+  it('0 minutos é "0 h"; abaixo de 1 h, em minutos; singular em 1 h e em 1 conquista', () => {
+    expect(resumoDoCatalogo([dados({ minutosJogados: 0, conquistasTotal: null })])?.texto).toBe(
+      '0 h',
+    );
+    expect(resumoDoCatalogo([dados({ minutosJogados: 45, conquistasTotal: null })])).toEqual({
+      texto: '45 min',
+      rotulo: 'Tempo jogado na Steam: 45 minutos',
+    });
+    expect(
+      resumoDoCatalogo([
+        dados({ minutosJogados: 60, conquistasTotal: 1, conquistasDesbloqueadas: 1 }),
+      ]),
+    ).toEqual({
+      texto: '1 h · 1/1',
+      rotulo: 'Tempo jogado na Steam: 1 hora, 1 de 1 conquista',
+    });
+  });
+
+  it('jogo sem vínculo: nada', () => {
+    expect(resumoDoCatalogo([])).toBeNull();
   });
 });

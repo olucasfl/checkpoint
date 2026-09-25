@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { type Game } from '@checkpoint/shared';
 import { Icon } from '@/shared/components/Icon';
 import { capasDoJogo } from '@/features/integracoes/lib/capa';
+import { resumoDoCatalogo } from '@/features/integracoes/lib/conquistas';
 import { platformIcon } from '../lib/status-meta';
 import { GameCover } from './GameCover';
 import { RatingBar } from './RatingBar';
@@ -24,6 +25,7 @@ const ACTION =
  * >= 768px, a linha única de antes. As áreas vêm de `data-area` (styles/index.css).
  */
 export function GameRow({ game, onEdit, onRemove, compacta = false }: GameRowProps) {
+  const resumo = resumoDoCatalogo(game.dadosPlataforma);
   return (
     <li
       data-status={game.status}
@@ -57,6 +59,20 @@ export function GameRow({ game, onEdit, onRemove, compacta = false }: GameRowPro
           <span className="flex min-w-0 items-center gap-1.5 text-base font-medium text-texto-suave">
             <Icon name={platformIcon(game.plataforma)} size={18} />
             <span className="truncate">{game.plataforma}</span>
+          </span>
+        )}
+        {resumo && (
+          // Só o que já veio na lista (`dadosPlataforma`): a linha nunca consulta a plataforma.
+          <span
+            role="img"
+            aria-label={resumo.rotulo}
+            data-steam-resumo
+            className="flex min-w-0 items-center gap-1.5 text-base font-medium text-texto-suave"
+          >
+            <Icon name="sports_esports" size={18} />
+            <span aria-hidden="true" className="truncate">
+              {resumo.texto}
+            </span>
           </span>
         )}
       </div>
