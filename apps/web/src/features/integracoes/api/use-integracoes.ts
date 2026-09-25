@@ -1,6 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { type PerfilPlataforma, type Provedor, type VincularJogoRequest } from '@checkpoint/shared';
+import {
+  type DetalheJogoPlataforma,
+  type Game,
+  type PerfilPlataforma,
+  type Provedor,
+  type VincularJogoRequest,
+} from '@checkpoint/shared';
 import { GAMES_QUERY_KEY } from '@/features/games/api/use-games';
+import { comDadosAtualizados } from '../lib/conquistas';
 import { integracoesApi } from './integracoes-api';
 
 /** As contas vinculadas. O logout local limpa o `queryClient` inteiro, estas chaves junto. */
@@ -90,11 +97,52 @@ export function useVincularJogo(provedor: Provedor) {
   });
 }
 
+export const detalheQueryKey = (provedor: Provedor, jogoId: string) =>
+  ['integracoes', 'jogo', provedor, jogoId] as const;
+
+/**
+ * O detalhe de um jogo ligado (horas e conquistas). Só é pedido quando `enabled` (a página do jogo já sabe que ele
+ * tem vínculo), então abrir `/` nunca consulta conquistas. Sem _retry_: o servidor já devolve o valor gravado com
+ * um aviso quando a plataforma falha. Os valores novos entram direto no cache do catálogo (a linha "42 h · 12/40").
+ */
+export function useDetalheJogo(provedor: Provedor, jogoId: string, enabled: boolean) {
+  const queryClient = useQueryClient();
+  return useQuery({
+    queryKey: detalheQueryKey(provedor, jogoId),
+    queryFn: async () => {
+      const detalhe = await integracoesApi.detalheDoJogo(provedor, jogoId);
+      queryClient.setQueryData<Game[]>(GAMES_QUERY_KEY, (jogos) =>
+        comDadosAtualizados(jogos, jogoId, detalhe.dados),
+      );
+      return detalhe;
+    },
+    enabled,
+    retry: false,
+  });
+}
+
+/** O "Atualizar" do bloco: o resultado entra no cache do detalhe e no do catálogo. */
+export function useAtualizarJogo(provedor: Provedor, jogoId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => integracoesApi.atualizarJogo(provedor, jogoId),
+    onSuccess: (detalhe: DetalheJogoPlataforma) => {
+      queryClient.setQueryData(detalheQueryKey(provedor, jogoId), detalhe);
+      queryClient.setQueryData<Game[]>(GAMES_QUERY_KEY, (jogos) =>
+        comDadosAtualizados(jogos, jogoId, detalhe.dados),
+      );
+    },
+  });
+}
+
 /** Desvincular um jogo (só a camada da plataforma). */
 export function useDesvincularJogo(provedor: Provedor) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (jogoId: string) => integracoesApi.desvincularJogo(provedor, jogoId),
+    onSuccess: (_resultado, jogoId) => {
+      queryClient.removeQueries({ queryKey: detalheQueryKey(provedor, jogoId) });
+    },
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: GAMES_QUERY_KEY });
       void queryClient.invalidateQueries({ queryKey: perfilQueryKey(provedor) });

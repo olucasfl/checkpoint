@@ -2,6 +2,7 @@ import {
   PROVEDOR_SLUG,
   type ContaVinculada,
   type DadosJogoPlataforma,
+  type DetalheJogoPlataforma,
   type IniciarVinculoResponse,
   type ItemBiblioteca,
   type PerfilPlataforma,
@@ -68,6 +69,22 @@ export const integracoesApi = {
     const response = await apiClient.put<DadosJogoPlataforma>(
       `${rota(provedor)}/jogos/${encodeURIComponent(jogoId)}`,
       body,
+    );
+    return response.data;
+  },
+
+  /** `GET .../jogos/:jogoId`: horas e conquistas de um jogo ligado (nunca 502: a falha vem como `aviso`). */
+  async detalheDoJogo(provedor: Provedor, jogoId: string): Promise<DetalheJogoPlataforma> {
+    const response = await apiClient.get<DetalheJogoPlataforma>(
+      `${rota(provedor)}/jogos/${encodeURIComponent(jogoId)}`,
+    );
+    return response.data;
+  },
+
+  /** `POST .../jogos/:jogoId/atualizacao`: o "Atualizar" (no máximo uma consulta a cada 30 s; 502 se a plataforma falhar). */
+  async atualizarJogo(provedor: Provedor, jogoId: string): Promise<DetalheJogoPlataforma> {
+    const response = await apiClient.post<DetalheJogoPlataforma>(
+      `${rota(provedor)}/jogos/${encodeURIComponent(jogoId)}/atualizacao`,
     );
     return response.data;
   },

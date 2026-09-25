@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { type Game } from '@checkpoint/shared';
 import { Icon } from '@/shared/components/Icon';
+import { capasDoJogo } from '@/features/integracoes/lib/capa';
 import { platformIcon } from '../lib/status-meta';
 import { GameCover } from './GameCover';
 import { RatingBar } from './RatingBar';
@@ -36,7 +37,8 @@ export function GameRow({ game, onEdit, onRemove, compacta = false }: GameRowPro
       <div data-area="capa" className="self-start md:self-center">
         <GameCover
           titulo={game.titulo}
-          capaUrl={game.capaUrl}
+          capaUrl={capasDoJogo(game)[0] ?? null}
+          alternativas={capasDoJogo(game).slice(1)}
           variant={compacta ? 'compacta' : 'row'}
         />
       </div>
