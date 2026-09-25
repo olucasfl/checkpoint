@@ -369,7 +369,11 @@ describe('GET /auth/me e o guard global (CA-07, CA-17)', () => {
 
   it('token alterado num caractere → 401 AUTH_NAO_AUTENTICADO', async () => {
     const { access } = await registerAna();
-    const alterado = access.slice(0, -2) + (access.endsWith('A') ? 'B' : 'A') + access.slice(-1);
+    // Troca o penúltimo caractere por um DIFERENTE dele: decidir pelo último deixava o token igual (e ainda
+    // válido) quando o penúltimo já era 'A' ou 'B', e o teste falhava de vez em quando.
+    const posicao = access.length - 2;
+    const alterado =
+      access.slice(0, posicao) + (access[posicao] === 'A' ? 'B' : 'A') + access.slice(posicao + 1);
 
     const reply = await call('GET', '/auth/me', { bearer: alterado });
 

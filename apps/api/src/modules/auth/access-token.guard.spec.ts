@@ -101,7 +101,11 @@ describe('AccessTokenGuard — token inválido → AUTH_NAO_AUTENTICADO (CA-07)'
 
   it('access token alterado num caractere', async () => {
     const token = await tokens.signAccess(USER_ID, SESSION_ID);
-    const alterado = token.slice(0, -2) + (token.endsWith('A') ? 'B' : 'A') + token.slice(-1);
+    // Troca o penúltimo caractere por um DIFERENTE dele (decidir pelo último deixava o token igual quando
+    // o penúltimo já era 'A' ou 'B': o teste passava a falhar de vez em quando, com um token ainda válido).
+    const posicao = token.length - 2;
+    const alterado =
+      token.slice(0, posicao) + (token[posicao] === 'A' ? 'B' : 'A') + token.slice(posicao + 1);
     const { context } = contextFor(ProtectedController, `Bearer ${alterado}`);
 
     await expect(codeOf(guard.canActivate(context))).resolves.toBe('AUTH_NAO_AUTENTICADO');
