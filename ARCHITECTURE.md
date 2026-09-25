@@ -143,7 +143,14 @@ implementado.
 ### 4.1 Ciclo de vida da request (`src/main.ts` + `src/app.setup.ts`)
 
 1. **Prefixo global** `api` (`API_GLOBAL_PREFIX`, `src/config/app.config.ts`) — toda rota fica sob
-   `/api/*`.
+   `/api/*`. Logo em seguida, **`trust proxy`**: `app.set('trust proxy', TRUST_PROXY_HOPS)`, com a env
+   opcional validada em `env.validation.ts` (inteiro de 0 a 10; **ausente = 0**, que ignora o
+   `X-Forwarded-For`). É um **número de saltos, nunca `true`**: sem isso o `req.ip` é o endereço do socket,
+   que atrás de Vercel → Render é o do proxy, e o limite por IP (§4.5) agrupava todos os usuários num contador
+   só (bug corrigido em `fix/trust-proxy`, com regressão em `app.setup.trust-proxy.http.spec.ts`). Com N saltos o
+   Express só confia nos **últimos N** endereços do cabeçalho e usa o anterior a eles como IP do cliente, então
+   o que o cliente forjar **antes** disso não muda o IP usado. O número **precisa ser medido em produção** (um
+   valor menor que o real deixa o limite quebrado; um maior deixa o cabeçalho forjável).
 2. **`cookie-parser`** (para ler o cookie `checkpoint_refresh`) e **CORS** com `credentials: true`. A origem
    vem de `CORS_ORIGIN`, parseada por `parseCorsOrigin()` **sempre para uma lista** (com uma string única o
    `cors` responderia `Access-Control-Allow-Origin` para qualquer origem). **`CORS_ORIGIN=*` é recusado no
@@ -406,7 +413,8 @@ Registre o módulo novo em `app.module.ts` (`imports: [...]`).
   CORS). Sem ele: 403 `AUTH_ORIGEM_INVALIDA`.
 - **Limite por IP** (`@nestjs/throttler`, memória, uma instância) só no `AuthController`: login 5/min, refresh
   30/min, troca de senha **5 a cada 15 min**, registro **3/h** (constante no código; a env opcional `AUTH_REGISTRATION_LIMIT_PER_HOUR` só existe
-  para verificação manual). 429 com `code: LIMITE_TENTATIVAS` e `Retry-After`.
+  para verificação manual). 429 com `code: LIMITE_TENTATIVAS` e `Retry-After`. O "IP" é o `req.ip`, que só é o
+  do cliente atrás de proxy com `TRUST_PROXY_HOPS` correto (§4.1); sem ele o contador vira um só para o site.
 - **Hash de senha: `node:crypto.scrypt`** (`password-hasher.ts`, N=2^17, r=8, p=1, sal de 16 bytes, formato
   `scrypt$N$r$p$sal$hash`), **não argon2**: o `argon2` não instala nesta máquina (sem binário pré-compilado e sem
   toolchain do Visual Studio), e a spec já previa esse plano B. `PasswordHasher` isola o algoritmo. Login com
@@ -888,6 +896,7 @@ mudanças de schema por um agente.
 | `apps/api/.env` | `AUTH_REGISTRATION_LIMIT_PER_HOUR`                                     | **Opcional**, só dev/teste: sobrescreve o limite de 3 registros por hora por IP. Em ambiente exposto, deixe ausente                                                                                                                                                                                           |
 | `apps/api/.env` | `STEAM_API_KEY`, `API_PUBLIC_URL`, `WEB_PUBLIC_URL`                    | Integração com plataformas (spec `integracao-plataformas`); **obrigatórias**: a API não sobe sem elas, cadastre no Render **antes** do deploy. `STEAM_API_KEY` só no backend, nunca no web nem em log. `API_PUBLIC_URL` e `WEB_PUBLIC_URL`: origens sem barra final (produção: o domínio da Vercel; §4.2)     |
 | `apps/api/.env` | `DIRECT_URL`                                                           | Só o Prisma CLI lê (via `schema.prisma`); necessária apenas se `DATABASE_URL` for uma conexão pooled (ex.: Supabase)                                                                                                                                                                                          |
+| `apps/api/.env` | `TRUST_PROXY_HOPS`                                                     | **Opcional**, inteiro de 0 a 10; ausente = 0 (dev, sem proxy). Quantos proxies confiáveis há entre o cliente e a API, para o limite por IP ver o cliente e não o proxy (§4.1). Em produção, o número **medido** (Vercel + Render); nunca um chute                                                             |
 | `apps/web/.env` | `VITE_API_URL`                                                         | Consumida em `src/shared/lib/env.ts`, `baseURL` do `apiClient`                                                                                                                                                                                                                                                |
 
 `CORS_ORIGIN` deixou de ter padrão e **recusa `*`** (cookie de sessão): liste as origens, ex.:

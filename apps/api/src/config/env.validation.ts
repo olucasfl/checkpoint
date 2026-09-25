@@ -31,6 +31,9 @@ const ORIGIN_PATTERN = /^https?:\/\/[^\s/?#]+$/;
 const ORIGIN_MESSAGE = (name: string) =>
   `${name} deve ser uma origem http(s) sem barra final nem caminho, ex.: http://localhost:3333`;
 
+/** Saltos de proxy confiáveis quando `TRUST_PROXY_HOPS` não está definida: nenhum. */
+export const DEFAULT_TRUST_PROXY_HOPS = 0;
+
 const CORS_WILDCARD_MESSAGE =
   'CORS_ORIGIN não pode ser * com cookies de sessão; liste as origens, ex.: http://localhost:5173';
 
@@ -135,6 +138,18 @@ export class EnvironmentVariables {
   /** Origem do web, para onde o retorno do vínculo redireciona (`/perfil?steam=…`). Sem barra final. */
   @Matches(ORIGIN_PATTERN, { message: ORIGIN_MESSAGE('WEB_PUBLIC_URL') })
   WEB_PUBLIC_URL: string;
+
+  /**
+   * Quantos proxies CONFIÁVEIS existem entre o cliente e a API (Vercel, Render…). Ausente = 0: o
+   * `X-Forwarded-For` é ignorado e o `req.ip` é o do socket (dev, sem proxy). Um número MENOR que o real deixa
+   * o limite por IP quebrado (todo mundo com o IP do proxy); MAIOR deixa o cabeçalho forjável. Por isso é
+   * um número medido, nunca `true` (que confiaria em qualquer cabeçalho): ver `ARCHITECTURE.md` §4.1.
+   */
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(10)
+  TRUST_PROXY_HOPS?: number;
 }
 
 /** Regras que envolvem mais de uma variável (ou uma lista), fora do alcance de um decorator só. */

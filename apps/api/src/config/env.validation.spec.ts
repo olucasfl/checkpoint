@@ -1,5 +1,9 @@
 import 'reflect-metadata';
-import { DEFAULT_REGISTRATION_LIMIT_PER_HOUR, validateEnv } from './env.validation';
+import {
+  DEFAULT_REGISTRATION_LIMIT_PER_HOUR,
+  DEFAULT_TRUST_PROXY_HOPS,
+  validateEnv,
+} from './env.validation';
 
 // Valores sintéticos e óbvios (RULES.md §8): nenhum segredo real em teste.
 const valid = {
@@ -231,4 +235,29 @@ describe('validateEnv — AUTH_REGISTRATION_LIMIT_PER_HOUR (opcional)', () => {
       'AUTH_REGISTRATION_LIMIT_PER_HOUR',
     );
   });
+});
+
+describe('validateEnv — TRUST_PROXY_HOPS (opcional, saltos de proxy confiáveis)', () => {
+  it('ausente é válida (o padrão vive no código: 0, não confia em cabeçalho nenhum)', () => {
+    expect(validateEnv(valid).TRUST_PROXY_HOPS).toBeUndefined();
+    expect(DEFAULT_TRUST_PROXY_HOPS).toBe(0);
+  });
+
+  it.each([
+    ['0', 0],
+    ['1', 1],
+    ['2', 2],
+    ['10', 10],
+  ])('aceita o inteiro %j', (value, esperado) => {
+    expect(validateEnv({ ...valid, TRUST_PROXY_HOPS: value })).toMatchObject({
+      TRUST_PROXY_HOPS: esperado,
+    });
+  });
+
+  it.each(['-1', '11', '1.5', 'abc', 'true', '*'])(
+    '%j falha no boot (só um número de saltos, nunca `true` nem `*`)',
+    (value) => {
+      expect(messageOf({ ...valid, TRUST_PROXY_HOPS: value })).toContain('TRUST_PROXY_HOPS');
+    },
+  );
 });
