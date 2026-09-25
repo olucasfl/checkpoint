@@ -107,6 +107,12 @@ commit — `/docs-sync` confere se ela bate com a realidade.
       mantém o problema). Cobrir por teste e conferir o `req.ip` real depois do deploy. A spec
       `integracao-plataformas` não depende dela (limite por usuário), mas a etapa 2 só começa depois.
 
+**`integracao-plataformas` — fixtures reais de privacidade (CA-63; execução humana, quando der):** perfil privado, conquistas negadas
+("detalhes do jogo" privados) e biblioteca vazia ainda são resposta **simulada** (CA-20, CA-30, CA-47, CA-49 ficam `[~]`). Para fechar: deixe a
+conta de teste no estado certo no site da Steam, espere alguns minutos e rode `node apps/api/scripts/capturar-fixtures-steam.cjs privado`,
+`... detalhes-privados` ou `... vazio` (uma captura por execução; só grava se o estado for o esperado). Depois troque as respostas
+simuladas pelos fixtures e reveja os CAs.
+
 **`integracao-plataformas` — execução humana (etapa 1; ordem obrigatória):**
 
 - [ ] Gerar a `STEAM_API_KEY` em `steamcommunity.com/dev/apikey` (pede um "domínio": usar o da Vercel; exige uma

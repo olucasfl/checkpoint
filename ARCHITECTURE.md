@@ -340,13 +340,10 @@ apps/api/src/modules/games/
     `users.http.spec.ts` (porta local, com a auth de verdade e o Prisma falso de `auth/testing/`, que ganhou o
     `user.delete` com o cascade: 204 e o cookie limpo, 400, 401, 429 no 6º pedido e o contador próprio).
 
-- `integrations/` — integrações com plataformas de jogos (spec `docs/specs/integracao-plataformas.md`, **etapas
-  1 a 3**: a base, o **vínculo da conta com o cartão do perfil**, a **biblioteca** e o **vínculo de jogo**; a lista de
-  conquistas por jogo é da etapa 4). Prefixo `/api/integracoes`, tag Swagger `integracoes`. Rotas (todas protegidas
+- `integrations/` — integrações com plataformas de jogos (spec `docs/specs/integracao-plataformas.md`, **etapas 1 a 4**: a base, o **vínculo da conta com o cartão do perfil**, a **biblioteca**, o **vínculo de jogo** e o **detalhe do jogo** com horas e a lista de conquistas). Prefixo `/api/integracoes`, tag Swagger `integracoes`. Rotas (todas protegidas
   pelo guard global, **exceto o retorno**): `GET /` (contas vinculadas), `POST :provedor/vinculo`,
   `GET :provedor/retorno` (`@Public()`), `DELETE :provedor`, `GET :provedor/perfil` e
-  `POST :provedor/perfil/atualizacao`, `GET :provedor/biblioteca`, `PUT :provedor/jogos/:jogoId` (200) e
-  `DELETE :provedor/jogos/:jogoId` (204). O `:provedor` é o _slug_ minúsculo (`steam`), validado pelo
+  `POST :provedor/perfil/atualizacao`, `GET :provedor/biblioteca`, `PUT :provedor/jogos/:jogoId` (200), `GET :provedor/jogos/:jogoId` (o detalhe), `POST :provedor/jogos/:jogoId/atualizacao` e `DELETE :provedor/jogos/:jogoId` (204). O `:provedor` é o _slug_ minúsculo (`steam`), validado pelo
   `ProvedorSlugPipe` (400 `VALIDACAO`).
   - **`GameProvider`** (`providers/game-provider.ts`) é a interface que cada plataforma implementa
     (`iniciarVinculo`, `concluirVinculo`, `listarBiblioteca` — que devolve também o perfil, porque o cartão do
@@ -410,8 +407,7 @@ indisponivel|ja-vinculada`, sem SteamID nem `state` na URL. A ordem é a defesa:
     é `cdn.cloudflare.steamstatic.com/steam/apps/<appid>/library_600x900.jpg` (404 em alguns apps: o web cai em
     `header.jpg`). `obterJogo` (etapa 3) devolve só o **resumo**: a biblioteca filtrada pelo appid (`appids_filter`, confere que o jogo é do
     usuário) e depois `GetPlayerAchievements` para as contagens; conquistas negadas não derrubam (contagens `null` e
-    aviso `CONQUISTAS_PRIVADAS`), jogo sem conquistas dá `0` de `0` (o 400 "no stats" é fixture real); a lista completa é da
-    etapa 4. **"Negado" (403 ou `success:false`) e "perfil privado" (visibilidade ≠ 3, biblioteca sem `game_count`) são
+    aviso `CONQUISTAS_PRIVADAS`), jogo sem conquistas dá `0` de `0` (o 400 "no stats" é fixture real); a lista completa vem do `obterDetalhe` (etapa 4, abaixo). **"Negado" (403 ou `success:false`) e "perfil privado" (visibilidade ≠ 3, biblioteca sem `game_count`) são
     suposições SEM fixture real (CA-63)**: os testes as chamam de "SIMULADO" e `apps/api/scripts/capturar-fixtures-steam.cjs`
     (modos `privado`, `detalhes-privados`, `vazio`; uma captura, sanitizada, sem gravar o ID) as troca por fixtures reais.
   - **Limite por USUÁRIO, não por IP** (`IntegrationsThrottlerGuard`, contador por rota e por usuário, em memória):
@@ -432,6 +428,23 @@ indisponivel|ja-vinculada`, sem SteamID nem `state` na URL. A ordem é a defesa:
     (CA-66/67); o jogo antigo perde só a camada e **nada é copiado**; P2002 é traduzido pelo `meta.target`. `DELETE
 .../jogos/:jogoId` tira só a camada (404 `PLATAFORMA_VINCULO_NAO_ENCONTRADO` se não há). O `games` devolve
     `Game.dadosPlataforma` (lista, lida com `include`, **sem chamar a Steam**) para o web saber quais jogos já têm vínculo.
+  - **Detalhe do jogo (etapa 4)**: `GET :provedor/jogos/:jogoId` devolve `{ dados, conquistas, aviso }`. Ordem: (1) o jogo é do
+    usuário → 404 `Jogo não encontrado`; (2) tem vínculo → 404 `PLATAFORMA_VINCULO_NAO_ENCONTRADO`; (3) há conta; **só então**
+    a Steam (jogo de outro usuário e jogo sem vínculo nunca gastam cota). As **horas** só são reconsultadas se o dado gravado
+    é mais velho que `ATUALIZACAO_AUTOMATICA_MS` (1 h); a **lista** vem do cache. O `POST .../atualizacao` (`ATUALIZACAO_MANUAL_MIN_MS`,
+    30 s) ignora o cache das conquistas do jogador e reconsulta as horas; antes de 30 s devolve o gravado (a lista sai do
+    cache). **O `GET` nunca dá 502**: se a plataforma falhar, 200 com o valor gravado e `aviso` (`INDISPONIVEL`, ou
+    `PERFIL_PRIVADO`), sem escrever nada e logando só o tipo do erro; só o `POST` propaga 502/409. Grava **só o que mudou**:
+    horas e `atualizadoEm` quando reconsultadas; contagens se diferem e **nunca** quando negadas (`null`: o valor antigo fica);
+    duas aberturas seguidas não escrevem duas vezes. `SteamProvider.obterDetalhe` faz até 4 chamadas (horas por
+    `appids_filter`, `GetPlayerAchievements`, `GetSchemaForGame` e os percentuais, estes sem chave) atrás de `CarregadorEmCache`
+    (`cache/carregador-em-cache.ts`: `TtlCache` + junção de chamadas simultâneas): conquistas do jogador 5 min por SteamID e
+    appid; schema e percentuais 24 h por appid (dado público, dividido entre usuários). Schema ou percentuais falhando não
+    derruba: o nome cai para o do jogador (ou o id) e a raridade fica `null`. A conquista oculta vem sem descrição; o percentual
+    (texto na Steam) vira número com 1 casa; ícones só de host da Steam (`iconeUrlSeguro`). **A regra do 403**: um 403 do
+    `GetPlayerAchievements` (ou `success:false`) é "conquistas negadas" (`CONQUISTAS_PRIVADAS`, horas e vínculo ficam); um 403 em
+    QUALQUER outra chamada é `INDISPONIVEL` (problema com a chave), e o 400 "no stats" é jogo sem conquistas (`SEM_CONQUISTAS`).
+    O "negado" e o "perfil privado" no detalhe são **suposições sem fixture real (CA-63)**.
   - **Testes** (Jest, sem rede e sem banco): `steam/steam.client.spec.ts` (com **fixtures reais e
     sanitizados** em `steam/__fixtures__/`: respostas de uma conta de teste com SteamID, nome e avatar
     sintéticos; `steam/fixtures.spec.ts` falha se um SteamID ou uma chave passar), `steam/steam-open-id.spec.ts`,
@@ -886,7 +899,7 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
   `features/games/lib/initial-filter.test.ts`, `features/games/components/PlatformField.test.tsx`,
   acréscimos em `styles/tokens.test.ts` e `pages/GamesPage.test.tsx`.
 
-### 5.13 Integrações no web (`features/integracoes/`, spec `docs/specs/integracao-plataformas.md`, etapas 2 e 3)
+### 5.13 Integrações no web (`features/integracoes/`, spec `docs/specs/integracao-plataformas.md`, etapas 2 a 4)
 
 - **`/perfil`** ganha a seção **Contas vinculadas** (`ContasVinculadas`, entre "Conta" e "Preferências"), com o
   **cartão Steam** (`ContaSteamCard`). Dados pelo `apiClient` (`api/integracoes-api.ts`) e TanStack Query
@@ -922,7 +935,22 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
   ao salvar cria o jogo e **só depois** liga (falha da ligação: jogo salvo, formulário passa a editar, o próximo Salvar
   reenvia sem 409); a confirmação de plataforma vem **antes** de criar qualquer coisa. A página do jogo tem **Vincular à
   Steam** (modo `vincular`). Ligar invalida `['games']` e o cartão do perfil.
-- **Testes** (Vitest): `components/BibliotecaSteamDialog.test.tsx`, `lib/biblioteca.test.ts`, `games/components/GameForm.steam.test.tsx`, `components/ContaSteamCard.test.tsx` (todos os estados, o desvio da URL fora da Steam, o
+- **Horas e conquistas (etapa 4)**: a página `/jogos/:id` de um jogo ligado ganha o bloco **Steam** (`BlocoSteam`, dentro do
+  `GameDetail`): tempo jogado ("42 h 30 min"), "Último jogo em dd/mm/aaaa" ou "Nunca jogado", a barra `role="progressbar"`
+  ("12 de 40 conquistas"), **Atualizar**, **Desvincular** (confirmação; só a camada da Steam some: título, status, notas e capa
+  ficam, e **Vincular à Steam** volta) e **Abrir na Steam** (`rel="noopener noreferrer"`). A lista tem dois `<details>`:
+  **Desbloqueadas** (fechada, por data decrescente) e **Faltam** (aberta, da mais comum à mais rara), com ícone (`width`/`height`/
+  `loading="lazy"`), nome, descrição ("Conquista oculta" se oculta e bloqueada), data e "12,4% dos jogadores" (ou "Raridade
+  indisponível"); uma coluna no celular e, a partir de 1024 px, data e raridade à direita. O detalhe **só é pedido nesta página**
+  (`useDetalheJogo`, sem _retry_; abrir `/` não faz nenhuma request de conquistas) e os valores novos entram direto no cache do
+  catálogo (`comDadosAtualizados`). Enquanto carrega, mostra o último valor gravado; os avisos são discretos: conquistas privadas
+  (horas mantidas, sem barra), perfil privado e Steam indisponível (valor antigo mantido). Sem nenhuma animação nova.
+- **Linha do catálogo**: só "42 h · 12/40" (`resumoDoCatalogo`, `role="img"` com o rótulo completo), a partir de `dadosPlataforma`,
+  sem consultar a plataforma; só as horas quando não há total; "0 h" com 0 minutos.
+- **Precedência da capa** (`lib/capa.ts` + `GameCover`): a enviada, depois a oficial (`library_600x900.jpg`), depois o
+  `header.jpg` do mesmo app (derivado da URL oficial, só na CDN conhecida) e por fim a gerada (cor e inicial). O `GameCover` tenta
+  a próxima quando uma falha ao carregar (`onError`); nada é gravado, então remover a enviada faz a oficial reaparecer.
+- **Testes** (Vitest): `components/BlocoSteam.test.tsx`, `lib/capa.test.ts`, `lib/conquistas.test.ts`, `games/components/GameCover.test.tsx`, `components/BibliotecaSteamDialog.test.tsx`, `lib/biblioteca.test.ts`, `games/components/GameForm.steam.test.tsx`, `components/ContaSteamCard.test.tsx` (todos os estados, o desvio da URL fora da Steam, o
   diálogo, Atualizar, privacidade), `lib/lib.test.ts` (URL da Steam, avisos, horas, classificação),
   `pages/PerfilPage.test.tsx` (a seção entre Conta e Preferências e os avisos do retorno; a API de integrações é
   mockada).

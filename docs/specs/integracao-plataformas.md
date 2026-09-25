@@ -743,52 +743,91 @@ como `[~]`, CA-20 e CA-30 (respostas simuladas).
 
 ### Etapa 4 — horas, conquistas, atualização e privacidade
 
-- [ ] **CA-41** — **Dado** o catálogo (`/`), **então** a linha do jogo ligado mostra "42 h · 12/40" com o
+- [x] **CA-41** — **Dado** o catálogo (`/`), **então** a linha do jogo ligado mostra "42 h · 12/40" com o
       `aria-label` completo e a do jogo sem ligação não mostra nada; **dado** Y = 0, **então** só as horas; **dado**
       0 minutos, **então** "0 h".
-- [ ] **CA-42** — **Dado** um jogo com capa enviada **e** vínculo, **então** a capa mostrada é a enviada; **dado**
+- [x] **CA-42** — **Dado** um jogo com capa enviada **e** vínculo, **então** a capa mostrada é a enviada; **dado**
       só o vínculo, **então** a oficial (e se ela falhar ao carregar, a de `header.jpg`, e depois a gerada); **dado**
       que removo a capa enviada, **então** a oficial reaparece.
-- [ ] **CA-43** — **Dado** um jogo ligado com `atualizadoEm` de 2 h atrás, **quando** `GET .../jogos/<id>`, **então**
+      _Implementação:_ nada é gravado no web; `lib/capa.ts` põe as imagens em ordem (enviada, oficial, `header.jpg` do
+      mesmo app e da mesma CDN, derivado da URL oficial) e o `GameCover` tenta a próxima quando uma falha; a gerada é o último recurso.
+
+- [x] **CA-43** — **Dado** um jogo ligado com `atualizadoEm` de 2 h atrás, **quando** `GET .../jogos/<id>`, **então**
       200 `DetalheJogoPlataforma`, a Steam é consultada (horas e conquistas), o `atualizadoEm` gravado é novo e
       `conquistas` traz cada uma com `nome`, `descricao`, `desbloqueada`, `desbloqueadaEm`, `iconeUrl` e `raridadePercentual`.
-- [ ] **CA-44** — **Dado** `atualizadoEm` de 10 min atrás, **quando** `GET .../jogos/<id>`, **então** as horas **não**
+- [x] **CA-44** — **Dado** `atualizadoEm` de 10 min atrás, **quando** `GET .../jogos/<id>`, **então** as horas **não**
       são reconsultadas (só a lista de conquistas, e do cache se tiver menos de 5 min).
-- [ ] **CA-45** — **Dado** o detalhe, **quando** `POST .../atualizacao` duas vezes em 30 s, **então** a 1ª consulta a
+- [x] **CA-45** — **Dado** o detalhe, **quando** `POST .../atualizacao` duas vezes em 30 s, **então** a 1ª consulta a
       Steam e a 2ª devolve o gravado sem chamá-la; **dado** ≥ 30 s depois, **então** consulta de novo.
-- [ ] **CA-46** — **Dado** `GET .../jogos/<id>` sem vínculo, **então** 404 `PLATAFORMA_VINCULO_NAO_ENCONTRADO`; com
+- [x] **CA-46** — **Dado** `GET .../jogos/<id>` sem vínculo, **então** 404 `PLATAFORMA_VINCULO_NAO_ENCONTRADO`; com
       jogo de outro usuário, **então** 404 igual ao do catálogo; com id inválido, **então** 400.
-- [ ] **CA-47** — **Dado** conquistas negadas (mock 403) com horas legíveis, **então** 200 com `aviso:
+- [~] **CA-47** — **Dado** conquistas negadas (mock 403) com horas legíveis, **então** 200 com `aviso:
 'CONQUISTAS_PRIVADAS'`, `conquistas: []`, horas atualizadas e as contagens gravadas **inalteradas**, e a página mantém as horas e mostra o aviso
-      discreto de conquistas privadas (não o bloco grande de perfil privado); **dado**
-      biblioteca privada, **então** 200 com `aviso: 'PERFIL_PRIVADO'` e o valor gravado.
-      _Nota (2026-09-25):_ quando a etapa 4 o implementar, este critério só pode ficar `[~]`: "conquistas negadas" é
-      resposta **simulada, sem fixture real**. O `obterJogo` da etapa 3 já trata 403 e `success:false` como "negado" (aviso
-      `CONQUISTAS_PRIVADAS`), com teste "SIMULADO"; fecha com `node apps/api/scripts/capturar-fixtures-steam.cjs detalhes-privados`.
-- [ ] **CA-48** — **Dado** um jogo sem conquistas (mock 400 "no stats"), **então** 200 com `aviso: 'SEM_CONQUISTAS'`,
+  discreto de conquistas privadas (não o bloco grande de perfil privado); **dado**
+  biblioteca privada, **então** 200 com `aviso: 'PERFIL_PRIVADO'` e o valor gravado.
+  _Verificado com resposta simulada, sem fixture real (decisão de 2026-09-25):_ "conquistas negadas" (403 ou `success:false` do `GetPlayerAchievements`) e "perfil privado" no detalhe (biblioteca sem `game_count` ou visibilidade ≠ 3) são suposições do formato; os testes de `steam.provider.spec`, `integrations.service.spec`, `integrations.http.spec` e `BlocoSteam.test` se chamam "SIMULADO". O 400 "Requested app has no stats" NÃO é "negado": é jogo sem conquistas (fixture real, CA-48). **Não é ✅ completo:** fecha com
+  `node apps/api/scripts/capturar-fixtures-steam.cjs detalhes-privados` / `... privado` e a revisão do CA-63.
+- [x] **CA-48** — **Dado** um jogo sem conquistas (mock 400 "no stats"), **então** 200 com `aviso: 'SEM_CONQUISTAS'`,
       `conquistas: []`, `conquistasTotal: 0`; a página não mostra barra de progresso e diz "Este jogo não tem
       conquistas".
-- [ ] **CA-49** — **Dado** a Steam fora do ar (timeout, 5xx, 429, 401, 403), **quando** `GET .../jogos/<id>`, **então**
-      **200** com o valor gravado e `aviso: 'INDISPONIVEL'` (nunca 502 nem 500), e a página mostra o bloco com "Não foi
-      possível atualizar agora" e o valor antigo; **quando** `POST .../atualizacao`, **então** 502
-      `PLATAFORMA_INDISPONIVEL` (429 da Steam: 502 `PLATAFORMA_LIMITE`).
-- [ ] **CA-50** — **Dado** falha só de `GetSchemaForGame` ou dos percentuais, **então** o detalhe continua 200: sem
-      percentual, a conquista mostra "Raridade indisponível"; sem schema, mostra a `apiname` como nome.
-- [ ] **CA-51** — **Dado** `/jogos/:id` de um jogo ligado, **então** o bloco **Steam** mostra horas ("42 h 30
+- [~] **CA-49** — **Dado** a Steam fora do ar (timeout, 5xx, 429, 401, 403), **quando** `GET .../jogos/<id>`, **então**
+  **200** com o valor gravado e `aviso: 'INDISPONIVEL'` (nunca 502 nem 500), e a página mostra o bloco com "Não foi
+  possível atualizar agora" e o valor antigo; **quando** `POST .../atualizacao`, **então** 502
+  `PLATAFORMA_INDISPONIVEL` (429 da Steam: 502 `PLATAFORMA_LIMITE`).
+  _Regra do 403 (decisão de 2026-09-25):_ um 403 do `GetPlayerAchievements`, e também `success:false`, é "conquistas
+  negadas" (`CONQUISTAS_PRIVADAS`, CA-47); um 403 em **qualquer outra** chamada (biblioteca, schema) indica problema com a
+  chave, não privacidade do jogador, e vira `INDISPONIVEL`. O 401 (chave inválida) tem fixture real.
+  _Verificado com resposta simulada, sem fixture real (decisão de 2026-09-25):_ o caso do **403** (e o 429, que a Steam não mandou nas capturas) é resposta simulada. **Não é ✅ completo:** fecha com
+  `node apps/api/scripts/capturar-fixtures-steam.cjs detalhes-privados` e a revisão do CA-63.
+
+- [x] **CA-50** — **Dado** falha só de `GetSchemaForGame` ou dos percentuais, **então** o detalhe continua 200: sem
+      percentual, a conquista mostra "Raridade indisponível"; sem schema, mostra o nome que o `GetPlayerAchievements` já traz (`l=brazilian`) e, sem ele, a `apiname`.
+
+- [x] **CA-51** — **Dado** `/jogos/:id` de um jogo ligado, **então** o bloco **Steam** mostra horas ("42 h 30
       min"), "Último jogo em dd/mm/aaaa" (ou "Nunca jogado" com data nula), a barra `role="progressbar"` com "12 de 40
       conquistas", **Atualizar**, **Desvincular** e "Abrir na Steam" (`rel="noopener noreferrer"`); **e** a lista só é
       pedida ao abrir a página (nenhuma request de conquistas ao abrir `/`).
-- [ ] **CA-52** — **Dado** a lista, **então** **Desbloqueadas** (por data decrescente, fechada) e **Faltam** (da mais
+- [x] **CA-52** — **Dado** a lista, **então** **Desbloqueadas** (por data decrescente, fechada) e **Faltam** (da mais
       comum à mais rara, aberta) são `<details>` separados com contagem; cada item tem ícone, nome, descrição, data
       ("Desbloqueada em dd/mm/aaaa") ou nada, e "12,4% dos jogadores"; a conquista oculta bloqueada mostra "Conquista oculta"
       no lugar da descrição.
 - [ ] **CA-53** — **Dado** 360×640, **quando** abro um jogo com 200 conquistas, **então** não há rolagem horizontal, a
       lista é uma coluna, os ícones têm `loading="lazy"` e `width`/`height`, e todo botão tem ≥ 44 × 44 px; **dado** 1024 px, **então**
       data e raridade ficam à direita de cada linha.
-- [ ] **CA-54** — **Dado** o **Desvincular** do jogo (página) confirmado, **então** o bloco Steam some, a linha do
+      _Só no navegador, depois do deploy (`/qa-verify`)._ Já provado por teste: ícones com `width`/`height`/`loading="lazy"`,
+      lista em coluna (`flex-col`, `lg:flex-row`) sem largura fixa nem `overflow-x`; a rolagem horizontal e o tamanho real dos botões
+      em 360×640 só se medem no navegador.
+
+- [x] **CA-54** — **Dado** o **Desvincular** do jogo (página) confirmado, **então** o bloco Steam some, a linha do
       catálogo volta a não ter horas, o jogo segue com título, status e notas, e **Vincular à Steam** reaparece.
 - [ ] **CA-55** — **Dado** efeitos "Reduzidos" ou `prefers-reduced-motion`, **então** nenhuma animação nova (esqueletos,
       barra, `<details>`) roda; **e** `tokens.test.ts` continua verde (nenhum hex fora do `@theme`).
+      _Só no navegador, depois do deploy (`/qa-verify`)._ Já provado por teste: o bloco não usa `animate-`, `transition` nem
+      `duration-` (nenhuma animação nova por construção) e `tokens.test.ts` está verde; ligar "efeitos reduzidos" e
+      `prefers-reduced-motion` de verdade é conferência visual.
+
+#### Evidência da etapa 4 (2026-09-25)
+
+| CA    | Evidência (teste que o prova)                                                                                                                                                                                                                  |
+| ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| CA-41 | `conquistas.test.ts` (`resumoDoCatalogo`: "42 h · 12/40", só horas com Y = 0 ou negado, "0 h", `aria-label`), `GamesPage.test.tsx` (linha ligada × solta)                                                                                      |
+| CA-42 | `capa.test.ts` (precedência e remoção da enviada), `GameCover.test.tsx` (queda enviada → oficial → header → gerada), `GamesPage.test.tsx` e `GameDetailPage.test.tsx` (a capa mostrada)                                                        |
+| CA-43 | `integrations.http.spec.ts` (dado com 2 h: horas novas, lista completa, `atualizadoEm` novo), `integrations.service.spec.ts`, `steam.provider.spec.ts` (junta jogador, schema e raridade)                                                      |
+| CA-44 | `integrations.http.spec.ts` e `integrations.service.spec.ts` (10 min: sem reconsultar as horas; a fronteira de 1 h exata)                                                                                                                      |
+| CA-45 | `integrations.http.spec.ts` (2 POST em 30 s → 1 consulta; ≥ 30 s → nova) e `integrations.service.spec.ts` (fronteira de 30 s)                                                                                                                  |
+| CA-46 | `integrations.http.spec.ts` (GET e POST: sem vínculo, de outro usuário, id inválido, sem token; **zero chamadas à Steam**)                                                                                                                     |
+| CA-47 | **`[~]`** `steam.provider.spec.ts`, `integrations.service.spec.ts`, `integrations.http.spec.ts`, `BlocoSteam.test.tsx`: negado e perfil privado **SIMULADOS**                                                                                  |
+| CA-48 | `steam.provider.spec.ts`, `integrations.http.spec.ts`, `BlocoSteam.test.tsx` (400 "no stats" é fixture real)                                                                                                                                   |
+| CA-49 | **`[~]`** `integrations.http.spec.ts` (o GET nunca dá 502: 200 com o gravado e `INDISPONIVEL`; só o POST dá 502; log sem chave, SteamID, `state` nem URL), `integrations.service.spec.ts`, `BlocoSteam.test.tsx`; o caso do 403 é **simulado** |
+| CA-50 | `steam.provider.spec.ts` (falha do schema e dos percentuais; percentual em texto e oculta, com o `SteamClient` e fixtures reais), `integrations.http.spec.ts`                                                                                  |
+| CA-51 | `BlocoSteam.test.tsx` (horas, última vez, `progressbar`, botões, "Abrir na Steam"), `GameDetailPage.test.tsx`, `GamesPage.test.tsx` (abrir `/` não consulta conquistas)                                                                        |
+| CA-52 | `BlocoSteam.test.tsx` e `conquistas.test.ts` (`<details>`, ordem, contagem, oculta, raridade)                                                                                                                                                  |
+| CA-53 | **só no navegador, depois do deploy**; `BlocoSteam.test.tsx` cobre ícones e a estrutura em coluna                                                                                                                                              |
+| CA-54 | `BlocoSteam.test.tsx` (confirmação e DELETE) e `GameDetailPage.test.tsx` (o bloco some, o jogo segue, "Vincular à Steam" volta)                                                                                                                |
+| CA-55 | **só no navegador, depois do deploy**; `BlocoSteam.test.tsx` (nenhuma animação) e `tokens.test.ts`                                                                                                                                             |
+
+**Abertos após a etapa 4:** CA-15 e CA-22 (só após o deploy), CA-39, CA-53 e CA-55 (só no navegador, depois do deploy) e CA-63
+(fixtures reais); como `[~]` (resposta simulada, sem fixture real), CA-20, CA-30, CA-47 e CA-49. Os CA-56 a CA-59 são da etapa 5.
 
 ### Transversais
 
