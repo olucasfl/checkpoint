@@ -90,17 +90,18 @@ checkpoint/
 ├── apps/
 │   ├── api/                          # @checkpoint/api
 │   │   ├── prisma/
-│   │   │   ├── schema.prisma         # datasource + generator + enum GameStatus + models Game, User e RefreshSession
+│   │   │   ├── schema.prisma         # datasource + generator + enums GameStatus e Provedor + models Game, User, RefreshSession, ContaVinculada e JogoPlataforma
 │   │   │   └── migrations/           # migrations versionadas (commitadas)
 │   │   └── src/
 │   │       ├── common/                # errors/ (ApiErrorResponse), pipes/ (ValidationPipe global), decorators/ (@Public, @CurrentUser), dto/ (transforms); filters/ e interceptors/ vazias (.gitkeep)
 │   │       ├── config/                 # app.config.ts, env.validation.ts, index.ts
 │   │       ├── database/               # PrismaModule (@Global) + PrismaService
-│   │       ├── modules/                # um módulo por domínio — hoje health/, games/, auth/ e users/
+│   │       ├── modules/                # um módulo por domínio — hoje health/, games/, auth/, users/ e integrations/
 │   │       │   ├── health/             # GET /api/health → status da API + do banco
 │   │       │   ├── games/              # catálogo de jogos: GET/POST/PATCH/DELETE /api/games
 │   │       │   ├── auth/               # registro, login, refresh, logout, me; guard global de access token (§4.5)
-│   │       │   └── users/              # a conta do usuário logado: PATCH /api/users/me (nome), POST /api/users/me/exclusao; lista branca do Usuario
+│   │       │   ├── users/              # a conta do usuário logado: PATCH /api/users/me (nome), POST /api/users/me/exclusao; lista branca do Usuario
+│   │       │   └── integrations/       # integrações com plataformas de jogos (Steam): interface GameProvider, registro e SteamClient; ainda sem rota (§4.4)
 │   │       ├── app.module.ts           # inclui o guard global (APP_GUARD)
 │   │       ├── app.setup.ts            # setupApp(): prefixo /api, cookie-parser, CORS, ValidationPipe, Swagger (o main.ts e a verificação manual usam o mesmo)
 │   │       └── main.ts                 # bootstrap: cria o app, setupApp() e listen
@@ -123,6 +124,7 @@ checkpoint/
 │   └── shared/
 │       └── src/
 │           ├── games.ts               # contrato do catálogo de jogos (tipos, constantes, notas por critério e notaMedia)
+│           ├── integracoes.ts         # contrato das integrações com plataformas (Provedor, tipos, constantes de atualização, chaveDeTitulo)
 │           └── index.ts               # reexporta games; HealthCheckResponse, APP_NAME — exemplos
 │
 ├── eslint.config.mjs                   # config compartilhada por todos os workspaces
@@ -176,7 +178,13 @@ implementado.
   `JWT_REFRESH_SECRET` (≥ 32 caracteres, **diferentes** entre si), `AUTH_REGISTRATION_OPEN`
   (`true`/`false`, sem padrão; o texto é lido cru porque a conversão implícita transformaria `"false"` em
   `true`), `AUTH_REGISTRATION_LIMIT_PER_HOUR` (opcional, inteiro ≥ 1; ausente = 3) e `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`,
-  `SUPABASE_STORAGE_BUCKET` (capas, §4.4) no boot; falta ou valor inválido **derruba a aplicação** com a
+  `SUPABASE_STORAGE_BUCKET` (capas, §4.4) no boot, mais as três da integração com plataformas (spec
+  `integracao-plataformas`): `STEAM_API_KEY` (32 hexadecimais, **só o backend**: viaja na query string das
+  chamadas à Steam, então nunca vai para o web nem para log, e a mensagem de erro não a ecoa),
+  `API_PUBLIC_URL` (o endereço em que o **navegador** alcança a API, usado no `return_to`/`realm` do OpenID: em
+  produção o domínio da Vercel, por causa do rewrite de `/api`; em dev `http://localhost:3333`) e
+  `WEB_PUBLIC_URL` (a origem do web, para onde o retorno do vínculo redireciona), as duas **sem barra final e
+  sem caminho**; falta ou valor inválido **derruba a aplicação** com a
   lista de erros. `SUPABASE_SERVICE_ROLE_KEY` também recusa uma chave que comece com
   `sb_publishable_` (a chave pública, sujeita a RLS, com que todo upload falharia com 403). Variável de ambiente nova em `apps/api/.env` **precisa** ganhar um campo aqui, ou
   o `ConfigService` não a expõe (nem para leitura).
@@ -207,6 +215,20 @@ implementado.
   único e sempre normalizado, `senhaHash`) e `RefreshSession` (uma linha por dispositivo logado; o `id` é o
   `sid` dos tokens; guarda só o **SHA-256** do refresh token e o do anterior, mais um rótulo do dispositivo
   derivado do `User-Agent`, sem IP), com `onDelete: Cascade`.
+- **`Provedor`, `ContaVinculada` e `JogoPlataforma`** (spec `integracao-plataformas`, etapa 1, migration
+  `integracao_plataformas`, **só aditiva**: um enum e duas tabelas, nenhuma coluna existente tocada).
+  `Provedor` é um enum do Postgres (`STEAM`; acrescentar um valor é `ALTER TYPE … ADD VALUE`). `ContaVinculada`
+  é a conta do usuário na plataforma, com a posse já comprovada (na Steam, o SteamID64 pelo OpenID): `userId`,
+  `provedor`, `idExterno`, `nomeExibicao`, `vinculadaEm`, com `@@unique([userId, provedor])` (uma por provedor).
+  `JogoPlataforma` é a camada da plataforma sobre um `Game` (o **último valor** consultado, nunca substitui
+  título, status, notas nem a capa do usuário): `gameId`, `userId` (repetido de `Game.userId` para a unicidade
+  por usuário; o service grava sempre com `where: { id, userId }`), `provedor`, `idExterno` (o appid),
+  `minutosJogados`, `ultimaVezJogadoEm`, `conquistasTotal`/`conquistasDesbloqueadas` (`null` = nunca consultado
+  ou negado; `0` = o jogo não tem conquistas), `capaUrl` e `atualizadoEm`, com `@@unique([userId, provedor,
+idExterno])` e `@@unique([gameId, provedor])` (1 para 1 nos dois sentidos). As duas tabelas têm `onDelete:
+Cascade` a partir de `User` (e `JogoPlataforma` também de `Game`): excluir a conta leva os vínculos e os dados
+  por provedor. `CHECK`s escritos à mão na migration: `minutosJogados >= 0` e conquistas nunca negativas, com as
+  desbloqueadas nunca acima do total. A lista de conquistas **não** é gravada (é buscada ao abrir o detalhe).
 - **`Game.userId`** (spec `autenticacao`): **obrigatório** (`String`, `NOT NULL`), com FK para `User` e
   `onDelete: Cascade` (excluir a conta apaga os jogos no banco; as capas no bucket ficam por conta de quem
   exclui). Veio em duas migrações **destrutivas**, aprovadas na spec: a A3 (`game_dono`) criou a coluna
@@ -218,8 +240,8 @@ implementado.
 ### 4.4 Módulo por domínio (`src/modules/`)
 
 Convenção NestJS padrão, um módulo por domínio, cada um com `*.module.ts` + `*.controller.ts` +
-`*.service.ts` (+ `dto/` quando a rota aceitar body). Hoje há quatro (`health/`, `games/`, `auth/`, §4.5 —
-que também guarda as **sessões ativas** do perfil —, e `users/`):
+`*.service.ts` (+ `dto/` quando a rota aceitar body). Hoje há cinco (`health/`, `games/`, `auth/`, §4.5 —
+que também guarda as **sessões ativas** do perfil —, `users/` e `integrations/`):
 
 - `health/` — `GET /api/health`, sem domínio; serve de modelo de forma.
 - `games/` — o catálogo de jogos (spec `docs/specs/catalogo-jogos.md`, etapas 1 e 2; o web está em §5.5):
@@ -310,6 +332,38 @@ apps/api/src/modules/games/
     errada, storage falhando com `warn` sem segredo, `P2025`), `dto/*.spec.ts` (pelo pipe do `main.ts`) e
     `users.http.spec.ts` (porta local, com a auth de verdade e o Prisma falso de `auth/testing/`, que ganhou o
     `user.delete` com o cascade: 204 e o cookie limpo, 400, 401, 429 no 6º pedido e o contador próprio).
+
+- `integrations/` — integrações com plataformas de jogos (spec `docs/specs/integracao-plataformas.md`, **etapa
+  1: só a base**, ainda sem controller nem rota; o vínculo, a biblioteca e os dados por jogo chegam nas etapas
+  2 a 4). O módulo exporta o `SteamClient` e o `ProviderRegistry`.
+  - **`GameProvider`** (`providers/game-provider.ts`) é a interface que cada plataforma implementa
+    (`iniciarVinculo`, `concluirVinculo`, `listarBiblioteca` — que devolve também o perfil, porque o cartão do
+    `/perfil` precisa dos dois e a detecção de privacidade cruza as duas chamadas —, e `obterJogo`). A Steam é
+    a primeira implementação; PlayStation, Xbox e Epic entram implementando a interface e acrescentando um
+    valor a `Provedor`. O **`ProviderRegistry`** acha o provider pelo `:provedor` da rota (o _slug_ em
+    minúsculas, `steam`) ou pelo enum; a lista vem do token `GAME_PROVIDERS` (vazia até a etapa 2). Os erros de
+    domínio (`providers/plataforma-errors.ts`: `PlataformaIndisponivelError`, `PlataformaLimiteError`,
+    `PerfilPrivadoError`, `IdExternoInvalidoError`, `ProvedorNaoSuportadoError`) **não** são `HttpException`:
+    carregam o `code` estável (`ApiErrorCode`), e quem responde HTTP os mapeia.
+  - **`SteamClient`** (`steam/steam.client.ts`) fala com a Steam Web API (`api.steampowered.com`) pelo `fetch`
+    nativo, **sem SDK**, no padrão do `StorageService`: timeout de 8 s, sem _retry_, isolado atrás de métodos
+    simples (`obterPerfil`, `listarJogos`, `obterConquistasDoJogador`, `obterSchema`,
+    `obterPercentuaisGlobais`) e mockado nos testes. Regras vindas da chamada real: **a chave viaja na query
+    string, então o log tem só o nome da chamada e o status, nunca a URL**; **sem `JSON.parse` cego** (a
+    Steam responde o 401 da chave inválida e o 400 de ID malformado em **HTML**, então o corpo só é lido como
+    JSON quando o `content-type` é JSON); **SteamID (`^7656\d{13}$`) e appid são validados antes de chamar**
+    (malformado é erro de validação, nunca "perfil privado"); 429 → `PlataformaLimiteError`; timeout, 5xx, 401
+    (com um `error` de "chave recusada" no log), 403 fora das conquistas e resposta ilegível →
+    `PlataformaIndisponivelError`; biblioteca sem `game_count` = privada (`game_count: 0` = vazia); jogo sem
+    conquistas (400 "no stats") e conquistas negadas são **estados**, não erros; `percent` (texto) vira número
+    com 1 casa e `rtime_last_played: 0` vira `null`.
+  - **Números nomeados** em `integrations.constants.ts` (timeout, host, TTLs e teto do cache em memória da
+    spec; o cache em si chega com quem o consome). Os intervalos de atualização (1 h e 30 s) ficam no `shared`.
+  - **Testes** (Jest, sem rede e sem banco): `steam/steam.client.spec.ts` (com **fixtures reais e
+    sanitizados** em `steam/__fixtures__/`: respostas de uma conta de teste com SteamID, nome e avatar
+    sintéticos; `steam/fixtures.spec.ts` falha se um SteamID ou uma chave passar), `providers/provider-registry.spec.ts`,
+    `integrations.module.spec.ts` (a injeção resolve) e `chave-de-titulo.spec.ts`. Perfil privado, conquistas
+    negadas e biblioteca vazia estão como `it.todo` até a captura dos fixtures reais.
 
 Registre o módulo novo em `app.module.ts` (`imports: [...]`).
 
@@ -777,7 +831,14 @@ antes de `api`/`web` (§2). Hoje tem:
   puras (`normalizeEmail`, `utf8ByteLength`, `passwordProblem`), `API_ERROR_CODES`/`ApiErrorCode` (com
   `SESSAO_ATUAL` e `SESSAO_NAO_ENCONTRADA`; o web tem um texto para cada, e o `Record<ApiErrorCode, string>`
   quebra o `typecheck` se faltar) e `CSRF_HEADER`.
-- `index.ts` — reexporta `auth` e `games` e mantém dois exemplos herdados do esqueleto
+- `integracoes.ts` — contrato das integrações com plataformas (spec `integracao-plataformas`): `PROVEDORES`/
+  `Provedor` (`STEAM`) e `PROVEDOR_SLUG`, as constantes `ATUALIZACAO_AUTOMATICA_MS` (1 h) e
+  `ATUALIZACAO_MANUAL_MIN_MS` (30 s), os tipos (`ContaVinculada`, `ItemBiblioteca`, `PerfilPlataforma`,
+  `DadosJogoPlataforma`, `Conquista`, `DetalheJogoPlataforma`, `AvisoPlataforma`, `VincularJogoRequest`,
+  `PlataformaItemJaVinculadoError`…) e a função pura `chaveDeTitulo` (compara títulos sem caixa, acento, ™ ® © nem
+  pontuação, **por igualdade**; só os acentos combinados do latim são tirados, para "ペ" não virar "ヘ").
+  `API_ERROR_CODES` (em `auth.ts`) ganhou os nove `PLATAFORMA_*`, cada um com texto no web.
+- `index.ts` — reexporta `auth`, `games` e `integracoes` e mantém dois exemplos herdados do esqueleto
   (`HealthCheckResponse`, `APP_NAME`).
 
 O que entra aqui: tipos de request/response compartilhados entre API e web, enums de domínio,
@@ -825,6 +886,7 @@ mudanças de schema por um agente.
 | `apps/api/.env` | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_STORAGE_BUCKET` | Storage das capas; validadas em `env.validation.ts` (obrigatórias). O valor da chave é a **secret key** (`sb_secret_…`) e só o backend a usa: nunca vai para o web nem para log                                                                                                                               |
 | `apps/api/.env` | `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `AUTH_REGISTRATION_OPEN`    | Autenticação; obrigatórias em `env.validation.ts`. Os dois segredos têm ≥ 32 caracteres e são **diferentes**; gere cada um localmente (`node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"`). Nunca vão para o web, spec, log ou PR. `AUTH_REGISTRATION_OPEN` é `true` ou `false` |
 | `apps/api/.env` | `AUTH_REGISTRATION_LIMIT_PER_HOUR`                                     | **Opcional**, só dev/teste: sobrescreve o limite de 3 registros por hora por IP. Em ambiente exposto, deixe ausente                                                                                                                                                                                           |
+| `apps/api/.env` | `STEAM_API_KEY`, `API_PUBLIC_URL`, `WEB_PUBLIC_URL`                    | Integração com plataformas (spec `integracao-plataformas`); **obrigatórias**: a API não sobe sem elas, cadastre no Render **antes** do deploy. `STEAM_API_KEY` só no backend, nunca no web nem em log. `API_PUBLIC_URL` e `WEB_PUBLIC_URL`: origens sem barra final (produção: o domínio da Vercel; §4.2)     |
 | `apps/api/.env` | `DIRECT_URL`                                                           | Só o Prisma CLI lê (via `schema.prisma`); necessária apenas se `DATABASE_URL` for uma conexão pooled (ex.: Supabase)                                                                                                                                                                                          |
 | `apps/web/.env` | `VITE_API_URL`                                                         | Consumida em `src/shared/lib/env.ts`, `baseURL` do `apiClient`                                                                                                                                                                                                                                                |
 
