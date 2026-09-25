@@ -57,3 +57,22 @@ export class ProvedorNaoSuportadoError extends Error {
     this.name = 'ProvedorNaoSuportadoError';
   }
 }
+
+/** O usuário desistiu do vínculo na tela da plataforma. */
+export class VinculoCanceladoError extends Error {
+  constructor(message = 'vínculo cancelado na plataforma') {
+    super(message);
+    this.name = new.target.name;
+  }
+}
+
+/**
+ * O retorno do vínculo não é uma prova válida de identidade (adulterado, incompleto ou recusado pela
+ * plataforma). Não é falha da plataforma: quem chama trata como retorno inválido, não como indisponível.
+ */
+export class VinculoRecusadoError extends Error {
+  constructor(message = 'retorno do vínculo recusado') {
+    super(message);
+    this.name = new.target.name;
+  }
+}

@@ -1,6 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { STEAM_REQUEST_TIMEOUT_MS } from '../integrations.constants';
-import { PlataformaIndisponivelError, PlataformaLimiteError } from '../providers/plataforma-errors';
+import {
+  PlataformaIndisponivelError,
+  PlataformaLimiteError,
+  VinculoCanceladoError,
+  VinculoRecusadoError,
+} from '../providers/plataforma-errors';
 
 export const STEAM_OPENID_ENDPOINT = 'https://steamcommunity.com/openid/login';
 
@@ -20,18 +25,16 @@ const CAMPOS_ASSINADOS_OBRIGATORIOS = [
 ] as const;
 
 /** O usuário desistiu na tela da Steam (`openid.mode=cancel`). */
-export class OpenIdCanceladoError extends Error {
+export class OpenIdCanceladoError extends VinculoCanceladoError {
   constructor() {
     super('vínculo cancelado na Steam');
-    this.name = 'OpenIdCanceladoError';
   }
 }
 
 /** O retorno não é uma prova válida de identidade: adulterado, incompleto ou recusado pela Steam. */
-export class OpenIdInvalidoError extends Error {
+export class OpenIdInvalidoError extends VinculoRecusadoError {
   constructor(motivo: string) {
     super(`retorno do OpenID inválido: ${motivo}`);
-    this.name = 'OpenIdInvalidoError';
   }
 }
 

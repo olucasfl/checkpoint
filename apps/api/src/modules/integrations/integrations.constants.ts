@@ -39,3 +39,13 @@ export const VINCULO_COOKIE_NAME = 'checkpoint_vinculo';
 
 /** O cookie só viaja para as rotas de integração (o `retorno` e o `vinculo` estão sob este caminho). */
 export const VINCULO_COOKIE_PATH = '/api/integracoes';
+
+// Limites das rotas de integração: POR USUÁRIO (não por IP), para não dependerem do `trust proxy`.
+/** Leitura e atualização: 30 por minuto, com contador próprio por rota. */
+export const INTEGRACOES_LIMIT = { limit: 30, ttl: 60_000 } as const;
+
+/** Iniciar o vínculo manda o usuário para fora do app: 5 por minuto. */
+export const INTEGRACOES_VINCULO_LIMIT = { limit: 5, ttl: 60_000 } as const;
+
+/** Quantos jogos "mais jogados" o cartão do perfil mostra. */
+export const MAIS_JOGADOS_NO_CARTAO = 3;
