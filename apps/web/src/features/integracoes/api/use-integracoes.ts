@@ -24,6 +24,12 @@ export function usePerfilPlataforma(provedor: Provedor, enabled: boolean) {
   });
 }
 
+/** Há conta Steam vinculada? `undefined` enquanto carrega ou se a consulta falhou (a tela some com o atalho). */
+export function useTemContaSteam(): boolean | undefined {
+  const contas = useContas();
+  return contas.data?.some((conta) => conta.provedor === 'STEAM');
+}
+
 export function useIniciarVinculo(provedor: Provedor) {
   return useMutation({ mutationFn: () => integracoesApi.iniciarVinculo(provedor) });
 }

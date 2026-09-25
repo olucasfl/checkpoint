@@ -1,13 +1,24 @@
 import { useState, type FormEvent } from 'react';
+import { Link, useInRouterContext } from 'react-router-dom';
 import {
   GAME_RATING_KEYS,
   statusAllowsRating,
   type Game,
   type GameRatingKey,
   type GameStatus,
+  type ItemBiblioteca,
 } from '@checkpoint/shared';
 import { Icon } from '@/shared/components/Icon';
 import { usePrefs } from '@/shared/hooks/use-prefs';
+import { describeAuthError } from '@/features/auth/lib/auth-errors';
+import { useTemContaSteam, useVincularJogo } from '@/features/integracoes/api/use-integracoes';
+import { BibliotecaSteamDialog } from '@/features/integracoes/components/BibliotecaSteamDialog';
+import {
+  PLATAFORMA_PADRAO,
+  precisaConfirmarPlataforma,
+  statusSugerido,
+  tituloDoItem,
+} from '@/features/integracoes/lib/biblioteca';
 import { useSaveGame } from '../api/use-games';
 import { describeError, forForm, type FormError } from '../lib/api-error';
 import {
@@ -33,6 +44,8 @@ interface GameFormProps {
   /** Salvou tudo (jogo e capa): o diálogo pode fechar. */
   onDone: () => void;
   onCancel: () => void;
+  /** Jogo NOVO: a pessoa ligou um item da Steam a um jogo que já existia. Quem abriu leva ao jogo. */
+  onLinkedExisting?: (jogoId: string) => void;
 }
 
 const NO_ERROR: FormError = { message: '', fields: {} };
@@ -42,7 +55,7 @@ const NO_ERROR: FormError = { message: '', fields: {} };
  * depois a capa. Se o jogo salvou e a capa falhou, o diálogo continua aberto, agora editando AQUELE
  * jogo (o próximo Salvar é PATCH, não POST, e não gera 409) e o erro aparece no campo da capa.
  */
-export function GameForm({ game, onDone, onCancel }: GameFormProps) {
+export function GameForm({ game, onDone, onCancel, onLinkedExisting }: GameFormProps) {
   const [saved, setSaved] = useState<Game | undefined>(game);
   const [values, setValues] = useState<GameFormValues>(
     game ? valuesFromGame(game) : EMPTY_FORM_VALUES,
@@ -51,6 +64,16 @@ export function GameForm({ game, onDone, onCancel }: GameFormProps) {
   const [removing, setRemoving] = useState(false);
   const [error, setError] = useState<FormError>(NO_ERROR);
   const mutation = useSaveGame();
+  const vincular = useVincularJogo('STEAM');
+  const temContaSteam = useTemContaSteam();
+  const noRouter = useInRouterContext();
+  // O item da Steam escolhido em "Buscar na Steam" (só jogo novo). O vínculo só é gravado DEPOIS de o jogo ser
+  // criado; a capa oficial dele é só prévia (o arquivo de capa continua sendo escolha da pessoa).
+  const [ligacao, setLigacao] = useState<ItemBiblioteca | null>(null);
+  const [ligado, setLigado] = useState(false);
+  const [erroLigacao, setErroLigacao] = useState('');
+  const [buscando, setBuscando] = useState(false);
+  const [confirmandoPlataforma, setConfirmandoPlataforma] = useState(false);
   const { plataformasFavoritas } = usePrefs();
 
   const editing = saved !== undefined;
@@ -92,12 +115,33 @@ export function GameForm({ game, onDone, onCancel }: GameFormProps) {
     clearError('capa');
   }
 
-  async function submit(event: FormEvent) {
+  function aplicarItem(item: ItemBiblioteca) {
+    setValues((current) => ({
+      ...current,
+      titulo: tituloDoItem(item.titulo),
+      plataforma: PLATAFORMA_PADRAO,
+      status: statusSugerido(item.minutosJogados),
+    }));
+    clearError('titulo');
+    clearError('plataforma');
+    setLigacao(item);
+    setLigado(false);
+    setErroLigacao('');
+    setBuscando(false);
+  }
+
+  function submit(event: FormEvent) {
     event.preventDefault();
-    if (mutation.isPending) {
+    void salvar(false);
+  }
+
+  async function salvar(plataformaConfirmada: boolean) {
+    if (mutation.isPending || vincular.isPending) {
       return;
     }
     setError(NO_ERROR);
+    setErroLigacao('');
+    setConfirmandoPlataforma(false);
 
     // Avisa antes de enviar o que a API rejeitaria de qualquer jeito (título vazio, nota fora de 0 a 10 ou
     // com casa demais): nenhuma request sai enquanto houver erro de digitação.
@@ -110,6 +154,17 @@ export function GameForm({ game, onDone, onCancel }: GameFormProps) {
       return;
     }
 
+    // Ligar um jogo de outra plataforma a um item da Steam pede confirmação ANTES de criar qualquer coisa.
+    if (
+      ligacao &&
+      !saved &&
+      !plataformaConfirmada &&
+      precisaConfirmarPlataforma(values.plataforma)
+    ) {
+      setConfirmandoPlataforma(true);
+      return;
+    }
+
     const cover: CoverChange = file
       ? { kind: 'upload', file }
       : removing && saved?.capaUrl
@@ -118,13 +173,28 @@ export function GameForm({ game, onDone, onCancel }: GameFormProps) {
 
     try {
       const result = await mutation.mutateAsync({ gameId: saved?.id, values, cover });
+      // O jogo FOI salvo: dali em diante o formulário edita AQUELE jogo (o próximo Salvar é PATCH, sem 409).
+      setSaved(result.game);
+      let ligacaoOk = true;
+      if (ligacao && !ligado) {
+        try {
+          await vincular.mutateAsync({ jogoId: result.game.id, idExterno: ligacao.idExterno });
+          setLigado(true);
+        } catch (failure) {
+          // O PUT é idempotente para o mesmo item: o próximo Salvar reenvia a ligação sem dar 409.
+          ligacaoOk = false;
+          setErroLigacao(
+            `O jogo foi salvo, mas não foi ligado à Steam. ${describeAuthError(failure).message} Toque em Salvar para tentar de novo.`,
+          );
+        }
+      }
       if (result.coverError) {
-        // O jogo FOI salvo: continua aberto, editando esse jogo, com o erro na área da capa.
-        setSaved(result.game);
         setError(forForm(result.coverError));
         return;
       }
-      onDone();
+      if (ligacaoOk) {
+        onDone();
+      }
     } catch (failure) {
       setError(forForm(describeError(failure)));
     }
@@ -162,6 +232,62 @@ export function GameForm({ game, onDone, onCancel }: GameFormProps) {
       </div>
 
       {generalMessage && <FieldError id="form-error" message={generalMessage} />}
+
+      {!editing && temContaSteam === true && (
+        <div className="flex flex-col gap-2">
+          {ligacao ? (
+            <div className="flex flex-wrap items-center gap-3 rounded-xl bg-painel-2 p-3">
+              {ligacao.capaUrl && (
+                // Só prévia (decorativa, sem `Referer`): a capa oficial NÃO é salva com o jogo.
+                <img
+                  src={ligacao.capaUrl}
+                  alt=""
+                  width={92}
+                  height={43}
+                  referrerPolicy="no-referrer"
+                  className="h-[43px] w-[92px] shrink-0 rounded-md bg-fundo object-cover"
+                />
+              )}
+              <span className="min-w-0 flex-1 text-[16px] font-semibold [overflow-wrap:anywhere]">
+                Ligado à Steam: «{ligacao.titulo}»
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setLigacao(null);
+                  setErroLigacao('');
+                }}
+                className="min-h-11 rounded-xl border border-borda-controle px-4 font-display text-[13px] font-semibold uppercase tracking-[0.1em] hover:bg-acao-hover"
+              >
+                Remover ligação
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setBuscando(true)}
+              className="min-h-11 rounded-xl border border-borda-controle px-4 font-display text-[13px] font-semibold uppercase tracking-[0.1em] hover:bg-acao-hover flex items-center gap-2 self-start"
+            >
+              <Icon name="search" size={20} />
+              Buscar na Steam
+            </button>
+          )}
+          <FieldError id="f-ligacao-err" message={erroLigacao} />
+        </div>
+      )}
+      {!editing && temContaSteam === false && (
+        <p className="m-0 text-[16px] text-texto-suave">
+          {noRouter ? (
+            <Link to="/perfil" className="font-semibold text-ciano underline">
+              Vincule sua Steam no perfil
+            </Link>
+          ) : (
+            'Vincule sua Steam no perfil'
+          )}{' '}
+          para buscar jogos da sua biblioteca.
+        </p>
+      )}
+      {editing && erroLigacao && <FieldError id="f-ligacao-err" message={erroLigacao} />}
 
       <Field>
         <label htmlFor="f-titulo" className={LABEL}>
@@ -236,6 +362,46 @@ export function GameForm({ game, onDone, onCancel }: GameFormProps) {
           setError((current) => ({ ...current, fields: { ...current.fields, capa: message } }))
         }
         onRemove={removeCover}
+      />
+
+      {confirmandoPlataforma && (
+        <div
+          role="group"
+          aria-label="Confirmar a plataforma"
+          className="flex flex-col gap-3 rounded-xl bg-painel-2 p-4"
+        >
+          <p className="m-0 text-[17px]">
+            «{values.titulo.trim()}» é um jogo de {values.plataforma.trim()}. Ao ligá-lo à Steam, as
+            horas e as conquistas mostradas serão as da Steam. A plataforma do jogo não muda.
+          </p>
+          <div className="flex flex-wrap justify-end gap-2.5">
+            <button
+              type="button"
+              onClick={() => setConfirmandoPlataforma(false)}
+              className="min-h-11 rounded-xl border border-borda-controle px-4 font-display text-[13px] font-semibold uppercase tracking-[0.1em] hover:bg-acao-hover"
+            >
+              Voltar
+            </button>
+            <button
+              type="button"
+              onClick={() => void salvar(true)}
+              className="min-h-11 rounded-xl bg-destaque px-4 font-display text-[13px] font-extrabold uppercase tracking-[0.1em] text-fundo"
+            >
+              Salvar mesmo assim
+            </button>
+          </div>
+        </div>
+      )}
+
+      <BibliotecaSteamDialog
+        open={buscando}
+        modo={{ tipo: 'novo' }}
+        onClose={() => setBuscando(false)}
+        onCriar={aplicarItem}
+        onVinculado={(jogoId) => {
+          setBuscando(false);
+          (onLinkedExisting ?? onDone)(jogoId);
+        }}
       />
 
       <div className="sheet-footer sticky bottom-0 -mx-6 -mb-6 flex justify-end gap-2.5 border-t border-borda bg-painel px-6 pt-4">

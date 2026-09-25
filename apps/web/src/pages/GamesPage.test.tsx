@@ -12,6 +12,10 @@ import { alterarPrefs, definirUsuario, resetPrefsForTests } from '@/shared/lib/p
 import { storage } from '@/shared/lib/storage/storage';
 import { GamesPage } from './GamesPage';
 
+// Sem conta Steam nestes testes: a API de integrações não vai à rede.
+vi.mock('@/features/integracoes/api/integracoes-api', () => ({
+  integracoesApi: { listarContas: vi.fn().mockResolvedValue([]) },
+}));
 vi.mock('@/features/games/api/games-api', () => ({
   gamesApi: {
     list: vi.fn(),

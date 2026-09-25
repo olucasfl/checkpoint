@@ -6,8 +6,13 @@ import { createMemoryRouter, RouterProvider, useLocation } from 'react-router-do
 import { type Game } from '@checkpoint/shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { gamesApi } from '@/features/games/api/games-api';
+import { integracoesApi } from '@/features/integracoes/api/integracoes-api';
 import { GameDetailPage } from './GameDetailPage';
 
+// Sem conta Steam nestes testes: a API de integrações não vai à rede.
+vi.mock('@/features/integracoes/api/integracoes-api', () => ({
+  integracoesApi: { listarContas: vi.fn().mockResolvedValue([]), biblioteca: vi.fn() },
+}));
 vi.mock('@/features/games/api/games-api', () => ({
   gamesApi: {
     list: vi.fn(),
@@ -387,5 +392,53 @@ describe('layout e acessibilidade (CA-30)', () => {
       'Avaliação',
       'Descrição',
     ]);
+  });
+});
+
+describe('Vincular à Steam (spec integracao-plataformas, etapa 3)', () => {
+  const conta = {
+    provedor: 'STEAM' as const,
+    idExterno: 'STEAMID_SINTETICO',
+    nomeExibicao: 'Jogador Sintetico',
+    vinculadaEm: '2026-09-25T12:00:00.000Z',
+  };
+  const dados = {
+    provedor: 'STEAM' as const,
+    idExterno: '1',
+    minutosJogados: 10,
+    ultimaVezJogadoEm: null,
+    conquistasTotal: null,
+    conquistasDesbloqueadas: null,
+    capaUrl: null,
+    atualizadoEm: '2026-09-25T12:00:00.000Z',
+  };
+
+  it('com conta Steam e jogo sem vínculo, o botão abre a biblioteca no modo vincular', async () => {
+    vi.mocked(integracoesApi.listarContas).mockResolvedValue([conta]);
+    vi.mocked(integracoesApi.biblioteca).mockResolvedValue([]);
+    const user = renderAt();
+
+    await user.click(await screen.findByRole('button', { name: 'Vincular à Steam' }));
+
+    expect(await screen.findByText('Escolha o jogo da Steam que é «Celeste».')).toBeInTheDocument();
+  });
+
+  it('sem conta Steam o botão não aparece', async () => {
+    vi.mocked(integracoesApi.listarContas).mockResolvedValue([]);
+    renderAt();
+    await screen.findByRole('heading', { level: 1, name: 'Celeste' });
+
+    await waitFor(() => expect(integracoesApi.listarContas).toHaveBeenCalled());
+    expect(screen.queryByRole('button', { name: 'Vincular à Steam' })).toBeNull();
+  });
+
+  it('jogo que já tem vínculo não oferece "Vincular à Steam"', async () => {
+    vi.mocked(integracoesApi.listarContas).mockResolvedValue([conta]);
+    api.list.mockResolvedValue([game({ dadosPlataforma: [dados] })]);
+    renderAt();
+    await screen.findByRole('heading', { level: 1, name: 'Celeste' });
+
+    await waitFor(() => expect(integracoesApi.listarContas).toHaveBeenCalled());
+    expect(screen.queryByRole('button', { name: 'Vincular à Steam' })).toBeNull();
   });
 });

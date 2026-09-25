@@ -14,6 +14,10 @@ import { queryClient } from '@/shared/lib/query-client';
 import { storage } from '@/shared/lib/storage/storage';
 import { routes } from './routes';
 
+// Sem conta Steam nestes testes: a API de integrações não vai à rede.
+vi.mock('@/features/integracoes/api/integracoes-api', () => ({
+  integracoesApi: { listarContas: vi.fn().mockResolvedValue([]) },
+}));
 vi.mock('@/features/auth/api/auth-api', () => ({
   authApi: { refresh: vi.fn(), logout: vi.fn(), login: vi.fn(), registro: vi.fn(), me: vi.fn() },
 }));
