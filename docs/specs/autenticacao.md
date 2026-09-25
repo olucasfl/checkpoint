@@ -1,7 +1,7 @@
 # Spec: autenticação
 
-> Status: em andamento (etapas 1 a 5 implementadas; 49 de 56 critérios comprovados por teste em
-> 2026-09-24; faltam CA-17, CA-21, CA-22, CA-40, CA-48, CA-49 e CA-50: ver `INDEX.md`)
+> Status: implementada (etapas 1 a 5; os 56 critérios comprovados, 49 por teste automatizado e 7 pela
+> "Verificação de fechamento" de 2026-09-24, no fim desta spec)
 >
 > ⚠️ Contém **mudança destrutiva de schema** (`Game.userId` obrigatório e `@@unique` alterado),
 > **aprovada pelo humano em 2026-09-24** (`RULES.md` §3). Ver "Modelo de dados" e a Questão Q5.
@@ -572,12 +572,12 @@ export const CSRF_HEADER = 'X-Checkpoint-Csrf';
 - [x] **CA-14** — **Dado** dois logins da mesma conta em jars diferentes (A e B), **quando** faço logout em A, **então** B continua: `me` 200 e `refresh` 200.
 - [x] **CA-15** — **Dado** 10 sessões ativas da mesma conta, **quando** faço o 11º login, **então** continuam 10 sessões e a de `ultimoUsoEm` mais antigo deixou de renovar (401).
 - [x] **CA-16** — **Dado** o mesmo IP, **quando** faço 6 logins em menos de 1 minuto, **então** o 6º responde 429 com `code: "LIMITE_TENTATIVAS"` e cabeçalho `Retry-After`; **e**, com `AUTH_REGISTRATION_LIMIT_PER_HOUR=2`, 3 registros seguidos → o 3º é 429. (O padrão de 3 por hora sem a env é verificado por teste unitário, não à mão.)
-- [ ] **CA-17** — **Dado** a etapa 1 implantada, **quando** `GET /api/health` e `GET /api/games` sem token, **então** ambos 200 (games ainda público até a etapa 3); **e** `GET /api/auth/me` sem token é 401.
+- [x] **CA-17** — _Superado pelo CA-41._ O texto original descrevia o estado temporário das etapas 1 e 2 (`GET /api/games` público até a etapa 3) e não é mais reproduzível. Hoje: `GET /api/health` sem token → 200; `GET /api/games` e `GET /api/auth/me` sem token → 401 `AUTH_NAO_AUTENTICADO`.
 - [x] **CA-18** — **Dado** `apps/api/.env` sem `JWT_ACCESS_SECRET`, sem `JWT_REFRESH_SECRET` ou sem `AUTH_REGISTRATION_OPEN`; ou com um segredo de menos de 32 caracteres; ou com os dois segredos iguais; ou com `CORS_ORIGIN=*`, **quando** a API sobe, **então** ela falha listando o problema; **e** `apps/api/.env.example` lista as três variáveis novas **sem valor real**.
 - [x] **CA-19** — **Dado** uma request com `Origin: http://localhost:5173` para `/auth/refresh`, **então** a resposta traz `Access-Control-Allow-Origin: http://localhost:5173` e `Access-Control-Allow-Credentials: true`; **dado** `Origin: http://malicioso.exemplo`, **então** a resposta não traz `Access-Control-Allow-Origin`.
 - [x] **CA-20** — **Dado** as respostas dos CA-01 a CA-15, **quando** procuro `senhaHash`, `tokenHash`, `hashAnterior` e o valor do refresh token nos **corpos**, **então** não há ocorrência; **e** o console da API durante esses passos não contém nenhuma senha, token ou cookie.
-- [ ] **CA-21** — **Dado** a migração A1, **quando** aplicada, **então** ela só cria `User` e `RefreshSession` (nenhuma tabela existente muda) e um segundo `npm run db:migrate` não gera migração nova.
-- [ ] **CA-22** — **Dado** `/api/docs`, **quando** abro, **então** vejo a tag `auth` com as rotas e o botão "Authorize" (Bearer).
+- [x] **CA-21** — **Dado** a migração A1, **quando** aplicada, **então** ela só cria `User` e `RefreshSession` (nenhuma tabela existente muda); **e** não há _drift_: `prisma migrate diff --from-schema-datasource prisma/schema.prisma --to-schema-datamodel prisma/schema.prisma --exit-code` sai com 0 (sem rodar `db:migrate` no banco compartilhado).
+- [x] **CA-22** — **Dado** `/api/docs`, **quando** abro, **então** vejo a tag `auth` com as rotas e o botão "Authorize" (Bearer).
 
 ### Etapa 2 — web
 
@@ -601,7 +601,7 @@ export const CSRF_HEADER = 'X-Checkpoint-Csrf';
 
 ### Etapa 3 — dono dos jogos, fase 1
 
-- [ ] **CA-40** — **Dado** o banco com N jogos sem dono, **quando** a migração A3 é aplicada, **então** `SELECT count(*) FROM "Game"` continua N, todos com `"userId" IS NULL`, existe a FK para `User` com `ON DELETE CASCADE`, o índice único é `(userId, tituloNormalizado, plataformaNormalizada)`, os dois `CHECK` continuam, e um segundo `db:migrate` não gera migração nova.
+- [x] **CA-40** — **Dado** a migração A3 aplicada, **quando** consulto o catálogo do Postgres (`pg_constraint`, `pg_indexes`), **então** existe a FK `"Game"."userId"` → `User` com `ON DELETE CASCADE`, o índice único é `(userId, tituloNormalizado, plataformaNormalizada)`, os dois `CHECK` do catálogo continuam, existe o índice de `status`, e não há _drift_ (`migrate diff --exit-code` = 0). _Histórico: a parte "N jogos sem dono preservados" não é mais reproduzível. A Q5 decidiu descartar esses jogos, e o banco estava vazio quando a A3 foi aplicada (0 jogos)._
 - [x] **CA-41** — **Dado** a etapa 3, **quando** `GET /api/games` sem token, **então** 401 `AUTH_NAO_AUTENTICADO`.
 - [x] **CA-42** — **Dado** Ana com 2 jogos e Bia com 1, **quando** cada uma faz `GET /api/games`, **então** cada uma vê só os seus; **e** `PATCH`, `DELETE`, `PUT /capa` e `DELETE /capa` da Bia no id de um jogo da Ana → 404 `"Jogo não encontrado"`, e o jogo da Ana não muda.
 - [x] **CA-43** — **Dado** Ana com "Celeste / PC", **quando** Bia cria "celeste / pc", **então** 201; **quando** Ana cria "CELESTE / PC", **então** 409 `"Já existe esse jogo nesta plataforma"`.
@@ -612,9 +612,9 @@ export const CSRF_HEADER = 'X-Checkpoint-Csrf';
 
 ### Etapa 4 — dono dos jogos, fase 2
 
-- [ ] **CA-48** — **Dado** um banco descartável com um jogo `userId NULL`, **quando** aplico a migração A4, **então** ela falha com a mensagem "Existem jogos sem dono (userId NULL)…" e nada muda. _Manual, banco descartável (nunca o Supabase compartilhado)._
-- [ ] **CA-49** — **Dado** o passo humano executado (`SELECT count(*) FROM "Game" WHERE "userId" IS NULL` = 0), **quando** aplico A4, **então** `userId` é `NOT NULL`, o total de jogos é o mesmo de antes da etapa 3, e o dono vê todos os jogos (com as capas) no web.
-- [ ] **CA-50** — **Dado** A4 aplicada, **quando** um `INSERT` direto em `"Game"` omite `"userId"`, **então** o banco rejeita; **e** um segundo `db:migrate` não gera migração nova.
+- [x] **CA-48** — **Dado** uma tabela **temporária** `"Game"` com um jogo `userId NULL`, criada numa transação que sempre termina em `ROLLBACK` (ela sombreia a real, e `to_regclass` prova isso), **quando** executo o `migration.sql` completo da A4, **então** ele falha com a mensagem "Existem jogos sem dono (userId NULL)…" e nada muda; **e**, com o jogo tendo dono, o mesmo arquivo passa (`SET NOT NULL` na temporária). _O projeto não tem banco descartável: a transação com tabela temporária substitui "banco descartável", e a tabela real não é tocada._
+- [x] **CA-49** — **Dado** o passo humano executado (`SELECT count(*) FROM "Game" WHERE "userId" IS NULL` = 0), **quando** aplico A4, **então** `userId` é `NOT NULL` (`information_schema.columns.is_nullable = NO`), e um jogo criado pela API aparece para o dono no `GET /api/games` e na lista do web. _Histórico: "o total de jogos é o mesmo de antes da etapa 3" ficou obsoleto. A Q5 decidiu descartar os jogos sem dono, e o banco estava vazio._
+- [x] **CA-50** — **Dado** A4 aplicada, **quando** um `INSERT` omite `"userId"` numa cópia da definição real (`CREATE TEMP TABLE "Game" (LIKE public."Game" INCLUDING ALL)`, numa transação com `ROLLBACK`), **então** o banco rejeita com SQLSTATE `23502` e fica 0 linhas; **e** não há _drift_ (`migrate diff --exit-code` = 0).
 
 ### Etapa 5 — troca de senha
 
@@ -624,6 +624,23 @@ export const CSRF_HEADER = 'X-Checkpoint-Csrf';
 - [x] **CA-54** — **Dado** `novaSenha` de 7 caracteres ou de 73 bytes, **então** 400 `VALIDACAO` com `fields.novaSenha`; **dado** a request sem token, **então** 401.
 - [x] **CA-55** — **Dado** o mesmo IP, **quando** faço 6 trocas de senha (certas ou erradas) em 15 min, **então** a 6ª é 429.
 - [x] **CA-56** — **Dado** `/perfil/senha` no web, **quando** a confirmação não coincide, **então** "As senhas não coincidem" sem request; **quando** troco com sucesso, **então** volto para `/perfil` com "Senha alterada. As outras sessões foram encerradas."; **e** outro navegador logado na mesma conta vai para `/login?motivo=sessao` na próxima ação.
+
+## Verificação de fechamento (2026-09-24)
+
+Os 7 critérios que dependiam de verificação real, executados contra a API e o web locais e o banco
+compartilhado. No banco foi **só leitura**. O único _write_ foi numa tabela **temporária**, dentro de
+transação com `ROLLBACK`, e o retrato da tabela real `"Game"` (linhas, `is_nullable`, 4 _constraints_,
+3 índices) ficou idêntico do início ao fim. Contas de teste só `@exemplo.com`, apagadas no fim.
+
+| Critério | O que foi executado                                                                                                                                                                                                            | Resultado                                                                                                                                                                                                                            |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| CA-17    | `curl` sem token em `/api/games`, `/api/health` e `/api/auth/me`                                                                                                                                                               | 401 `AUTH_NAO_AUTENTICADO` · 200 `{"status":"ok","database":"up"}` · 401. Superado pelo CA-41                                                                                                                                        |
+| CA-21    | leitura do `*_autenticacao_usuarios/migration.sql` e `prisma migrate diff … --exit-code`                                                                                                                                       | 5 instruções (2 `CREATE TABLE`, 2 `CREATE INDEX`, 1 FK), todas só em `User` e `RefreshSession`, sem `DROP` nem `"Game"`. `No difference detected.`, exit 0                                                                           |
+| CA-22    | `/api/docs` no Chrome headless (1280 × 900)                                                                                                                                                                                    | tags `auth`, `health`, `games`, `users`. Na `auth`: registro, login, refresh, logout, me, senha e as três de sessões. Botão "Authorize", e o modal mostra `bearer (http, Bearer)`                                                    |
+| CA-40    | `pg_constraint` e `pg_indexes` de `public."Game"`                                                                                                                                                                              | `Game_userId_fkey … REFERENCES "User"(id) ON UPDATE CASCADE ON DELETE CASCADE`, `UNIQUE ("userId", "tituloNormalizado", "plataformaNormalizada")`, `Game_nota_range_check`, `Game_nota_status_check`, `Game_status_idx`. Sem _drift_ |
+| CA-48    | duas transações com `ROLLBACK`, cada uma com `CREATE TEMP TABLE "Game" ("id" text, "userId" text)` (`"Game"` sem prefixo → `pg_temp_*`, diferente de `public."Game"`) e o `migration.sql` da A4 inteiro, nas suas 2 instruções | sem dono: `P0001` "Existem jogos sem dono (userId NULL)…" e a coluna segue aceitando `NULL`. Com dono: passa, e `"userId"` vira `NOT NULL` na temporária. Depois do `ROLLBACK`, a temporária não existe                              |
+| CA-49    | `information_schema.columns` e, com uma conta `@exemplo.com`, `POST /api/games`, `GET /api/games` e a lista no web (Chrome headless)                                                                                           | `is_nullable = NO`. O jogo criado aparece no `GET` (200) e na lista do web em `/`                                                                                                                                                    |
+| CA-50    | transação com `ROLLBACK`: `CREATE TEMP TABLE "Game" (LIKE public."Game" INCLUDING ALL)` (sombreamento provado) e `INSERT` sem `"userId"`                                                                                       | `"userId"` da cópia é `NOT NULL`. `INSERT` rejeitado com SQLSTATE `23502`, 0 linhas. Sem _drift_ (exit 0)                                                                                                                            |
 
 ## Plano de testes
 

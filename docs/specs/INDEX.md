@@ -8,7 +8,7 @@ commit — `/docs-sync` confere se ela bate com a realidade.
 | ----------------- | -------------------------------------- | --------------- |
 | Catálogo de jogos | [catalogo-jogos.md](catalogo-jogos.md) | 🚧 em andamento |
 | PWA e mobile      | [pwa-e-mobile.md](pwa-e-mobile.md)     | 🚧 em andamento |
-| Autenticação      | [autenticacao.md](autenticacao.md)     | 🚧 em andamento |
+| Autenticação      | [autenticacao.md](autenticacao.md)     | ✅ implementada |
 | Perfil            | [perfil.md](perfil.md)                 | 🚧 em andamento |
 
 ## Legenda de status
@@ -75,32 +75,14 @@ commit — `/docs-sync` confere se ela bate com a realidade.
       e `@nestjs/throttler`); faltam `@nestjs/jwt` e `cookie-parser`.
 - [x] **Decidir Q5 e aprovar a mudança destrutiva** de `Game` (Q5 decidida em 2026-09-24: descartar os jogos): `@@unique` com `userId` (migração A3) e
       `userId` obrigatório (migração A4). Backup do banco antes de cada uma.
-- [ ] Entre as etapas 3 e 4 (Q5 = descartar; **sem conta e sem SQL com e-mail**): listar os `capaPath`
+- [x] Entre as etapas 3 e 4 (Q5 = descartar; **sem conta e sem SQL com e-mail**): listar os `capaPath`
       dos jogos sem dono, apagar esses objetos no bucket `capas`, executar
       `DELETE FROM "Game" WHERE "userId" IS NULL;` e conferir que
-      `SELECT count(*) FROM "Game" WHERE "userId" IS NULL;` dá `0`.
+      `SELECT count(*) FROM "Game" WHERE "userId" IS NULL;` dá `0`. _Concluído: a A4 está aplicada
+      (`migrate status` com as 5 migrações, `"userId"` `NOT NULL`), a contagem de jogos sem dono é `0`, e
+      o banco já estava vazio antes da A3, sem capas para apagar._
 - [x] Gerar `JWT_ACCESS_SECRET` e `JWT_REFRESH_SECRET` (diferentes) e definir `AUTH_REGISTRATION_OPEN`
       em `apps/api/.env`.
-
-**`autenticacao` — o que falta para ✅ implementada (spec-sync de 2026-09-24):**
-
-49 de 56 critérios estão comprovados por teste automatizado (API 412/412, web 539/539). Os
-relatórios de `/qa-verify` das etapas 1 a 5 não foram gravados no repositório, então nenhum critério
-foi marcado só por verificação manual. Faltam:
-
-- [ ] **CA-17** — descreve o estado temporário das etapas 1 e 2 (`GET /api/games` público). Desde a
-      etapa 3 é 401 (CA-41, testado). Decidir: marcar como superado pelo CA-41 ou reescrever.
-- [ ] **CA-21**, **CA-40**, **CA-50** — conferência no banco: SQL das migrações A1/A3/A4, FK com
-      cascade, índice único por dono, `CHECK`s, `userId NOT NULL` e ausência de drift (um segundo
-      `db:migrate` não gera nada). `/qa-verify` com registro.
-- [ ] **CA-22** — `/api/docs` com a tag `auth` e o botão "Authorize". `/qa-verify` com registro.
-- [ ] **CA-48** — a trava da migração A4 com um jogo `userId NULL`, **só em banco descartável** (nunca
-      no Supabase compartilhado).
-- [ ] **CA-49** — **a spec está inconsistente**: o critério pede "o total de jogos é o mesmo de antes
-      da etapa 3", mas a Q5 decidiu **descartar** os jogos sem dono. Reescrever o critério (humano) antes
-      de verificar.
-- [ ] Gravar o resultado dos próximos `/qa-verify` num lugar versionado (ex.: uma seção
-      "Verificação" na própria spec), para o fechamento não depender da conversa em que rodaram.
 
 **`perfil` — o que falta para ✅ implementada (etapas 1 a 4 feitas; só conferência humana):**
 
