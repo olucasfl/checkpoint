@@ -536,3 +536,22 @@ describe('bloco Steam na página do jogo (spec integracao-plataformas, etapa 4)'
     expect(await screen.findByRole('button', { name: 'Vincular à Steam' })).toBeInTheDocument();
   });
 });
+
+describe('ações do jogo com a fonte mais larga (F1 da troca de design)', () => {
+  it('a fileira Vincular à Steam · Editar · Excluir quebra linha em vez de estourar a tela (o jsdom não mede; a classe é o contrato)', async () => {
+    vi.mocked(integracoesApi.listarContas).mockResolvedValue([
+      {
+        provedor: 'STEAM',
+        idExterno: 'STEAMID_SINTETICO',
+        nomeExibicao: 'Jogador Sintetico',
+        vinculadaEm: '2026-09-25T12:00:00.000Z',
+      },
+    ]);
+    renderAt();
+    await screen.findByRole('button', { name: 'Vincular à Steam' });
+
+    const fileira = document.querySelector('[data-acoes-do-jogo]');
+    expect(fileira).toHaveClass('flex-wrap');
+    expect(within(fileira as HTMLElement).getAllByRole('button')).toHaveLength(3);
+  });
+});

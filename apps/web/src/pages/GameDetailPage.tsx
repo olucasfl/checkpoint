@@ -58,7 +58,7 @@ export function GameDetailPage() {
           </button>
 
           {game && (
-            <div className="flex gap-2">
+            <div data-acoes-do-jogo className="flex flex-wrap gap-2">
               {temContaSteam === true && game.dadosPlataforma.length === 0 && (
                 <button
                   type="button"

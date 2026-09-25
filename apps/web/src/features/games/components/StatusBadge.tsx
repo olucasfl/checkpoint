@@ -8,7 +8,7 @@ export function StatusBadge({ status }: { status: GameStatus }) {
 
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-[3px] border border-current px-3 py-1.5 font-display text-[11px] font-semibold uppercase tracking-[0.14em] ${meta.text} ${meta.tint}`}
+      className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-[3px] border border-current px-3 py-1.5 font-display text-[11px] font-semibold uppercase tracking-[0.14em] ${meta.text} ${meta.tint}`}
     >
       {status === 'JOGANDO' ? (
         <span aria-hidden="true" className="size-[7px] rounded-full bg-status-jogando" />

@@ -374,7 +374,7 @@ function Conteudo({
               : `Escolha o jogo da Steam que é «${modo.jogo.titulo}».`}
           </p>
         </div>
-        <button type="button" onClick={onClose} className={BOTAO_CONTORNO}>
+        <button type="button" onClick={onClose} className={`${BOTAO_CONTORNO} shrink-0`}>
           Fechar
         </button>
       </div>
