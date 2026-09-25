@@ -1291,3 +1291,346 @@ describe('PUT e DELETE /integracoes/:provedor/jogos/:jogoId (CA-26 a CA-31, CA-6
     expect(ligado).toMatchObject({ gameId: G_CELESTE, minutosJogados: 600, conquistasTotal: 3 });
   });
 });
+
+describe('GET e POST /integracoes/:provedor/jogos/:jogoId[/atualizacao] (etapa 4, CA-43 a CA-50)', () => {
+  const G_CELESTE = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const G_HADES = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+  const G_BIA = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+  const CELESTE = '504230';
+  const HORA = 60 * 60_000;
+  const CAMINHO = (jogoId: string) => `/integracoes/steam/jogos/${jogoId}`;
+  const ATUALIZACAO = (jogoId: string) => `${CAMINHO(jogoId)}/atualizacao`;
+
+  const biblioteca = {
+    privada: false,
+    total: 1,
+    jogos: [
+      {
+        appid: CELESTE,
+        nome: 'Celeste',
+        minutosJogados: 600,
+        ultimaVezJogadoEm: new Date('2026-02-01T00:00:00Z'),
+      },
+    ],
+  };
+  const doJogador = (id: string, desbloqueada: boolean) => ({
+    id,
+    desbloqueada,
+    desbloqueadaEm: desbloqueada ? new Date('2026-02-17T18:06:22Z') : null,
+    nome: `Nome ${id}`,
+    descricao: `Descrição ${id}`,
+  });
+  const schema = ['A', 'B', 'C'].map((id) => ({
+    id,
+    nome: `Schema ${id}`,
+    descricao: `Descrição ${id}`,
+    oculta: id === 'C',
+    iconeUrl: `https://steamcdn-a.akamaihd.net/${id}.jpg`,
+    iconeCinzaUrl: `https://steamcdn-a.akamaihd.net/${id}-cinza.jpg`,
+  }));
+
+  const chamadasASteam = () =>
+    ctx.client.listarJogos.mock.calls.length +
+    ctx.client.obterConquistasDoJogador.mock.calls.length +
+    ctx.client.obterSchema.mock.calls.length +
+    ctx.client.obterPercentuaisGlobais.mock.calls.length +
+    ctx.client.obterPerfil.mock.calls.length;
+
+  /** Ana e Bia vinculadas; o jogo de Ana ligado ao Celeste com o último valor de `idadeMs` atrás. */
+  async function comLigado(idadeMs: number): Promise<{ ana: string; bia: string }> {
+    const ana = await ctx.tokenFor(ANA_ID);
+    const bia = await ctx.tokenFor(BIA_ID);
+    for (const token of [ana, bia]) {
+      const ida = await iniciar(token);
+      await retornar(ida.state, ida.nonce);
+    }
+    ctx.db.games.push(
+      { id: G_CELESTE, userId: ANA_ID, titulo: 'Celeste', plataforma: 'PC' },
+      { id: G_HADES, userId: ANA_ID, titulo: 'Hades', plataforma: '' },
+      { id: G_BIA, userId: BIA_ID, titulo: 'Celeste', plataforma: 'PC' },
+    );
+    ctx.db.jogos.push({
+      id: 'linha-celeste',
+      userId: ANA_ID,
+      gameId: G_CELESTE,
+      provedor: 'STEAM',
+      idExterno: CELESTE,
+      minutosJogados: 5,
+      conquistasTotal: 1,
+      conquistasDesbloqueadas: 0,
+      atualizadoEm: new Date(Date.now() - idadeMs),
+    });
+    ctx.client.listarJogos.mockResolvedValue(biblioteca);
+    ctx.client.obterConquistasDoJogador.mockResolvedValue({
+      tipo: 'ok',
+      nomeDoJogo: 'Celeste',
+      conquistas: [doJogador('A', true), doJogador('B', true), doJogador('C', false)],
+    });
+    ctx.client.obterSchema.mockResolvedValue(schema);
+    ctx.client.obterPercentuaisGlobais.mockResolvedValue(new Map([['A', 40.7]]));
+    for (const mock of Object.values(ctx.client)) {
+      mock.mockClear();
+    }
+    return { ana, bia };
+  }
+
+  const linhaCeleste = () => ctx.db.jogos.find((j) => j.gameId === G_CELESTE);
+
+  it('dado com 2 h: 200 com as horas novas e a lista completa; o atualizadoEm gravado é novo (CA-43)', async () => {
+    const { ana } = await comLigado(2 * HORA);
+    const antes = Date.now();
+
+    const response = await pedir('GET', CAMINHO(G_CELESTE), ana);
+    const corpo = (await response.json()) as {
+      dados: Record<string, unknown>;
+      conquistas: Record<string, unknown>[];
+      aviso: string | null;
+    };
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(corpo.aviso).toBeNull();
+    expect(corpo.dados).toMatchObject({
+      provedor: 'STEAM',
+      idExterno: CELESTE,
+      minutosJogados: 600,
+      conquistasTotal: 3,
+      conquistasDesbloqueadas: 2,
+    });
+    expect(new Date(corpo.dados.atualizadoEm as string).getTime()).toBeGreaterThanOrEqual(antes);
+    expect(corpo.conquistas).toHaveLength(3);
+    expect(corpo.conquistas[0]).toEqual({
+      id: 'A',
+      nome: 'Schema A',
+      descricao: 'Descrição A',
+      oculta: false,
+      desbloqueada: true,
+      desbloqueadaEm: '2026-02-17T18:06:22.000Z',
+      iconeUrl: 'https://steamcdn-a.akamaihd.net/A.jpg',
+      raridadePercentual: 40.7,
+    });
+    expect(corpo.conquistas[2]).toMatchObject({
+      id: 'C',
+      oculta: true,
+      desbloqueada: false,
+      iconeUrl: 'https://steamcdn-a.akamaihd.net/C-cinza.jpg',
+      raridadePercentual: null,
+    });
+    expect(Object.keys(corpo.dados).sort()).toEqual(
+      [
+        'atualizadoEm',
+        'capaUrl',
+        'conquistasDesbloqueadas',
+        'conquistasTotal',
+        'idExterno',
+        'minutosJogados',
+        'provedor',
+        'ultimaVezJogadoEm',
+      ].sort(),
+    );
+    expect(ctx.client.listarJogos).toHaveBeenCalledTimes(1);
+  });
+
+  it('dado com 10 min: as horas NÃO são reconsultadas, só a lista de conquistas (CA-44)', async () => {
+    const { ana } = await comLigado(10 * 60_000);
+
+    const response = await pedir('GET', CAMINHO(G_CELESTE), ana);
+    const corpo = (await response.json()) as {
+      dados: { minutosJogados: number };
+      conquistas: unknown[];
+    };
+
+    expect(response.status).toBe(200);
+    expect(ctx.client.listarJogos).not.toHaveBeenCalled();
+    expect(ctx.client.obterConquistasDoJogador).toHaveBeenCalledTimes(1);
+    expect(corpo.dados.minutosJogados).toBe(5);
+    expect(corpo.conquistas).toHaveLength(3);
+  });
+
+  it('duas aberturas seguidas (dentro de 1 h): a segunda NÃO grava e NÃO chama a Steam além do cache', async () => {
+    const { ana } = await comLigado(10 * 60_000);
+
+    await pedir('GET', CAMINHO(G_CELESTE), ana);
+    const escritasDepoDaPrimeira = ctx.db.escritas;
+    const chamadasDepoisDaPrimeira = chamadasASteam();
+    const segunda = await pedir('GET', CAMINHO(G_CELESTE), ana);
+
+    expect(segunda.status).toBe(200);
+    expect(ctx.db.escritas).toBe(escritasDepoDaPrimeira);
+    expect(chamadasASteam()).toBe(chamadasDepoisDaPrimeira);
+  });
+
+  it('dado velho: duas aberturas seguidas gravam UMA vez e consultam as horas UMA vez', async () => {
+    const { ana } = await comLigado(2 * HORA);
+
+    await pedir('GET', CAMINHO(G_CELESTE), ana);
+    const escritas = ctx.db.escritas;
+    await pedir('GET', CAMINHO(G_CELESTE), ana);
+
+    expect(ctx.client.listarJogos).toHaveBeenCalledTimes(1);
+    expect(ctx.db.escritas).toBe(escritas);
+    expect(chamadasASteam()).toBe(4);
+  });
+
+  it('POST duas vezes em 30 s: a 1ª consulta a Steam, a 2ª devolve o gravado sem chamá-la; ≥ 30 s depois consulta de novo (CA-45)', async () => {
+    const { ana } = await comLigado(10 * 60_000);
+
+    const primeira = await pedir('POST', ATUALIZACAO(G_CELESTE), ana);
+    expect(primeira.status).toBe(200);
+    expect(ctx.client.listarJogos).toHaveBeenCalledTimes(1);
+    const chamadas = chamadasASteam();
+
+    const segunda = await pedir('POST', ATUALIZACAO(G_CELESTE), ana);
+    const corpo = (await segunda.json()) as {
+      dados: { minutosJogados: number };
+      conquistas: unknown[];
+    };
+    expect(segunda.status).toBe(200);
+    expect(chamadasASteam()).toBe(chamadas);
+    expect(corpo.dados.minutosJogados).toBe(600);
+    expect(corpo.conquistas).toHaveLength(3);
+
+    linhaCeleste()!.atualizadoEm = new Date(Date.now() - 31_000);
+    await pedir('POST', ATUALIZACAO(G_CELESTE), ana);
+    expect(ctx.client.listarJogos).toHaveBeenCalledTimes(2);
+  });
+
+  it('sem vínculo, de outro usuário, id inválido ou sem token: 404, 404, 400 e 401, e NENHUMA chamada à Steam (CA-46, CA-57)', async () => {
+    const { ana } = await comLigado(2 * HORA);
+
+    for (const caminho of [CAMINHO, ATUALIZACAO]) {
+      const metodo = caminho === CAMINHO ? 'GET' : 'POST';
+      const semVinculo = await pedir(metodo, caminho(G_HADES), ana);
+      expect(semVinculo.status).toBe(404);
+      expect((await json(semVinculo))?.code).toBe('PLATAFORMA_VINCULO_NAO_ENCONTRADO');
+
+      const deBia = await pedir(metodo, caminho(G_BIA), ana);
+      expect(deBia.status).toBe(404);
+      expect((await json(deBia))?.message).toBe('Jogo não encontrado');
+
+      expect((await pedir(metodo, caminho('nao-e-uuid'), ana)).status).toBe(400);
+      expect((await pedir(metodo, caminho(G_CELESTE))).status).toBe(401);
+    }
+    expect(chamadasASteam()).toBe(0);
+  });
+
+  it('(SIMULADO, sem fixture real) conquistas negadas: 200 CONQUISTAS_PRIVADAS, horas novas e contagens antigas (CA-47)', async () => {
+    const { ana } = await comLigado(2 * HORA);
+    ctx.client.obterConquistasDoJogador.mockResolvedValue({ tipo: 'negado' });
+
+    const response = await pedir('GET', CAMINHO(G_CELESTE), ana);
+    const corpo = (await response.json()) as {
+      dados: Record<string, unknown>;
+      conquistas: unknown[];
+      aviso: string;
+    };
+
+    expect(response.status).toBe(200);
+    expect(corpo.aviso).toBe('CONQUISTAS_PRIVADAS');
+    expect(corpo.conquistas).toEqual([]);
+    expect(corpo.dados).toMatchObject({
+      minutosJogados: 600,
+      conquistasTotal: 1,
+      conquistasDesbloqueadas: 0,
+    });
+    expect(linhaCeleste()).toMatchObject({ minutosJogados: 600, conquistasTotal: 1 });
+  });
+
+  it('(SIMULADO, sem fixture real) biblioteca privada: 200 PERFIL_PRIVADO com o valor gravado, sem escrever (CA-47)', async () => {
+    const { ana } = await comLigado(2 * HORA);
+    ctx.client.listarJogos.mockResolvedValue({ privada: true, total: 0, jogos: [] });
+    const antes = ctx.db.escritas;
+
+    const response = await pedir('GET', CAMINHO(G_CELESTE), ana);
+    const corpo = (await response.json()) as { dados: Record<string, unknown>; aviso: string };
+
+    expect(response.status).toBe(200);
+    expect(corpo.aviso).toBe('PERFIL_PRIVADO');
+    expect(corpo.dados.minutosJogados).toBe(5);
+    expect(ctx.db.escritas).toBe(antes);
+  });
+
+  it('jogo sem conquistas (400 "no stats", real): 200 SEM_CONQUISTAS, 0 de 0 gravado (CA-48)', async () => {
+    const { ana } = await comLigado(10 * 60_000);
+    ctx.client.obterConquistasDoJogador.mockResolvedValue({ tipo: 'sem-conquistas' });
+
+    const response = await pedir('GET', CAMINHO(G_CELESTE), ana);
+    const corpo = (await response.json()) as {
+      dados: Record<string, unknown>;
+      aviso: string;
+      conquistas: unknown[];
+    };
+
+    expect(corpo.aviso).toBe('SEM_CONQUISTAS');
+    expect(corpo.conquistas).toEqual([]);
+    expect(corpo.dados).toMatchObject({ conquistasTotal: 0, conquistasDesbloqueadas: 0 });
+    expect(linhaCeleste()).toMatchObject({ conquistasTotal: 0, conquistasDesbloqueadas: 0 });
+  });
+
+  it.each([
+    ['timeout/5xx', new PlataformaIndisponivelError(), 502, 'PLATAFORMA_INDISPONIVEL'],
+    ['429', new PlataformaLimiteError(), 502, 'PLATAFORMA_LIMITE'],
+  ])(
+    'Steam falhando (%s): o GET NUNCA dá 502 (200 com o gravado e INDISPONIVEL); só o POST dá 502 (CA-49)',
+    async (_nome, erro, statusDoPost, codeDoPost) => {
+      const { ana } = await comLigado(2 * HORA);
+      ctx.client.listarJogos.mockRejectedValue(erro);
+      const antes = ctx.db.escritas;
+
+      const get = await pedir('GET', CAMINHO(G_CELESTE), ana);
+      const corpo = (await get.json()) as {
+        dados: Record<string, unknown>;
+        aviso: string;
+        conquistas: unknown[];
+      };
+      expect(get.status).toBe(200);
+      expect(corpo.aviso).toBe('INDISPONIVEL');
+      expect(corpo.conquistas).toEqual([]);
+      expect(corpo.dados.minutosJogados).toBe(5);
+      expect(ctx.db.escritas).toBe(antes);
+
+      const post = await pedir('POST', ATUALIZACAO(G_CELESTE), ana);
+      expect(post.status).toBe(statusDoPost);
+      expect((await json(post))?.code).toBe(codeDoPost);
+      expect(ctx.db.escritas).toBe(antes);
+    },
+  );
+
+  it('nenhum log tem a chave, o SteamID, o state ou uma URL, mesmo com a Steam falhando (CA-58)', async () => {
+    const { ana } = await comLigado(2 * HORA);
+    ctx.client.listarJogos.mockRejectedValue(new PlataformaIndisponivelError());
+    ctx.logger.lines.length = 0;
+
+    await pedir('GET', CAMINHO(G_CELESTE), ana);
+    await pedir('POST', ATUALIZACAO(G_CELESTE), ana);
+
+    const logs = ctx.logger.lines.join('\n');
+    expect(logs).toContain('PlataformaIndisponivelError');
+    expect(logs).not.toContain(STEAM_ID);
+    expect(logs).not.toContain('ABCDEF0123456789ABCDEF0123456789');
+    expect(logs).not.toContain(CELESTE);
+    expect(logs).not.toMatch(/https?:\/\//);
+    expect(logs).not.toMatch(/key=|state=|checkpoint_vinculo/);
+  });
+
+  it('falha só do schema ou dos percentuais: continua 200, sem enfeite (CA-50)', async () => {
+    const { ana } = await comLigado(10 * 60_000);
+    ctx.client.obterSchema.mockRejectedValue(new PlataformaIndisponivelError());
+    ctx.client.obterPercentuaisGlobais.mockRejectedValue(new PlataformaLimiteError());
+
+    const response = await pedir('GET', CAMINHO(G_CELESTE), ana);
+    const corpo = (await response.json()) as {
+      aviso: string | null;
+      conquistas: Record<string, unknown>[];
+    };
+
+    expect(response.status).toBe(200);
+    expect(corpo.aviso).toBeNull();
+    expect(corpo.conquistas).toHaveLength(3);
+    expect(corpo.conquistas[0]).toMatchObject({
+      nome: 'Nome A',
+      iconeUrl: null,
+      raridadePercentual: null,
+    });
+  });
+});

@@ -74,6 +74,10 @@ export class FakeIntegrationsPrisma {
   games: GameRow[] = [];
   /** Um retrato de `jogos` ANTES de cada escrita: é o que a transação usa para desfazer (rollback). */
   private historico: JogoPlataformaRow[][] = [];
+  /** Quantas escritas em `JogoPlataforma` já houve (para provar "não grava duas vezes"). */
+  get escritas(): number {
+    return this.historico.length;
+  }
 
   private registrar(): void {
     this.historico.push(this.jogos.map((j) => ({ ...j })));
@@ -179,6 +183,25 @@ export class FakeIntegrationsPrisma {
       );
       return Promise.resolve(achada ? this.completa(achada) : null);
     },
+    update: ({
+      where,
+      data,
+    }: {
+      where: { gameId_provedor: { gameId: string; provedor: string } };
+      data: Partial<JogoPlataformaRow>;
+    }) => {
+      this.registrar();
+      const achada = this.jogos.find(
+        (j) =>
+          j.gameId === where.gameId_provedor.gameId &&
+          j.provedor === where.gameId_provedor.provedor,
+      );
+      if (!achada) {
+        return Promise.reject(Object.assign(new Error('nao existe'), { code: 'P2025' }));
+      }
+      Object.assign(achada, data);
+      return Promise.resolve(this.completa(achada));
+    },
     /** As duas unicidades da migration: `(gameId, provedor)` e `(userId, provedor, idExterno)`. */
     create: ({ data }: { data: Omit<JogoPlataformaRow, 'id'> }) => {
       this.registrar();
@@ -283,7 +306,13 @@ export interface IntegrationsHttpApp {
   baseUrl: string;
   db: FakeIntegrationsPrisma;
   /** O `SteamClient` falso (só o que o provider usa). */
-  client: { obterPerfil: jest.Mock; listarJogos: jest.Mock; obterConquistasDoJogador: jest.Mock };
+  client: {
+    obterPerfil: jest.Mock;
+    listarJogos: jest.Mock;
+    obterConquistasDoJogador: jest.Mock;
+    obterSchema: jest.Mock;
+    obterPercentuaisGlobais: jest.Mock;
+  };
   /** O OpenID de verdade, com a chamada à Steam (`validarRetorno`) trocada por um mock. */
   openId: SteamOpenId & { validarRetorno: jest.Mock };
   logger: CollectingLogger;
@@ -307,6 +336,8 @@ export async function startIntegrationsApp(
     obterPerfil: jest.fn(),
     listarJogos: jest.fn(),
     obterConquistasDoJogador: jest.fn(),
+    obterSchema: jest.fn(),
+    obterPercentuaisGlobais: jest.fn(),
   };
   const openId = Object.assign(new SteamOpenId(), { validarRetorno: jest.fn() });
 

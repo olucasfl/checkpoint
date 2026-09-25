@@ -36,6 +36,7 @@ import { type Request, type Response } from 'express';
 import {
   type ContaVinculada,
   type DadosJogoPlataforma,
+  type DetalheJogoPlataforma,
   type ItemBiblioteca,
   type PerfilPlataforma,
   type Provedor,
@@ -53,6 +54,7 @@ import {
   ContaVinculadaDto,
   DadosJogoPlataformaDto,
   IniciarVinculoResponseDto,
+  DetalheJogoPlataformaDto,
   ItemBibliotecaDto,
   PerfilPlataformaDto,
 } from './dto/integracao-response.dto';
@@ -284,6 +286,64 @@ export class IntegrationsController {
     @Body() dto: VincularJogoDto,
   ): Promise<DadosJogoPlataforma> {
     return this.integrations.vincularJogo(user.id, provedor, jogoId, dto);
+  }
+
+  @Get(':provedor/jogos/:jogoId')
+  @Header('cache-control', 'no-store')
+  @ApiOperation({
+    summary: 'As horas e a lista de conquistas de um jogo ligado',
+    description:
+      'As horas só são reconsultadas se o dado gravado tem mais de 1 h; a lista vem do cache de 5 min. Nunca dá ' +
+      '502: se a plataforma falhar, devolve o valor gravado com `aviso` (`INDISPONIVEL`, `PERFIL_PRIVADO`). ' +
+      'Conquistas negadas dão `CONQUISTAS_PRIVADAS` (horas mantidas); jogo sem conquistas, `SEM_CONQUISTAS`.',
+  })
+  @ApiParam(PROVEDOR_PARAM)
+  @ApiOkResponse({ type: DetalheJogoPlataformaDto })
+  @ApiBadRequestResponse({ type: ApiErrorResponseDto, description: '`VALIDACAO`' })
+  @ApiNotFoundResponse({
+    type: ApiErrorResponseDto,
+    description: 'Jogo inexistente ou de outro usuário, ou `PLATAFORMA_VINCULO_NAO_ENCONTRADO`',
+  })
+  @ApiConflictResponse({ type: ApiErrorResponseDto, description: '`PLATAFORMA_NAO_VINCULADA`' })
+  @ApiUnauthorizedResponse({ type: ApiErrorResponseDto })
+  @ApiTooManyRequestsResponse({ type: ApiErrorResponseDto, description: '`LIMITE_TENTATIVAS`' })
+  detalheDoJogo(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('provedor', ProvedorSlugPipe) provedor: Provedor,
+    @Param('jogoId', jogoIdPipe()) jogoId: string,
+  ): Promise<DetalheJogoPlataforma> {
+    return this.integrations.detalheDoJogo(user.id, provedor, jogoId);
+  }
+
+  @Post(':provedor/jogos/:jogoId/atualizacao')
+  @HttpCode(HttpStatus.OK)
+  @Header('cache-control', 'no-store')
+  @ApiOperation({
+    summary: 'Atualiza as horas e as conquistas de um jogo (no máximo uma consulta a cada 30 s)',
+    description:
+      'Ignora o cache das conquistas do jogador. Antes de 30 s da última consulta, devolve o gravado sem chamar a ' +
+      'plataforma. Diferente do `GET`, a falha da plataforma sobe: 502 `PLATAFORMA_INDISPONIVEL` ou `PLATAFORMA_LIMITE`.',
+  })
+  @ApiParam(PROVEDOR_PARAM)
+  @ApiOkResponse({ type: DetalheJogoPlataformaDto })
+  @ApiBadRequestResponse({ type: ApiErrorResponseDto, description: '`VALIDACAO`' })
+  @ApiNotFoundResponse({
+    type: ApiErrorResponseDto,
+    description: 'Jogo inexistente ou de outro usuário, ou `PLATAFORMA_VINCULO_NAO_ENCONTRADO`',
+  })
+  @ApiConflictResponse({
+    type: ApiErrorResponseDto,
+    description: '`PLATAFORMA_NAO_VINCULADA` ou `PLATAFORMA_PERFIL_PRIVADO`',
+  })
+  @ApiUnauthorizedResponse({ type: ApiErrorResponseDto })
+  @ApiTooManyRequestsResponse({ type: ApiErrorResponseDto, description: '`LIMITE_TENTATIVAS`' })
+  @ApiResponse502()
+  atualizarJogo(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('provedor', ProvedorSlugPipe) provedor: Provedor,
+    @Param('jogoId', jogoIdPipe()) jogoId: string,
+  ): Promise<DetalheJogoPlataforma> {
+    return this.integrations.atualizarJogo(user.id, provedor, jogoId);
   }
 
   @Delete(':provedor/jogos/:jogoId')

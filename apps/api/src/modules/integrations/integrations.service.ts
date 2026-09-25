@@ -1,11 +1,13 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
+  ATUALIZACAO_AUTOMATICA_MS,
   ATUALIZACAO_MANUAL_MIN_MS,
   PROVEDOR_SLUG,
   chaveDeTitulo,
   type ContaVinculada,
   type DadosJogoPlataforma,
+  type DetalheJogoPlataforma,
   type IniciarVinculoResponse,
   type ItemBiblioteca,
   type JogoParecido,
@@ -24,10 +26,19 @@ import {
   MAIS_JOGADOS_NO_CARTAO,
   MAX_JOGOS_PARECIDOS,
 } from './integrations.constants';
-import { DADOS_JOGO_PLATAFORMA_SELECT, toDadosJogoPlataforma } from './lib/dados-plataforma';
-import { integracaoErrors } from './plataforma-http-errors';
-import { type ItemDaBiblioteca, type PerfilBasico } from './providers/game-provider';
 import {
+  DADOS_JOGO_PLATAFORMA_SELECT,
+  toDadosJogoPlataforma,
+  type DadosJogoPlataformaRow,
+} from './lib/dados-plataforma';
+import { integracaoErrors } from './plataforma-http-errors';
+import {
+  type DetalheDoJogo,
+  type ItemDaBiblioteca,
+  type PerfilBasico,
+} from './providers/game-provider';
+import {
+  PerfilPrivadoError,
   PlataformaError,
   VinculoCanceladoError,
   VinculoRecusadoError,
@@ -407,6 +418,127 @@ export class IntegrationsService {
     } catch (error) {
       throw await this.traduzirErroDoVinculo(error, userId, provedor, dados.idExterno);
     }
+  }
+
+  /**
+   * `GET .../jogos/:jogoId` (etapa 4): as horas e a lista de conquistas de um jogo ligado. As horas só são
+   * reconsultadas se o dado gravado tem mais de `ATUALIZACAO_AUTOMATICA_MS` (1 h); antes disso, só a lista de
+   * conquistas (do cache de 5 min). **Nunca dá 502**: se a plataforma falhar, devolve o valor gravado com o aviso
+   * `INDISPONIVEL` (ou `PERFIL_PRIVADO`), e o dado gravado fica como estava.
+   */
+  detalheDoJogo(
+    userId: string,
+    provedor: Provedor,
+    jogoId: string,
+  ): Promise<DetalheJogoPlataforma> {
+    return this.detalhar(userId, provedor, jogoId, false);
+  }
+
+  /**
+   * `POST .../jogos/:jogoId/atualizacao`: o "Atualizar" manual. Ignora o cache das conquistas do jogador e
+   * reconsulta as horas, mas só se o último dado tem mais de `ATUALIZACAO_MANUAL_MIN_MS` (30 s); antes disso
+   * devolve o gravado (a lista sai do cache) sem chamar a plataforma. Aqui a falha SOBE: 502 (ou 409 se privado).
+   */
+  atualizarJogo(
+    userId: string,
+    provedor: Provedor,
+    jogoId: string,
+  ): Promise<DetalheJogoPlataforma> {
+    return this.detalhar(userId, provedor, jogoId, true);
+  }
+
+  private async detalhar(
+    userId: string,
+    provedor: Provedor,
+    jogoId: string,
+    manual: boolean,
+  ): Promise<DetalheJogoPlataforma> {
+    const provider = this.registry.porProvedor(provedor);
+
+    // As três checagens de banco vêm ANTES de qualquer chamada à plataforma (jogo de outro usuário e jogo sem
+    // vínculo dão 404 sem gastar a cota).
+    const jogo = await this.prisma.game.findFirst({
+      where: { id: jogoId, userId },
+      select: { id: true },
+    });
+    if (!jogo) {
+      throw new NotFoundException(JOGO_NAO_ENCONTRADO);
+    }
+    const gravado = await this.prisma.jogoPlataforma.findUnique({
+      where: { gameId_provedor: { gameId: jogoId, provedor } },
+      select: DADOS_JOGO_PLATAFORMA_SELECT,
+    });
+    if (!gravado) {
+      throw integracaoErrors.vinculoNaoEncontrado();
+    }
+    const conta = await this.contaDe(userId, provedor);
+    if (!conta) {
+      throw integracaoErrors.naoVinculada();
+    }
+
+    const idade = Date.now() - gravado.atualizadoEm.getTime();
+    const foraDaJanela = manual && idade >= ATUALIZACAO_MANUAL_MIN_MS;
+    const comHoras = manual ? foraDaJanela : idade > ATUALIZACAO_AUTOMATICA_MS;
+
+    try {
+      const detalhe = await provider.obterDetalhe(conta.idExterno, gravado.idExterno, {
+        comHoras,
+        ignorarCache: foraDaJanela,
+      });
+      const dados = await this.gravarDetalhe(jogoId, provedor, gravado, detalhe);
+      return {
+        dados: toDadosJogoPlataforma(dados),
+        conquistas: detalhe.conquistas,
+        aviso: detalhe.aviso,
+      };
+    } catch (error) {
+      if (manual || !(error instanceof PlataformaError)) {
+        throw error;
+      }
+      // Só o tipo do erro: nada do que a plataforma respondeu, nenhum ID nem URL.
+      this.logger.warn(`Detalhe do jogo: a plataforma falhou (${error.constructor.name})`);
+      return {
+        dados: toDadosJogoPlataforma(gravado),
+        conquistas: [],
+        aviso: error instanceof PerfilPrivadoError ? 'PERFIL_PRIVADO' : 'INDISPONIVEL',
+      };
+    }
+  }
+
+  /**
+   * Grava só o que mudou. Horas novas (e o `atualizadoEm`) só quando foram reconsultadas; contagens só se
+   * diferem do gravado, e NUNCA quando as conquistas foram negadas (`null`: o valor antigo fica). Duas
+   * aberturas seguidas, com o mesmo resultado, não escrevem nada na segunda.
+   */
+  private async gravarDetalhe(
+    jogoId: string,
+    provedor: Provedor,
+    gravado: DadosJogoPlataformaRow,
+    detalhe: DetalheDoJogo,
+  ): Promise<DadosJogoPlataformaRow> {
+    const data: Partial<DadosJogoPlataformaRow> = {};
+    if (detalhe.horas) {
+      data.minutosJogados = detalhe.horas.minutosJogados;
+      data.ultimaVezJogadoEm = detalhe.horas.ultimaVezJogadoEm;
+      data.capaUrl = detalhe.horas.capaUrl;
+      data.atualizadoEm = new Date(Date.now());
+    }
+    if (
+      detalhe.conquistasTotal !== null &&
+      (detalhe.conquistasTotal !== gravado.conquistasTotal ||
+        detalhe.conquistasDesbloqueadas !== gravado.conquistasDesbloqueadas)
+    ) {
+      data.conquistasTotal = detalhe.conquistasTotal;
+      data.conquistasDesbloqueadas = detalhe.conquistasDesbloqueadas;
+    }
+    if (Object.keys(data).length === 0) {
+      return gravado;
+    }
+    return this.prisma.jogoPlataforma.update({
+      where: { gameId_provedor: { gameId: jogoId, provedor } },
+      data,
+      select: DADOS_JOGO_PLATAFORMA_SELECT,
+    });
   }
 
   /** Remove só a camada da plataforma DESTE jogo. Os dados do usuário (título, notas, capa…) não são tocados. */

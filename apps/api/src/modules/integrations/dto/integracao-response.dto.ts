@@ -89,3 +89,40 @@ export class DadosJogoPlataformaDto {
   @ApiPropertyOptional({ nullable: true, type: String }) capaUrl!: string | null;
   @ApiProperty({ description: 'ISO 8601' }) atualizadoEm!: string;
 }
+
+export class ConquistaDto {
+  @ApiProperty() id!: string;
+  @ApiProperty({ description: 'O nome da conquista (ou o id, se o schema falhou)' }) nome!: string;
+  @ApiPropertyOptional({
+    nullable: true,
+    type: String,
+    description: 'null quando a conquista é oculta e ainda bloqueada',
+  })
+  descricao!: string | null;
+  @ApiProperty() oculta!: boolean;
+  @ApiProperty() desbloqueada!: boolean;
+  @ApiPropertyOptional({ nullable: true, type: String, description: 'ISO 8601' })
+  desbloqueadaEm!: string | null;
+  @ApiPropertyOptional({ nullable: true, type: String }) iconeUrl!: string | null;
+  @ApiPropertyOptional({
+    nullable: true,
+    type: Number,
+    description: '% dos jogadores que a têm, com 1 casa; null quando indisponível',
+  })
+  raridadePercentual!: number | null;
+}
+
+export class DetalheJogoPlataformaDto {
+  @ApiProperty({ type: DadosJogoPlataformaDto }) dados!: DadosJogoPlataformaDto;
+  @ApiProperty({
+    type: [ConquistaDto],
+    description: 'Vazia com aviso (privado, sem conquistas ou plataforma indisponível)',
+  })
+  conquistas!: ConquistaDto[];
+  @ApiPropertyOptional({
+    nullable: true,
+    type: String,
+    enum: ['PERFIL_PRIVADO', 'CONQUISTAS_PRIVADAS', 'SEM_CONQUISTAS', 'INDISPONIVEL'],
+  })
+  aviso!: string | null;
+}

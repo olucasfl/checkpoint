@@ -55,6 +55,7 @@ function montar() {
       findMany: jest.fn(),
       findUnique: jest.fn(),
       create: jest.fn(),
+      update: jest.fn(),
       deleteMany: jest.fn(),
     },
     $transaction: jest.fn((operacoes: Promise<unknown>[]) => Promise.all(operacoes)),
@@ -75,6 +76,7 @@ function montar() {
     concluirVinculo: jest.fn(),
     listarBiblioteca: jest.fn(),
     obterJogo: jest.fn(),
+    obterDetalhe: jest.fn(),
   };
   const registry = new ProviderRegistry([provider as unknown as GameProvider]);
   const vinculoState = new VinculoStateService(jwt, config as never);
@@ -1289,5 +1291,224 @@ describe('IntegrationsService.desvincularJogo (CA-31)', () => {
       message: 'Jogo não encontrado',
     });
     expect(ctx.prisma.jogoPlataforma.deleteMany).not.toHaveBeenCalled();
+  });
+});
+
+describe('IntegrationsService.detalheDoJogo e atualizarJogo (etapa 4, CA-43 a CA-49)', () => {
+  const GAME = '33333333-3333-4333-8333-333333333333';
+  const APP = '504230';
+  const HORA = 60 * 60_000;
+
+  function gravado(idadeMs: number, extra: Record<string, unknown> = {}) {
+    return {
+      provedor: 'STEAM',
+      idExterno: APP,
+      minutosJogados: 5,
+      ultimaVezJogadoEm: null,
+      conquistasTotal: 3,
+      conquistasDesbloqueadas: 1,
+      capaUrl: null,
+      atualizadoEm: new Date(NOW - idadeMs),
+      ...extra,
+    };
+  }
+
+  function comVinculo(idadeMs: number) {
+    const ctx = montar();
+    ctx.prisma.game.findFirst.mockResolvedValue({ id: GAME });
+    ctx.prisma.contaVinculada.findUnique.mockResolvedValue({
+      idExterno: STEAM_ID,
+      nomeExibicao: 'x',
+    });
+    ctx.prisma.jogoPlataforma.findUnique.mockResolvedValue(gravado(idadeMs));
+    ctx.prisma.jogoPlataforma.update.mockImplementation(({ data }: { data: object }) =>
+      Promise.resolve({ ...gravado(idadeMs), ...data }),
+    );
+    ctx.provider.obterDetalhe.mockResolvedValue({
+      horas: null,
+      conquistasTotal: 3,
+      conquistasDesbloqueadas: 1,
+      conquistas: [],
+      aviso: null,
+    });
+    return ctx;
+  }
+
+  const horas = {
+    minutosJogados: 600,
+    ultimaVezJogadoEm: new Date('2026-02-01T00:00:00Z'),
+    capaUrl: 'https://cdn.cloudflare.steamstatic.com/steam/apps/504230/library_600x900.jpg',
+  };
+
+  it('GET: só reconsulta as horas se o dado é MAIS VELHO que 1 h (1 h exata ainda não)', async () => {
+    const exata = comVinculo(HORA);
+    await exata.service.detalheDoJogo(ANA, 'STEAM', GAME);
+    expect(exata.provider.obterDetalhe).toHaveBeenCalledWith(STEAM_ID, APP, {
+      comHoras: false,
+      ignorarCache: false,
+    });
+
+    const velho = comVinculo(HORA + 1);
+    await velho.service.detalheDoJogo(ANA, 'STEAM', GAME);
+    expect(velho.provider.obterDetalhe).toHaveBeenCalledWith(STEAM_ID, APP, {
+      comHoras: true,
+      ignorarCache: false,
+    });
+  });
+
+  it('POST: antes de 30 s não reconsulta as horas nem ignora o cache; a partir de 30 s, sim', async () => {
+    const cedo = comVinculo(29_999);
+    await cedo.service.atualizarJogo(ANA, 'STEAM', GAME);
+    expect(cedo.provider.obterDetalhe).toHaveBeenCalledWith(STEAM_ID, APP, {
+      comHoras: false,
+      ignorarCache: false,
+    });
+
+    const tarde = comVinculo(30_000);
+    await tarde.service.atualizarJogo(ANA, 'STEAM', GAME);
+    expect(tarde.provider.obterDetalhe).toHaveBeenCalledWith(STEAM_ID, APP, {
+      comHoras: true,
+      ignorarCache: true,
+    });
+  });
+
+  it('jogo de outro usuário ou sem vínculo → 404 e a plataforma nem é chamada', async () => {
+    const outro = comVinculo(0);
+    outro.prisma.game.findFirst.mockResolvedValue(null);
+    await expect(outro.service.detalheDoJogo(BIA, 'STEAM', GAME)).rejects.toMatchObject({
+      status: 404,
+      message: 'Jogo não encontrado',
+    });
+    await expect(outro.service.atualizarJogo(BIA, 'STEAM', GAME)).rejects.toMatchObject({
+      status: 404,
+    });
+    expect(outro.prisma.jogoPlataforma.findUnique).not.toHaveBeenCalled();
+    expect(outro.provider.obterDetalhe).not.toHaveBeenCalled();
+
+    const sem = comVinculo(0);
+    sem.prisma.jogoPlataforma.findUnique.mockResolvedValue(null);
+    await expect(statusEcodeDe(sem.service.detalheDoJogo(ANA, 'STEAM', GAME))).resolves.toEqual({
+      status: 404,
+      code: 'PLATAFORMA_VINCULO_NAO_ENCONTRADO',
+    });
+    await expect(statusEcodeDe(sem.service.atualizarJogo(ANA, 'STEAM', GAME))).resolves.toEqual({
+      status: 404,
+      code: 'PLATAFORMA_VINCULO_NAO_ENCONTRADO',
+    });
+    expect(sem.provider.obterDetalhe).not.toHaveBeenCalled();
+  });
+
+  it('grava só o que mudou: mesmas contagens e sem horas novas → nenhuma escrita', async () => {
+    const ctx = comVinculo(10 * 60_000);
+
+    await ctx.service.detalheDoJogo(ANA, 'STEAM', GAME);
+
+    expect(ctx.prisma.jogoPlataforma.update).not.toHaveBeenCalled();
+  });
+
+  it('contagens novas sem horas novas: grava as contagens e NÃO mexe no atualizadoEm', async () => {
+    const ctx = comVinculo(10 * 60_000);
+    ctx.provider.obterDetalhe.mockResolvedValue({
+      horas: null,
+      conquistasTotal: 3,
+      conquistasDesbloqueadas: 2,
+      conquistas: [],
+      aviso: null,
+    });
+
+    const detalhe = await ctx.service.detalheDoJogo(ANA, 'STEAM', GAME);
+
+    expect(ctx.prisma.jogoPlataforma.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { conquistasTotal: 3, conquistasDesbloqueadas: 2 } }),
+    );
+    expect(detalhe.dados.conquistasDesbloqueadas).toBe(2);
+    expect(detalhe.dados.atualizadoEm).toBe(new Date(NOW - 10 * 60_000).toISOString());
+  });
+
+  it('com horas novas: grava as horas, a capa e o atualizadoEm novo (CA-43)', async () => {
+    const ctx = comVinculo(2 * HORA);
+    ctx.provider.obterDetalhe.mockResolvedValue({
+      horas,
+      conquistasTotal: 3,
+      conquistasDesbloqueadas: 1,
+      conquistas: [],
+      aviso: null,
+    });
+
+    const detalhe = await ctx.service.detalheDoJogo(ANA, 'STEAM', GAME);
+
+    expect(ctx.prisma.jogoPlataforma.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { gameId_provedor: { gameId: GAME, provedor: 'STEAM' } },
+        data: { ...horas, atualizadoEm: new Date(NOW) },
+      }),
+    );
+    expect(detalhe.dados.minutosJogados).toBe(600);
+    expect(detalhe.dados.atualizadoEm).toBe(new Date(NOW).toISOString());
+  });
+
+  it('(SIMULADO, sem fixture real) conquistas negadas: as horas gravam e as contagens antigas ficam (CA-47)', async () => {
+    const ctx = comVinculo(2 * HORA);
+    ctx.provider.obterDetalhe.mockResolvedValue({
+      horas,
+      conquistasTotal: null,
+      conquistasDesbloqueadas: null,
+      conquistas: [],
+      aviso: 'CONQUISTAS_PRIVADAS',
+    });
+
+    const detalhe = await ctx.service.detalheDoJogo(ANA, 'STEAM', GAME);
+
+    const { data } = ctx.prisma.jogoPlataforma.update.mock.calls[0]?.[0] as {
+      data: Record<string, unknown>;
+    };
+    expect(data).not.toHaveProperty('conquistasTotal');
+    expect(data).not.toHaveProperty('conquistasDesbloqueadas');
+    expect(detalhe).toMatchObject({
+      aviso: 'CONQUISTAS_PRIVADAS',
+      conquistas: [],
+      dados: { minutosJogados: 600, conquistasTotal: 3, conquistasDesbloqueadas: 1 },
+    });
+  });
+
+  it.each([
+    ['Steam indisponível', new PlataformaIndisponivelError(), 'INDISPONIVEL'],
+    ['Steam no limite', new PlataformaLimiteError(), 'INDISPONIVEL'],
+    ['item fora da biblioteca', new PlataformaItemNaoEncontradoError(), 'INDISPONIVEL'],
+    ['perfil privado (SIMULADO, sem fixture real)', new PerfilPrivadoError(), 'PERFIL_PRIVADO'],
+  ])(
+    'GET com a plataforma falhando (%s): 200 com o valor gravado e aviso %s, sem escrever nada, nunca 502 (CA-49)',
+    async (_nome, erro, aviso) => {
+      const ctx = comVinculo(2 * HORA);
+      ctx.provider.obterDetalhe.mockRejectedValue(erro);
+
+      const detalhe = await ctx.service.detalheDoJogo(ANA, 'STEAM', GAME);
+
+      expect(detalhe).toEqual({
+        dados: expect.objectContaining({ minutosJogados: 5, idExterno: APP }),
+        conquistas: [],
+        aviso,
+      });
+      expect(ctx.prisma.jogoPlataforma.update).not.toHaveBeenCalled();
+      const logs = logCalls.join('\n');
+      expect(logs).toContain(erro.constructor.name);
+      expect(logs).not.toContain(STEAM_ID);
+      expect(logs).not.toContain(APP);
+    },
+  );
+
+  it('POST com a plataforma falhando: o erro SOBE (502 ou 409), nada é gravado', async () => {
+    const indisponivel = comVinculo(HORA);
+    indisponivel.provider.obterDetalhe.mockRejectedValue(new PlataformaIndisponivelError());
+    await expect(indisponivel.service.atualizarJogo(ANA, 'STEAM', GAME)).rejects.toBeInstanceOf(
+      PlataformaIndisponivelError,
+    );
+    expect(indisponivel.prisma.jogoPlataforma.update).not.toHaveBeenCalled();
+
+    const limite = comVinculo(HORA);
+    limite.provider.obterDetalhe.mockRejectedValue(new PlataformaLimiteError());
+    await expect(limite.service.atualizarJogo(ANA, 'STEAM', GAME)).rejects.toBeInstanceOf(
+      PlataformaLimiteError,
+    );
   });
 });
