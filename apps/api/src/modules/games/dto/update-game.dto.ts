@@ -1,32 +1,22 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import {
-  IsIn,
-  IsInt,
-  IsNotEmpty,
-  IsOptional,
-  IsString,
-  Max,
-  MaxLength,
-  Min,
-  ValidateIf,
-} from 'class-validator';
+import { IsIn, IsNotEmpty, IsOptional, IsString, MaxLength, ValidateIf } from 'class-validator';
 import {
   GAME_PLATFORM_MAX_LENGTH,
-  GAME_RATING_MAX,
-  GAME_RATING_MIN,
   GAME_STATUS,
   GAME_TITLE_MAX_LENGTH,
   type GameStatus,
   type UpdateGameRequest,
 } from '@checkpoint/shared';
 import { RawValue, TrimString } from '../../../common/dto/transforms';
+import { GameRatingFieldsDto } from './rating-fields.dto';
 
 /**
  * Todos os campos são opcionais, mas `titulo` e `status` NÃO aceitam `null`: por isso usam
  * `@ValidateIf` (só pula `undefined`) em vez de `@IsOptional` (que também pularia `null`).
- * Só `plataforma` e `nota` aceitam `null`, que remove o valor.
+ * Só `plataforma`, os critérios de nota e `descricao` (herdados de `GameRatingFieldsDto`) aceitam `null`,
+ * que remove o valor.
  */
-export class UpdateGameDto implements UpdateGameRequest {
+export class UpdateGameDto extends GameRatingFieldsDto implements UpdateGameRequest {
   @ApiPropertyOptional({ example: 'Hollow Knight', maxLength: GAME_TITLE_MAX_LENGTH })
   @ValidateIf((_, value: unknown) => value !== undefined)
   @TrimString()
@@ -57,26 +47,4 @@ export class UpdateGameDto implements UpdateGameRequest {
     message: `A plataforma deve ter no máximo ${GAME_PLATFORM_MAX_LENGTH} caracteres`,
   })
   plataforma?: string | null;
-
-  @ApiPropertyOptional({
-    type: Number,
-    nullable: true,
-    minimum: GAME_RATING_MIN,
-    maximum: GAME_RATING_MAX,
-    example: 8,
-    description:
-      'null remove a nota. Só pode existir se o status FINAL do jogo for ZERADO ou JOGANDO.',
-  })
-  @IsOptional()
-  @RawValue()
-  @IsInt({
-    message: `A nota deve ser um número inteiro de ${GAME_RATING_MIN} a ${GAME_RATING_MAX}`,
-  })
-  @Min(GAME_RATING_MIN, {
-    message: `A nota deve ser um número inteiro de ${GAME_RATING_MIN} a ${GAME_RATING_MAX}`,
-  })
-  @Max(GAME_RATING_MAX, {
-    message: `A nota deve ser um número inteiro de ${GAME_RATING_MIN} a ${GAME_RATING_MAX}`,
-  })
-  nota?: number | null;
 }

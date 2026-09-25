@@ -22,7 +22,8 @@ async function rejection(body: unknown): Promise<ApiErrorResponse> {
 describe('UpdateGameDto', () => {
   it('aceita qualquer subconjunto dos campos', async () => {
     await expect(parse({ status: 'JOGANDO' })).resolves.toMatchObject({ status: 'JOGANDO' });
-    await expect(parse({ nota: 5 })).resolves.toMatchObject({ nota: 5 });
+    await expect(parse({ gameplay: 5 })).resolves.toMatchObject({ gameplay: 5 });
+    await expect(parse({ descricao: ' Texto ' })).resolves.toMatchObject({ descricao: 'Texto' });
     await expect(parse({ titulo: '  Celeste  ' })).resolves.toMatchObject({ titulo: 'Celeste' });
   });
 
@@ -32,11 +33,28 @@ describe('UpdateGameDto', () => {
     expect(Object.values(dto).every((value) => value === undefined)).toBe(true);
   });
 
-  it('aceita null so em plataforma e nota (CA-10, CA-11)', async () => {
-    const dto = await parse({ plataforma: null, nota: null });
+  it('aceita null em plataforma, nos cinco criterios e na descricao (CA-10, CA-11)', async () => {
+    const dto = await parse({
+      plataforma: null,
+      gameplay: null,
+      historia: null,
+      graficos: null,
+      trilhaSonora: null,
+      performance: null,
+      descricao: null,
+    });
 
     expect(dto.plataforma).toBeNull();
-    expect(dto.nota).toBeNull();
+    for (const chave of [
+      'gameplay',
+      'historia',
+      'graficos',
+      'trilhaSonora',
+      'performance',
+    ] as const) {
+      expect(dto[chave]).toBeNull();
+    }
+    expect(dto.descricao).toBeNull();
   });
 
   it('rejeita titulo null com fields.titulo (CA-52)', async () => {
@@ -56,13 +74,22 @@ describe('UpdateGameDto', () => {
     ['titulo so com espacos', { titulo: '   ' }, 'titulo'],
     ['titulo com 121 caracteres', { titulo: 'a'.repeat(121) }, 'titulo'],
     ['status inexistente', { status: 'PAUSADO' }, 'status'],
-    ['nota 11', { nota: 11 }, 'nota'],
-    ['nota fracionada', { nota: 7.5 }, 'nota'],
+    ['gameplay 11', { gameplay: 11 }, 'gameplay'],
+    ['historia com 2 casas', { historia: 7.55 }, 'historia'],
+    ['graficos em texto', { graficos: '8' }, 'graficos'],
+    ['descricao com 1001 caracteres', { descricao: 'a'.repeat(1001) }, 'descricao'],
     ['plataforma com 61 caracteres', { plataforma: 'p'.repeat(61) }, 'plataforma'],
   ])('rejeita %s com fields.%s (CA-25)', async (_nome, body, campo) => {
     const error = await rejection(body);
 
     expect(error.fields).toHaveProperty(campo);
+  });
+
+  it('aceita 7,5 (uma casa) e rejeita o campo antigo nota (CA-04, CA-12)', async () => {
+    await expect(parse({ gameplay: 7.5 })).resolves.toMatchObject({ gameplay: 7.5 });
+
+    const error = await rejection({ nota: 5 });
+    expect(error.message).toContain('nota');
   });
 
   it('rejeita campo nao declarado', async () => {

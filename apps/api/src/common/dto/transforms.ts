@@ -21,6 +21,19 @@ export const TrimString = () =>
     }),
   );
 
+/**
+ * Texto de várias linhas (a descrição do jogo): `\r\n` e `\r` viram `\n` (os limites valem igual em
+ * qualquer navegador) e as pontas são aparadas; as quebras do meio são preservadas.
+ */
+export const TrimText = () =>
+  applyDecorators(
+    Type(() => Object),
+    Transform(({ obj, key }: TransformFnParams) => {
+      const raw: unknown = obj[key];
+      return typeof raw === 'string' ? raw.replace(/\r\n?/g, '\n').trim() : raw;
+    }),
+  );
+
 /** Mantém o valor exatamente como veio no body/query (sem conversão implícita de tipo). */
 export const RawValue = () =>
   applyDecorators(

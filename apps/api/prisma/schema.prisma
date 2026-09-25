@@ -19,15 +19,25 @@ enum GameStatus {
 }
 
 model Game {
-  id         String     @id @default(uuid())
+  id               String     @id @default(uuid())
   // Gravados ja aparados (trim) pelo GamesService.
-  titulo     String     @db.VarChar(120)
+  titulo           String     @db.VarChar(120)
   // "" significa "sem plataforma" (a API expoe null). Guardar "" em vez de NULL faz o par de
   // unicidade abaixo tratar jogo sem plataforma como uma plataforma "vazia": no Postgres,
   // NULL nunca conflita com NULL.
-  plataforma String     @default("") @db.VarChar(60)
-  status     GameStatus
-  nota       Int?
+  plataforma       String     @default("") @db.VarChar(60)
+  status           GameStatus
+  // Notas por criterio (spec avaliacao-de-jogos), em DECIMOS: 0 a 100 no banco, 0 a 10 na API (73 = 7,3).
+  // Inteiros evitam Decimal e ponto flutuante; a conversao fica so no GamesService. A nota geral nao e
+  // gravada: e a media calculada por notaMedia() do shared. CHECKs (faixa e Quero jogar sem nota) na migration.
+  notaGameplay     Int?
+  notaHistoria     Int?
+  notaGraficos     Int?
+  notaTrilhaSonora Int?
+  notaPerformance  Int?
+
+  // Texto simples (sem Markdown nem HTML), aparado; vazio vira NULL no service.
+  descricao String? @db.VarChar(1000)
 
   // Chaves de comparacao da unicidade (titulo/plataforma em minusculas), preenchidas pelo
   // GamesService a partir do estado final. Colunas normalizadas em vez de um indice com lower()

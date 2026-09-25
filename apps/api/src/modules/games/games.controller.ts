@@ -73,7 +73,8 @@ export class GamesController {
   @ApiCreatedResponse({ type: GameResponseDto })
   @ApiBadRequestResponse({
     type: ApiErrorResponseDto,
-    description: 'Payload inválido, campo desconhecido ou nota com status QUERO_JOGAR',
+    description:
+      'Payload inválido, campo desconhecido (inclusive o antigo `nota`), nota com status QUERO_JOGAR ou Zerado sem nenhum critério',
   })
   @ApiConflictResponse({
     type: ApiErrorResponseDto,
@@ -90,15 +91,18 @@ export class GamesController {
   @ApiOperation({
     summary: 'Edita um jogo (parcial)',
     description:
-      'Envie ao menos um campo. Só `plataforma` e `nota` aceitam `null`. A regra da nota vale ' +
-      'para o estado final do jogo: `{ "status": "QUERO_JOGAR" }` num jogo com nota é rejeitado, ' +
-      'a menos que o mesmo body traga `"nota": null`. A capa não passa por aqui: use `PUT /games/:id/capa`.',
+      'Envie ao menos um campo. Só `plataforma`, os cinco critérios de nota (`gameplay`, `historia`, ' +
+      '`graficos`, `trilhaSonora`, `performance`) e `descricao` aceitam `null`. Quero jogar vale para o ' +
+      'estado final do jogo: `{ "status": "QUERO_JOGAR" }` num jogo com nota é rejeitado, a menos que o ' +
+      'mesmo body traga todos os critérios como `null`. "Zerado exige ao menos 1 critério" só vale quando ' +
+      'a escrita muda o status para Zerado ou o valor de algum critério (o campo vir no body não conta). ' +
+      'A capa não passa por aqui: use `PUT /games/:id/capa`.',
   })
   @ApiOkResponse({ type: GameResponseDto })
   @ApiBadRequestResponse({
     type: ApiErrorResponseDto,
     description:
-      'Payload inválido, body vazio, id que não é UUID ou nota incompatível com o status',
+      'Payload inválido, body vazio, id que não é UUID ou notas incompatíveis com o status (`fields.notas` quando é Zerado sem critério)',
   })
   @ApiNotFoundResponse({ description: 'Jogo não encontrado (inclusive jogo de outro usuário)' })
   @ApiConflictResponse({

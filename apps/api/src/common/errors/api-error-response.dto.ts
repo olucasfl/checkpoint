@@ -10,7 +10,8 @@ export class ApiErrorResponseDto implements ApiErrorResponse {
   message!: string;
 
   @ApiPropertyOptional({
-    description: 'Mensagem por campo (titulo, plataforma, status, nota).',
+    description:
+      'Mensagem por campo (titulo, plataforma, status, os critérios de nota, notas, descricao).',
     type: 'object',
     additionalProperties: { type: 'string' },
     example: { titulo: 'Já existe esse jogo nesta plataforma' },

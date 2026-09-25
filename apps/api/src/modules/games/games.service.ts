@@ -2,26 +2,36 @@ import { randomUUID } from 'node:crypto';
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Prisma, type Game as GameRow } from '@prisma/client';
 import {
+  GAME_RATING_KEYS,
+  notaMedia,
   statusAllowsRating,
   type CreateGameRequest,
   type Game,
   type GameStatus,
   type UpdateGameRequest,
 } from '@checkpoint/shared';
-import { badRequestError, conflictError } from '../../common/errors/api-error';
+import { badRequestError, conflictError, type ApiFieldErrors } from '../../common/errors/api-error';
 import { PrismaService } from '../../database/prisma.service';
 import { COVER_INVALID_TYPE, COVER_MISSING } from './cover/cover-messages';
 import { detectImageType } from './cover/image-signature';
 import { StorageService } from './cover/storage.service';
+import { columnsOfTenths, ratingsOfRow, tenthsOfRow, toTenths, type Tenths } from './lib/ratings';
 
 const GAME_NOT_FOUND = 'Jogo não encontrado';
 const DUPLICATE_GAME = 'Já existe esse jogo nesta plataforma';
-const RATING_NOT_ALLOWED = 'Nota só pode ser preenchida quando o status é Zerado ou Jogando';
+const RATINGS_NOT_ALLOWED = 'Notas só podem ser preenchidas quando o status é Zerado ou Jogando';
+const ZERADO_NEEDS_RATING = 'Preencha ao menos um critério para marcar como Zerado';
 const EMPTY_UPDATE = 'Informe ao menos um campo para atualizar';
 
 /** Gravados aparados; plataforma ausente, null ou só espaços vira "". */
 function cleanTitle(titulo: string): string {
   return titulo.trim();
+}
+
+/** A descrição chega aparada pelo DTO; vazia, só espaços ou null viram `null` (sem descrição). */
+function cleanDescription(descricao: string | null | undefined): string | null {
+  const texto = (descricao ?? '').trim();
+  return texto === '' ? null : texto;
 }
 
 function cleanPlatform(plataforma: string | null | undefined): string {
@@ -66,9 +76,13 @@ export class GamesService {
   async create(userId: string, dto: CreateGameRequest): Promise<Game> {
     const titulo = cleanTitle(dto.titulo);
     const plataforma = cleanPlatform(dto.plataforma);
-    const nota = dto.nota ?? null;
+    const notas = {} as Tenths;
+    for (const key of GAME_RATING_KEYS) {
+      notas[key] = toTenths(dto[key]);
+    }
 
-    this.assertRatingAllowed(dto.status, nota);
+    // Criar sempre "mexe" nas notas: um Zerado novo precisa de ao menos um critério.
+    this.assertRatingsAllowed(dto.status, notas, true);
     await this.assertNotDuplicate(userId, titulo, plataforma);
 
     try {
@@ -78,7 +92,8 @@ export class GamesService {
           titulo,
           plataforma,
           status: dto.status,
-          nota,
+          ...columnsOfTenths(notas),
+          descricao: cleanDescription(dto.descricao),
           ...uniquenessKeys(titulo, plataforma),
         },
       });
@@ -101,15 +116,36 @@ export class GamesService {
     const plataforma =
       dto.plataforma !== undefined ? cleanPlatform(dto.plataforma) : current.plataforma;
     const status = dto.status ?? current.status;
-    const nota = dto.nota !== undefined ? dto.nota : current.nota;
+    const gravadas = tenthsOfRow(current);
+    const notas: Tenths = { ...gravadas };
+    for (const key of GAME_RATING_KEYS) {
+      if (dto[key] !== undefined) {
+        notas[key] = toTenths(dto[key]);
+      }
+    }
+    const descricao =
+      dto.descricao !== undefined ? cleanDescription(dto.descricao) : current.descricao;
 
-    this.assertRatingAllowed(status, nota);
+    // "Zerado exige ao menos 1 critério" vale quando a escrita MUDA o status para Zerado ou o VALOR de
+    // algum critério em relação ao gravado. Presença no body não conta: o formulário envia tudo a cada
+    // salvamento, e assim os jogos Zerado sem notas (as antigas foram descartadas) continuam editáveis.
+    const virouZerado = status === 'ZERADO' && current.status !== 'ZERADO';
+    const notaMudou = GAME_RATING_KEYS.some((key) => notas[key] !== gravadas[key]);
+
+    this.assertRatingsAllowed(status, notas, virouZerado || notaMudou);
     await this.assertNotDuplicate(userId, titulo, plataforma, id);
 
     try {
       const row = await this.prisma.game.update({
         where: { id, userId },
-        data: { titulo, plataforma, status, nota, ...uniquenessKeys(titulo, plataforma) },
+        data: {
+          titulo,
+          plataforma,
+          status,
+          ...columnsOfTenths(notas),
+          descricao,
+          ...uniquenessKeys(titulo, plataforma),
+        },
       });
       return this.toGame(row);
     } catch (error) {
@@ -220,12 +256,15 @@ export class GamesService {
    * saem: os campos da resposta são listados um a um.
    */
   private toGame(row: GameRow): Game {
+    const notas = ratingsOfRow(row);
     return {
       id: row.id,
       titulo: row.titulo,
       plataforma: row.plataforma === '' ? null : row.plataforma,
       status: row.status,
-      nota: row.nota,
+      notas,
+      notaMedia: notaMedia(notas),
+      descricao: row.descricao,
       capaUrl: row.capaPath ? this.storage.publicUrl(row.capaPath) : null,
       criadoEm: row.criadoEm.toISOString(),
       atualizadoEm: row.atualizadoEm.toISOString(),
@@ -249,9 +288,24 @@ export class GamesService {
     }
   }
 
-  private assertRatingAllowed(status: GameStatus, nota: number | null): void {
-    if (nota !== null && !statusAllowsRating(status)) {
-      throw badRequestError(RATING_NOT_ALLOWED, { nota: RATING_NOT_ALLOWED });
+  /**
+   * As regras das notas sobre o estado final. Quero jogar não tem nenhuma (sempre valida); Zerado exige ao
+   * menos um critério só quando `exigeZerado` (a escrita mexeu no status ou numa nota). A faixa e o passo
+   * de cada critério já foram validados no DTO.
+   */
+  private assertRatingsAllowed(status: GameStatus, notas: Tenths, exigeZerado: boolean): void {
+    const preenchidos = GAME_RATING_KEYS.filter((key) => notas[key] !== null);
+
+    if (preenchidos.length > 0 && !statusAllowsRating(status)) {
+      const fields: ApiFieldErrors = {};
+      for (const key of preenchidos) {
+        fields[key] = RATINGS_NOT_ALLOWED;
+      }
+      throw badRequestError(RATINGS_NOT_ALLOWED, fields);
+    }
+
+    if (status === 'ZERADO' && exigeZerado && preenchidos.length === 0) {
+      throw badRequestError(ZERADO_NEEDS_RATING, { notas: ZERADO_NEEDS_RATING });
     }
   }
 

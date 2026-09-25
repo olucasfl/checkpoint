@@ -1,26 +1,16 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import {
-  IsIn,
-  IsInt,
-  IsNotEmpty,
-  IsOptional,
-  IsString,
-  Max,
-  MaxLength,
-  Min,
-} from 'class-validator';
+import { IsIn, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 import {
   GAME_PLATFORM_MAX_LENGTH,
-  GAME_RATING_MAX,
-  GAME_RATING_MIN,
   GAME_STATUS,
   GAME_TITLE_MAX_LENGTH,
   type CreateGameRequest,
   type GameStatus,
 } from '@checkpoint/shared';
 import { RawValue, TrimString } from '../../../common/dto/transforms';
+import { GameRatingFieldsDto } from './rating-fields.dto';
 
-export class CreateGameDto implements CreateGameRequest {
+export class CreateGameDto extends GameRatingFieldsDto implements CreateGameRequest {
   @ApiProperty({ example: 'Hollow Knight', maxLength: GAME_TITLE_MAX_LENGTH })
   @TrimString()
   @IsString({ message: 'Informe o título' })
@@ -49,25 +39,4 @@ export class CreateGameDto implements CreateGameRequest {
     message: `A plataforma deve ter no máximo ${GAME_PLATFORM_MAX_LENGTH} caracteres`,
   })
   plataforma?: string | null;
-
-  @ApiPropertyOptional({
-    type: Number,
-    nullable: true,
-    minimum: GAME_RATING_MIN,
-    maximum: GAME_RATING_MAX,
-    example: 9,
-    description: 'Só com status ZERADO ou JOGANDO.',
-  })
-  @IsOptional()
-  @RawValue()
-  @IsInt({
-    message: `A nota deve ser um número inteiro de ${GAME_RATING_MIN} a ${GAME_RATING_MAX}`,
-  })
-  @Min(GAME_RATING_MIN, {
-    message: `A nota deve ser um número inteiro de ${GAME_RATING_MIN} a ${GAME_RATING_MAX}`,
-  })
-  @Max(GAME_RATING_MAX, {
-    message: `A nota deve ser um número inteiro de ${GAME_RATING_MIN} a ${GAME_RATING_MAX}`,
-  })
-  nota?: number | null;
 }

@@ -29,10 +29,16 @@ describe('CreateGameDto', () => {
     expect(dto).toMatchObject(valid);
   });
 
-  it('aceita plataforma e nota (CA-02)', async () => {
-    const dto = await parse({ titulo: 'Celeste', status: 'ZERADO', plataforma: 'PC', nota: 9 });
+  it('aceita plataforma e notas por critério (CA-01)', async () => {
+    const dto = await parse({
+      titulo: 'Celeste',
+      status: 'ZERADO',
+      plataforma: 'PC',
+      gameplay: 9,
+      historia: 8.5,
+    });
 
-    expect(dto).toMatchObject({ plataforma: 'PC', nota: 9 });
+    expect(dto).toMatchObject({ plataforma: 'PC', gameplay: 9, historia: 8.5 });
   });
 
   it('apara espacos nas pontas do titulo e da plataforma (CA-03)', async () => {
@@ -48,11 +54,19 @@ describe('CreateGameDto', () => {
     expect(dto.plataforma).toBe('');
   });
 
-  it('aceita plataforma null e nota null', async () => {
-    const dto = await parse({ ...valid, plataforma: null, nota: null });
+  it('aceita null em plataforma, nas notas e na descricao', async () => {
+    const dto = await parse({
+      ...valid,
+      plataforma: null,
+      gameplay: null,
+      trilhaSonora: null,
+      descricao: null,
+    });
 
     expect(dto.plataforma).toBeNull();
-    expect(dto.nota).toBeNull();
+    expect(dto.gameplay).toBeNull();
+    expect(dto.trilhaSonora).toBeNull();
+    expect(dto.descricao).toBeNull();
   });
 
   it.each([
@@ -87,19 +101,65 @@ describe('CreateGameDto', () => {
 
   it.each([
     ['11', 11],
+    ['10,1', 10.1],
     ['-1', -1],
-    ['7.5', 7.5],
+    ['-0,1', -0.1],
+    ['7,55 (2 casas)', 7.55],
+    ['0,01', 0.01],
     ['texto numerico "7"', '7'],
+    ['texto com virgula "7,3"', '7,3'],
     ['booleano', true],
-  ])('rejeita nota %s com fields.nota (CA-16)', async (_nome, nota) => {
-    const error = await rejection({ ...valid, nota });
+    ['objeto', { valor: 7 }],
+  ])('rejeita nota %s com fields.gameplay (CA-04)', async (_nome, gameplay) => {
+    const error = await rejection({ ...valid, gameplay });
 
-    expect(error.fields?.nota).toEqual(expect.any(String));
+    expect(error.fields?.gameplay).toBe(
+      'A nota de Gameplay deve ser um número de 0 a 10, com no máximo 1 casa decimal',
+    );
   });
 
-  it('aceita os limites da nota: 0 e 10', async () => {
-    await expect(parse({ ...valid, nota: 0 })).resolves.toMatchObject({ nota: 0 });
-    await expect(parse({ ...valid, nota: 10 })).resolves.toMatchObject({ nota: 10 });
+  it.each(['gameplay', 'historia', 'graficos', 'trilhaSonora', 'performance'] as const)(
+    'valida o criterio %s com a mensagem do proprio rotulo',
+    async (chave) => {
+      const error = await rejection({ ...valid, [chave]: 11 });
+
+      expect(Object.keys(error.fields ?? {})).toEqual([chave]);
+    },
+  );
+
+  it('aceita os limites (0 e 10) e uma casa decimal (7,3), sem erro de ponto flutuante', async () => {
+    await expect(parse({ ...valid, gameplay: 0 })).resolves.toMatchObject({ gameplay: 0 });
+    await expect(parse({ ...valid, gameplay: 10 })).resolves.toMatchObject({ gameplay: 10 });
+    await expect(parse({ ...valid, historia: 7.3 })).resolves.toMatchObject({ historia: 7.3 });
+    await expect(parse({ ...valid, graficos: 0.1 })).resolves.toMatchObject({ graficos: 0.1 });
+    await expect(parse({ ...valid, performance: 9.9 })).resolves.toMatchObject({
+      performance: 9.9,
+    });
+  });
+
+  it('descricao: apara as pontas, preserva as quebras e normaliza CRLF (CA-11)', async () => {
+    const dto = await parse({ ...valid, descricao: '  Ótimo\r\n\r\njogo\n  ' });
+
+    expect(dto.descricao).toBe('Ótimo\n\njogo');
+  });
+
+  it('descricao: 1000 caracteres passa e 1001 nao (CA-11)', async () => {
+    await expect(parse({ ...valid, descricao: 'a'.repeat(1000) })).resolves.toBeDefined();
+
+    const error = await rejection({ ...valid, descricao: 'a'.repeat(1001) });
+    expect(error.fields?.descricao).toBe('A descrição deve ter no máximo 1000 caracteres');
+  });
+
+  it('descricao que nao e texto falha', async () => {
+    const error = await rejection({ ...valid, descricao: 42 });
+
+    expect(error.fields?.descricao).toEqual(expect.any(String));
+  });
+
+  it('rejeita o campo antigo nota e o cita na message (CA-12)', async () => {
+    const error = await rejection({ ...valid, nota: 8 });
+
+    expect(error.message).toContain('nota');
   });
 
   it('rejeita plataforma com 61 caracteres com fields.plataforma (CA-17)', async () => {
@@ -123,8 +183,8 @@ describe('CreateGameDto', () => {
   });
 
   it('acumula erros de mais de um campo', async () => {
-    const error = await rejection({ titulo: '', status: 'PAUSADO', nota: 99 });
+    const error = await rejection({ titulo: '', status: 'PAUSADO', gameplay: 99 });
 
-    expect(Object.keys(error.fields ?? {}).sort()).toEqual(['nota', 'status', 'titulo']);
+    expect(Object.keys(error.fields ?? {}).sort()).toEqual(['gameplay', 'status', 'titulo']);
   });
 });

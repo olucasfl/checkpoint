@@ -10,7 +10,8 @@ import { ANA_ID, BIA_ID, startGamesApp } from './testing/games-http-app';
  */
 const ID = '3f2b8a52-9c1e-4d6a-8f31-0a7e5b2c9d44';
 const DUPLICATE = 'Já existe esse jogo nesta plataforma';
-const RATING = 'Nota só pode ser preenchida quando o status é Zerado ou Jogando';
+const RATINGS = 'Notas só podem ser preenchidas quando o status é Zerado ou Jogando';
+const ZERADO_NEEDS = 'Preencha ao menos um critério para marcar como Zerado';
 
 const game = {
   findMany: jest.fn(),
@@ -34,7 +35,12 @@ function row(overrides: Partial<GameRow> = {}): GameRow {
     titulo: 'Hollow Knight',
     plataforma: '',
     status: 'JOGANDO',
-    nota: null,
+    notaGameplay: null,
+    notaHistoria: null,
+    notaGraficos: null,
+    notaTrilhaSonora: null,
+    notaPerformance: null,
+    descricao: null,
     capaPath: null,
     tituloNormalizado: 'hollow knight',
     plataformaNormalizada: '',
@@ -118,7 +124,15 @@ describe('GET /api/games', () => {
         titulo: 'Hollow Knight',
         plataforma: null,
         status: 'JOGANDO',
-        nota: null,
+        notas: {
+          gameplay: null,
+          historia: null,
+          graficos: null,
+          trilhaSonora: null,
+          performance: null,
+        },
+        notaMedia: null,
+        descricao: null,
         capaUrl: null,
         criadoEm: '2026-09-23T12:00:00.000Z',
         atualizadoEm: '2026-09-23T12:00:00.000Z',
@@ -173,8 +187,9 @@ describe('POST /api/games', () => {
     });
 
     expect(status).toBe(201);
-    expect(json).toMatchObject({ id: ID, plataforma: null, nota: null });
+    expect(json).toMatchObject({ id: ID, plataforma: null, notaMedia: null, descricao: null });
     expect(json).not.toHaveProperty('userId');
+    expect(json).not.toHaveProperty('nota');
     expect(game.create).toHaveBeenCalledWith({
       data: expect.objectContaining({ userId: ANA_ID }),
     });
@@ -194,7 +209,14 @@ describe('POST /api/games', () => {
   it.each([
     ['titulo vazio (CA-13)', { titulo: '', status: 'JOGANDO' }, 'titulo'],
     ['status inválido (CA-15)', { titulo: 'X', status: 'PAUSADO' }, 'status'],
-    ['nota 11 (CA-16)', { titulo: 'X', status: 'ZERADO', nota: 11 }, 'nota'],
+    ['gameplay 10,1 (CA-04)', { titulo: 'X', status: 'ZERADO', gameplay: 10.1 }, 'gameplay'],
+    ['historia 7,55 (CA-04)', { titulo: 'X', status: 'JOGANDO', historia: 7.55 }, 'historia'],
+    ['graficos em texto (CA-04)', { titulo: 'X', status: 'JOGANDO', graficos: '8' }, 'graficos'],
+    [
+      'descricao com 1001 caracteres (CA-11)',
+      { titulo: 'X', status: 'JOGANDO', descricao: 'a'.repeat(1001) },
+      'descricao',
+    ],
   ])('400 com o campo apontado em fields: %s', async (_nome, body, campo) => {
     const { status, json } = await call('POST', '/games', { body });
 
@@ -212,21 +234,70 @@ describe('POST /api/games', () => {
     expect(json).toMatchObject({ message: expect.stringContaining('cor') });
   });
 
-  it('400 com fields.nota quando a nota vem com QUERO_JOGAR, e nada é criado (CA-19)', async () => {
+  it('400 com fields.historia quando a nota vem com QUERO_JOGAR, e nada é criado (CA-05)', async () => {
     const { status, json } = await call('POST', '/games', {
-      body: { titulo: 'Hades', status: 'QUERO_JOGAR', nota: 8 },
+      body: { titulo: 'Hades', status: 'QUERO_JOGAR', historia: 8 },
     });
 
     expect(status).toBe(400);
-    expect(json).toEqual({ statusCode: 400, message: RATING, fields: { nota: RATING } });
+    expect(json).toEqual({ statusCode: 400, message: RATINGS, fields: { historia: RATINGS } });
     expect(game.create).not.toHaveBeenCalled();
+  });
+
+  it('400 com fields.notas para ZERADO sem nenhum critério (CA-08)', async () => {
+    const { status, json } = await call('POST', '/games', {
+      body: { titulo: 'Hades', status: 'ZERADO' },
+    });
+
+    expect(status).toBe(400);
+    expect(json).toEqual({
+      statusCode: 400,
+      message: ZERADO_NEEDS,
+      fields: { notas: ZERADO_NEEDS },
+    });
+    expect(game.create).not.toHaveBeenCalled();
+  });
+
+  it('400 para o corpo antigo com nota: o campo não existe mais (CA-12)', async () => {
+    const { status, json } = await call('POST', '/games', {
+      body: { titulo: 'X', status: 'ZERADO', nota: 8 },
+    });
+
+    expect(status).toBe(400);
+    expect(json).toMatchObject({ message: expect.stringContaining('nota') });
+    expect(game.create).not.toHaveBeenCalled();
+  });
+
+  it('201 com as notas agrupadas, a média calculada e a descrição (CA-01)', async () => {
+    game.findFirst.mockResolvedValue(null);
+    game.create.mockImplementation(({ data }: { data: Partial<GameRow> }) =>
+      Promise.resolve(row({ ...data, status: 'ZERADO' })),
+    );
+
+    const { status, json } = await call('POST', '/games', {
+      body: {
+        titulo: 'Celeste',
+        status: 'ZERADO',
+        gameplay: 9,
+        historia: 8.5,
+        descricao: '  Ótimo\n\njogo  ',
+      },
+    });
+
+    expect(status).toBe(201);
+    expect(json).toMatchObject({
+      notas: { gameplay: 9, historia: 8.5, graficos: null, trilhaSonora: null, performance: null },
+      notaMedia: 8.8,
+      descricao: 'Ótimo\n\njogo',
+    });
+    expect(json).not.toHaveProperty('nota');
   });
 
   it('409 com a mensagem literal em fields.titulo quando já existe (CA-30)', async () => {
     game.findFirst.mockResolvedValue({ id: 'outro' });
 
     const { status, json } = await call('POST', '/games', {
-      body: { titulo: 'Celeste', status: 'ZERADO', plataforma: 'PC' },
+      body: { titulo: 'Celeste', status: 'ZERADO', plataforma: 'PC', gameplay: 9 },
     });
 
     expect(status).toBe(409);
@@ -246,10 +317,10 @@ describe('POST /api/games', () => {
 
     const bia = await call('POST', '/games', {
       token: biaToken,
-      body: { titulo: 'celeste', plataforma: 'pc', status: 'ZERADO' },
+      body: { titulo: 'celeste', plataforma: 'pc', status: 'ZERADO', gameplay: 9 },
     });
     const ana = await call('POST', '/games', {
-      body: { titulo: 'CELESTE', plataforma: 'PC', status: 'ZERADO' },
+      body: { titulo: 'CELESTE', plataforma: 'PC', status: 'ZERADO', gameplay: 9 },
     });
 
     expect(bia.status).toBe(201);
@@ -266,7 +337,7 @@ describe('POST /api/games', () => {
     game.create.mockRejectedValue(prismaError('P2002'));
 
     const { status } = await call('POST', '/games', {
-      body: { titulo: 'Celeste', status: 'ZERADO' },
+      body: { titulo: 'Celeste', status: 'ZERADO', gameplay: 9 },
     });
 
     expect(status).toBe(409);
@@ -313,15 +384,48 @@ describe('PATCH /api/games/:id', () => {
     expect(game.update).not.toHaveBeenCalled();
   });
 
-  it('400 para PATCH só com { status: QUERO_JOGAR } num jogo com nota (CA-21)', async () => {
-    game.findUnique.mockResolvedValue(row({ status: 'JOGANDO', nota: 7 }));
+  it('400 para PATCH só com { status: QUERO_JOGAR } num jogo com nota (CA-06)', async () => {
+    game.findUnique.mockResolvedValue(row({ status: 'JOGANDO', notaGameplay: 70 }));
 
     const { status, json } = await call('PATCH', `/games/${ID}`, {
       body: { status: 'QUERO_JOGAR' },
     });
 
     expect(status).toBe(400);
-    expect(json).toMatchObject({ fields: { nota: RATING } });
+    expect(json).toMatchObject({ fields: { gameplay: RATINGS } });
+    expect(game.update).not.toHaveBeenCalled();
+  });
+
+  it('200 para editar só o título de um Zerado sem notas: o corpo completo do formulário não reabre o bloqueio (CA-32)', async () => {
+    game.findUnique.mockResolvedValue(row({ status: 'ZERADO' }));
+    game.findFirst.mockResolvedValue(null);
+    game.update.mockResolvedValue(row({ status: 'ZERADO', titulo: 'Novo nome' }));
+
+    const { status, json } = await call('PATCH', `/games/${ID}`, {
+      body: {
+        titulo: 'Novo nome',
+        status: 'ZERADO',
+        plataforma: null,
+        gameplay: null,
+        historia: null,
+        graficos: null,
+        trilhaSonora: null,
+        performance: null,
+        descricao: null,
+      },
+    });
+
+    expect(status).toBe(200);
+    expect(json).toMatchObject({ titulo: 'Novo nome', notaMedia: null });
+  });
+
+  it('400 com fields.notas ao virar Zerado sem critério (CA-32)', async () => {
+    game.findUnique.mockResolvedValue(row({ status: 'JOGANDO' }));
+
+    const { status, json } = await call('PATCH', `/games/${ID}`, { body: { status: 'ZERADO' } });
+
+    expect(status).toBe(400);
+    expect(json).toMatchObject({ fields: { notas: ZERADO_NEEDS } });
     expect(game.update).not.toHaveBeenCalled();
   });
 

@@ -1,5 +1,23 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { GAME_STATUS, type Game, type GameStatus } from '@checkpoint/shared';
+import { GAME_STATUS, type Game, type GameRatings, type GameStatus } from '@checkpoint/shared';
+
+/** Só existe para o Swagger mostrar as `notas` (cada critério de 0 a 10, ou null sem nota). */
+export class GameRatingsResponseDto implements GameRatings {
+  @ApiProperty({ type: Number, nullable: true, example: 9 })
+  gameplay!: number | null;
+
+  @ApiProperty({ type: Number, nullable: true, example: 8.5 })
+  historia!: number | null;
+
+  @ApiProperty({ type: Number, nullable: true, example: null })
+  graficos!: number | null;
+
+  @ApiProperty({ type: Number, nullable: true, example: null })
+  trilhaSonora!: number | null;
+
+  @ApiProperty({ type: Number, nullable: true, example: null })
+  performance!: number | null;
+}
 
 /** Só existe para o Swagger mostrar o shape de `Game` (o contrato real está em @checkpoint/shared). */
 export class GameResponseDto implements Game {
@@ -15,8 +33,20 @@ export class GameResponseDto implements Game {
   @ApiProperty({ enum: GAME_STATUS })
   status!: GameStatus;
 
-  @ApiProperty({ type: Number, nullable: true, example: 9 })
-  nota!: number | null;
+  @ApiProperty({ type: GameRatingsResponseDto })
+  notas!: GameRatingsResponseDto;
+
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    example: 8.8,
+    description:
+      'Média dos critérios preenchidos, com 1 casa decimal (calculada, nunca gravada); null sem nenhum critério.',
+  })
+  notaMedia!: number | null;
+
+  @ApiProperty({ type: String, nullable: true, example: 'Escalada difícil e trilha marcante.' })
+  descricao!: string | null;
 
   @ApiProperty({
     type: String,

@@ -10,7 +10,7 @@ commit — `/docs-sync` confere se ela bate com a realidade.
 | PWA e mobile       | [pwa-e-mobile.md](pwa-e-mobile.md)             | 🚧 em andamento |
 | Autenticação       | [autenticacao.md](autenticacao.md)             | ✅ implementada |
 | Perfil             | [perfil.md](perfil.md)                         | 🚧 em andamento |
-| Avaliação de jogos | [avaliacao-de-jogos.md](avaliacao-de-jogos.md) | ✅ aprovada     |
+| Avaliação de jogos | [avaliacao-de-jogos.md](avaliacao-de-jogos.md) | 🚧 em andamento |
 
 ## Legenda de status
 

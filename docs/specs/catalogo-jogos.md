@@ -1,5 +1,7 @@
 # Spec: catálogo de jogos
 
+> **Nota (2026-09-25):** a `nota` inteira única foi substituída por **notas por critério** (spec `avaliacao-de-jogos`). Os critérios que citam `nota` estão marcados _superado_ abaixo; onde o texto desta spec fala de `nota`, vale o contrato novo (`notas`, `notaMedia`, `descricao`).
+>
 > Status: aprovada
 
 ## Objetivo
@@ -446,16 +448,16 @@ Supabase real).
 
 ### API — caminho feliz
 
-- [ ] **CA-01** — **Dado** o catálogo vazio, **quando** `POST /api/games` com `{"titulo":"Hollow Knight","status":"JOGANDO"}`, **então** 201, `Game` com `plataforma: null`, `nota: null` e `id` UUID.
-- [ ] **CA-02** — **Dado** o catálogo vazio, **quando** `POST /api/games` com `{"titulo":"Celeste","status":"ZERADO","plataforma":"PC","nota":9}`, **então** 201 e o response traz `plataforma: "PC"` e `nota: 9`.
+- [ ] **CA-01** — _(**superado** por `avaliacao-de-jogos`, CA-02)_ **Dado** o catálogo vazio, **quando** `POST /api/games` com `{"titulo":"Hollow Knight","status":"JOGANDO"}`, **então** 201, `Game` com `plataforma: null`, `nota: null` e `id` UUID.
+- [ ] **CA-02** — _(**superado** por `avaliacao-de-jogos`, CA-01)_ **Dado** o catálogo vazio, **quando** `POST /api/games` com `{"titulo":"Celeste","status":"ZERADO","plataforma":"PC","nota":9}`, **então** 201 e o response traz `plataforma: "PC"` e `nota: 9`.
 - [ ] **CA-03** — **Dado** `POST` com `{"titulo":"  Outer Wilds  ","status":"QUERO_JOGAR"}`, **quando** a resposta chega, **então** `titulo` é `"Outer Wilds"` (sem espaços nas pontas).
 - [ ] **CA-04** — **Dado** `POST` com `plataforma: "   "` (só espaços), **quando** a resposta chega, **então** `plataforma` é `null`.
 - [ ] **CA-05** — **Dado** jogos nos três status, **quando** `GET /api/games`, **então** 200 com todos, do `atualizadoEm` mais recente para o mais antigo.
 - [ ] **CA-06** — **Dado** jogos nos três status, **quando** `GET /api/games?status=JOGANDO`, **então** 200 só com jogos `JOGANDO`.
 - [ ] **CA-07** — **Dado** nenhum jogo `ZERADO`, **quando** `GET /api/games?status=ZERADO`, **então** 200 e `[]`.
-- [ ] **CA-08** — **Dado** um jogo `QUERO_JOGAR` sem nota, **quando** `PATCH /api/games/:id` com `{"status":"JOGANDO"}`, **então** 200, `status: "JOGANDO"` e `atualizadoEm` maior que antes; os demais campos ficam iguais.
+- [ ] **CA-08** — _(**superado** por `avaliacao-de-jogos`, CA-06)_ **Dado** um jogo `QUERO_JOGAR` sem nota, **quando** `PATCH /api/games/:id` com `{"status":"JOGANDO"}`, **então** 200, `status: "JOGANDO"` e `atualizadoEm` maior que antes; os demais campos ficam iguais.
 - [ ] **CA-09** — **Dado** um jogo `ZERADO`, **quando** `PATCH` com `{"status":"JOGANDO"}`, **então** 200 (transição de volta é permitida).
-- [ ] **CA-10** — **Dado** um jogo `JOGANDO` com `nota: 7`, **quando** `PATCH` com `{"status":"QUERO_JOGAR","nota":null}`, **então** 200, `status: "QUERO_JOGAR"` e `nota: null`.
+- [ ] **CA-10** — _(**superado** por `avaliacao-de-jogos`, CA-06)_ **Dado** um jogo `JOGANDO` com `nota: 7`, **quando** `PATCH` com `{"status":"QUERO_JOGAR","nota":null}`, **então** 200, `status: "QUERO_JOGAR"` e `nota: null`.
 - [ ] **CA-11** — **Dado** um jogo com `plataforma: "PC"`, **quando** `PATCH` com `{"plataforma":null}`, **então** 200 e `plataforma: null`.
 - [ ] **CA-12** — **Dado** um jogo existente, **quando** `DELETE /api/games/:id`, **então** 204 sem corpo, e um `GET /api/games` seguinte não o inclui.
 
@@ -464,17 +466,17 @@ Supabase real).
 - [ ] **CA-13** — **Dado** `POST` sem `titulo`, com `titulo: ""` ou com `titulo: "   "`, **quando** enviado, **então** 400 e `fields.titulo` presente.
 - [ ] **CA-14** — **Dado** `POST` com `titulo` de 121 caracteres, **quando** enviado, **então** 400 e `fields.titulo` presente.
 - [ ] **CA-15** — **Dado** `POST` sem `status` ou com `status: "PAUSADO"`, **quando** enviado, **então** 400 e `fields.status` presente.
-- [ ] **CA-16** — **Dado** `POST` com `nota: 11`, `nota: -1` ou `nota: 7.5`, **quando** enviado, **então** 400 e `fields.nota` presente.
+- [ ] **CA-16** — _(**superado** por `avaliacao-de-jogos`, CA-04)_ **Dado** `POST` com `nota: 11`, `nota: -1` ou `nota: 7.5`, **quando** enviado, **então** 400 e `fields.nota` presente.
 - [ ] **CA-17** — **Dado** `POST` com `plataforma` de 61 caracteres, **quando** enviado, **então** 400 e `fields.plataforma` presente.
 - [ ] **CA-18** — **Dado** `POST` com um campo não declarado (ex.: `"cor":"x"`), **quando** enviado, **então** 400.
-- [ ] **CA-19** — **Dado** `POST` com `{"titulo":"Hades","status":"QUERO_JOGAR","nota":8}`, **quando** enviado, **então** 400 com `fields.nota` = `"Nota só pode ser preenchida quando o status é Zerado ou Jogando"`, e nenhum jogo é criado.
+- [ ] **CA-19** — _(**superado** por `avaliacao-de-jogos`, CA-05)_ **Dado** `POST` com `{"titulo":"Hades","status":"QUERO_JOGAR","nota":8}`, **quando** enviado, **então** 400 com `fields.nota` = `"Nota só pode ser preenchida quando o status é Zerado ou Jogando"`, e nenhum jogo é criado.
 - [ ] **CA-20** — **Dado** `GET /api/games?status=PAUSADO`, **quando** enviado, **então** 400 e `fields.status` presente.
-- [ ] **CA-21** — **Dado** um jogo `JOGANDO` com `nota: 7`, **quando** `PATCH` com **só** `{"status":"QUERO_JOGAR"}`, **então** 400 com a mesma mensagem de `fields.nota` do CA-19, e o jogo continua `JOGANDO` com `nota: 7` (validação sobre o estado final, não só o body).
-- [ ] **CA-22** — **Dado** um jogo `QUERO_JOGAR` sem nota, **quando** `PATCH` com **só** `{"nota":5}`, **então** 400 com `fields.nota`, e o jogo continua sem nota.
-- [ ] **CA-23** — **Dado** um jogo `QUERO_JOGAR` sem nota, **quando** `PATCH` com `{"status":"ZERADO","nota":5}`, **então** 200 com `status: "ZERADO"` e `nota: 5`.
+- [ ] **CA-21** — _(**superado** por `avaliacao-de-jogos`, CA-06)_ **Dado** um jogo `JOGANDO` com `nota: 7`, **quando** `PATCH` com **só** `{"status":"QUERO_JOGAR"}`, **então** 400 com a mesma mensagem de `fields.nota` do CA-19, e o jogo continua `JOGANDO` com `nota: 7` (validação sobre o estado final, não só o body).
+- [ ] **CA-22** — _(**superado** por `avaliacao-de-jogos`, CA-07)_ **Dado** um jogo `QUERO_JOGAR` sem nota, **quando** `PATCH` com **só** `{"nota":5}`, **então** 400 com `fields.nota`, e o jogo continua sem nota.
+- [ ] **CA-23** — _(**superado** por `avaliacao-de-jogos`, CA-08)_ **Dado** um jogo `QUERO_JOGAR` sem nota, **quando** `PATCH` com `{"status":"ZERADO","nota":5}`, **então** 200 com `status: "ZERADO"` e `nota: 5`.
 - [ ] **CA-24** — **Dado** um jogo existente, **quando** `PATCH` com `{}`, **então** 400.
 - [ ] **CA-25** — **Dado** um jogo existente, **quando** `PATCH` com `{"status":"PAUSADO"}`, **então** 400 e `fields.status` presente.
-- [ ] **CA-52** — **Dado** um jogo existente, **quando** `PATCH` com `{"titulo":null}`, **então** 400 com `fields.titulo` presente; **quando** `PATCH` com `{"status":null}`, **então** 400 com `fields.status` presente; em ambos os casos o jogo não muda. (Só `nota` e `plataforma` aceitam `null`.)
+- [ ] **CA-52** — _(**superado** por `avaliacao-de-jogos`, CA-10)_ **Dado** um jogo existente, **quando** `PATCH` com `{"titulo":null}`, **então** 400 com `fields.titulo` presente; **quando** `PATCH` com `{"status":null}`, **então** 400 com `fields.status` presente; em ambos os casos o jogo não muda. (Só `nota` e `plataforma` aceitam `null`.)
 - [ ] **CA-26** — **Dado** `PATCH /api/games/abc` ou `DELETE /api/games/abc` (id que não é UUID), **quando** enviado, **então** 400.
 
 ### API — recurso inexistente (404)
@@ -490,11 +492,11 @@ Supabase real).
 - [ ] **CA-32** — **Dado** o jogo `{titulo:"Celeste", plataforma:"PC"}`, **quando** `POST` com o mesmo título e `plataforma: "Switch"`, **então** 201 (plataforma diferente não é duplicata).
 - [ ] **CA-33** — **Dado** o jogo `{titulo:"Celeste"}` (sem plataforma), **quando** `POST` com `{"titulo":"celeste","plataforma":"   "}`, **então** 409 (sem plataforma equivale a "vazia").
 - [ ] **CA-34** — **Dado** os jogos `Celeste/PC` e `Hades/PC`, **quando** `PATCH` no `Hades` com `{"titulo":"celeste"}`, **então** 409 e o `Hades` continua com o título original.
-- [ ] **CA-35** — **Dado** o jogo `Celeste/PC`, **quando** `PATCH` nele mesmo com `{"titulo":"CELESTE"}` ou `{"nota":8,"status":"ZERADO"}`, **então** 200 (não conflita consigo mesmo).
+- [ ] **CA-35** — _(**superado** por `avaliacao-de-jogos`, CA-08)_ **Dado** o jogo `Celeste/PC`, **quando** `PATCH` nele mesmo com `{"titulo":"CELESTE"}` ou `{"nota":8,"status":"ZERADO"}`, **então** 200 (não conflita consigo mesmo).
 
 ### Banco e migration
 
-- [ ] **CA-36** — **Dado** a migration aplicada, **quando** um `INSERT` direto em `"Game"` viola `nota BETWEEN 0 AND 10` ou combina `nota` com `status = 'QUERO_JOGAR'`, **então** o banco rejeita (`CHECK`). _Verificação manual; não coberta por teste unitário._
+- [ ] **CA-36** — _(**superado** por `avaliacao-de-jogos`, CA-14)_ **Dado** a migration aplicada, **quando** um `INSERT` direto em `"Game"` viola `nota BETWEEN 0 AND 10` ou combina `nota` com `status = 'QUERO_JOGAR'`, **então** o banco rejeita (`CHECK`). _Verificação manual; não coberta por teste unitário._
 - [ ] **CA-37** — **Dado** a migration aplicada, **quando** dois `INSERT` diretos usam o mesmo par (`tituloNormalizado`, `plataformaNormalizada`), **então** o segundo é rejeitado pelo `@@unique`. _Verificação manual._
 - [ ] **CA-38** — **Dado** duas requests `POST` simultâneas com o mesmo título e plataforma, **quando** ambas passam pela checagem prévia, **então** exatamente uma retorna 201 e a outra retorna 409 (não 500).
 - [ ] **CA-39** — **Dado** `apps/api/prisma/migrations/`, **quando** a migration 1 do `Game` é gerada, **então** existe um diretório novo commitado e o SQL dos dois `CHECK` está nele.
@@ -512,7 +514,7 @@ Os que dependem do Supabase real são verificação manual; os demais têm teste
 - [ ] **CA-57** — **Dado** um PNG válido de 2 MB + 1 byte, **quando** `PUT /capa`, **então** 413 com `fields.arquivo` = `"A capa deve ter no máximo 2 MB"`, e o jogo (inclusive a capa antiga, se havia) não muda. **Dado** um PNG válido de ~1,9 MB, **então** 200.
 - [ ] **CA-58** — **Dado** `PUT /capa` sem o campo `arquivo`, com o arquivo em outro campo (ex.: `file`) ou com um arquivo vazio, **quando** enviado, **então** 400 com `fields.arquivo` presente.
 - [ ] **CA-59** — **Dado** `PUT /api/games/abc/capa` (id que não é UUID), **então** 400. **Dado** um UUID válido sem jogo e um PNG válido, **então** 404 com `message` = `"Jogo não encontrado"`. **Dado** o mesmo UUID e um arquivo de 2 MB + 1 byte, **então** 413 (o limite de tamanho vem antes da checagem do jogo).
-- [ ] **CA-60** — **Dado** um jogo com capa, **quando** `GET /api/games` e `PATCH /api/games/:id` (ex.: `{"nota":8}`), **então** os dois trazem o mesmo `capaUrl` e **nenhum** response contém `capaPath`; **e** `POST /api/games` devolve `capaUrl: null`.
+- [ ] **CA-60** — _(**superado** por `avaliacao-de-jogos`, o mesmo critério, com {"gameplay":8})_ **Dado** um jogo com capa, **quando** `GET /api/games` e `PATCH /api/games/:id` (ex.: `{"nota":8}`), **então** os dois trazem o mesmo `capaUrl` e **nenhum** response contém `capaPath`; **e** `POST /api/games` devolve `capaUrl: null`.
 - [ ] **CA-61** — **Dado** um jogo com capa, **quando** `PUT /capa` com outra imagem, **então** 200, o novo `capaUrl` tem `<uuid>` diferente, o objeto antigo não está mais no bucket (listagem do bucket para o prefixo `<gameId>/` mostra só o novo; ou `GET` na URL antiga **com um parâmetro de query novo** dá status ≠ 200; a URL original pode continuar respondendo 200 por até ~1 min por causa do CDN), e `atualizadoEm` avança. _Manual (bucket real)._
 - [ ] **CA-62** — **Dado** um jogo com capa e o `StorageService` mockado falhando ao remover o objeto antigo, **quando** `PUT /capa` com imagem válida, **então** 200 com a capa nova ativa, e o log registra um aviso (sem segredos).
 - [ ] **CA-63** — **Dado** o `StorageService` falhando no upload, **quando** `PUT /capa`, **então** 502 com `fields.arquivo` = `"Falha ao acessar o armazenamento de capas"`, o `capaPath` do jogo fica como estava, e **nunca** 500. _Manual: com o nome do bucket errado no `.env`._
@@ -530,7 +532,7 @@ Os que dependem do Supabase real são verificação manual; os demais têm teste
 
 - [ ] **CA-41** — **Dado** o catálogo vazio, **quando** abro `/`, **então** vejo o estado "nenhum jogo cadastrado" e o botão "Adicionar jogo".
 - [ ] **CA-42** — **Dado** o diálogo aberto, **quando** preencho título, escolho "Jogando" e envio, **então** o diálogo fecha e o jogo aparece na lista com o selo "Jogando", sem recarregar a página.
-- [ ] **CA-43** — **Dado** o formulário com status "Zerado" e nota 8, **quando** troco o status para "Quero jogar", **então** o campo Nota fica desabilitado e vazio, e ao enviar a request leva `nota: null`.
+- [ ] **CA-43** — _(**superado** por `avaliacao-de-jogos`, CA-17 e CA-21)_ **Dado** o formulário com status "Zerado" e nota 8, **quando** troco o status para "Quero jogar", **então** o campo Nota fica desabilitado e vazio, e ao enviar a request leva `nota: null`.
 - [ ] **CA-44** — **Dado** o jogo `Celeste/PC` existente, **quando** cadastro outro `celeste`/`pc`, **então** o diálogo continua aberto com os dados digitados e a mensagem "Já existe esse jogo nesta plataforma" aparece junto do campo Título.
 - [ ] **CA-45** — **Dado** jogos nos três status, **quando** clico no filtro "Zerado", **então** a URL vira `/?status=ZERADO` e só os jogos zerados aparecem; ao recarregar a página, o filtro e a lista continuam iguais.
 - [ ] **CA-46** — **Dado** o filtro "Zerado" com nenhum jogo zerado, **quando** a lista carrega, **então** vejo "nenhum jogo neste status".
@@ -551,8 +553,8 @@ Os que dependem do Supabase real são verificação manual; os demais têm teste
 - [ ] **CA-78** — **Dado** um jogo com capa, **quando** edito, clico "Remover capa" e salvo, **então** o web faz `DELETE /api/games/:id/capa` e a linha volta à capa gerada; **e** se eu cancelo o diálogo em vez de salvar, a capa continua.
 - [ ] **CA-79** — **Dado** 2 jogos Jogando, 1 Zerado e 0 Quero jogar, **quando** abro `/`, **então** os painéis mostram **Zerados 01, Jogando 02, Quero jogar 00** (dois dígitos, com zero à esquerda; o `aria-label` de cada número é o número simples, "1", "2" e "0"); **quando** crio um jogo Jogando → Jogando 03; **quando** o edito para Zerado → Jogando 02 e Zerados 02; **quando** o removo → Zerados 01. Tudo sem recarregar a página.
 - [ ] **CA-80** — **Dado** a lista com jogos, **quando** olho os filtros, **então** cada um mostra ícone, rótulo e contagem ("Todos" = total), e exatamente o ativo tem `aria-pressed="true"` e a cor `ciano` com brilho.
-- [ ] **CA-81** — **Dado** jogos com nota 8, nota 0 e sem nota, **quando** a lista carrega, **então** a barra mostra 8 segmentos preenchidos, com a legenda "NOTA" e o número "8" seguido de "/10" e de uma estrela; 0 segmentos e "0"; e "SEM NOTA" (com a estrela vazia) sem segmentos preenchidos. Cada barra tem `aria-label` "Nota N de 10" (quando há nota).
-- [ ] **CA-82** — **Dado** o formulário aberto, **quando** olho o status, **então** há três botões com ícone e `aria-pressed`, exatamente um verdadeiro; **quando** escolho "Quero jogar", o campo Nota fica bloqueado com um ícone de cadeado visível.
+- [ ] **CA-81** — _(**superado** por `avaliacao-de-jogos`, CA-23 e CA-25)_ **Dado** jogos com nota 8, nota 0 e sem nota, **quando** a lista carrega, **então** a barra mostra 8 segmentos preenchidos, com a legenda "NOTA" e o número "8" seguido de "/10" e de uma estrela; 0 segmentos e "0"; e "SEM NOTA" (com a estrela vazia) sem segmentos preenchidos. Cada barra tem `aria-label` "Nota N de 10" (quando há nota).
+- [ ] **CA-82** — _(**superado** por `avaliacao-de-jogos`, CA-16)_ **Dado** o formulário aberto, **quando** olho o status, **então** há três botões com ícone e `aria-pressed`, exatamente um verdadeiro; **quando** escolho "Quero jogar", o campo Nota fica bloqueado com um ícone de cadeado visível.
 - [ ] **CA-83** — **Dado** um campo com erro (ex.: título duplicado), **quando** o erro aparece, **então** o campo tem borda `erro` e a mensagem, e faz uma animação curta de tremer; **e** com `prefers-reduced-motion: reduce` a borda e a mensagem aparecem, mas **sem** tremer.
 - [x] **CA-84** — **Dado** `prefers-reduced-motion: reduce` (emulado no DevTools), **quando** a página está aberta, **então** nenhuma destas animações roda: _scanlines_, orbes de fundo, pulso do botão "Adicionar jogo", ponto piscando do "Jogando", tremer do campo e transição de hover das linhas (`animation-name: none`, sem `transition` de movimento). _Estado: verificado por teste e pelo humano no Windows (2026-09-24), com "Efeitos de animação" desligado. O keyframe do pulso do botão chama `neon-pulse` (o nome `pulse` colidia com o do Tailwind)._
 - [ ] **CA-85** — **Dado** o diálogo aberto, **quando** aperto Esc, **então** ele fecha e o foco volta ao botão que o abriu; **e** navegando só por Tab, todo elemento clicável mostra o anel de foco; **e** botões, filtros e ações da linha medem ≥ 44 × 44 px; **e** todo botão só com ícone tem `aria-label` e todo ícone decorativo tem `aria-hidden="true"`.

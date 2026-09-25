@@ -114,7 +114,7 @@ checkpoint/
 ├── packages/
 │   └── shared/
 │       └── src/
-│           ├── games.ts               # contrato do catálogo de jogos (tipos, constantes, regra da nota)
+│           ├── games.ts               # contrato do catálogo de jogos (tipos, constantes, notas por critério e notaMedia)
 │           └── index.ts               # reexporta games; HealthCheckResponse, APP_NAME — exemplos
 │
 ├── eslint.config.mjs                   # config compartilhada por todos os workspaces
@@ -182,13 +182,15 @@ implementado.
 - `PrismaService extends PrismaClient`, conecta em `onModuleInit`, desconecta em
   `onModuleDestroy`, expõe `isHealthy()` (usado só pelo health check hoje — `SELECT 1`).
 - `prisma/schema.prisma` tem o enum `GameStatus` (`ZERADO`, `JOGANDO`, `QUERO_JOGAR`) e o model
-  `Game`: `titulo`, `plataforma` (`""` = sem plataforma; a API expõe `null`), `status`, `nota`
-  (`Int?`), `capaPath` (`String?`: caminho do objeto da capa no bucket, não a URL), `userId` (o dono,
+  `Game`: `titulo`, `plataforma` (`""` = sem plataforma; a API expõe `null`), `status`, as cinco notas por
+  critério `notaGameplay`/`notaHistoria`/`notaGraficos`/`notaTrilhaSonora`/`notaPerformance` (`Int?` em
+  **décimos**, 0 a 100: 7,3 = 73; sem `Decimal` nem ponto flutuante; a conversão fica só no
+  `GamesService`/`games/lib/ratings.ts`), `descricao` (`VarChar(1000)?`), `capaPath` (`String?`: caminho do objeto da capa no bucket, não a URL), `userId` (o dono,
   ver abaixo), `criadoEm`/`atualizadoEm` e as colunas `tituloNormalizado`/`plataformaNormalizada`,
   preenchidas pelo `GamesService` (aparadas e em minúsculas) e cobertas por
   `@@unique([userId, tituloNormalizado, plataformaNormalizada])`. É assim, e não com um índice `lower()`
   escrito à mão, para o Prisma enxergar toda a estrutura e o `migrate dev` não acusar drift. A
-  migration também tem dois `CHECK` escritos à mão (nota entre 0 e 10; nota nula com
+  migration também tem `CHECK`s escritos à mão (cada nota entre 0 e 100; as cinco nulas com
   `QUERO_JOGAR`), que o Prisma não modela e não vê como drift. Este projeto usa **migrations versionadas**
   (`prisma migrate dev`/`prisma migrate deploy`), diferente de um fluxo baseado em `db push` sem
   histórico — toda mudança de schema gera um arquivo em `prisma/migrations/` que fica commitado.
@@ -220,7 +222,7 @@ que também guarda as **sessões ativas** do perfil —, e `users/`):
     um id inexistente (não revela que existe). `userId` **não** está no `Game` da resposta (os campos
     são listados um a um em `toGame`) e **não** é aceito no corpo (400, campo desconhecido).
   - `GET /api/games[?status=]` (ordenado por `atualizadoEm` desc, desempate `criadoEm` desc),
-    `POST /api/games`, `PATCH /api/games/:id` (parcial; só `plataforma` e `nota` aceitam `null`) e
+    `POST /api/games`, `PATCH /api/games/:id` (parcial; só `plataforma`, os cinco critérios de nota e `descricao` aceitam `null`) e
     `DELETE /api/games/:id` (204).
   - **Capa** (uma por jogo, opcional): `PUT /api/games/:id/capa` (multipart, campo `arquivo`) e
     `DELETE /api/games/:id/capa`. Só JPEG/PNG/WebP, identificados pela **assinatura do arquivo**
@@ -240,9 +242,18 @@ que também guarda as **sessões ativas** do perfil —, e `users/`):
   - `cover/cover-upload.interceptor.ts` embrulha o `FileInterceptor` do Nest para converter os erros
     do multer (413, campo errado) em `ApiErrorResponse`; o multipart é lido **antes** dos pipes, então
     um arquivo grande para um id inválido dá 413, não 400.
-  - **Regra da nota:** validada no service sobre o **estado final** (registro atual + body), porque
-    o DTO só enxerga o body: `{ status: "QUERO_JOGAR" }` num jogo com nota é 400, a menos que o
-    mesmo body traga `nota: null`. A API nunca apaga a nota por conta própria.
+  - **Notas por critério** (spec `avaliacao-de-jogos`): cinco campos no topo do corpo (`gameplay`, `historia`,
+    `graficos`, `trilhaSonora`, `performance`), cada um `number | null` de 0 a 10 com no máximo 1 casa
+    (DTO `GameRatingFieldsDto`, um decorator `Rating` que lê o valor cru: texto `"8"` falha). A resposta as
+    agrupa em `notas` e traz `notaMedia` (calculada por `notaMedia()` do shared, nunca gravada) e `descricao`
+    (`TrimText`: `\r\n` vira `\n`, apara as pontas; vazia vira `null` no service). O campo antigo `nota` não existe
+    mais (400, campo desconhecido).
+  - **Regras das notas** (no service, sobre o **estado final** = registro atual + body, porque o DTO só enxerga o
+    body): `QUERO_JOGAR` não tem nenhuma nota (400 com `fields.<critério>` em cada preenchido; `{ status:
+"QUERO_JOGAR" }` num jogo com nota é 400, a menos que o mesmo body traga todas como `null`); **Zerado exige ao
+    menos 1 critério só quando a escrita muda o status para Zerado ou o VALOR de algum critério** em relação
+    ao gravado (`fields.notas`; a presença no body não conta, porque o formulário envia tudo sempre, e assim os
+    jogos Zerado sem notas continuam editáveis). A API nunca apaga nota por conta própria.
   - **Duplicidade** (mesmo dono, título e plataforma, sem diferenciar caixa nem espaços nas pontas): checagem
     prévia para dar um 409 claro; a garantia real é o `@@unique` do banco, e o `P2002` da corrida
     também vira 409. Ao editar, o próprio jogo não conta como duplicata.
@@ -708,7 +719,13 @@ antes de `api`/`web` (§2). Hoje tem:
 - `games.ts` — contrato do catálogo de jogos: `GAME_STATUS`/`GameStatus` (códigos `ZERADO`,
   `JOGANDO`, `QUERO_JOGAR`, sem rótulo de tela), `Game`, `CreateGameRequest`, `UpdateGameRequest`,
   `ListGamesQuery`, `ApiErrorResponse` (formato dos erros 400/409, com `fields` por campo), as
-  constantes de limite e `statusAllowsRating` (regra da nota, usada pela API e pelo formulário).
+  constantes de limite e `statusAllowsRating` (regra das notas, usada pela API e pelo formulário).
+  **Avaliação** (spec `avaliacao-de-jogos`): `GAME_RATING_CRITERIA` (chave, rótulo e descrição curta dos cinco
+  critérios, fonte única de API e web), `GameRatingKey`, `GameRatings`, `GAME_RATING_STEP` (0,1),
+  `GAME_DESCRIPTION_MAX_LENGTH` (1000) e as funções puras `isValidRating` (0 a 10, no máximo 1 casa) e
+  `notaMedia` (média dos critérios preenchidos, 1 casa, arredondada para cima na metade, em décimos inteiros);
+  `Game` traz `notas`, `notaMedia` e `descricao`, e `ApiErrorField` ganhou as chaves dos critérios, `notas` e
+  `descricao`. O `shared` não tem runner: as funções são testadas no Jest da API e no Vitest do web.
   A capa entra como `Game.capaUrl` (URL pública ou `null`), `GAME_COVER_MAX_BYTES` (2 MB),
   `GAME_COVER_MIME_TYPES`, `GAME_COVER_FIELD` (`arquivo`) e o campo `arquivo` em `ApiErrorField`.
 - `auth.ts` — contrato da autenticação e da conta: `Usuario`, `RegistroRequest`, `LoginRequest`,

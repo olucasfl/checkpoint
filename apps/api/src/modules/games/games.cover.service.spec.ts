@@ -28,7 +28,12 @@ function row(overrides: Partial<GameRow> = {}): GameRow {
     titulo: 'Celeste',
     plataforma: 'PC',
     status: 'ZERADO',
-    nota: 9,
+    notaGameplay: 90,
+    notaHistoria: null,
+    notaGraficos: null,
+    notaTrilhaSonora: null,
+    notaPerformance: null,
+    descricao: null,
     capaPath: null,
     tituloNormalizado: 'celeste',
     plataformaNormalizada: 'pc',
@@ -363,10 +368,10 @@ describe('GamesService — capa', () => {
       game.findMany.mockResolvedValue([row({ capaPath: OLD })]);
       game.findUnique.mockResolvedValue(row({ capaPath: OLD }));
       game.findFirst.mockResolvedValue(null);
-      game.update.mockResolvedValue(row({ capaPath: OLD, nota: 8 }));
+      game.update.mockResolvedValue(row({ capaPath: OLD, notaGameplay: 80 }));
 
       const [listed] = await service.list(USER);
-      const updated = await service.update(USER, ID, { nota: 8 });
+      const updated = await service.update(USER, ID, { gameplay: 8 });
 
       for (const result of [listed, updated]) {
         expect(result?.capaUrl).toBe(`https://storage.teste/capas/${OLD}`);
@@ -403,7 +408,11 @@ describe('GamesService — capa', () => {
       game.findFirst.mockResolvedValue(null);
       game.create.mockResolvedValue(row({ capaPath: null }));
 
-      const created = await service.create(USER, { titulo: 'Celeste', status: 'ZERADO' });
+      const created = await service.create(USER, {
+        titulo: 'Celeste',
+        status: 'ZERADO',
+        gameplay: 9,
+      });
 
       expect(created.capaUrl).toBeNull();
     });
