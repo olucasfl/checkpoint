@@ -10,6 +10,7 @@ import {
   PerfilPrivadoError,
   PlataformaError,
   PlataformaIndisponivelError,
+  PlataformaItemNaoEncontradoError,
 } from '../providers/plataforma-errors';
 import { OpenIdInvalidoError, SteamOpenId } from './steam-open-id';
 import { STEAM_VISIBILIDADE_PUBLICA, SteamClient } from './steam.client';
@@ -106,14 +107,56 @@ export class SteamProvider implements GameProvider {
     };
   }
 
-  /** Horas e conquistas de um jogo chegam na etapa 4 da spec. Sem rota que chegue aqui até lá. */
-  obterJogo(
-    _idExterno: string,
-    _idJogo: string,
+  /**
+   * O RESUMO de um jogo (etapa 3 da spec): horas, última vez jogado, capa e as contagens de conquistas, mais o
+   * aviso de privacidade. A lista completa de conquistas (schema e raridade) é da etapa 4: `conquistas` vem vazia.
+   *
+   * Duas chamadas, uma depois da outra e só se a primeira der certo: (1) a biblioteca filtrada pelo appid, que
+   * confere que o jogo é do usuário e traz as horas; (2) `GetPlayerAchievements`, para as contagens. Biblioteca
+   * privada → `PerfilPrivadoError`; appid fora da biblioteca → `PlataformaItemNaoEncontradoError`. Conquistas
+   * negadas NÃO derrubam o resumo (contagens `null` e o aviso `CONQUISTAS_PRIVADAS`); jogo sem conquistas dá
+   * `0` de `0` e `SEM_CONQUISTAS`. Falha da Steam (502) sobe: quem grava decide não gravar nada.
+   */
+  async obterJogo(
+    idExterno: string,
+    idJogo: string,
   ): Promise<{ dados: DadosDoJogo; conquistas: Conquista[]; aviso: AvisoPlataforma | null }> {
-    return Promise.reject(
-      new Error('SteamProvider.obterJogo ainda não foi implementado (etapa 4)'),
-    );
+    const biblioteca = await this.client.listarJogos(idExterno, { appId: idJogo });
+    if (biblioteca.privada) {
+      throw new PerfilPrivadoError();
+    }
+    const jogo = biblioteca.jogos.find((candidato) => candidato.appid === idJogo);
+    if (!jogo) {
+      throw new PlataformaItemNaoEncontradoError();
+    }
+
+    const conquistas = await this.client.obterConquistasDoJogador(idExterno, idJogo);
+    let total: number | null = null;
+    let desbloqueadas: number | null = null;
+    let aviso: AvisoPlataforma | null = null;
+    if (conquistas.tipo === 'ok') {
+      total = conquistas.conquistas.length;
+      desbloqueadas = conquistas.conquistas.filter((conquista) => conquista.desbloqueada).length;
+    } else if (conquistas.tipo === 'sem-conquistas') {
+      total = 0;
+      desbloqueadas = 0;
+      aviso = 'SEM_CONQUISTAS';
+    } else {
+      aviso = 'CONQUISTAS_PRIVADAS';
+    }
+
+    return {
+      dados: {
+        idExterno: jogo.appid,
+        minutosJogados: jogo.minutosJogados,
+        ultimaVezJogadoEm: jogo.ultimaVezJogadoEm,
+        conquistasTotal: total,
+        conquistasDesbloqueadas: desbloqueadas,
+        capaUrl: capaOficialUrl(jogo.appid),
+      },
+      conquistas: [],
+      aviso,
+    };
   }
 
   private returnToCompleto(base: string, state: string): string {

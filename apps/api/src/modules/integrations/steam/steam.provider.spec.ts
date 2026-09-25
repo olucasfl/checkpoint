@@ -5,6 +5,7 @@ import { type EnvironmentVariables } from '../../../config/env.validation';
 import {
   PerfilPrivadoError,
   PlataformaIndisponivelError,
+  PlataformaItemNaoEncontradoError,
   PlataformaLimiteError,
 } from '../providers/plataforma-errors';
 import {
@@ -14,7 +15,12 @@ import {
   type SteamOpenId,
 } from './steam-open-id';
 import { NOME_PADRAO_DA_CONTA, SteamProvider } from './steam.provider';
-import { SteamClient, type SteamBiblioteca, type SteamPerfil } from './steam.client';
+import {
+  SteamClient,
+  type SteamBiblioteca,
+  type SteamConquistasDoJogador,
+  type SteamPerfil,
+} from './steam.client';
 
 // Valores sintéticos e óbvios (RULES.md §8).
 const STEAM_ID = '76561190000000000';
@@ -45,7 +51,8 @@ const bibliotecaPublica: SteamBiblioteca = {
 function montar() {
   const client = {
     obterPerfil: jest.fn<Promise<SteamPerfil | null>, [string]>(),
-    listarJogos: jest.fn<Promise<SteamBiblioteca>, [string]>(),
+    listarJogos: jest.fn<Promise<SteamBiblioteca>, [string, { appId?: string }?]>(),
+    obterConquistasDoJogador: jest.fn<Promise<SteamConquistasDoJogador>, [string, string]>(),
   };
   const openId = {
     montarUrl: jest.fn<string, [{ returnTo: string; realm: string }]>(
@@ -300,15 +307,184 @@ describe('SteamProvider com o SteamClient de verdade e as respostas reais (fixtu
   });
 });
 
-describe('SteamProvider.obterJogo (etapa 4)', () => {
-  it('ainda não implementado: rejeita com uma mensagem explícita', async () => {
-    const { provider } = montar();
-
-    await expect(provider.obterJogo(STEAM_ID, '1794680')).rejects.toThrow('etapa 4');
+describe('SteamProvider.obterJogo — o resumo (etapa 3)', () => {
+  const APP_ID = '1794680';
+  const jogoDaBiblioteca: SteamBiblioteca['jogos'][number] = {
+    appid: APP_ID,
+    nome: 'Vampire Survivors',
+    minutosJogados: 550,
+    ultimaVezJogadoEm: new Date('2026-02-22T17:24:41Z'),
+  };
+  const conquista = (id: string, desbloqueada: boolean) => ({
+    id,
+    desbloqueada,
+    desbloqueadaEm: desbloqueada ? new Date('2026-02-01T00:00:00Z') : null,
+    nome: null,
+    descricao: null,
   });
 
-  it.todo('etapa 4: horas, conquistas, avisos e cache do detalhe de um jogo');
-  it.todo(
-    'perfil privado real: fixture de "perfil privado" pendente (a conta de teste troca a privacidade e avisa)',
+  function comBiblioteca(jogos = [jogoDaBiblioteca]) {
+    const ctx = montar();
+    ctx.client.listarJogos.mockResolvedValue({ privada: false, total: jogos.length, jogos });
+    return ctx;
+  }
+
+  it('horas, última vez jogado, capa e as contagens; a lista de conquistas vem vazia (CA-26)', async () => {
+    const ctx = comBiblioteca();
+    ctx.client.obterConquistasDoJogador.mockResolvedValue({
+      tipo: 'ok',
+      nomeDoJogo: 'Vampire Survivors',
+      conquistas: [conquista('A', true), conquista('B', true), conquista('C', false)],
+    });
+
+    const resultado = await ctx.provider.obterJogo(STEAM_ID, APP_ID);
+
+    expect(resultado).toEqual({
+      dados: {
+        idExterno: APP_ID,
+        minutosJogados: 550,
+        ultimaVezJogadoEm: new Date('2026-02-22T17:24:41Z'),
+        conquistasTotal: 3,
+        conquistasDesbloqueadas: 2,
+        capaUrl: 'https://cdn.cloudflare.steamstatic.com/steam/apps/1794680/library_600x900.jpg',
+      },
+      conquistas: [],
+      aviso: null,
+    });
+    expect(ctx.client.listarJogos).toHaveBeenCalledWith(STEAM_ID, { appId: APP_ID });
+    expect(ctx.client.obterConquistasDoJogador).toHaveBeenCalledWith(STEAM_ID, APP_ID);
+  });
+
+  it('jogo sem conquistas: 0 de 0 e o aviso SEM_CONQUISTAS', async () => {
+    const ctx = comBiblioteca();
+    ctx.client.obterConquistasDoJogador.mockResolvedValue({ tipo: 'sem-conquistas' });
+
+    const { dados, aviso } = await ctx.provider.obterJogo(STEAM_ID, APP_ID);
+
+    expect(dados).toMatchObject({ conquistasTotal: 0, conquistasDesbloqueadas: 0 });
+    expect(aviso).toBe('SEM_CONQUISTAS');
+  });
+
+  it('conquistas negadas: as horas ficam, as contagens são null e o aviso é CONQUISTAS_PRIVADAS (CA-30)', async () => {
+    const ctx = comBiblioteca();
+    ctx.client.obterConquistasDoJogador.mockResolvedValue({ tipo: 'negado' });
+
+    const { dados, aviso } = await ctx.provider.obterJogo(STEAM_ID, APP_ID);
+
+    expect(dados).toMatchObject({
+      minutosJogados: 550,
+      conquistasTotal: null,
+      conquistasDesbloqueadas: null,
+    });
+    expect(aviso).toBe('CONQUISTAS_PRIVADAS');
+  });
+
+  it('nunca jogado: 0 minutos e última vez jogado null', async () => {
+    const ctx = comBiblioteca([
+      { ...jogoDaBiblioteca, minutosJogados: 0, ultimaVezJogadoEm: null },
+    ]);
+    ctx.client.obterConquistasDoJogador.mockResolvedValue({ tipo: 'sem-conquistas' });
+
+    const { dados } = await ctx.provider.obterJogo(STEAM_ID, APP_ID);
+
+    expect(dados).toMatchObject({ minutosJogados: 0, ultimaVezJogadoEm: null });
+  });
+
+  it('biblioteca privada → PerfilPrivadoError, e as conquistas nem são consultadas (CA-30)', async () => {
+    const ctx = montar();
+    ctx.client.listarJogos.mockResolvedValue({ privada: true, total: 0, jogos: [] });
+
+    await expect(ctx.provider.obterJogo(STEAM_ID, APP_ID)).rejects.toBeInstanceOf(
+      PerfilPrivadoError,
+    );
+    expect(ctx.client.obterConquistasDoJogador).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['biblioteca sem o appid (a Steam devolve game_count 0)', []],
+    ['a Steam devolveu outro appid', [{ ...jogoDaBiblioteca, appid: '999' }]],
+  ])(
+    '%s → PlataformaItemNaoEncontradoError, sem consultar conquistas (CA-27)',
+    async (_nome, jogos) => {
+      const ctx = comBiblioteca(jogos);
+
+      const erro: unknown = await ctx.provider.obterJogo(STEAM_ID, APP_ID).catch((e: unknown) => e);
+
+      expect(erro).toBeInstanceOf(PlataformaItemNaoEncontradoError);
+      expect(erro).toMatchObject({ code: 'PLATAFORMA_ITEM_NAO_ENCONTRADO' });
+      expect(ctx.client.obterConquistasDoJogador).not.toHaveBeenCalled();
+    },
   );
+
+  it.each([
+    ['biblioteca indisponível', 'listarJogos', new PlataformaIndisponivelError()],
+    ['biblioteca no limite', 'listarJogos', new PlataformaLimiteError()],
+    ['conquistas indisponíveis', 'obterConquistasDoJogador', new PlataformaIndisponivelError()],
+    ['conquistas no limite', 'obterConquistasDoJogador', new PlataformaLimiteError()],
+  ] as const)(
+    'falha da Steam (%s) sobe como está: quem grava decide não gravar nada (CA-30)',
+    async (_nome, quem, erro) => {
+      const ctx = comBiblioteca();
+      ctx.client.obterConquistasDoJogador.mockResolvedValue({ tipo: 'sem-conquistas' });
+      ctx.client[quem].mockRejectedValue(erro);
+
+      await expect(ctx.provider.obterJogo(STEAM_ID, APP_ID)).rejects.toBe(erro);
+    },
+  );
+
+  it('com o SteamClient de verdade e as respostas reais: contagens do fixture de conquistas', async () => {
+    const fixture = (nome: string) => {
+      const { status, body } = JSON.parse(
+        readFileSync(join(__dirname, '__fixtures__', nome), 'utf8'),
+      ) as { status: number; body: unknown };
+      return new Response(JSON.stringify(body), {
+        status,
+        headers: { 'content-type': 'application/json; charset=UTF-8' },
+      });
+    };
+    jest.spyOn(globalThis, 'fetch').mockImplementation((input) => {
+      const url = String(input);
+      if (url.includes('GetOwnedGames')) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              response: {
+                game_count: 1,
+                games: [
+                  {
+                    appid: 1794680,
+                    name: 'Vampire Survivors',
+                    playtime_forever: 550,
+                    rtime_last_played: 1771783481,
+                  },
+                ],
+              },
+            }),
+            { status: 200, headers: { 'content-type': 'application/json' } },
+          ),
+        );
+      }
+      return Promise.resolve(fixture('player-achievements.com-conquistas.json'));
+    });
+    const config = { get: () => 'ABCDEF0123456789ABCDEF0123456789' } as unknown as ConfigService<
+      EnvironmentVariables,
+      true
+    >;
+    const provider = new SteamProvider(new SteamClient(config), {} as SteamOpenId);
+
+    const { dados, aviso } = await provider.obterJogo(STEAM_ID, APP_ID);
+    jest.restoreAllMocks();
+
+    expect(dados).toMatchObject({
+      minutosJogados: 550,
+      conquistasTotal: 6,
+      conquistasDesbloqueadas: 3,
+    });
+    expect(aviso).toBeNull();
+  });
+
+  it.todo(
+    'conquistas negadas REAIS: o que o GetPlayerAchievements devolve com "detalhes do jogo" privados (fixture pendente; hoje o 403 é tratado como negado)',
+  );
+  it.todo('etapa 4: a lista completa de conquistas (schema, raridade e cache)');
 });

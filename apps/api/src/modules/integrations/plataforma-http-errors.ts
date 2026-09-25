@@ -6,6 +6,7 @@ import {
   PerfilPrivadoError,
   PlataformaError,
   PlataformaIndisponivelError,
+  PlataformaItemNaoEncontradoError,
   PlataformaLimiteError,
   ProvedorNaoSuportadoError,
 } from './providers/plataforma-errors';
@@ -30,6 +31,9 @@ export const integracaoErrors = {
 export function plataformaHttpError(error: unknown): HttpException | null {
   if (error instanceof PerfilPrivadoError) {
     return apiError(409, 'PLATAFORMA_PERFIL_PRIVADO', 'O perfil na plataforma está privado.');
+  }
+  if (error instanceof PlataformaItemNaoEncontradoError) {
+    return apiError(404, 'PLATAFORMA_ITEM_NAO_ENCONTRADO', 'Esse jogo não está na sua biblioteca.');
   }
   if (error instanceof PlataformaLimiteError) {
     return apiError(

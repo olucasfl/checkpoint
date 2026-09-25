@@ -62,7 +62,11 @@ export interface GameProvider {
    */
   listarBiblioteca(idExterno: string): Promise<{ itens: ItemDaBiblioteca[]; perfil: PerfilBasico }>;
 
-  /** Horas, última vez jogado e conquistas de UM jogo. */
+  /**
+   * O resumo de UM jogo: horas, última vez jogado, capa e as contagens de conquistas (etapa 3); a lista
+   * completa de conquistas chega na etapa 4. Lança `PerfilPrivadoError` (biblioteca privada),
+   * `PlataformaItemNaoEncontradoError` (o item não é do usuário) e os erros de indisponibilidade.
+   */
   obterJogo(
     idExterno: string,
     idJogo: string,

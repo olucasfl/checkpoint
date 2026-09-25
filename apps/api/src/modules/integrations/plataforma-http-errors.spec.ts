@@ -8,6 +8,7 @@ import {
   IdExternoInvalidoError,
   PerfilPrivadoError,
   PlataformaIndisponivelError,
+  PlataformaItemNaoEncontradoError,
   PlataformaLimiteError,
   ProvedorNaoSuportadoError,
 } from './providers/plataforma-errors';
@@ -15,6 +16,12 @@ import {
 describe('plataformaHttpError — domínio → HTTP (CA-20, CA-21)', () => {
   it.each([
     ['perfil privado', new PerfilPrivadoError(), 409, 'PLATAFORMA_PERFIL_PRIVADO'],
+    [
+      'item fora da biblioteca',
+      new PlataformaItemNaoEncontradoError(),
+      404,
+      'PLATAFORMA_ITEM_NAO_ENCONTRADO',
+    ],
     ['plataforma indisponível', new PlataformaIndisponivelError(), 502, 'PLATAFORMA_INDISPONIVEL'],
     ['plataforma no limite', new PlataformaLimiteError(), 502, 'PLATAFORMA_LIMITE'],
   ])('%s → %i %s (nunca 500)', (_nome, erro, status, code) => {

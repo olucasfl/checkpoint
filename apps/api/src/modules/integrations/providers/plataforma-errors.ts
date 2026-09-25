@@ -36,6 +36,13 @@ export class PerfilPrivadoError extends PlataformaError {
   }
 }
 
+/** O item (na Steam, o appid) não está na biblioteca do usuário: só se liga o que ele tem. */
+export class PlataformaItemNaoEncontradoError extends PlataformaError {
+  constructor(message = 'O item não está na biblioteca do usuário') {
+    super('PLATAFORMA_ITEM_NAO_ENCONTRADO', message);
+  }
+}
+
 /**
  * Identificador externo (SteamID, appid) fora do formato. É erro de VALIDAÇÃO (na rota vira 400), nunca
  * "perfil privado": a Steam responde 400 em HTML a um ID malformado, então o formato é conferido antes.
