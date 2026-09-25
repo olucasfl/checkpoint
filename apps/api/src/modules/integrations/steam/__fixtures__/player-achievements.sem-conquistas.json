@@ -1,0 +1,9 @@
+{
+  "status": 400,
+  "body": {
+    "playerstats": {
+      "error": "Requested app has no stats",
+      "success": false
+    }
+  }
+}

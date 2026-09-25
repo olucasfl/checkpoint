@@ -1,0 +1,67 @@
+{
+  "status": 200,
+  "body": {
+    "game": {
+      "gameName": "Vampire Survivors",
+      "gameVersion": "70",
+      "availableGameStats": {
+        "achievements": [
+          {
+            "name": "ReachLV5",
+            "defaultvalue": 0,
+            "displayName": "Asas",
+            "hidden": 0,
+            "description": "Alcance o nível 5.",
+            "icon": "https://steamcdn-a.akamaihd.net/steamcommunity/public/images/apps/1794680/e3a90bb8e2cb0c4a81199ed0d174b11a01a426fe.jpg",
+            "icongray": "https://steamcdn-a.akamaihd.net/steamcommunity/public/images/apps/1794680/4598233b5adcc28af9d3f10f3db17868182e716e.jpg"
+          },
+          {
+            "name": "ReachLV10",
+            "defaultvalue": 0,
+            "displayName": "Coroa",
+            "hidden": 0,
+            "description": "Alcance o nível 10.",
+            "icon": "https://steamcdn-a.akamaihd.net/steamcommunity/public/images/apps/1794680/f16b40537a1b8417c00c1b92fd1ae0347b5adb2e.jpg",
+            "icongray": "https://steamcdn-a.akamaihd.net/steamcommunity/public/images/apps/1794680/26cb7378ecac2a78aac5f41724d1f9e797f7f84c.jpg"
+          },
+          {
+            "name": "Survive1Minute",
+            "defaultvalue": 0,
+            "displayName": "Coração Vazio",
+            "hidden": 0,
+            "description": "Sobreviva por 1 minuto com qualquer personagem.",
+            "icon": "https://steamcdn-a.akamaihd.net/steamcommunity/public/images/apps/1794680/219e279c2fe7559d13aae15ac6117b56ed5a8eb9.jpg",
+            "icongray": "https://steamcdn-a.akamaihd.net/steamcommunity/public/images/apps/1794680/f11b1d5fb93dee75efe00250175250244ffa2e5f.jpg"
+          },
+          {
+            "name": "FindAStoneMask",
+            "defaultvalue": 0,
+            "displayName": "Máscara de Pedra",
+            "hidden": 0,
+            "description": "Encontre uma Máscara de Pedra.",
+            "icon": "https://steamcdn-a.akamaihd.net/steamcommunity/public/images/apps/1794680/17b3ef1d5ca5feae5e9f60c3937ad0795c0da71e.jpg",
+            "icongray": "https://steamcdn-a.akamaihd.net/steamcommunity/public/images/apps/1794680/e9368973a5689649c19256e344d4e3ce00a6c152.jpg"
+          },
+          {
+            "name": "EvolveCross",
+            "defaultvalue": 0,
+            "displayName": "Espada Celeste",
+            "hidden": 0,
+            "description": "Evolua a Cruz.",
+            "icon": "https://steamcdn-a.akamaihd.net/steamcommunity/public/images/apps/1794680/1d826a99c78fa4727d7f75d947f8e066d3ac2654.jpg",
+            "icongray": "https://steamcdn-a.akamaihd.net/steamcommunity/public/images/apps/1794680/2cc77f819306b7dafb8d3486c5252fe1fd663497.jpg"
+          },
+          {
+            "name": "Survive20MinutesWithCross",
+            "defaultvalue": 0,
+            "displayName": "Tiragisú",
+            "hidden": 0,
+            "description": "Sobreviva por 20 minutos com Krochi.",
+            "icon": "https://steamcdn-a.akamaihd.net/steamcommunity/public/images/apps/1794680/97ea633f0fde183a4f80dd9d6f5795beec22d2f6.jpg",
+            "icongray": "https://steamcdn-a.akamaihd.net/steamcommunity/public/images/apps/1794680/c808c2f74fcec0be19871d1bc7c0d77345c74c8b.jpg"
+          }
+        ]
+      }
+    }
+  }
+}
