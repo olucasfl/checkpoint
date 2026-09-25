@@ -163,9 +163,9 @@ function ItemDaLista({
         </button>
       )}
 
-      {modo.tipo === 'novo' && !item.vinculadoA && (
+      {modo.tipo === 'novo' && (
         <div className="flex flex-col gap-2.5">
-          {item.jogosParecidos.length > 0 && (
+          {!item.vinculadoA && item.jogosParecidos.length > 0 && (
             <div className="flex flex-col gap-2">
               <p className="m-0 text-[16px] font-semibold">Já no seu catálogo:</p>
               <ul className="m-0 flex list-none flex-col gap-2 p-0">
@@ -191,15 +191,17 @@ function ItemDaLista({
             </div>
           )}
           <div className="flex flex-wrap gap-2.5">
-            <button
-              type="button"
-              disabled={ocupado}
-              aria-label={`${item.jogosParecidos.length > 0 ? 'Criar outro jogo' : 'Criar jogo'}: ${item.titulo}`}
-              onClick={() => onCriar(item)}
-              className={BOTAO_PRIMARIO}
-            >
-              {item.jogosParecidos.length > 0 ? 'Criar outro jogo' : 'Criar jogo'}
-            </button>
+            {!item.vinculadoA && (
+              <button
+                type="button"
+                disabled={ocupado}
+                aria-label={`${item.jogosParecidos.length > 0 ? 'Criar outro jogo' : 'Criar jogo'}: ${item.titulo}`}
+                onClick={() => onCriar(item)}
+                className={BOTAO_PRIMARIO}
+              >
+                {item.jogosParecidos.length > 0 ? 'Criar outro jogo' : 'Criar jogo'}
+              </button>
+            )}
             <button
               type="button"
               aria-expanded={escolhendoOutro}

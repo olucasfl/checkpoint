@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Icon } from '@/shared/components/Icon';
 import { ModalDialog } from '@/shared/components/ModalDialog';
 import { useConnectivity } from '@/shared/hooks/use-connectivity';
@@ -88,6 +88,15 @@ export function GameDetailPage() {
             </div>
           )}
         </div>
+
+        {game && temContaSteam === false && game.dadosPlataforma.length === 0 && (
+          <p className="m-0 text-[16px] text-texto-suave">
+            <Link to="/perfil" className="font-semibold text-ciano underline">
+              Vincule sua Steam no perfil
+            </Link>{' '}
+            para ligar este jogo à sua biblioteca.
+          </p>
+        )}
 
         {isPending && <DetailLoading />}
         {/* Com a lista já carregada, um refetch que falha não esconde o jogo. */}

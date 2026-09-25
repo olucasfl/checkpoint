@@ -430,6 +430,9 @@ describe('Vincular à Steam (spec integracao-plataformas, etapa 3)', () => {
 
     await waitFor(() => expect(integracoesApi.listarContas).toHaveBeenCalled());
     expect(screen.queryByRole('button', { name: 'Vincular à Steam' })).toBeNull();
+    expect(
+      await screen.findByRole('link', { name: 'Vincule sua Steam no perfil' }),
+    ).toHaveAttribute('href', '/perfil');
   });
 
   it('jogo que já tem vínculo não oferece "Vincular à Steam"', async () => {

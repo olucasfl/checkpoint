@@ -178,6 +178,32 @@ describe('BibliotecaSteamDialog — modo novo', () => {
     expect(screen.queryByRole('button', { name: /Criar/ })).toBeNull();
   });
 
+  it('item já ligado a outro jogo: "Vincular a outro jogo" leva ao aviso do 409 e "Mover o vínculo" reenvia com mover: true (CA-36)', async () => {
+    api.biblioteca.mockResolvedValue([
+      item({ vinculadoA: { id: 'g2', titulo: 'Celeste', plataforma: 'PC' } }),
+    ]);
+    games.list.mockResolvedValue([jogo({ id: 'a', titulo: 'Livre' })]);
+    api.vincularJogo.mockRejectedValueOnce(
+      erroHttp(409, {
+        code: 'PLATAFORMA_ITEM_JA_VINCULADO',
+        jogoAtual: { id: 'g2', titulo: 'Celeste' },
+      }),
+    );
+    api.vincularJogo.mockResolvedValueOnce({} as never);
+    const { user, onVinculado } = abrir();
+
+    await user.click(await screen.findByRole('button', { name: /a outro jogo que já tenho/ }));
+    await user.selectOptions(await screen.findByLabelText('Jogo que já tenho'), 'a');
+    await user.click(screen.getByRole('button', { name: 'Vincular' }));
+    await user.click(await screen.findByRole('button', { name: 'Mover o vínculo' }));
+
+    await waitFor(() => expect(onVinculado).toHaveBeenCalledWith('a'));
+    expect(api.vincularJogo).toHaveBeenLastCalledWith('STEAM', 'a', {
+      idExterno: '100',
+      mover: true,
+    });
+  });
+
   it('a busca só vai à API depois de 300 ms parado', async () => {
     api.biblioteca.mockResolvedValue([item()]);
     const { user } = abrir();
