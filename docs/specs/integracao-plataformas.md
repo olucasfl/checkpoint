@@ -126,7 +126,8 @@ O retorno da Steam é um **GET do navegador sem Bearer** e o cookie `checkpoint_
 5. **Depois** — o web abre em `/perfil` com `?steam=`; a página mostra o aviso (`role="status"`) e troca a
    URL por `/perfil` com `replace` (o aviso não vai em `state` de navegação, porque a origem é um redirecionamento externo).
 6. Conta Steam já vinculada com **outro** SteamID → `ja-vinculada` (desvincule antes). Mesmo SteamID →
-   sucesso idempotente. Falha ao ler o nome (`GetPlayerSummaries`) **não** desfaz o vínculo já comprovado:
+   sucesso idempotente. **O mesmo SteamID em outra conta do checkpoint não conflita** (ver "Modelo de dados" e
+   CA-65). Falha ao ler o nome (`GetPlayerSummaries`) **não** desfaz o vínculo já comprovado:
    grava o nome "Conta Steam", corrigido na próxima leitura do perfil.
 
 **Reuso do `JWT_ACCESS_SECRET` só é seguro com os dois sentidos travados** (decisão de 2026-09-25):
@@ -382,6 +383,12 @@ notas: `minutosJogados >= 0`; `conquistasDesbloqueadas <= conquistasTotal` quand
 conquistas **não** é gravada (é buscada ao abrir o detalhe). Acrescentar um valor ao `Provedor` no futuro é
 `ALTER TYPE … ADD VALUE`, também aditivo.
 
+**A mesma conta Steam pode estar vinculada a mais de um usuário do checkpoint** (decisão de 2026-09-25, antes
+só em "Suposições"). Não há unicidade global do SteamID: os `@@unique` são por `(userId, provedor)` e
+`(userId, provedor, idExterno)`. Os dados da Steam são públicos e o OpenID prova a posse, então dois usuários que
+provam ser donos da mesma conta a vinculam sem conflito, e **cada vínculo é isolado**: cada um só vê e desvincula
+o seu, e os `JogoPlataforma` de um nunca aparecem para o outro (toda consulta filtra por `userId`).
+
 ## Contrato compartilhado
 
 Novo `packages/shared/src/integracoes.ts`, reexportado em `index.ts` (agnóstico de plataforma, sem Node):
@@ -502,7 +509,7 @@ simples e **mockado nos testes**, como o `StorageService`) e o `SteamOpenId` (mo
 ## Critérios de aceite (testáveis, em BDD)
 
 A numeração segue a ordem de escrita; a tabela de "Etapas" diz a que etapa cada critério pertence (CA-60, CA-63 e
-CA-64 são da etapa 1; CA-61 e CA-62, da etapa 2). O CA-63 só fecha quando os fixtures de perfil privado e
+CA-64 são da etapa 1; CA-61, CA-62 e CA-65, da etapa 2). O CA-63 só fecha quando os fixtures de perfil privado e
 conquistas negadas forem capturados (a etapa 1 pode ter testes `todo` até lá); a biblioteca vazia, sem conta
 de teste, fica com `todo` até a etapa 4.
 
@@ -599,6 +606,10 @@ idExterno)` e `(gameId, provedor)`, e nenhuma coluna de `Game`, `User` ou `Refre
       envio como `state` em `GET .../retorno` (com o cookie do mesmo nonce e uma resposta OpenID válida), **então** 302
       `motivo=invalido`, nada é gravado e o `check_authentication` da Steam **não** é chamado; **e** o mesmo resultado
       com um refresh token no lugar (assinatura de outro segredo).
+- [ ] **CA-65** — **Dado** Ana e Bia (duas contas do checkpoint) provando ser donas do MESMO SteamID, **quando** cada
+      uma conclui o vínculo, **então** as duas têm uma `ContaVinculada` (mesmo `idExterno`, um `userId` cada), sem
+      409; **e** `GET /api/integracoes` de cada uma devolve só a dela; **e** desvincular a da Ana (`DELETE`) não
+      apaga a `ContaVinculada` nem os `JogoPlataforma` da Bia.
 
 ### Etapa 3 — biblioteca e vínculo de jogo
 
@@ -739,7 +750,7 @@ Uma branch (`feat/integracao-plataformas`) e commits por etapa, parando para val
 | Etapa | Entrega                                                                                                                                                                                                                                                                                                        | Depende de | Critérios                          |
 | ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- | ---------------------------------- |
 | 1     | contrato no `shared` · schema + migration (aditiva) · env (`STEAM_API_KEY`, `API_PUBLIC_URL`, `WEB_PUBLIC_URL`) · `GameProvider` + registro · `SteamClient` com mocks · **primeira tarefa: chamada real com conta Steam de teste para fixar os fixtures** · `.env.example` no mesmo commit da validação de env | —          | CA-01 a CA-05, CA-60, CA-63, CA-64 |
-| 2     | OpenID (`vinculo`, `retorno`, `state` + cookie) · `perfil`, `atualizacao`, `DELETE` da conta · seção "Contas vinculadas" com o cartão · **pré-requisito: a chore do `trust proxy` (fora desta spec) já feita**                                                                                                 | 1          | CA-06 a CA-22, CA-61, CA-62        |
+| 2     | OpenID (`vinculo`, `retorno`, `state` + cookie) · `perfil`, `atualizacao`, `DELETE` da conta · seção "Contas vinculadas" com o cartão · **pré-requisito: a chore do `trust proxy` (fora desta spec) já feita**                                                                                                 | 1          | CA-06 a CA-22, CA-61, CA-62, CA-65 |
 | 3     | `biblioteca` · `PUT/DELETE .../jogos/:jogoId` · `BibliotecaSteamDialog` · Buscar na Steam, parecidos, "outro jogo", mover, confirmação de plataforma                                                                                                                                                           | 2          | CA-23 a CA-39                      |
 | 4     | `Game.dadosPlataforma` · linha do catálogo · precedência da capa · `GET/POST .../jogos/:jogoId` · bloco Steam, conquistas, atualização, privacidade                                                                                                                                                            | 3          | CA-40 a CA-55                      |
 | 5     | fechamento: `ARCHITECTURE.md` (ver abaixo), `INDEX.md`, exclusão de conta (CA-56 a CA-59), `/qa-verify` em produção, `/docs-sync`                                                                                                                                                                              | 4          | CA-56 a CA-59                      |
@@ -816,7 +827,8 @@ Assumidas ao escrever a spec e **aprovadas pelo humano em 2026-09-25**, junto co
 - O `state` é um JWT de `@nestjs/jwt` com `JWT_ACCESS_SECRET` e `typ: 'vinculo'` (sem segredo novo); o cookie
   `checkpoint_vinculo` amarra o retorno ao navegador que iniciou. Não amarra à `sid` da sessão.
 - Uma conta Steam do checkpoint pode ser vinculada por mais de um usuário do checkpoint (não há unicidade
-  global do SteamID): os dados são públicos e o OpenID prova a posse.
+  global do SteamID): os dados são públicos e o OpenID prova a posse. **Agora é comportamento explícito**
+  ("Modelo de dados" e CA-65).
 - A biblioteca é buscada por `busca` no servidor (sem paginação, `limite` ≤ 50), porque uma biblioteca de
   milhares de jogos não cabe numa resposta.
 - `jogosParecidos` compara por **igualdade** da chave normalizada, sem fuzzy (Levenshtein): "The Witcher 3" ≠
