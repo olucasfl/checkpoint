@@ -1,7 +1,8 @@
 # Spec: troca de design — "Estante de console"
 
-> Status: rascunho (2026-09-25). Escrita a partir da direção **aprovada** em `docs/design/estante-de-console/`. Só vira
-> `aprovada` com um "ok" explícito, depois das respostas às **Questões em aberto**. Nenhum código foi escrito.
+> Status: ✅ aprovada (2026-09-25). Escrita a partir da direção **aprovada** em `docs/design/estante-de-console/`; as decisões 1 a 3
+> e as questões 4 a 14 foram respondidas com "aceito todas as recomendações" (registro em "Decisões tomadas"). A implementação
+> começa pela F1 (branch `feat/design-estante-f1`). Nenhum código foi escrito ainda.
 
 ## Objetivo
 
@@ -190,7 +191,8 @@ Medidas do desenho a 1280 px, com o `safe-x` de 56 px que já existe.
   `fundo`) e o acesso ao **Perfil** (botão redondo de 48 px, `aria-label="Perfil"`, leva a `/perfil`).
 - **Destaque "Continue de onde parou"** (regra nova): o jogo com status **Jogando** de **maior `atualizadoEm`** (a lista já vem
   ordenada por `atualizadoEm` desc, `criadoEm` desc, então é o primeiro Jogando). **Sem nenhum Jogando, o destaque some** e a
-  estante começa direto. **Só aparece com o filtro "Todos" ou "Jogando"**, mesmo havendo jogos Jogando nos outros filtros. O jogo
+  estante começa direto. **Qualquer edição de um jogo (até a da descrição) atualiza o `atualizadoEm` e o promove a destaque** (decisão do humano,
+  questão 14). **Só aparece com o filtro "Todos" ou "Jogando"**, mesmo havendo jogos Jogando nos outros filtros. O jogo
   do destaque **continua na prateleira** "Jogando agora". Cartão de 230 px de altura, raio 24, fundo na cor da capa do jogo com o
   degradê escuro à esquerda; rótulo "Continue de onde parou" (ícone `play_circle`, 13 px, maiúsculas), título (Outfit 800, 52 px, até
   2 linhas), chips escuros de 32 px: plataforma (só se houver), estrela + média (só se houver), relógio + "42 h 30 min na Steam"
@@ -310,7 +312,7 @@ Decisões da **questão 1**; abaixo o que a spec propõe (recomendação). Nada 
 
 - **Cor de destaque:** as quatro continuam, mapeadas para tokens novos: **Azul** (`acento` `#4f8cff`, **padrão**), **Violeta** (`capa-6`),
   **Rosa** (`capa-2`) e **Laranja** (`capa-3`). Os valores gravados passam a `azul | violeta | rosa | laranja`. O antigo `magenta`
-  (o padrão de antes) e o antigo `azul` (`capa-1`, azul-claro) **viram `azul`** na migração; `violeta` e `laranja` ficam.
+  (o padrão de antes) e o antigo `azul` (`capa-1`, azul-claro) **viram `azul`** na migração, **sem tentar distinguir** quem escolheu de quem ficou no padrão; `violeta` e `laranja` ficam.
 - **Efeitos** viram **"Animações"** (`completas` / `reduzidas` na tela; o valor gravado continua `completos` / `reduzidos`, então
   **nenhuma migração** dessa chave). "Reduzidas" desliga a elevação e as transições novas, como o `prefers-reduced-motion`.
 - **Densidade:** continua, agora com o sentido de **capas menores** (medidas acima); valores gravados inalterados.
@@ -671,11 +673,24 @@ Tudo que a spec assumiu sem pergunta (cada uma tem um padrão razoável; corrija
 15. **"Perfil" no topo do catálogo** é um `link` (o desenho mostra um botão redondo); `aria-current` da navegação vale onde há a
     navegação em pílulas (questão 7).
 
-## Questões em aberto
+## Decisões tomadas e questões resolvidas
 
-**Decisões que você pediu para perguntar** (cada uma com a recomendação; responda "ok" para aceitar todas):
+Todas foram **aceitas como recomendadas** (2026-09-25), com os registros abaixo. Nenhuma questão em aberto.
 
-- [ ] **1. Preferências do perfil.**
+**Registros do humano na aprovação:**
+
+- **Q11 (ícones e favicon do PWA):** continuam magenta e ficam **fora desta spec**. O `INDEX.md` > Pendências registra que o ícone instalado vai
+  **destoar do azul**, para uma spec própria.
+- **Q14 (destaque):** a regra continua **"o último Jogando por `atualizadoEm`"**. **Qualquer edição de um jogo (até a da descrição) o promove a
+  destaque**, porque toda edição atualiza `atualizadoEm`. Se incomodar no uso, a regra é trocada depois (por exemplo, pela última vez jogado da
+  Steam), sem refazer o layout.
+- **Decisão 1 (preferências):** o armazenamento local **migra da versão 1 para a 2** (`STORAGE_SCHEMA_VERSION`, `MIGRATIONS[1]`); quem tinha
+  **magenta** ou o **azul antigo** (`capa-1`) **cai em `azul`** (o novo padrão), **sem tentar distinguir** quem escolheu de quem ficou no padrão;
+  `violeta` e `laranja` ficam. "Efeitos" vira "Animações" e "Densidade" vira "capas menores", ambos com o mesmo valor gravado.
+
+**Decisões e questões (com a recomendação aceita):**
+
+- [x] **1. Preferências do perfil.**
   - **(a) Cor de destaque:** manter as quatro, com **Azul** (`#4f8cff`) no lugar do padrão magenta, **Violeta** (`capa-6`), **Rosa**
     (`capa-2`) e **Laranja** (`capa-3`), e migrar o storage (1 → 2: `magenta` e o antigo `azul` viram `azul`; `violeta` e `laranja` ficam).
     _Recomendado._ Alternativas: (i) manter o antigo `azul` (`capa-1`, azul-claro) como uma quinta cor; (ii) reduzir a três cores.
@@ -684,49 +699,49 @@ Tudo que a spec assumiu sem pergunta (cada uma tem um padrão razoável; corrija
     migração. _Recomendado._ Alternativas: remover a opção (sobra só `prefers-reduced-motion`), ou mantê-la sem efeito algum.
   - **(c) "Densidade compacta":** virar **capas menores** (120 × 160 e 108 × 144), mesmo valor gravado. _Recomendado._ Alternativa:
     remover.
-- [ ] **2. Fontes.** Confirmar `<link>` do Google Fonts (sem pacote npm), com `display=swap` (o desenho usa `block`, que esconde o
+- [x] **2. Fontes.** Confirmar `<link>` do Google Fonts (sem pacote npm), com `display=swap` (o desenho usa `block`, que esconde o
       texto por até 3 s numa rede lenta) e `system-ui, sans-serif` de reserva. **Efeito no PWA offline:** nenhum novo. As fontes não
       entram no precache (`runtimeCaching: []`, só o shell): offline cai a fonte do sistema, como hoje com Orbitron e Rajdhani, e os ícones
       (Material Symbols, também por `<link>`) aparecem como texto de ligadura, como hoje. Trocar isso (fontes empacotadas em `public/`,
       que o `woff2` do precache já cobriria) é um trabalho à parte. _Recomendado: confirmar assim._
-- [ ] **3. Fases.** Confirmar a divisão da tabela: **F1** tokens, fontes e efeitos (layout em linhas); **F2** catálogo em estante e capa em
+- [x] **3. Fases.** Confirmar a divisão da tabela: **F1** tokens, fontes e efeitos (layout em linhas); **F2** catálogo em estante e capa em
       pé; **F3** detalhe e formulários; **F4** herdado, conferência e fechamento. Cada uma implantável sozinha. Ponto de atenção: entre a
       F2 e a F3, o detalhe e o formulário ficam nas cores novas com os cantos antigos.
 
 **Achados do design, com padrão sugerido:**
 
-- [ ] **4. Prateleira com muitos jogos** (o desenho só mostra 1 a 3 por prateleira). Opções: (a) rolagem horizontal em todos os
+- [x] **4. Prateleira com muitos jogos** (o desenho só mostra 1 a 3 por prateleira). Opções: (a) rolagem horizontal em todos os
       tamanhos (esconde jogos; no desktop o mouse rola mal; a elevação e o anel do hover são cortados se não houver folga); (b) quebra em
       linhas em todos os tamanhos (mostra tudo; a página cresce); (c) **quebra em linhas no desktop (≥ 768 px) e rolagem horizontal no
       celular**, como o desenho do celular. _Recomendado: (c)._ Com (c) a prateleira do desktop é uma grade de colunas de 150 px (o
       botão-bloco "Adicionar" fecha a última linha) e a do celular rola.
-- [ ] **5. Ações no celular, sem hover.** O desenho do celular não tem Editar nem Remover no _tile_. Proposta: **o caminho é abrir o
+- [x] **5. Ações no celular, sem hover.** O desenho do celular não tem Editar nem Remover no _tile_. Proposta: **o caminho é abrir o
       jogo** (o detalhe já tem Editar e Excluir), e em aparelho sem hover os botões nem são renderizados na estante. Alternativa: um botão
       "⋯" de 44 px por _tile_ abrindo uma folha com as duas ações (mais toques, mais ruído visual, mais teste).
-- [ ] **6. Halo do topo.** O desenho tem um degradê radial **estático** atrás do topo de cada tela (`rgba(79,140,255,0.16 a 0.2)`), e você
+- [x] **6. Halo do topo.** O desenho tem um degradê radial **estático** atrás do topo de cada tela (`rgba(79,140,255,0.16 a 0.2)`), e você
       pediu "sem orbes". Proposta: manter como decoração fixa, sem animação (`color-mix` de `destaque` a 16%), sem nada em movimento;
       ou remover.
-- [ ] **7. Barra superior no desktop.** O catálogo desenhado tem logo, filtros, "Adicionar jogo" e um botão de perfil, **sem** a
+- [x] **7. Barra superior no desktop.** O catálogo desenhado tem logo, filtros, "Adicionar jogo" e um botão de perfil, **sem** a
       navegação em pílulas (Jogos, Adicionar, Perfil) que o detalhe desenhado tem. Proposta: no catálogo, a barra do desenho; nas demais
       telas, a navegação em pílulas; o botão redondo de perfil é um `link` "Perfil"; e o `aria-current="page"` fica no logo (link para `/`)
       no catálogo. Alternativa: navegação em pílulas em todas as telas, com os filtros numa segunda fileira.
-- [ ] **8. Conquistas no detalhe: `<details>` ou sempre abertas?** Hoje (`integracao-plataformas`, CA-52) "Desbloqueadas" é um `<details>`
+- [x] **8. Conquistas no detalhe: `<details>` ou sempre abertas?** Hoje (`integracao-plataformas`, CA-52) "Desbloqueadas" é um `<details>`
       fechado e "Faltam" um aberto. O desenho mostra as duas abertas, lado a lado, com contador. Proposta: **manter os `<details>`** (uma
       lista de 200 itens fecha), estilizando o `summary` como o cabeçalho do desenho, e em ≥ 1024 px colocá-los em duas colunas.
       Alternativa: as duas sempre abertas (muda o CA-52).
-- [ ] **9. Fallback `header.jpg`.** A cadeia da capa hoje é enviada → oficial → `header.jpg` → gerada. Numa capa em pé, o `header.jpg`
+- [x] **9. Fallback `header.jpg`.** A cadeia da capa hoje é enviada → oficial → `header.jpg` → gerada. Numa capa em pé, o `header.jpg`
       (largo) vira um recorte do meio. Proposta: **tirar o `header.jpg`** (enviada → oficial → gerada). Alternativa: manter.
-- [ ] **10. Destaque de um jogo com capa de imagem.** O desenho mostra o fundo na cor da capa gerada com as iniciais como marca d'água.
+- [x] **10. Destaque de um jogo com capa de imagem.** O desenho mostra o fundo na cor da capa gerada com as iniciais como marca d'água.
       Proposta: com capa de imagem (enviada ou oficial), usá-la como fundo, com o mesmo degradê escuro à esquerda (o contraste do texto
       vem do degradê e dos chips escuros, não da imagem). Alternativa: o destaque **sempre** com a cor e a marca d'água, ignorando a imagem.
-- [ ] **11. Ícones e favicon do PWA** (`public/favicon.svg`, `public/icons/*`) são magenta sobre `#07040f`. O desenho só define o logo do
+- [x] **11. Ícones e favicon do PWA** (`public/favicon.svg`, `public/icons/*`) são magenta sobre `#07040f`. O desenho só define o logo do
       cabeçalho. Proposta: **fora desta spec** (ficam como estão) e uma tarefa própria com o desenho dos ícones. Alternativa: incluir na F4 um
       ícone simples (a bandeira em `fundo` sobre o círculo `acento`).
-- [ ] **12. "Sem plataforma" e o "Adicionar" com status.** (a) Sem plataforma: **sem chip** (padrão desta spec) ou o chip "Sem
+- [x] **12. "Sem plataforma" e o "Adicionar" com status.** (a) Sem plataforma: **sem chip** (padrão desta spec) ou o chip "Sem
       plataforma" do desenho. (b) O botão-bloco "Adicionar" da prateleira abre o formulário **com o status dela** (padrão desta spec, que
       para "Zerados" obriga a preencher ao menos uma nota, como já obriga hoje) ou sempre com o padrão.
-- [ ] **13. Anotação do desenho** "Capa enviada · a oficial da Steam é o plano B" (sob a capa do detalhe): tratada como **anotação**, não
+- [x] **13. Anotação do desenho** "Capa enviada · a oficial da Steam é o plano B" (sob a capa do detalhe): tratada como **anotação**, não
       como interface. Confirmar.
-- [ ] **14. O destaque é "o último Jogando por `atualizadoEm`".** Editar qualquer campo de um jogo (até a descrição) o torna o destaque,
+- [x] **14. O destaque é "o último Jogando por `atualizadoEm`".** Editar qualquer campo de um jogo (até a descrição) o torna o destaque,
       porque toda edição atualiza `atualizadoEm`; e a "última vez jogado" da Steam não entra. É a regra que você definiu; registrado como
       consequência.

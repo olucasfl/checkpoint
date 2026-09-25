@@ -12,7 +12,7 @@ commit — `/docs-sync` confere se ela bate com a realidade.
 | Perfil                              | [perfil.md](perfil.md)                                   | 🚧 em andamento |
 | Avaliação de jogos                  | [avaliacao-de-jogos.md](avaliacao-de-jogos.md)           | ✅ implementada |
 | Integração com plataformas (Steam)  | [integracao-plataformas.md](integracao-plataformas.md)   | 🚧 em andamento |
-| Troca de design: Estante de console | [troca-de-design-estante.md](troca-de-design-estante.md) | 📝 rascunho     |
+| Troca de design: Estante de console | [troca-de-design-estante.md](troca-de-design-estante.md) | ✅ aprovada     |
 
 ## Legenda de status
 
@@ -36,6 +36,12 @@ commit — `/docs-sync` confere se ela bate com a realidade.
   conversa nova, a spec é o único lugar onde "o que deveria acontecer" está escrito.
 
 ## Pendências de execução humana
+
+**`troca-de-design-estante` — ícones do PWA (fora da spec, decisão Q11):**
+
+- [ ] Os ícones instaláveis e o favicon (`public/favicon.svg`, `public/icons/*`) continuam **magenta sobre `#07040f`** e vão **destoar do azul**
+      (`#4f8cff`) do app novo, no ícone da tela inicial, na tela de abertura e na aba. Fazer uma **spec própria** com o desenho dos ícones
+      (o desenho aprovado só define o logo do cabeçalho: círculo azul com a bandeira).
 
 **`catalogo-jogos` — capa (etapa 2):**
 
