@@ -3,7 +3,7 @@ import { Prisma, type Game as GameRow } from '@prisma/client';
 import { badGatewayError } from '../../common/errors/api-error';
 import { type PrismaService } from '../../database/prisma.service';
 import { type StorageService } from './cover/storage.service';
-import { GamesService } from './games.service';
+import { GamesService, DADOS_PLATAFORMA_INCLUDE } from './games.service';
 
 /** Casos de capa do GamesService. PrismaService e StorageService são objetos simples de funções. */
 const ID = '3f2b8a52-9c1e-4d6a-8f31-0a7e5b2c9d44';
@@ -100,10 +100,14 @@ describe('GamesService — capa', () => {
       expect(path.endsWith('.png')).toBe(true);
       expect(content).toBe(PNG);
       expect(mime).toBe('image/png');
-      expect(game.findUnique).toHaveBeenCalledWith({ where: { id: ID, userId: USER } });
+      expect(game.findUnique).toHaveBeenCalledWith({
+        where: { id: ID, userId: USER },
+        include: DADOS_PLATAFORMA_INCLUDE,
+      });
       expect(game.update).toHaveBeenCalledWith({
         where: { id: ID, userId: USER },
         data: { capaPath: path },
+        include: DADOS_PLATAFORMA_INCLUDE,
       });
       expect(result.capaUrl).toBe(`https://storage.teste/capas/${path}`);
       expect(result).not.toHaveProperty('capaPath');
@@ -271,6 +275,7 @@ describe('GamesService — capa', () => {
       expect(game.update).toHaveBeenCalledWith({
         where: { id: ID, userId: USER },
         data: { capaPath: null },
+        include: DADOS_PLATAFORMA_INCLUDE,
       });
       expect(result.capaUrl).toBeNull();
       expect(storage.remove.mock.invocationCallOrder[0]).toBeLessThan(
@@ -296,7 +301,10 @@ describe('GamesService — capa', () => {
       const error = await failure(service.removeCover(USER, ID));
 
       expect(error.getStatus()).toBe(404);
-      expect(game.findUnique).toHaveBeenCalledWith({ where: { id: ID, userId: USER } });
+      expect(game.findUnique).toHaveBeenCalledWith({
+        where: { id: ID, userId: USER },
+        include: DADOS_PLATAFORMA_INCLUDE,
+      });
       expect(storage.remove).not.toHaveBeenCalled();
     });
 

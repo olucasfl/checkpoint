@@ -2,7 +2,7 @@ import { HttpException } from '@nestjs/common';
 import { Prisma, type Game as GameRow } from '@prisma/client';
 import { type PrismaService } from '../../database/prisma.service';
 import { type StorageService } from './cover/storage.service';
-import { GamesService } from './games.service';
+import { GamesService, DADOS_PLATAFORMA_INCLUDE } from './games.service';
 
 const ID = '3f2b8a52-9c1e-4d6a-8f31-0a7e5b2c9d44';
 /** Dono de todos os jogos destes testes. */
@@ -92,6 +92,7 @@ describe('GamesService', () => {
       expect(game.findMany).toHaveBeenCalledWith({
         where: { userId: USER },
         orderBy: [{ atualizadoEm: 'desc' }, { criadoEm: 'desc' }],
+        include: DADOS_PLATAFORMA_INCLUDE,
       });
     });
 
@@ -138,6 +139,7 @@ describe('GamesService', () => {
         capaUrl: null,
         criadoEm: '2026-09-23T12:00:00.000Z',
         atualizadoEm: '2026-09-23T13:00:00.000Z',
+        dadosPlataforma: [],
       });
       expect(result).not.toHaveProperty('tituloNormalizado');
       expect(result).not.toHaveProperty('plataformaNormalizada');
@@ -497,7 +499,10 @@ describe('GamesService', () => {
 
       expect(error.getStatus()).toBe(404);
       expect(error.getResponse()).toMatchObject({ message: 'Jogo não encontrado' });
-      expect(game.findUnique).toHaveBeenCalledWith({ where: { id: ID, userId: USER } });
+      expect(game.findUnique).toHaveBeenCalledWith({
+        where: { id: ID, userId: USER },
+        include: DADOS_PLATAFORMA_INCLUDE,
+      });
       expect(game.findFirst).not.toHaveBeenCalled();
       expect(game.update).not.toHaveBeenCalled();
     });
@@ -521,6 +526,7 @@ describe('GamesService', () => {
           tituloNormalizado: 'celeste',
           plataformaNormalizada: 'pc',
         },
+        include: DADOS_PLATAFORMA_INCLUDE,
       });
     });
 
@@ -834,5 +840,129 @@ describe('GamesService', () => {
 
       await expect(service.remove(USER, ID)).rejects.toThrow('conexao perdida');
     });
+  });
+});
+
+describe('GamesService — dadosPlataforma (CA-40)', () => {
+  const linhaDaPlataforma = {
+    provedor: 'STEAM' as const,
+    idExterno: '504230',
+    minutosJogados: 90,
+    ultimaVezJogadoEm: new Date('2026-02-01T00:00:00Z'),
+    conquistasTotal: 40,
+    conquistasDesbloqueadas: 12,
+    capaUrl: 'https://cdn.cloudflare.steamstatic.com/steam/apps/504230/library_600x900.jpg',
+    atualizadoEm: new Date('2026-09-25T12:00:00Z'),
+  };
+
+  it('o jogo ligado traz a camada da plataforma; o outro traz [] (só o que já está gravado)', async () => {
+    const { service, game } = setup();
+    game.findMany.mockResolvedValue([
+      // Colunas que NUNCA saem (userId, gameId, id da linha) vêm no mock de propósito.
+      {
+        ...row({ id: 'ligado' }),
+        dadosPlataforma: [{ ...linhaDaPlataforma, userId: USER, gameId: 'ligado', id: 'interno' }],
+      },
+      row({ id: 'sem-vinculo' }),
+    ]);
+
+    const [ligado, semVinculo] = await service.list(USER);
+
+    expect(ligado?.dadosPlataforma).toEqual([
+      {
+        provedor: 'STEAM',
+        idExterno: '504230',
+        minutosJogados: 90,
+        ultimaVezJogadoEm: '2026-02-01T00:00:00.000Z',
+        conquistasTotal: 40,
+        conquistasDesbloqueadas: 12,
+        capaUrl: 'https://cdn.cloudflare.steamstatic.com/steam/apps/504230/library_600x900.jpg',
+        atualizadoEm: '2026-09-25T12:00:00.000Z',
+      },
+    ]);
+    expect(semVinculo?.dadosPlataforma).toEqual([]);
+    expect(JSON.stringify(ligado)).not.toContain('interno');
+    expect(JSON.stringify(ligado)).not.toContain('gameId');
+  });
+
+  it('lê a camada na mesma consulta, só das colunas do contrato, sem consultar mais nada', async () => {
+    const { service, game } = setup();
+    game.findMany.mockResolvedValue([]);
+
+    await service.list(USER);
+
+    expect(game.findMany).toHaveBeenCalledTimes(1);
+    expect(game.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        include: {
+          dadosPlataforma: {
+            select: {
+              provedor: true,
+              idExterno: true,
+              minutosJogados: true,
+              ultimaVezJogadoEm: true,
+              conquistasTotal: true,
+              conquistasDesbloqueadas: true,
+              capaUrl: true,
+              atualizadoEm: true,
+            },
+            orderBy: { provedor: 'asc' },
+          },
+        },
+      }),
+    );
+  });
+
+  it('conquistas null (negadas ou nunca consultadas) e última vez jogado null passam como null', async () => {
+    const { service, game } = setup();
+    game.findMany.mockResolvedValue([
+      {
+        ...row(),
+        dadosPlataforma: [
+          {
+            ...linhaDaPlataforma,
+            conquistasTotal: null,
+            conquistasDesbloqueadas: null,
+            ultimaVezJogadoEm: null,
+          },
+        ],
+      },
+    ]);
+
+    const [jogo] = await service.list(USER);
+
+    expect(jogo?.dadosPlataforma[0]).toMatchObject({
+      conquistasTotal: null,
+      conquistasDesbloqueadas: null,
+      ultimaVezJogadoEm: null,
+    });
+  });
+
+  it('o PATCH devolve a camada também (o formulário edita o jogo salvo)', async () => {
+    const { service, game } = setup();
+    game.findUnique.mockResolvedValue(row());
+    game.findFirst.mockResolvedValue(null);
+    game.update.mockResolvedValue({
+      ...row({ titulo: 'Celeste 2' }),
+      dadosPlataforma: [linhaDaPlataforma],
+    });
+
+    const atualizado = await service.update(USER, ID, { titulo: 'Celeste 2' });
+
+    expect(atualizado.dadosPlataforma).toHaveLength(1);
+  });
+
+  it('um jogo recém-criado não tem camada: []', async () => {
+    const { service, game } = setup();
+    game.findFirst.mockResolvedValue(null);
+    game.create.mockResolvedValue(row());
+
+    const criado = await service.create(USER, {
+      titulo: 'Celeste',
+      status: 'JOGANDO',
+      plataforma: 'PC',
+    });
+
+    expect(criado.dadosPlataforma).toEqual([]);
   });
 });

@@ -304,7 +304,7 @@ describe('SteamClient', () => {
       expect(erro.message).not.toContain('steampowered');
     });
 
-    it('conquistas: 403 → "negado" (a confirmar com o fixture real de conquistas negadas)', async () => {
+    it('(SIMULADO, sem fixture real) conquistas: 403 → "negado"', async () => {
       fetchMock.mockResolvedValueOnce(html(403));
 
       await expect(client.obterConquistasDoJogador(STEAM_ID, APP_ID)).resolves.toEqual({
@@ -312,7 +312,7 @@ describe('SteamClient', () => {
       });
     });
 
-    it('conquistas: 200 com success false e outra mensagem → "negado"', async () => {
+    it('(SIMULADO, sem fixture real) conquistas: 200 com success false e outra mensagem → "negado"', async () => {
       fetchMock.mockResolvedValueOnce(
         resposta({
           status: 200,
@@ -322,6 +322,32 @@ describe('SteamClient', () => {
 
       await expect(client.obterConquistasDoJogador(STEAM_ID, APP_ID)).resolves.toEqual({
         tipo: 'negado',
+      });
+    });
+
+    it('(SIMULADO, sem fixture real) listarJogos: resposta SEM game_count é biblioteca privada; com game_count 0 é pública e vazia', async () => {
+      fetchMock.mockResolvedValueOnce(resposta({ status: 200, body: { response: {} } }));
+      fetchMock.mockResolvedValueOnce(
+        resposta({ status: 200, body: { response: { game_count: 0 } } }),
+      );
+
+      await expect(client.listarJogos(STEAM_ID)).resolves.toEqual({
+        privada: true,
+        total: 0,
+        jogos: [],
+      });
+      await expect(client.listarJogos(STEAM_ID)).resolves.toEqual({
+        privada: false,
+        total: 0,
+        jogos: [],
+      });
+    });
+
+    it('o 400 "Requested app has no stats" NÃO é "negado": é jogo sem conquistas (fixture REAL)', async () => {
+      fetchMock.mockResolvedValueOnce(resposta(fixture('player-achievements.sem-conquistas.json')));
+
+      await expect(client.obterConquistasDoJogador(STEAM_ID, '2076040')).resolves.toEqual({
+        tipo: 'sem-conquistas',
       });
     });
 
@@ -389,15 +415,17 @@ describe('SteamClient', () => {
   });
 
   // Fixtures que dependem de uma captura real ainda pendente (CA-63). Os testes vêm junto do fixture.
-  describe('pendentes (CA-63)', () => {
+  // Casos SEM fixture real (CA-63). Os testes acima que os cobrem estão nomeados "SIMULADO". Cada um se fecha
+  // rodando UM comando (gasta cota da chave: uma captura por execução) e trocando a resposta simulada pelo fixture.
+  describe('pendentes de fixture real (CA-63)', () => {
     it.todo(
-      'perfil privado: GetPlayerSummaries com visibilidade ≠ 3 e GetOwnedGames sem game_count → privada (fixture real pendente: a conta de teste troca a privacidade)',
+      'perfil privado REAL: GetPlayerSummaries com visibilidade ≠ 3 e GetOwnedGames sem game_count. Deixe "Meu perfil" = Privado no site da Steam, espere alguns minutos e rode: node apps/api/scripts/capturar-fixtures-steam.cjs privado',
     );
     it.todo(
-      'conquistas negadas: o que o GetPlayerAchievements devolve com "detalhes do jogo" privados, 403 ou success:false (fixture real pendente)',
+      'conquistas negadas REAIS: GetPlayerAchievements com "Detalhes do jogo" privados (403 ou success:false?). Deixe "Meu perfil" = Público e "Detalhes do jogo" = Privado e rode: node apps/api/scripts/capturar-fixtures-steam.cjs detalhes-privados (o script diz se é 403; se não for, ajuste obterConquistasDoJogador e os CA-30/CA-47)',
     );
     it.todo(
-      'biblioteca vazia: game_count 0 num perfil público sem jogos (sem conta de teste; fica para a etapa 4)',
+      'biblioteca vazia REAL (game_count 0): precisa de uma conta pública sem jogos em STEAM_TEST_ID_VAZIO no .env e rode: node apps/api/scripts/capturar-fixtures-steam.cjs vazio',
     );
   });
 });

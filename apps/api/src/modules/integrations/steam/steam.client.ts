@@ -189,8 +189,9 @@ export class SteamClient {
   ): Promise<SteamConquistasDoJogador> {
     this.validarSteamId(steamId);
     this.validarAppId(appId);
-    // 400 = jogo sem estatísticas ("Requested app has no stats"). O 403 é tratado como "negado" (detalhes
-    // do jogo privados) até o fixture real de conquistas negadas confirmar o que a Steam devolve (CA-63).
+    // 400 = jogo sem estatísticas ("Requested app has no stats", fixture REAL). "Negado" (detalhes do jogo
+    // privados) = 403 ou 200 com success:false: SIMULADO, sem fixture real (CA-63). Rode
+    // `node apps/api/scripts/capturar-fixtures-steam.cjs detalhes-privados` para confirmar.
     const { status, body } = await this.request(
       'GetPlayerAchievements',
       'ISteamUserStats/GetPlayerAchievements/v1/',

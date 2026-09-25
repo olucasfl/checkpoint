@@ -73,6 +73,7 @@ export class SteamProvider implements GameProvider {
   }
 
   /**
+   * SIMULADO, sem fixture real (CA-63): "privado" = visibilidade ≠ 3 ou biblioteca sem `game_count`.
    * A biblioteca e o perfil, na mesma consulta. Perfil que não é público, ou biblioteca sem `game_count`
    * ("detalhes do jogo" privados), é `PerfilPrivadoError`. Biblioteca pública e vazia NÃO é erro.
    */

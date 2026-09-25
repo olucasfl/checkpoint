@@ -223,7 +223,7 @@ describe('SteamProvider.listarBiblioteca', () => {
       { privada: true, total: 0, jogos: [] },
     ],
   ])(
-    '%s → PerfilPrivadoError (PLATAFORMA_PERFIL_PRIVADO, CA-20)',
+    '(SIMULADO, sem fixture real) %s → PerfilPrivadoError (PLATAFORMA_PERFIL_PRIVADO, CA-20)',
     async (_nome, perfil, biblioteca) => {
       const { provider, client } = montar();
       client.obterPerfil.mockResolvedValue(perfil);
@@ -236,7 +236,7 @@ describe('SteamProvider.listarBiblioteca', () => {
     },
   );
 
-  it('biblioteca pública e VAZIA (game_count 0) não é erro: devolve zero itens (CA-20)', async () => {
+  it('(SIMULADO, sem fixture real) biblioteca pública e VAZIA (game_count 0) não é erro: devolve zero itens (CA-20)', async () => {
     const { provider, client } = montar();
     client.obterPerfil.mockResolvedValue(perfilPublico);
     client.listarJogos.mockResolvedValue({ privada: false, total: 0, jogos: [] });
@@ -365,7 +365,7 @@ describe('SteamProvider.obterJogo — o resumo (etapa 3)', () => {
     expect(aviso).toBe('SEM_CONQUISTAS');
   });
 
-  it('conquistas negadas: as horas ficam, as contagens são null e o aviso é CONQUISTAS_PRIVADAS (CA-30)', async () => {
+  it('(SIMULADO, sem fixture real) conquistas negadas: as horas ficam, as contagens são null e o aviso é CONQUISTAS_PRIVADAS (CA-30)', async () => {
     const ctx = comBiblioteca();
     ctx.client.obterConquistasDoJogador.mockResolvedValue({ tipo: 'negado' });
 
@@ -390,7 +390,7 @@ describe('SteamProvider.obterJogo — o resumo (etapa 3)', () => {
     expect(dados).toMatchObject({ minutosJogados: 0, ultimaVezJogadoEm: null });
   });
 
-  it('biblioteca privada → PerfilPrivadoError, e as conquistas nem são consultadas (CA-30)', async () => {
+  it('(SIMULADO, sem fixture real) biblioteca privada → PerfilPrivadoError, e as conquistas nem são consultadas (CA-30)', async () => {
     const ctx = montar();
     ctx.client.listarJogos.mockResolvedValue({ privada: true, total: 0, jogos: [] });
 
@@ -484,7 +484,7 @@ describe('SteamProvider.obterJogo — o resumo (etapa 3)', () => {
   });
 
   it.todo(
-    'conquistas negadas REAIS: o que o GetPlayerAchievements devolve com "detalhes do jogo" privados (fixture pendente; hoje o 403 é tratado como negado)',
+    'conquistas negadas REAIS no obterJogo: troque o mock "negado" pelo fixture player-achievements.negado.json. Comando: node apps/api/scripts/capturar-fixtures-steam.cjs detalhes-privados',
   );
   it.todo('etapa 4: a lista completa de conquistas (schema, raridade e cache)');
 });

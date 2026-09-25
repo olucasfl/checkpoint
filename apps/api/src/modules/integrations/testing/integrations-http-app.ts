@@ -56,8 +56,12 @@ export interface JogoPlataformaRow {
   gameId?: string;
   provedor: 'STEAM';
   idExterno: string;
+  minutosJogados?: number;
+  ultimaVezJogadoEm?: Date | null;
   conquistasTotal: number | null;
   conquistasDesbloqueadas: number | null;
+  capaUrl?: string | null;
+  atualizadoEm?: Date;
 }
 
 /**
@@ -68,6 +72,12 @@ export class FakeIntegrationsPrisma {
   contas: ContaRow[] = [];
   jogos: JogoPlataformaRow[] = [];
   games: GameRow[] = [];
+  /** Um retrato de `jogos` ANTES de cada escrita: é o que a transação usa para desfazer (rollback). */
+  private historico: JogoPlataformaRow[][] = [];
+
+  private registrar(): void {
+    this.historico.push(this.jogos.map((j) => ({ ...j })));
+  }
   sessions = new Map<string, string>();
 
   refreshSession = {
@@ -124,25 +134,119 @@ export class FakeIntegrationsPrisma {
   };
 
   game = {
+    findFirst: ({ where }: { where: { id: string; userId: string } }) => {
+      const jogo = this.games.find((g) => g.id === where.id && g.userId === where.userId);
+      return Promise.resolve(jogo ? { ...jogo } : null);
+    },
     findMany: ({ where }: { where: { userId: string } }) =>
       Promise.resolve(this.games.filter((g) => g.userId === where.userId).map((g) => ({ ...g }))),
   };
 
+  /** Preenche o que as linhas de teste omitem, como o banco devolveria as colunas. */
+  private completa(j: JogoPlataformaRow) {
+    return {
+      ...j,
+      minutosJogados: j.minutosJogados ?? 0,
+      ultimaVezJogadoEm: j.ultimaVezJogadoEm ?? null,
+      capaUrl: j.capaUrl ?? null,
+      atualizadoEm: j.atualizadoEm ?? new Date(0),
+    };
+  }
+
   jogoPlataforma = {
     findMany: ({ where }: { where: { userId: string; provedor: string } }) =>
       Promise.resolve(
-        this.jogos.filter((j) => j.userId === where.userId && j.provedor === where.provedor),
+        this.jogos
+          .filter((j) => j.userId === where.userId && j.provedor === where.provedor)
+          .map((j) => this.completa(j)),
       ),
-    deleteMany: ({ where }: { where: { userId: string; provedor: string } }) => {
+    findUnique: ({
+      where,
+    }: {
+      where: {
+        gameId_provedor?: { gameId: string; provedor: string };
+        userId_provedor_idExterno?: { userId: string; provedor: string; idExterno: string };
+      };
+    }) => {
+      const porJogo = where.gameId_provedor;
+      const porItem = where.userId_provedor_idExterno;
+      const achada = this.jogos.find((j) =>
+        porJogo
+          ? j.gameId === porJogo.gameId && j.provedor === porJogo.provedor
+          : j.userId === porItem?.userId &&
+            j.provedor === porItem.provedor &&
+            j.idExterno === porItem.idExterno,
+      );
+      return Promise.resolve(achada ? this.completa(achada) : null);
+    },
+    /** As duas unicidades da migration: `(gameId, provedor)` e `(userId, provedor, idExterno)`. */
+    create: ({ data }: { data: Omit<JogoPlataformaRow, 'id'> }) => {
+      this.registrar();
+      if (this.jogos.some((j) => j.gameId === data.gameId && j.provedor === data.provedor)) {
+        return Promise.reject(
+          Object.assign(new Error('unique'), {
+            code: 'P2002',
+            meta: { target: ['gameId', 'provedor'] },
+          }),
+        );
+      }
+      if (
+        this.jogos.some(
+          (j) =>
+            j.userId === data.userId &&
+            j.provedor === data.provedor &&
+            j.idExterno === data.idExterno,
+        )
+      ) {
+        return Promise.reject(
+          Object.assign(new Error('unique'), {
+            code: 'P2002',
+            meta: { target: ['userId', 'provedor', 'idExterno'] },
+          }),
+        );
+      }
+      if (!this.games.some((g) => g.id === data.gameId)) {
+        return Promise.reject(Object.assign(new Error('fk'), { code: 'P2003' }));
+      }
+      const row: JogoPlataformaRow = { ...data, id: randomUUID() };
+      this.jogos.push(row);
+      return Promise.resolve(this.completa(row));
+    },
+    deleteMany: ({
+      where,
+    }: {
+      where: { userId: string; provedor?: string; id?: string; gameId?: string };
+    }) => {
+      this.registrar();
       const antes = this.jogos.length;
       this.jogos = this.jogos.filter(
-        (j) => !(j.userId === where.userId && j.provedor === where.provedor),
+        (j) =>
+          !(
+            j.userId === where.userId &&
+            (where.provedor === undefined || j.provedor === where.provedor) &&
+            (where.id === undefined || j.id === where.id) &&
+            (where.gameId === undefined || j.gameId === where.gameId)
+          ),
       );
       return Promise.resolve({ count: antes - this.jogos.length });
     },
   };
 
-  $transaction = (operacoes: Promise<unknown>[]) => Promise.all(operacoes);
+  /**
+   * Como o Prisma: se uma operação falha, TODAS as escritas da transação são desfeitas. As operações chegam
+   * já executadas (o fake é eager), então o estado anterior é o retrato tirado antes da PRIMEIRA delas.
+   */
+  $transaction = async (operacoes: Promise<unknown>[]) => {
+    const anterior = this.historico[this.historico.length - operacoes.length];
+    try {
+      return await Promise.all(operacoes);
+    } catch (error) {
+      if (anterior) {
+        this.jogos = anterior;
+      }
+      throw error;
+    }
+  };
 }
 
 /** Uma rota protegida qualquer, para provar que o `state` não vale como access token (CA-61). */
@@ -179,7 +283,7 @@ export interface IntegrationsHttpApp {
   baseUrl: string;
   db: FakeIntegrationsPrisma;
   /** O `SteamClient` falso (só o que o provider usa). */
-  client: { obterPerfil: jest.Mock; listarJogos: jest.Mock };
+  client: { obterPerfil: jest.Mock; listarJogos: jest.Mock; obterConquistasDoJogador: jest.Mock };
   /** O OpenID de verdade, com a chamada à Steam (`validarRetorno`) trocada por um mock. */
   openId: SteamOpenId & { validarRetorno: jest.Mock };
   logger: CollectingLogger;
@@ -199,7 +303,11 @@ export async function startIntegrationsApp(
 ): Promise<IntegrationsHttpApp> {
   const db = new FakeIntegrationsPrisma();
   const logger = new CollectingLogger();
-  const client = { obterPerfil: jest.fn(), listarJogos: jest.fn() };
+  const client = {
+    obterPerfil: jest.fn(),
+    listarJogos: jest.fn(),
+    obterConquistasDoJogador: jest.fn(),
+  };
   const openId = Object.assign(new SteamOpenId(), { validarRetorno: jest.fn() });
 
   const moduleRef = await Test.createTestingModule({

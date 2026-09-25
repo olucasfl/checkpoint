@@ -71,3 +71,21 @@ export class ItemBibliotecaDto {
   })
   vinculadoA!: JogoParecidoDto | null;
 }
+
+export class DadosJogoPlataformaDto {
+  @ApiProperty({ enum: PROVEDORES }) provedor!: Provedor;
+  @ApiProperty({ description: 'O identificador do item na plataforma (na Steam, o appid)' })
+  idExterno!: string;
+  @ApiProperty() minutosJogados!: number;
+  @ApiPropertyOptional({ nullable: true, type: String, description: 'ISO 8601' })
+  ultimaVezJogadoEm!: string | null;
+  @ApiPropertyOptional({
+    nullable: true,
+    type: Number,
+    description: 'null = nunca consultado ou negado; 0 = o jogo não tem conquistas',
+  })
+  conquistasTotal!: number | null;
+  @ApiPropertyOptional({ nullable: true, type: Number }) conquistasDesbloqueadas!: number | null;
+  @ApiPropertyOptional({ nullable: true, type: String }) capaUrl!: string | null;
+  @ApiProperty({ description: 'ISO 8601' }) atualizadoEm!: string;
+}

@@ -1,4 +1,5 @@
 import {
+  Body,
   Controller,
   Delete,
   Get,
@@ -7,6 +8,7 @@ import {
   HttpStatus,
   Param,
   Post,
+  Put,
   Query,
   Req,
   Res,
@@ -20,6 +22,7 @@ import {
   ApiConflictResponse,
   ApiFoundResponse,
   ApiNoContentResponse,
+  ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
   ApiParam,
@@ -32,6 +35,7 @@ import { SkipThrottle, Throttle } from '@nestjs/throttler';
 import { type Request, type Response } from 'express';
 import {
   type ContaVinculada,
+  type DadosJogoPlataforma,
   type ItemBiblioteca,
   type PerfilPlataforma,
   type Provedor,
@@ -44,8 +48,10 @@ import {
 import { ApiErrorResponseDto } from '../../common/errors/api-error-response.dto';
 import { type EnvironmentVariables } from '../../config/env.validation';
 import { BibliotecaQueryDto } from './dto/biblioteca-query.dto';
+import { VincularJogoDto } from './dto/vincular-jogo.dto';
 import {
   ContaVinculadaDto,
+  DadosJogoPlataformaDto,
   IniciarVinculoResponseDto,
   ItemBibliotecaDto,
   PerfilPlataformaDto,
@@ -57,6 +63,7 @@ import {
 } from './integrations.constants';
 import { IntegrationsService } from './integrations.service';
 import { IntegrationsThrottlerGuard } from './integrations-throttler.guard';
+import { jogoIdPipe } from './jogo-id.pipe';
 import { PlataformaExceptionFilter } from './plataforma-http-errors';
 import { ProvedorSlugPipe } from './provedor-slug.pipe';
 import { clearVinculoCookie, setVinculoCookie } from './vinculo/vinculo-cookie';
@@ -239,6 +246,69 @@ export class IntegrationsController {
     @Query() query: BibliotecaQueryDto,
   ): Promise<ItemBiblioteca[]> {
     return this.integrations.biblioteca(user.id, provedor, query);
+  }
+
+  @Put(':provedor/jogos/:jogoId')
+  @HttpCode(HttpStatus.OK)
+  @Header('cache-control', 'no-store')
+  @ApiOperation({
+    summary: 'Liga um item da biblioteca a UM jogo do catálogo (1 para 1) e grava o último valor',
+    description:
+      'Só liga o que o usuário escolhe (nunca automático) e só itens da biblioteca dele. Não olha nem altera a ' +
+      '`plataforma` do jogo. Um item já ligado a outro jogo dá 409 com `jogoAtual`; com `mover: true` o vínculo ' +
+      'passa para este jogo e o antigo perde só a camada da plataforma. Repetir o mesmo pedido é idempotente.',
+  })
+  @ApiParam(PROVEDOR_PARAM)
+  @ApiOkResponse({ type: DadosJogoPlataformaDto })
+  @ApiBadRequestResponse({
+    type: ApiErrorResponseDto,
+    description:
+      '`VALIDACAO`: provedor, jogo ou corpo inválido (`idExterno` ausente ou malformado)',
+  })
+  @ApiNotFoundResponse({
+    type: ApiErrorResponseDto,
+    description: 'Jogo inexistente ou de outro usuário, ou `PLATAFORMA_ITEM_NAO_ENCONTRADO`',
+  })
+  @ApiConflictResponse({
+    type: ApiErrorResponseDto,
+    description:
+      '`PLATAFORMA_NAO_VINCULADA`, `PLATAFORMA_JOGO_JA_VINCULADO`, `PLATAFORMA_ITEM_JA_VINCULADO` (com `jogoAtual`) ou `PLATAFORMA_PERFIL_PRIVADO`',
+  })
+  @ApiUnauthorizedResponse({ type: ApiErrorResponseDto })
+  @ApiTooManyRequestsResponse({ type: ApiErrorResponseDto, description: '`LIMITE_TENTATIVAS`' })
+  @ApiResponse502()
+  vincularJogo(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('provedor', ProvedorSlugPipe) provedor: Provedor,
+    @Param('jogoId', jogoIdPipe()) jogoId: string,
+    @Body() dto: VincularJogoDto,
+  ): Promise<DadosJogoPlataforma> {
+    return this.integrations.vincularJogo(user.id, provedor, jogoId, dto);
+  }
+
+  @Delete(':provedor/jogos/:jogoId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({
+    summary: 'Remove só a camada da plataforma deste jogo',
+    description: 'Título, status, notas, descrição e capa do jogo não são tocados.',
+  })
+  @ApiParam(PROVEDOR_PARAM)
+  @ApiNoContentResponse({ description: 'Desvinculado' })
+  @ApiBadRequestResponse({
+    type: ApiErrorResponseDto,
+    description: '`VALIDACAO`: provedor ou jogo inválido',
+  })
+  @ApiNotFoundResponse({
+    type: ApiErrorResponseDto,
+    description: 'Jogo inexistente ou de outro usuário, ou `PLATAFORMA_VINCULO_NAO_ENCONTRADO`',
+  })
+  @ApiUnauthorizedResponse({ type: ApiErrorResponseDto })
+  desvincularJogo(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('provedor', ProvedorSlugPipe) provedor: Provedor,
+    @Param('jogoId', jogoIdPipe()) jogoId: string,
+  ): Promise<void> {
+    return this.integrations.desvincularJogo(user.id, provedor, jogoId);
   }
 
   @Post(':provedor/perfil/atualizacao')

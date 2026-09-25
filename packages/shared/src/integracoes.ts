@@ -1,4 +1,4 @@
-import { type ApiErrorResponse } from './games';
+import type { ApiErrorResponse } from './games';
 
 /**
  * Contrato das integrações com plataformas de jogos (spec `integracao-plataformas`). Só tipos,

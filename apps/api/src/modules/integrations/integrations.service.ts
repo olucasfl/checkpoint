@@ -1,15 +1,17 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   ATUALIZACAO_MANUAL_MIN_MS,
   PROVEDOR_SLUG,
   chaveDeTitulo,
   type ContaVinculada,
+  type DadosJogoPlataforma,
   type IniciarVinculoResponse,
   type ItemBiblioteca,
   type JogoParecido,
   type PerfilPlataforma,
   type Provedor,
+  type VincularJogoRequest,
 } from '@checkpoint/shared';
 import { API_GLOBAL_PREFIX } from '../../config/app.config';
 import { type EnvironmentVariables } from '../../config/env.validation';
@@ -22,6 +24,7 @@ import {
   MAIS_JOGADOS_NO_CARTAO,
   MAX_JOGOS_PARECIDOS,
 } from './integrations.constants';
+import { DADOS_JOGO_PLATAFORMA_SELECT, toDadosJogoPlataforma } from './lib/dados-plataforma';
 import { integracaoErrors } from './plataforma-http-errors';
 import { type ItemDaBiblioteca, type PerfilBasico } from './providers/game-provider';
 import {
@@ -46,6 +49,9 @@ interface BibliotecaEmCache {
   perfil: PerfilBasico;
   consultadoEm: number;
 }
+
+/** A mesma mensagem do catálogo: jogo inexistente OU de outro usuário. */
+const JOGO_NAO_ENCONTRADO = 'Jogo não encontrado';
 
 const CONTA_SELECT = {
   provedor: true,
@@ -319,6 +325,107 @@ export class IntegrationsService {
     return entrada;
   }
 
+  /**
+   * Liga um item da biblioteca a UM jogo do catálogo (1 para 1) e grava o último valor da plataforma. Nunca é
+   * automático: só roda por um pedido explícito. A ORDEM poupa a cota da chave: (1) o jogo é do usuário e há
+   * conta vinculada; (2) o jogo já tem vínculo (o mesmo item é idempotente; outro item é 409); (3) o item já está
+   * ligado a outro jogo (sem `mover`, 409 com o jogo atual, SEM chamar a plataforma); (4) só então a plataforma:
+   * confere que o item é do usuário e traz o resumo; (5) grava. Com `mover`, a linha do jogo antigo é apagada e a
+   * do novo criada NUMA transação, e o jogo antigo só perde a camada da plataforma. Se a plataforma falha no
+   * passo 4, nada muda. A `plataforma` do jogo (texto livre) nunca é lida nem alterada.
+   */
+  async vincularJogo(
+    userId: string,
+    provedor: Provedor,
+    jogoId: string,
+    corpo: VincularJogoRequest,
+  ): Promise<DadosJogoPlataforma> {
+    const provider = this.registry.porProvedor(provedor);
+
+    const jogo = await this.prisma.game.findFirst({
+      where: { id: jogoId, userId },
+      select: { id: true },
+    });
+    if (!jogo) {
+      throw new NotFoundException(JOGO_NAO_ENCONTRADO);
+    }
+    const conta = await this.contaDe(userId, provedor);
+    if (!conta) {
+      throw integracaoErrors.naoVinculada();
+    }
+
+    const doJogo = await this.prisma.jogoPlataforma.findUnique({
+      where: { gameId_provedor: { gameId: jogoId, provedor } },
+      select: DADOS_JOGO_PLATAFORMA_SELECT,
+    });
+    if (doJogo) {
+      if (doJogo.idExterno === corpo.idExterno) {
+        // Repetir o mesmo pedido (uma resposta perdida) não é erro: devolve o que já está gravado.
+        return toDadosJogoPlataforma(doJogo);
+      }
+      throw integracaoErrors.jogoJaVinculado();
+    }
+
+    const doItem = await this.prisma.jogoPlataforma.findUnique({
+      where: { userId_provedor_idExterno: { userId, provedor, idExterno: corpo.idExterno } },
+      select: { id: true, gameId: true },
+    });
+    if (doItem && corpo.mover !== true) {
+      throw await this.itemJaVinculado(userId, doItem.gameId);
+    }
+
+    // A plataforma: confere que o item é do usuário e traz o resumo. Falha (502, privado, item fora da biblioteca)
+    // sobe aqui, ANTES de qualquer escrita.
+    const { dados } = await provider.obterJogo(conta.idExterno, corpo.idExterno);
+    const data = {
+      userId,
+      gameId: jogoId,
+      provedor,
+      idExterno: dados.idExterno,
+      minutosJogados: dados.minutosJogados,
+      ultimaVezJogadoEm: dados.ultimaVezJogadoEm,
+      conquistasTotal: dados.conquistasTotal,
+      conquistasDesbloqueadas: dados.conquistasDesbloqueadas,
+      capaUrl: dados.capaUrl,
+      // `Date.now()` como no resto do service: o relógio é um só (e os testes o controlam).
+      atualizadoEm: new Date(Date.now()),
+    };
+
+    try {
+      if (doItem) {
+        const [, criada] = await this.prisma.$transaction([
+          this.prisma.jogoPlataforma.deleteMany({ where: { id: doItem.id, userId } }),
+          this.prisma.jogoPlataforma.create({ data, select: DADOS_JOGO_PLATAFORMA_SELECT }),
+        ]);
+        return toDadosJogoPlataforma(criada);
+      }
+      const criada = await this.prisma.jogoPlataforma.create({
+        data,
+        select: DADOS_JOGO_PLATAFORMA_SELECT,
+      });
+      return toDadosJogoPlataforma(criada);
+    } catch (error) {
+      throw await this.traduzirErroDoVinculo(error, userId, provedor, dados.idExterno);
+    }
+  }
+
+  /** Remove só a camada da plataforma DESTE jogo. Os dados do usuário (título, notas, capa…) não são tocados. */
+  async desvincularJogo(userId: string, provedor: Provedor, jogoId: string): Promise<void> {
+    const jogo = await this.prisma.game.findFirst({
+      where: { id: jogoId, userId },
+      select: { id: true },
+    });
+    if (!jogo) {
+      throw new NotFoundException(JOGO_NAO_ENCONTRADO);
+    }
+    const { count } = await this.prisma.jogoPlataforma.deleteMany({
+      where: { gameId: jogoId, userId, provedor },
+    });
+    if (count === 0) {
+      throw integracaoErrors.vinculoNaoEncontrado();
+    }
+  }
+
   /** Para onde o navegador volta depois do retorno: sem o SteamID, o `state` nem qualquer dado do usuário. */
   urlDoRedirecionamento(resultado: ResultadoDoRetorno): string {
     const base = `${this.webPublicUrl()}/perfil`;
@@ -435,6 +542,46 @@ export class IntegrationsService {
       total: jogos.reduce((soma, jogo) => soma + (jogo.conquistasTotal ?? 0), 0),
       jogosVinculados: jogos.length,
     };
+  }
+
+  /** O 409 do item já ligado: leva o jogo atual (`jogoAtual`) para o web oferecer "Mover o vínculo". */
+  private async itemJaVinculado(userId: string, gameId: string) {
+    const outro = await this.prisma.game.findFirst({
+      where: { id: gameId, userId },
+      select: { id: true, titulo: true },
+    });
+    return integracaoErrors.itemJaVinculado({ id: gameId, titulo: outro?.titulo ?? '' });
+  }
+
+  /**
+   * Uma corrida no banco (`P2002`) é traduzida pela restrição violada: `(gameId, provedor)` é "o jogo já tem
+   * vínculo"; `(userId, provedor, idExterno)` é "o item já está ligado a outro jogo". `P2003`: o jogo sumiu
+   * no meio do caminho.
+   */
+  private async traduzirErroDoVinculo(
+    error: unknown,
+    userId: string,
+    provedor: Provedor,
+    idExterno: string,
+  ): Promise<unknown> {
+    const code = (error as { code?: string }).code;
+    if (code === 'P2002') {
+      const alvo = JSON.stringify((error as { meta?: { target?: unknown } }).meta?.target ?? '');
+      if (alvo.includes('idExterno')) {
+        const dono = await this.prisma.jogoPlataforma.findUnique({
+          where: { userId_provedor_idExterno: { userId, provedor, idExterno } },
+          select: { gameId: true },
+        });
+        if (dono) {
+          return this.itemJaVinculado(userId, dono.gameId);
+        }
+      }
+      return integracaoErrors.jogoJaVinculado();
+    }
+    if (code === 'P2003') {
+      return new NotFoundException(JOGO_NAO_ENCONTRADO);
+    }
+    return error;
   }
 
   private recusar(provedor: Provedor, motivo: MotivoDoRetorno): ResultadoDoRetorno {

@@ -1,4 +1,4 @@
-import { ArgumentsHost, Catch, type ExceptionFilter, type HttpException } from '@nestjs/common';
+import { ArgumentsHost, Catch, HttpException, type ExceptionFilter } from '@nestjs/common';
 import { type Response } from 'express';
 import { apiError, badRequestError } from '../../common/errors/api-error';
 import {
@@ -13,6 +13,25 @@ import {
 
 /** Os erros de negócio das rotas de integração, um por `code` estável (o web mostra o texto pelo `code`). */
 export const integracaoErrors = {
+  jogoJaVinculado: () =>
+    apiError(
+      409,
+      'PLATAFORMA_JOGO_JA_VINCULADO',
+      'Este jogo já está ligado a um item da plataforma. Desvincule-o antes.',
+    ),
+  /** O corpo traz o jogo que já tem o item (`jogoAtual`): o web oferece "Mover o vínculo". */
+  itemJaVinculado: (jogoAtual: { id: string; titulo: string }) =>
+    new HttpException(
+      {
+        statusCode: 409,
+        code: 'PLATAFORMA_ITEM_JA_VINCULADO',
+        message: 'Esse item da biblioteca já está ligado a outro jogo seu.',
+        jogoAtual,
+      },
+      409,
+    ),
+  vinculoNaoEncontrado: () =>
+    apiError(404, 'PLATAFORMA_VINCULO_NAO_ENCONTRADO', 'Este jogo não está ligado à plataforma.'),
   naoVinculada: () =>
     apiError(409, 'PLATAFORMA_NAO_VINCULADA', 'Vincule sua conta na plataforma para continuar.'),
   jaVinculada: () =>

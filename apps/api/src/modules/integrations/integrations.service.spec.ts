@@ -7,6 +7,7 @@ import { IntegrationsService } from './integrations.service';
 import {
   PerfilPrivadoError,
   PlataformaIndisponivelError,
+  PlataformaItemNaoEncontradoError,
   PlataformaLimiteError,
   VinculoCanceladoError,
   VinculoRecusadoError,
@@ -49,8 +50,13 @@ function montar() {
       update: jest.fn(),
       deleteMany: jest.fn(),
     },
-    game: { findMany: jest.fn() },
-    jogoPlataforma: { findMany: jest.fn(), deleteMany: jest.fn() },
+    game: { findMany: jest.fn(), findFirst: jest.fn() },
+    jogoPlataforma: {
+      findMany: jest.fn(),
+      findUnique: jest.fn(),
+      create: jest.fn(),
+      deleteMany: jest.fn(),
+    },
     $transaction: jest.fn((operacoes: Promise<unknown>[]) => Promise.all(operacoes)),
   };
   prisma.contaVinculada.findUnique.mockResolvedValue(null);
@@ -623,7 +629,7 @@ describe('IntegrationsService.perfil', () => {
   });
 
   it.each([
-    ['perfil privado', new PerfilPrivadoError()],
+    ['perfil privado (SIMULADO, sem fixture real)', new PerfilPrivadoError()],
     ['Steam indisponível', new PlataformaIndisponivelError()],
     ['Steam no limite', new PlataformaLimiteError()],
   ])(
@@ -887,7 +893,7 @@ describe('IntegrationsService.biblioteca (CA-23 a CA-25)', () => {
   });
 
   it.each([
-    ['perfil privado', new PerfilPrivadoError()],
+    ['perfil privado (SIMULADO, sem fixture real)', new PerfilPrivadoError()],
     ['Steam indisponível', new PlataformaIndisponivelError()],
     ['Steam no limite', new PlataformaLimiteError()],
   ])(
@@ -911,5 +917,377 @@ describe('IntegrationsService.biblioteca (CA-23 a CA-25)', () => {
 
     await expect(ctx.service.biblioteca(ANA, 'STEAM')).resolves.toEqual([]);
     expect(ctx.prisma.game.findMany).not.toHaveBeenCalled();
+  });
+});
+
+describe('IntegrationsService.vincularJogo (CA-26 a CA-31, CA-66, CA-67)', () => {
+  const GAME = '33333333-3333-4333-8333-333333333333';
+  const OUTRO_GAME = '44444444-4444-4444-8444-444444444444';
+  const APP = '504230';
+
+  const dadosDaSteam = {
+    idExterno: APP,
+    minutosJogados: 90,
+    ultimaVezJogadoEm: new Date('2026-02-01T00:00:00Z'),
+    conquistasTotal: 40,
+    conquistasDesbloqueadas: 12,
+    capaUrl: 'https://cdn.cloudflare.steamstatic.com/steam/apps/504230/library_600x900.jpg',
+  };
+
+  /** Um jogo do usuário, a conta vinculada, sem vínculo nenhum: o caso simples. */
+  function comJogo(vinculos: { doJogo?: unknown; doItem?: unknown } = {}) {
+    const ctx = montar();
+    ctx.prisma.game.findFirst.mockResolvedValue({ id: GAME, titulo: 'Celeste' });
+    ctx.prisma.contaVinculada.findUnique.mockResolvedValue({
+      idExterno: STEAM_ID,
+      nomeExibicao: 'x',
+    });
+    ctx.prisma.jogoPlataforma.findUnique.mockImplementation(
+      ({ where }: { where: { gameId_provedor?: unknown } }) =>
+        Promise.resolve(
+          where.gameId_provedor ? (vinculos.doJogo ?? null) : (vinculos.doItem ?? null),
+        ),
+    );
+    ctx.prisma.jogoPlataforma.create.mockImplementation(
+      ({ data }: { data: Record<string, unknown> }) => Promise.resolve({ ...data }),
+    );
+    ctx.provider.obterJogo.mockResolvedValue({ dados: dadosDaSteam, conquistas: [], aviso: null });
+    return ctx;
+  }
+
+  const vincular = (
+    ctx: ReturnType<typeof montar>,
+    corpo: { idExterno: string; mover?: boolean } = { idExterno: APP },
+  ) => ctx.service.vincularJogo(ANA, 'STEAM', GAME, corpo);
+
+  it('liga o item ao jogo e grava o último valor da plataforma (CA-26)', async () => {
+    const ctx = comJogo();
+
+    const dados = await vincular(ctx);
+
+    expect(dados).toEqual({
+      provedor: 'STEAM',
+      idExterno: APP,
+      minutosJogados: 90,
+      ultimaVezJogadoEm: '2026-02-01T00:00:00.000Z',
+      conquistasTotal: 40,
+      conquistasDesbloqueadas: 12,
+      capaUrl: dadosDaSteam.capaUrl,
+      atualizadoEm: new Date(NOW).toISOString(),
+    });
+    expect(ctx.prisma.jogoPlataforma.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          userId: ANA,
+          gameId: GAME,
+          provedor: 'STEAM',
+          idExterno: APP,
+        }) as unknown,
+      }),
+    );
+    expect(ctx.provider.obterJogo).toHaveBeenCalledWith(STEAM_ID, APP);
+    expect(ctx.prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('nunca lê nem altera o jogo: só confere que é do usuário (a plataforma do jogo fica como está) (CA-37)', async () => {
+    const ctx = comJogo();
+
+    await vincular(ctx);
+
+    expect(ctx.prisma.game.findFirst).toHaveBeenCalledWith({
+      where: { id: GAME, userId: ANA },
+      select: { id: true },
+    });
+    expect(ctx.prisma.game).not.toHaveProperty('update');
+  });
+
+  it('a resposta não traz userId nem gameId', async () => {
+    const dados = await vincular(comJogo());
+
+    expect(Object.keys(dados).sort()).toEqual([
+      'atualizadoEm',
+      'capaUrl',
+      'conquistasDesbloqueadas',
+      'conquistasTotal',
+      'idExterno',
+      'minutosJogados',
+      'provedor',
+      'ultimaVezJogadoEm',
+    ]);
+  });
+
+  it('jogo que não é do usuário → 404 com a mesma mensagem do catálogo, sem tocar em mais nada (CA-27)', async () => {
+    const ctx = comJogo();
+    ctx.prisma.game.findFirst.mockResolvedValue(null);
+
+    const erro: unknown = await vincular(ctx).catch((e: unknown) => e);
+
+    expect(erro).toMatchObject({ status: 404, message: 'Jogo não encontrado' });
+    expect(ctx.prisma.contaVinculada.findUnique).not.toHaveBeenCalled();
+    expect(ctx.provider.obterJogo).not.toHaveBeenCalled();
+  });
+
+  it('sem conta vinculada → 409 PLATAFORMA_NAO_VINCULADA, sem chamar a plataforma (CA-27)', async () => {
+    const ctx = comJogo();
+    ctx.prisma.contaVinculada.findUnique.mockResolvedValue(null);
+
+    await expect(statusEcodeDe(vincular(ctx))).resolves.toEqual({
+      status: 409,
+      code: 'PLATAFORMA_NAO_VINCULADA',
+    });
+    expect(ctx.provider.obterJogo).not.toHaveBeenCalled();
+  });
+
+  it('o mesmo item no mesmo jogo é idempotente: devolve o gravado e NÃO chama a plataforma', async () => {
+    const gravado = {
+      ...dadosDaSteam,
+      provedor: 'STEAM',
+      atualizadoEm: new Date('2026-09-24T00:00:00Z'),
+    };
+    const ctx = comJogo({ doJogo: gravado });
+
+    const dados = await vincular(ctx);
+
+    expect(dados.atualizadoEm).toBe('2026-09-24T00:00:00.000Z');
+    expect(ctx.provider.obterJogo).not.toHaveBeenCalled();
+    expect(ctx.prisma.jogoPlataforma.create).not.toHaveBeenCalled();
+  });
+
+  it('o jogo já tem OUTRO item → 409 PLATAFORMA_JOGO_JA_VINCULADO, sem plataforma, nem com mover (CA-29, CA-67)', async () => {
+    const ctx = comJogo({
+      doJogo: { ...dadosDaSteam, idExterno: '999', provedor: 'STEAM', atualizadoEm: new Date() },
+    });
+
+    for (const corpo of [{ idExterno: APP }, { idExterno: APP, mover: true }]) {
+      await expect(statusEcodeDe(vincular(ctx, corpo))).resolves.toEqual({
+        status: 409,
+        code: 'PLATAFORMA_JOGO_JA_VINCULADO',
+      });
+    }
+    expect(ctx.provider.obterJogo).not.toHaveBeenCalled();
+    expect(ctx.prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('item já ligado a outro jogo, sem mover → 409 com jogoAtual e a plataforma NÃO é chamada (CA-28, CA-67)', async () => {
+    const ctx = comJogo({ doItem: { id: 'linha-antiga', gameId: OUTRO_GAME } });
+    ctx.prisma.game.findFirst.mockImplementation(({ where }: { where: { id: string } }) =>
+      Promise.resolve(
+        where.id === GAME ? { id: GAME } : { id: OUTRO_GAME, titulo: 'Celeste (PS5)' },
+      ),
+    );
+
+    const erro = (await vincular(ctx).catch((e: unknown) => e)) as HttpException;
+
+    expect(erro.getStatus()).toBe(409);
+    expect(erro.getResponse()).toMatchObject({
+      statusCode: 409,
+      code: 'PLATAFORMA_ITEM_JA_VINCULADO',
+      jogoAtual: { id: OUTRO_GAME, titulo: 'Celeste (PS5)' },
+    });
+    expect(ctx.provider.obterJogo).not.toHaveBeenCalled();
+    expect(ctx.prisma.jogoPlataforma.create).not.toHaveBeenCalled();
+    expect(ctx.prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('com mover: apaga a linha do jogo antigo e cria a do novo NUMA transação; nada é copiado (CA-28)', async () => {
+    const ctx = comJogo({ doItem: { id: 'linha-antiga', gameId: OUTRO_GAME } });
+
+    await vincular(ctx, { idExterno: APP, mover: true });
+
+    expect(ctx.prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(ctx.prisma.jogoPlataforma.deleteMany).toHaveBeenCalledWith({
+      where: { id: 'linha-antiga', userId: ANA },
+    });
+    const criado = (
+      ctx.prisma.jogoPlataforma.create.mock.calls[0]?.[0] as { data: Record<string, unknown> }
+    ).data;
+    // Os dados do novo jogo vêm FRESCOS da plataforma, não do vínculo antigo.
+    expect(criado).toMatchObject({ gameId: GAME, minutosJogados: 90, conquistasTotal: 40 });
+    expect(ctx.provider.obterJogo).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ['perfil privado (SIMULADO, sem fixture real)', new PerfilPrivadoError()],
+    ['Steam indisponível', new PlataformaIndisponivelError()],
+    ['Steam no limite', new PlataformaLimiteError()],
+  ])(
+    'mover com a plataforma falhando (%s): NADA muda, o vínculo continua no jogo antigo (CA-66)',
+    async (_nome, erro) => {
+      const ctx = comJogo({ doItem: { id: 'linha-antiga', gameId: OUTRO_GAME } });
+      ctx.provider.obterJogo.mockRejectedValue(erro);
+
+      await expect(vincular(ctx, { idExterno: APP, mover: true })).rejects.toBe(erro);
+
+      expect(ctx.prisma.$transaction).not.toHaveBeenCalled();
+      expect(ctx.prisma.jogoPlataforma.deleteMany).not.toHaveBeenCalled();
+      expect(ctx.prisma.jogoPlataforma.create).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    [
+      'perfil privado (simulado, sem fixture real)',
+      new PerfilPrivadoError(),
+      'PLATAFORMA_PERFIL_PRIVADO',
+    ],
+    [
+      'item fora da biblioteca',
+      new PlataformaItemNaoEncontradoError(),
+      'PLATAFORMA_ITEM_NAO_ENCONTRADO',
+    ],
+    ['Steam indisponível', new PlataformaIndisponivelError(), 'PLATAFORMA_INDISPONIVEL'],
+    ['Steam no limite', new PlataformaLimiteError(), 'PLATAFORMA_LIMITE'],
+  ])('%s: o erro sobe e NENHUMA linha é criada (CA-27, CA-30)', async (_nome, erro, code) => {
+    const ctx = comJogo();
+    ctx.provider.obterJogo.mockRejectedValue(erro);
+
+    const capturado: unknown = await vincular(ctx).catch((e: unknown) => e);
+
+    expect(capturado).toBe(erro);
+    expect(capturado).toMatchObject({ code });
+    expect(ctx.prisma.jogoPlataforma.create).not.toHaveBeenCalled();
+  });
+
+  it('conquistas negadas (SIMULADO, sem fixture real): o vínculo é gravado com as contagens null (CA-30)', async () => {
+    const ctx = comJogo();
+    ctx.provider.obterJogo.mockResolvedValue({
+      dados: { ...dadosDaSteam, conquistasTotal: null, conquistasDesbloqueadas: null },
+      conquistas: [],
+      aviso: 'CONQUISTAS_PRIVADAS',
+    });
+
+    const dados = await vincular(ctx);
+
+    expect(dados).toMatchObject({
+      minutosJogados: 90,
+      conquistasTotal: null,
+      conquistasDesbloqueadas: null,
+    });
+  });
+
+  it('corrida (P2002) em (gameId, provedor) → 409 PLATAFORMA_JOGO_JA_VINCULADO', async () => {
+    const ctx = comJogo();
+    ctx.prisma.jogoPlataforma.create.mockRejectedValue(
+      Object.assign(new Error('unique'), {
+        code: 'P2002',
+        meta: { target: ['gameId', 'provedor'] },
+      }),
+    );
+
+    await expect(statusEcodeDe(vincular(ctx))).resolves.toEqual({
+      status: 409,
+      code: 'PLATAFORMA_JOGO_JA_VINCULADO',
+    });
+  });
+
+  it('corrida (P2002) em (userId, provedor, idExterno) → 409 PLATAFORMA_ITEM_JA_VINCULADO com jogoAtual', async () => {
+    const ctx = comJogo();
+    ctx.prisma.jogoPlataforma.create.mockRejectedValue(
+      Object.assign(new Error('unique'), {
+        code: 'P2002',
+        meta: { target: ['userId', 'provedor', 'idExterno'] },
+      }),
+    );
+    // Depois da corrida, o item aparece ligado a outro jogo.
+    ctx.prisma.jogoPlataforma.findUnique.mockImplementation(
+      ({ where }: { where: { gameId_provedor?: unknown } }) =>
+        Promise.resolve(
+          where.gameId_provedor ? null : calls++ === 0 ? null : { gameId: OUTRO_GAME },
+        ),
+    );
+    let calls = 0;
+    ctx.prisma.game.findFirst.mockImplementation(({ where }: { where: { id: string } }) =>
+      Promise.resolve(
+        where.id === GAME ? { id: GAME } : { id: OUTRO_GAME, titulo: 'Celeste (PS5)' },
+      ),
+    );
+
+    const erro = (await vincular(ctx).catch((e: unknown) => e)) as HttpException;
+
+    expect(erro.getResponse()).toMatchObject({
+      code: 'PLATAFORMA_ITEM_JA_VINCULADO',
+      jogoAtual: { id: OUTRO_GAME },
+    });
+  });
+
+  it('o jogo sumiu no meio do caminho (P2003) → 404 do catálogo; outro erro do banco sobe', async () => {
+    const ctx = comJogo();
+    ctx.prisma.jogoPlataforma.create.mockRejectedValueOnce(
+      Object.assign(new Error('fk'), { code: 'P2003' }),
+    );
+
+    await expect(vincular(ctx)).rejects.toMatchObject({
+      status: 404,
+      message: 'Jogo não encontrado',
+    });
+
+    ctx.prisma.jogoPlataforma.create.mockRejectedValueOnce(new Error('banco caiu'));
+    await expect(vincular(ctx)).rejects.toThrow('banco caiu');
+  });
+
+  it('todas as consultas de vínculo filtram por usuário', async () => {
+    const ctx = comJogo();
+
+    await vincular(ctx);
+
+    expect(ctx.prisma.jogoPlataforma.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { userId_provedor_idExterno: { userId: ANA, provedor: 'STEAM', idExterno: APP } },
+      }),
+    );
+    expect(ctx.prisma.game.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: GAME, userId: ANA } }),
+    );
+  });
+
+  it('a MESMA conta Steam em dois usuários: cada um liga o mesmo appid ao seu jogo (CA-65)', async () => {
+    const ctx = comJogo();
+
+    await ctx.service.vincularJogo(ANA, 'STEAM', GAME, { idExterno: APP });
+    await ctx.service.vincularJogo(BIA, 'STEAM', GAME, { idExterno: APP });
+
+    const donos = ctx.prisma.jogoPlataforma.create.mock.calls.map(
+      ([arg]) => (arg as { data: { userId: string } }).data.userId,
+    );
+    expect(donos).toEqual([ANA, BIA]);
+  });
+});
+
+describe('IntegrationsService.desvincularJogo (CA-31)', () => {
+  const GAME = '33333333-3333-4333-8333-333333333333';
+
+  it('remove só a camada deste jogo, filtrando por jogo, usuário e provedor', async () => {
+    const ctx = montar();
+    ctx.prisma.game.findFirst.mockResolvedValue({ id: GAME });
+    ctx.prisma.jogoPlataforma.deleteMany.mockResolvedValue({ count: 1 });
+
+    await ctx.service.desvincularJogo(ANA, 'STEAM', GAME);
+
+    expect(ctx.prisma.jogoPlataforma.deleteMany).toHaveBeenCalledWith({
+      where: { gameId: GAME, userId: ANA, provedor: 'STEAM' },
+    });
+    expect(ctx.prisma.contaVinculada.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it('jogo sem vínculo → 404 PLATAFORMA_VINCULO_NAO_ENCONTRADO', async () => {
+    const ctx = montar();
+    ctx.prisma.game.findFirst.mockResolvedValue({ id: GAME });
+    ctx.prisma.jogoPlataforma.deleteMany.mockResolvedValue({ count: 0 });
+
+    await expect(statusEcodeDe(ctx.service.desvincularJogo(ANA, 'STEAM', GAME))).resolves.toEqual({
+      status: 404,
+      code: 'PLATAFORMA_VINCULO_NAO_ENCONTRADO',
+    });
+  });
+
+  it('jogo de outro usuário → 404 do catálogo, sem apagar nada', async () => {
+    const ctx = montar();
+    ctx.prisma.game.findFirst.mockResolvedValue(null);
+
+    await expect(ctx.service.desvincularJogo(BIA, 'STEAM', GAME)).rejects.toMatchObject({
+      status: 404,
+      message: 'Jogo não encontrado',
+    });
+    expect(ctx.prisma.jogoPlataforma.deleteMany).not.toHaveBeenCalled();
   });
 });

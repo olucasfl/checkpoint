@@ -1,5 +1,6 @@
 import { type INestApplication } from '@nestjs/common';
 import {
+  IdExternoInvalidoError,
   PerfilPrivadoError,
   PlataformaIndisponivelError,
   PlataformaLimiteError,
@@ -121,6 +122,8 @@ describe('autenticação das rotas (CA-57)', () => {
     ['DELETE', '/integracoes/steam'],
     ['GET', '/integracoes/steam/perfil'],
     ['GET', '/integracoes/steam/biblioteca'],
+    ['PUT', '/integracoes/steam/jogos/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'],
+    ['DELETE', '/integracoes/steam/jogos/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'],
     ['POST', '/integracoes/steam/perfil/atualizacao'],
   ])('%s %s sem token → 401', async (metodo, caminho) => {
     const response = await pedir(metodo, caminho);
@@ -479,7 +482,7 @@ describe('GET /integracoes e o cartão do perfil (CA-16 a CA-21)', () => {
     expect(ctx.client.listarJogos.mock.calls.length).toBe(chamadas);
   });
 
-  it('perfil privado → 409 PLATAFORMA_PERFIL_PRIVADO; biblioteca vazia (game_count 0) → 200 com 0 jogos (CA-20)', async () => {
+  it('(SIMULADO, sem fixture real) perfil privado → 409 PLATAFORMA_PERFIL_PRIVADO; biblioteca vazia (game_count 0) → 200 com 0 jogos (CA-20)', async () => {
     const token = await vincular(ANA_ID);
     ctx.client.obterPerfil.mockResolvedValue({ ...perfilPublico, visibilidade: 1 });
 
@@ -494,7 +497,7 @@ describe('GET /integracoes e o cartão do perfil (CA-16 a CA-21)', () => {
     expect(await json(vazio)).toMatchObject({ totalJogos: 0, maisJogados: [] });
   });
 
-  it('detalhes do jogo privados (sem game_count) também são 409 PLATAFORMA_PERFIL_PRIVADO', async () => {
+  it('(SIMULADO, sem fixture real) detalhes do jogo privados (sem game_count) também são 409 PLATAFORMA_PERFIL_PRIVADO', async () => {
     const token = await vincular(ANA_ID);
     ctx.client.listarJogos.mockResolvedValue({ privada: true, total: 0, jogos: [] });
 
@@ -831,7 +834,7 @@ describe('GET /integracoes/:provedor/biblioteca (CA-23 a CA-25, CA-34)', () => {
     expect(await json(response)).toMatchObject({ code: 'PLATAFORMA_NAO_VINCULADA' });
   });
 
-  it('perfil privado → 409; Steam fora do ar ou no limite → 502, nunca 500 (CA-39)', async () => {
+  it('(SIMULADO, sem fixture real) perfil privado → 409; Steam fora do ar ou no limite → 502, nunca 500 (CA-39)', async () => {
     const token = await vinculada(ANA_ID);
 
     ctx.client.obterPerfil.mockResolvedValue({ ...perfilPublico, visibilidade: 1 });
@@ -860,5 +863,431 @@ describe('GET /integracoes/:provedor/biblioteca (CA-23 a CA-25, CA-34)', () => {
     await pedir('GET', '/integracoes/steam/perfil', token);
 
     expect(ctx.client.listarJogos.mock.calls.length).toBeLessThanOrEqual(1);
+  });
+});
+
+describe('PUT e DELETE /integracoes/:provedor/jogos/:jogoId (CA-26 a CA-31, CA-66, CA-67)', () => {
+  const G_CELESTE = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const G_PS5 = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  const G_HADES = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+  const G_BIA = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+  const CELESTE = '504230';
+  const HADES = '1145360';
+  const CAMINHO = (jogoId: string) => `/integracoes/steam/jogos/${jogoId}`;
+
+  const biblioteca = {
+    privada: false,
+    total: 2,
+    jogos: [
+      {
+        appid: CELESTE,
+        nome: 'Celeste',
+        minutosJogados: 600,
+        ultimaVezJogadoEm: new Date('2026-02-01T00:00:00Z'),
+      },
+      { appid: HADES, nome: 'Hades', minutosJogados: 0, ultimaVezJogadoEm: null },
+    ],
+  };
+  const conquista = (id: string, desbloqueada: boolean) => ({
+    id,
+    desbloqueada,
+    desbloqueadaEm: null,
+    nome: null,
+    descricao: null,
+  });
+
+  async function enviar(
+    metodo: string,
+    caminho: string,
+    token: string,
+    corpo?: unknown,
+  ): Promise<Response> {
+    return fetch(`${ctx.baseUrl}${caminho}`, {
+      method: metodo,
+      redirect: 'manual',
+      headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+      body: corpo === undefined ? undefined : JSON.stringify(corpo),
+    });
+  }
+
+  /** Ana com a Steam vinculada e três jogos no catálogo (um em PC, um em PS5, um em PlayStation 5); Bia com um. */
+  async function comCatalogo(): Promise<{ ana: string; bia: string }> {
+    const ana = await ctx.tokenFor(ANA_ID);
+    const bia = await ctx.tokenFor(BIA_ID);
+    for (const token of [ana, bia]) {
+      const ida = await iniciar(token);
+      await retornar(ida.state, ida.nonce);
+    }
+    ctx.db.games.push(
+      { id: G_CELESTE, userId: ANA_ID, titulo: 'Celeste', plataforma: 'PC' },
+      { id: G_PS5, userId: ANA_ID, titulo: 'Celeste (PS5)', plataforma: 'PlayStation 5' },
+      { id: G_HADES, userId: ANA_ID, titulo: 'Hades', plataforma: '' },
+      { id: G_BIA, userId: BIA_ID, titulo: 'Celeste', plataforma: 'PC' },
+    );
+    ctx.client.listarJogos.mockResolvedValue(biblioteca);
+    ctx.client.obterConquistasDoJogador.mockResolvedValue({
+      tipo: 'ok',
+      nomeDoJogo: 'Celeste',
+      conquistas: [conquista('A', true), conquista('B', true), conquista('C', false)],
+    });
+    ctx.client.listarJogos.mockClear();
+    ctx.client.obterConquistasDoJogador.mockClear();
+    return { ana, bia };
+  }
+
+  const linha = (userId: string, gameId: string, idExterno: string) => ({
+    id: `linha-${gameId}`,
+    userId,
+    gameId,
+    provedor: 'STEAM' as const,
+    idExterno,
+    minutosJogados: 5,
+    conquistasTotal: 1,
+    conquistasDesbloqueadas: 0,
+  });
+
+  const chamadasASteam = () =>
+    ctx.client.listarJogos.mock.calls.length +
+    ctx.client.obterConquistasDoJogador.mock.calls.length;
+
+  it('200 com os dados da Steam, só os campos do contrato; a linha é gravada e o jogo NÃO muda (CA-26)', async () => {
+    const { ana } = await comCatalogo();
+    const antes = JSON.stringify(ctx.db.games);
+
+    const response = await enviar('PUT', CAMINHO(G_CELESTE), ana, { idExterno: CELESTE });
+    const corpo = (await response.json()) as Record<string, unknown>;
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(Object.keys(corpo).sort()).toEqual([
+      'atualizadoEm',
+      'capaUrl',
+      'conquistasDesbloqueadas',
+      'conquistasTotal',
+      'idExterno',
+      'minutosJogados',
+      'provedor',
+      'ultimaVezJogadoEm',
+    ]);
+    expect(corpo).toMatchObject({
+      provedor: 'STEAM',
+      idExterno: CELESTE,
+      minutosJogados: 600,
+      conquistasTotal: 3,
+      conquistasDesbloqueadas: 2,
+      capaUrl: `https://cdn.cloudflare.steamstatic.com/steam/apps/${CELESTE}/library_600x900.jpg`,
+    });
+    expect(ctx.db.jogos).toEqual([
+      expect.objectContaining({ userId: ANA_ID, gameId: G_CELESTE, idExterno: CELESTE }),
+    ]);
+    // Título, status, notas e plataforma do jogo continuam exatamente como estavam.
+    expect(JSON.stringify(ctx.db.games)).toBe(antes);
+    expect(JSON.stringify(corpo)).not.toContain(ANA_ID);
+  });
+
+  it('funciona com QUALQUER plataforma do jogo, sem alterá-la (CA-37)', async () => {
+    const { ana } = await comCatalogo();
+
+    const response = await enviar('PUT', CAMINHO(G_PS5), ana, { idExterno: CELESTE });
+
+    expect(response.status).toBe(200);
+    expect(ctx.db.games.find((g) => g.id === G_PS5)?.plataforma).toBe('PlayStation 5');
+  });
+
+  it.each([
+    ['sem corpo (objeto vazio)', {}],
+    ['idExterno vazio', { idExterno: '' }],
+    ['idExterno malformado', { idExterno: 'abc; drop' }],
+    ['idExterno número', { idExterno: 504230 }],
+    ['campo extra', { idExterno: CELESTE, userId: 'outro' }],
+    ['mover que não é booleano', { idExterno: CELESTE, mover: 'sim' }],
+  ])('corpo inválido (%s) → 400 VALIDACAO, sem chamar a Steam (CA-27)', async (_nome, corpo) => {
+    const { ana } = await comCatalogo();
+
+    const response = await enviar('PUT', CAMINHO(G_CELESTE), ana, corpo);
+
+    expect(response.status).toBe(400);
+    expect(await json(response)).toMatchObject({ code: 'VALIDACAO' });
+    expect(chamadasASteam()).toBe(0);
+    expect(ctx.db.jogos).toHaveLength(0);
+  });
+
+  it('idExterno que passa no formato mas não é um appid ("abc") → 400 VALIDACAO, erro de validação, nada gravado (CA-27)', async () => {
+    const { ana } = await comCatalogo();
+    // O `SteamClient` de verdade valida o appid antes de chamar (steam.client.spec, CA-64); o falso faz o mesmo.
+    ctx.client.listarJogos.mockImplementation((_steamId: string, opcoes?: { appId?: string }) => {
+      if (opcoes?.appId !== undefined && !/^\d{1,10}$/.test(opcoes.appId)) {
+        return Promise.reject(new IdExternoInvalidoError('appId', 'appid inválido'));
+      }
+      return Promise.resolve(biblioteca);
+    });
+
+    const response = await enviar('PUT', CAMINHO(G_CELESTE), ana, { idExterno: 'abc' });
+
+    expect(response.status).toBe(400);
+    expect(await json(response)).toMatchObject({ code: 'VALIDACAO' });
+    // O cliente rejeita antes de qualquer chamada à Steam: as conquistas nem chegam a ser consultadas.
+    expect(ctx.client.obterConquistasDoJogador).not.toHaveBeenCalled();
+    expect(ctx.db.jogos).toHaveLength(0);
+  });
+
+  it('item que NÃO está na biblioteca → 404 PLATAFORMA_ITEM_NAO_ENCONTRADO e nada é gravado (CA-27)', async () => {
+    const { ana } = await comCatalogo();
+    ctx.client.listarJogos.mockResolvedValue({ privada: false, total: 0, jogos: [] });
+
+    const response = await enviar('PUT', CAMINHO(G_CELESTE), ana, { idExterno: '99999' });
+
+    expect(response.status).toBe(404);
+    expect(await json(response)).toMatchObject({ code: 'PLATAFORMA_ITEM_NAO_ENCONTRADO' });
+    expect(ctx.db.jogos).toHaveLength(0);
+  });
+
+  it('jogoId inválido → 400; jogo inexistente ou de OUTRO usuário → o mesmo 404 do catálogo; sem token → 401 (CA-27)', async () => {
+    const { ana } = await comCatalogo();
+
+    expect((await enviar('PUT', CAMINHO('abc'), ana, { idExterno: CELESTE })).status).toBe(400);
+
+    const daBia = await enviar('PUT', CAMINHO(G_BIA), ana, { idExterno: CELESTE });
+    const inexistente = await enviar('PUT', CAMINHO('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee'), ana, {
+      idExterno: CELESTE,
+    });
+    expect(daBia.status).toBe(404);
+    expect(await json(daBia)).toMatchObject({ statusCode: 404, message: 'Jogo não encontrado' });
+    expect(inexistente.status).toBe(404);
+    expect(await json(inexistente)).toMatchObject({
+      statusCode: 404,
+      message: 'Jogo não encontrado',
+    });
+    expect(chamadasASteam()).toBe(0);
+    expect(ctx.db.jogos).toHaveLength(0);
+  });
+
+  it('sem conta vinculada → 409 PLATAFORMA_NAO_VINCULADA; provedor desconhecido → 400', async () => {
+    const semConta = await ctx.tokenFor(ANA_ID);
+    ctx.db.games.push({ id: G_CELESTE, userId: ANA_ID, titulo: 'Celeste', plataforma: 'PC' });
+
+    const response = await enviar('PUT', CAMINHO(G_CELESTE), semConta, { idExterno: CELESTE });
+
+    expect(response.status).toBe(409);
+    expect(await json(response)).toMatchObject({ code: 'PLATAFORMA_NAO_VINCULADA' });
+    expect(
+      (await enviar('PUT', `/integracoes/xbox/jogos/${G_CELESTE}`, semConta, { idExterno: '1' }))
+        .status,
+    ).toBe(400);
+  });
+
+  it('item já ligado a outro jogo, sem mover → 409 com jogoAtual e a Steam NÃO é chamada (CA-28, CA-67)', async () => {
+    const { ana } = await comCatalogo();
+    ctx.db.jogos.push(linha(ANA_ID, G_PS5, CELESTE));
+
+    const response = await enviar('PUT', CAMINHO(G_CELESTE), ana, { idExterno: CELESTE });
+
+    expect(response.status).toBe(409);
+    expect(await json(response)).toMatchObject({
+      statusCode: 409,
+      code: 'PLATAFORMA_ITEM_JA_VINCULADO',
+      jogoAtual: { id: G_PS5, titulo: 'Celeste (PS5)' },
+    });
+    expect(chamadasASteam()).toBe(0);
+    expect(ctx.db.jogos.map((j) => j.gameId)).toEqual([G_PS5]);
+  });
+
+  it('com mover: o vínculo passa para este jogo; o antigo perde só a camada e segue intacto (CA-28)', async () => {
+    const { ana } = await comCatalogo();
+    ctx.db.jogos.push(linha(ANA_ID, G_PS5, CELESTE));
+    const antes = JSON.stringify(ctx.db.games);
+
+    const response = await enviar('PUT', CAMINHO(G_CELESTE), ana, {
+      idExterno: CELESTE,
+      mover: true,
+    });
+
+    expect(response.status).toBe(200);
+    expect(ctx.db.jogos).toHaveLength(1);
+    expect(ctx.db.jogos[0]).toMatchObject({
+      gameId: G_CELESTE,
+      idExterno: CELESTE,
+      minutosJogados: 600,
+    });
+    expect(JSON.stringify(ctx.db.games)).toBe(antes);
+  });
+
+  it('o jogo JÁ tem outro item → 409 PLATAFORMA_JOGO_JA_VINCULADO, com ou sem mover, sem chamar a Steam (CA-29, CA-67)', async () => {
+    const { ana } = await comCatalogo();
+    ctx.db.jogos.push(linha(ANA_ID, G_CELESTE, HADES));
+
+    for (const corpo of [{ idExterno: CELESTE }, { idExterno: CELESTE, mover: true }]) {
+      const response = await enviar('PUT', CAMINHO(G_CELESTE), ana, corpo);
+      expect(response.status).toBe(409);
+      expect(await json(response)).toMatchObject({ code: 'PLATAFORMA_JOGO_JA_VINCULADO' });
+    }
+    expect(chamadasASteam()).toBe(0);
+    expect(ctx.db.jogos.map((j) => j.idExterno)).toEqual([HADES]);
+  });
+
+  it('repetir o mesmo pedido é idempotente: 200 com o gravado, sem chamar a Steam', async () => {
+    const { ana } = await comCatalogo();
+    await enviar('PUT', CAMINHO(G_CELESTE), ana, { idExterno: CELESTE });
+    ctx.client.listarJogos.mockClear();
+    ctx.client.obterConquistasDoJogador.mockClear();
+
+    const response = await enviar('PUT', CAMINHO(G_CELESTE), ana, { idExterno: CELESTE });
+
+    expect(response.status).toBe(200);
+    expect(chamadasASteam()).toBe(0);
+    expect(ctx.db.jogos).toHaveLength(1);
+  });
+
+  it.each([
+    [
+      'perfil privado (SIMULADO, sem fixture real: biblioteca sem game_count)',
+      () => ctx.client.listarJogos.mockResolvedValue({ privada: true, total: 0, jogos: [] }),
+      409,
+      'PLATAFORMA_PERFIL_PRIVADO',
+    ],
+    [
+      'Steam fora do ar na biblioteca',
+      () => ctx.client.listarJogos.mockRejectedValue(new PlataformaIndisponivelError()),
+      502,
+      'PLATAFORMA_INDISPONIVEL',
+    ],
+    [
+      'Steam no limite na biblioteca',
+      () => ctx.client.listarJogos.mockRejectedValue(new PlataformaLimiteError()),
+      502,
+      'PLATAFORMA_LIMITE',
+    ],
+    [
+      'Steam fora do ar nas conquistas',
+      () =>
+        ctx.client.obterConquistasDoJogador.mockRejectedValue(new PlataformaIndisponivelError()),
+      502,
+      'PLATAFORMA_INDISPONIVEL',
+    ],
+  ])('%s → %i %s e NENHUMA linha é criada (CA-30)', async (_nome, falhar, status, code) => {
+    const { ana } = await comCatalogo();
+    falhar();
+
+    const response = await enviar('PUT', CAMINHO(G_CELESTE), ana, { idExterno: CELESTE });
+
+    expect(response.status).toBe(status);
+    expect(await json(response)).toMatchObject({ code });
+    expect(ctx.db.jogos).toHaveLength(0);
+    expect((await pedir('GET', '/integracoes', ana)).status).toBe(200);
+  });
+
+  it('conquistas negadas (SIMULADO, sem fixture real): liga com as contagens null (CA-30)', async () => {
+    const { ana } = await comCatalogo();
+    ctx.client.obterConquistasDoJogador.mockResolvedValue({ tipo: 'negado' });
+
+    const response = await enviar('PUT', CAMINHO(G_CELESTE), ana, { idExterno: CELESTE });
+
+    expect(response.status).toBe(200);
+    expect(await json(response)).toMatchObject({
+      minutosJogados: 600,
+      conquistasTotal: null,
+      conquistasDesbloqueadas: null,
+    });
+    expect(ctx.db.jogos).toHaveLength(1);
+  });
+
+  it.each([
+    [
+      'Steam fora do ar',
+      () => ctx.client.listarJogos.mockRejectedValue(new PlataformaIndisponivelError()),
+      502,
+    ],
+    [
+      'perfil privado (SIMULADO)',
+      () => ctx.client.listarJogos.mockResolvedValue({ privada: true, total: 0, jogos: [] }),
+      409,
+    ],
+  ])(
+    'mover com a plataforma falhando (%s): NADA muda, o vínculo fica no jogo antigo (CA-66)',
+    async (_nome, falhar, status) => {
+      const { ana } = await comCatalogo();
+      ctx.db.jogos.push(linha(ANA_ID, G_PS5, CELESTE));
+      falhar();
+
+      const response = await enviar('PUT', CAMINHO(G_CELESTE), ana, {
+        idExterno: CELESTE,
+        mover: true,
+      });
+
+      expect(response.status).toBe(status);
+      expect(ctx.db.jogos.map((j) => j.gameId)).toEqual([G_PS5]);
+    },
+  );
+
+  it('a transação do mover desfaz TUDO se a criação falhar no banco (o antigo não some)', async () => {
+    const { ana } = await comCatalogo();
+    ctx.db.jogos.push(linha(ANA_ID, G_PS5, CELESTE));
+    // Uma corrida: entre a checagem e a escrita, o jogo de destino ganha outro vínculo.
+    const create = ctx.db.jogoPlataforma.create;
+    ctx.db.jogoPlataforma.create = (arg) => {
+      ctx.db.jogos.push({ ...linha(ANA_ID, G_CELESTE, HADES), id: 'corrida' });
+      return create(arg);
+    };
+
+    const response = await enviar('PUT', CAMINHO(G_CELESTE), ana, {
+      idExterno: CELESTE,
+      mover: true,
+    });
+
+    expect(response.status).toBe(409);
+    expect(await json(response)).toMatchObject({ code: 'PLATAFORMA_JOGO_JA_VINCULADO' });
+    // O deleteMany do antigo foi desfeito junto: o PS5 continua com o vínculo.
+    expect(ctx.db.jogos.some((j) => j.gameId === G_PS5 && j.idExterno === CELESTE)).toBe(true);
+  });
+
+  it('a MESMA conta Steam em dois usuários: cada um liga o mesmo appid ao seu jogo (CA-65)', async () => {
+    const { ana, bia } = await comCatalogo();
+
+    const daAna = await enviar('PUT', CAMINHO(G_CELESTE), ana, { idExterno: CELESTE });
+    const daBia = await enviar('PUT', CAMINHO(G_BIA), bia, { idExterno: CELESTE });
+
+    expect(daAna.status).toBe(200);
+    expect(daBia.status).toBe(200);
+    expect(ctx.db.jogos.map((j) => [j.userId, j.gameId])).toEqual([
+      [ANA_ID, G_CELESTE],
+      [BIA_ID, G_BIA],
+    ]);
+  });
+
+  it('DELETE: 204, só a camada daquele jogo some, o jogo e a conta ficam; repetir → 404 (CA-31)', async () => {
+    const { ana } = await comCatalogo();
+    ctx.db.jogos.push(linha(ANA_ID, G_CELESTE, CELESTE), linha(ANA_ID, G_HADES, HADES));
+    const jogosAntes = JSON.stringify(ctx.db.games);
+
+    const response = await enviar('DELETE', CAMINHO(G_CELESTE), ana);
+
+    expect(response.status).toBe(204);
+    expect(ctx.db.jogos.map((j) => j.gameId)).toEqual([G_HADES]);
+    expect(JSON.stringify(ctx.db.games)).toBe(jogosAntes);
+    expect(ctx.db.contas.some((c) => c.userId === ANA_ID)).toBe(true);
+    const repetido = await enviar('DELETE', CAMINHO(G_CELESTE), ana);
+    expect(repetido.status).toBe(404);
+    expect(await json(repetido)).toMatchObject({ code: 'PLATAFORMA_VINCULO_NAO_ENCONTRADO' });
+  });
+
+  it('DELETE: jogo de outro usuário → 404 do catálogo e o vínculo dele fica; jogoId inválido e provedor desconhecido → 400', async () => {
+    const { ana } = await comCatalogo();
+    ctx.db.jogos.push(linha(BIA_ID, G_BIA, CELESTE));
+
+    const response = await enviar('DELETE', CAMINHO(G_BIA), ana);
+
+    expect(response.status).toBe(404);
+    expect(await json(response)).toMatchObject({ statusCode: 404, message: 'Jogo não encontrado' });
+    expect(ctx.db.jogos).toHaveLength(1);
+    expect((await enviar('DELETE', CAMINHO('abc'), ana)).status).toBe(400);
+    expect((await enviar('DELETE', `/integracoes/xbox/jogos/${G_CELESTE}`, ana)).status).toBe(400);
+  });
+
+  it('depois de ligar, o jogo aparece com dadosPlataforma na lista do catálogo, sem chamar a Steam (CA-40 no fluxo)', async () => {
+    const { ana } = await comCatalogo();
+    await enviar('PUT', CAMINHO(G_CELESTE), ana, { idExterno: CELESTE });
+    const ligado = ctx.db.jogos[0];
+
+    expect(ligado).toMatchObject({ gameId: G_CELESTE, minutosJogados: 600, conquistasTotal: 3 });
   });
 });
