@@ -1,10 +1,13 @@
 import { useRef, type KeyboardEvent, type ReactNode } from 'react';
+import { Icon } from '@/shared/components/Icon';
 
 export interface Opcao<T extends string> {
   valor: T;
   rotulo: string;
-  /** Algo antes do rótulo (a amostra da cor de destaque). */
+  /** Algo antes do rótulo (a amostra da seção antiga de preferências). */
   antes?: ReactNode;
+  /** Só na variante `bolinha`: classe do token da cor (ex.: `bg-capa-6`), nunca um hex. */
+  cor?: string;
 }
 
 interface GrupoOpcoesProps<T extends string> {
@@ -13,6 +16,8 @@ interface GrupoOpcoesProps<T extends string> {
   opcoes: readonly Opcao<T>[];
   valor: T;
   onChange: (valor: T) => void;
+  /** `bolinha`: só a amostra da cor, com o rótulo no `aria-label` (a cor de destaque). */
+  variante?: 'texto' | 'bolinha';
 }
 
 const PROXIMA: Record<string, number> = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
@@ -27,6 +32,7 @@ export function GrupoOpcoes<T extends string>({
   opcoes,
   valor,
   onChange,
+  variante = 'texto',
 }: GrupoOpcoesProps<T>) {
   const botoes = useRef<(HTMLButtonElement | null)[]>([]);
 
@@ -45,7 +51,7 @@ export function GrupoOpcoes<T extends string>({
   }
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-2.5">
       <div id={id} className="text-[16px] font-semibold">
         {titulo}
       </div>
@@ -61,17 +67,34 @@ export function GrupoOpcoes<T extends string>({
               type="button"
               role="radio"
               aria-checked={marcada}
+              aria-label={variante === 'bolinha' ? opcao.rotulo : undefined}
               tabIndex={marcada ? 0 : -1}
               onClick={() => onChange(opcao.valor)}
               onKeyDown={(event) => onKeyDown(event, indice)}
-              className={`flex min-h-11 min-w-11 items-center gap-2 rounded-[4px] border px-3 text-[16px] font-semibold ${
-                marcada
-                  ? 'border-ciano bg-painel-2 text-ciano'
-                  : 'border-borda-controle text-texto-suave hover:text-texto'
-              }`}
+              className={
+                variante === 'bolinha'
+                  ? `grid size-11 place-items-center rounded-full border-2 ${
+                      marcada ? 'border-texto' : 'border-transparent'
+                    }`
+                  : `flex min-h-11 min-w-11 items-center gap-2 rounded-xl border px-4 text-[16px] font-semibold ${
+                      marcada
+                        ? 'border-destaque bg-painel-2 text-texto'
+                        : 'border-borda-controle text-texto-suave hover:text-texto'
+                    }`
+              }
             >
-              {opcao.antes}
-              {opcao.rotulo}
+              {variante === 'bolinha' ? (
+                <span
+                  className={`grid size-7 place-items-center rounded-full text-fundo ${opcao.cor ?? ''}`}
+                >
+                  {marcada && <Icon name="check" size={18} />}
+                </span>
+              ) : (
+                <>
+                  {opcao.antes}
+                  {opcao.rotulo}
+                </>
+              )}
             </button>
           );
         })}
