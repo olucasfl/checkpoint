@@ -605,14 +605,18 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
 - **Diálogos** são `<dialog>` nativo com `showModal()` (`shared/components/ModalDialog`): Esc fecha, o
   foco fica preso e volta ao botão que abriu. O `autoFocus` do React não funciona com o diálogo
   fechado; o foco inicial vai para o elemento com `data-autofocus`.
-- **Tema Neon arcade:** todos os tokens de cor (e os únicos hex do web) ficam no `@theme` de
-  `src/styles/index.css`; componentes usam só as classes (`bg-fundo`, `text-ouro`...) e os brilhos são
-  `color-mix()` dos tokens. Status: Zerado = `ouro`, Jogando = `ciano`, Quero jogar = `vermelho-neon`.
-  O acento primário (logo, "Adicionar", diálogos, botões principais) é o token **`destaque`** (§5.12).
-  `prefers-reduced-motion: reduce` desliga todas as animações e transições (variante
-  `movimento-reduzido`, §5.12). Fontes (Orbitron, Rajdhani)
-  e ícones (Material Symbols Rounded) vêm por `<link>` no `index.html`, sem pacote npm. O número da nota
-  usa Rajdhani (a Orbitron deixa o 0 e o 8 ambíguos).
+- **Tema "Estante de console"** (spec `troca-de-design-estante`, F1; antes, "Neon arcade"): todos os tokens de cor (e os
+  únicos hex do web) ficam no `@theme` de `src/styles/index.css`; componentes usam só as classes (`bg-fundo`,
+  `text-status-jogando`, `border-borda-controle`...) e sombras e sobreposições são `color-mix()` dos tokens. Superfícies:
+  `fundo`, `painel`, `painel-2` e `painel-3` (esta também é o hover de botão e o esqueleto, por alias `acao-hover` e
+  `esqueleto`). Status: Jogando = `status-jogando`, Quero jogar = `status-quero-jogar` (o mesmo `ouro` das conquistas, da estrela e dos
+  avisos) e Zerado = `status-zerado`; chips de status usam `tint-status-*` (18% da cor). Erro: `erro` (borda e preenchimento) e `erro-texto`
+  (texto de botão de perigo). O acento (logo, "Adicionar", botões principais, foco, barras) é o token **`destaque`** (§5.12).
+  **`borda-controle` é `#606a8e`** (3,32:1 sobre o painel; o desenho trazia um valor de 1,86:1 que reprova a WCAG 1.4.11) e o anel de foco
+  é o `destaque`. `apagado` (segmentos da barra de nota) é temporário até a F2. `prefers-reduced-motion: reduce` desliga todas as animações e
+  transições (variante `movimento-reduzido`, §5.12). Fontes **Outfit** (`--font-display`) e **Manrope** (`--font-corpo`) e ícones
+  (Material Symbols Rounded) vêm por `<link>` no `index.html` (`display=swap`, `system-ui` de reserva), sem pacote npm; offline cai a fonte do
+  sistema, como antes. Sem orbes, _scanlines_, pulso nem brilhos neon: o `Backdrop` é só um halo estático (`.halo`).
 - **Build de produção:** o `@checkpoint/shared/dist` é CommonJS e linkado; o `vite.config.ts` libera
   esse caminho em `build.commonjsOptions`, senão o Rollup não enxerga os valores exportados (o `dev`
   esconde o problema).
@@ -624,7 +628,7 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
 ### 5.6 Layout mobile-first (`app/layout/`, spec `docs/specs/pwa-e-mobile.md`, etapa 1)
 
 - **`AppLayout`** envolve toda tela do app (menos `/login` e `/registro`, que usam o `AuthLayout`): fundo
-  Neon (`Backdrop`: orbes + _scanlines_), `TopNav`, o `<Outlet/>` e a `BottomNav`. A moldura em si é o
+  (`Backdrop`: um halo estático na cor do destaque), `TopNav`, o `<Outlet/>` e a `BottomNav`. A moldura em si é o
   `AppFrame` (recebe `children`), para o `RequireAuth` poder mostrar a moldura com uma mensagem no lugar da
   rota. **Nenhuma página importa a navegação**
   (teste em `AppLayout.test.tsx`).
@@ -665,11 +669,14 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
 - `storage.get/set/remove` **nunca lançam**: JSON inválido ou valor que o `validar` recusa devolve o
   padrão e apaga a chave; armazenamento bloqueado ou cheio cai num `Map` em memória (cota cheia avisa
   com **um** `console.warn` por sessão, sem o valor).
-- **Versão e migração** (`migrations.ts`): `STORAGE_SCHEMA_VERSION` (hoje 1) em `checkpoint:versao`;
+- **Versão e migração** (`migrations.ts`): `STORAGE_SCHEMA_VERSION` (hoje **2**) em `checkpoint:versao`;
   `runStorageMigrations()` roda em `main.tsx` **antes** do render. Ausente → grava a atual; menor →
   aplica `MIGRATIONS[n]` (n→n+1) em ordem; maior, ilegível ou migração que lança → apaga **todas** as
   chaves `checkpoint:*` (só elas; `outro-app:x` fica) e grava a atual. Mudar o formato de uma chave =
-  subir a versão + escrever a migração.
+  subir a versão + escrever a migração (`Migration` recebe o `raw` do armazenamento). A **1 → 2** (`migrarDestaques`) reescreve o
+  `destaque` de cada entrada de `checkpoint:prefs`: `magenta` e o antigo `azul` viram `azul`, sem distinguir quem escolheu de quem ficou no
+  padrão; `violeta` e `laranja` ficam; JSON ilegível, chave ausente e valor desconhecido não são tocados (a leitura devolve os padrões só para
+  aquela entrada).
 - **Conectividade** (`connectivity.ts`, hook `use-connectivity`): store externo lido por
   `useSyncExternalStore` com `online | offline | sem-servidor`. Entradas: eventos `online`/`offline` e
   `visibilitychange` (ligados por `connectivity.start()` em `main.tsx`) e o **interceptor de resposta
@@ -779,7 +786,7 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
   `BroadcastChannel` avisa as outras abas, que fazem o logout local na hora.
 - **Telas:** `LoginForm` e `RegistroForm` (validação local com as regras da API; "Confirmar senha" só no registro;
   `CampoSenha` com "mostrar senha" de 44 × 44 e `aria-pressed`) e o Sair do `/perfil` (a página está em §5.11). Reusam `shared/components/form-parts` (movido de `features/games`)
-  e o visual Neon.
+  e o tema do app.
 - **`/perfil/senha`** (etapa 5, `TrocarSenhaPage` + `TrocarSenhaForm`): Senha atual (`current-password`), Nova senha
   e Confirmar nova senha (`new-password`), cada uma com o "mostrar senha". Confirmação diferente → "As senhas não
   coincidem" **sem request**; erros pelo `code`/`fields`. `authApi.trocarSenha` é uma chamada protegida comum (Bearer
@@ -850,27 +857,25 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
   validada na leitura (`prefsDoUsuario`): a entrada inválida de um usuário volta aos padrões **só para ele**.
   JSON corrompido → padrões (a chave sai); armazenamento bloqueado → o módulo de storage guarda em memória e a
   escolha vale até recarregar.
-- **As cinco** (padrão primeiro): cor de destaque (magenta, violeta, azul, laranja), filtro inicial (Todos,
-  Jogando, Quero jogar, Zerado), densidade (confortável, compacta), efeitos (completos, reduzidos) e até
+- **As cinco** (padrão primeiro): cor de destaque (azul, violeta, rosa, laranja), filtro inicial (Todos,
+  Jogando, Quero jogar, Zerado), densidade (confortável, compacta), animações (completas, reduzidas; o valor gravado continua `completos`/`reduzidos`) e até
   **8** plataformas favoritas.
 - **Store** (`prefs-store.ts` + `shared/hooks/use-prefs.ts`, `useSyncExternalStore`): `iniciarPrefs()` roda no
   `main.tsx` **depois das migrações e antes do `createRoot`** e aplica as de `ultimoUsuario` no `<html>`
-  (sem piscar em magenta); o **`app/PrefsSync.tsx`** (nos providers) chama `definirUsuario` quando a sessão
+  (sem piscar na cor padrão); o **`app/PrefsSync.tsx`** (nos providers) chama `definirUsuario` quando a sessão
   resolve, e aí valem as de quem entrou (que vira o `ultimoUsuario`). Sair não troca a aparência.
 - **Exclusão da conta** (`removerPrefsDoUsuario`, etapa 4): some só a entrada desse usuário (as dos outros
   ficam); `ultimoUsuario` vira `null` se era ele; e, se as preferências em uso eram as dele, a aparência volta ao
   padrão (a tela de login não fica com as cores de uma conta que não existe mais).
   `alterarPrefs` só grava com alguém logado.
-- **Cor de destaque sem hex novo:** `@theme` tem `--color-destaque: var(--color-magenta)`, e
-  `html[data-destaque='violeta'|'azul'|'laranja']` o aponta para `capa-6`, `capa-1` e `capa-3`. Texto `fundo`
-  sobre o destaque: magenta 6,28:1, violeta 7,47:1, azul 9,64:1, laranja 8,98:1 (`tokens.test.ts` confere
-  ≥ 4,5:1). Usam `destaque`: logo (`glow-logo`, `glow-text-destaque`), "Adicionar" (barra e topo, pulso
-  `neon-pulse`), borda e brilho dos diálogos, botões principais (login/registro, Salvar). **Não** mudam: status,
-  o `ciano` do filtro ativo, a barra de nota e o orbe do fundo.
-- **Efeitos "Reduzidos":** as regras de movimento reduzido estão **uma vez só**, na variante do Tailwind
+- **Cor de destaque sem hex novo** (além do `acento`): `@theme` tem `--color-destaque: var(--color-acento)` (**Azul**, `#4f8cff`, o padrão), e
+  `html[data-destaque='violeta'|'rosa'|'laranja']` o aponta para `capa-6`, `capa-2` e `capa-3`. Texto `fundo` sobre o destaque: azul 5,95:1, violeta
+  7,03:1, rosa 7,22:1, laranja 8,45:1 (`tokens.test.ts` confere ≥ 4,5:1). Usam `destaque`: logo, "Adicionar" (barra e topo), borda dos diálogos, botões
+  principais (login/registro, Salvar), item ativo da navegação, filtro ativo (até a F2), segmentos da barra de nota (até a F2) e o anel de foco.
+  **Não** mudam: as cores de status e as conquistas (`ouro`).
+- **"Animações" reduzidas** (antes "Efeitos"): as regras de movimento reduzido estão **uma vez só**, na variante do Tailwind
   `@custom-variant movimento-reduzido` com dois ramos: `@media (prefers-reduced-motion: reduce)` e
-  `:root[data-efeitos='reduzidos'] &`. Além disso, `html[data-efeitos='reduzidos']` esconde `.orb` e
-  `.scanlines`. O ramo do atributo **não alcança `::before`/`::after`** (pseudo-elemento não entra no
+  `:root[data-efeitos='reduzidos'] &`. O ramo do atributo **não alcança `::before`/`::after`** (pseudo-elemento não entra no
   `:is()` gerado); nenhum pseudo-elemento do app anima, e o `tokens.test.ts` falha se algum passar a animar.
 - **Filtro inicial** (`features/games/lib/initial-filter.ts`): abrir `/` sem `?status=` (inclusive pelo item
   "Jogos") troca a URL por `/?status=<filtro>` com `replace`, no mesmo efeito da `GamesPage` que trata o
@@ -884,9 +889,8 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
   `/perfil`): o `ModalDialog` existente (Esc, foco preso, volta à linha que abriu; folha inferior no celular), com
   três abas em `Abas.tsx` (`tablist`/`tab`/`tabpanel`, ativação automática, setas com volta circular, Home/End, Tab só
   na ativa, foco inicial na aba ativa): **Aparência** (cor de destaque em bolinhas `role="radio"` com nome
-  acessível, pela variante `bolinha` do `GrupoOpcoes`; densidade e efeitos, cada um com sua prévia em
-  `PreviasAparencia.tsx`: duas linhas de jogo sintéticas nas medidas da `GameRow`, e um quadro com `.orb` e
-  `.scanlines` reais mais um texto do estado), **Catálogo** (filtro inicial) e **Plataformas** (`ChipsPlataformas`:
+  acessível, pela variante `bolinha` do `GrupoOpcoes`; densidade e animações, cada uma com sua prévia em
+  `PreviasAparencia.tsx`: duas linhas de jogo sintéticas nas medidas da `GameRow`, e um esqueleto que anima (ou para) mais um texto do estado), **Catálogo** (filtro inicial) e **Plataformas** (`ChipsPlataformas`:
   chips `aria-pressed` por família; a 9ª mostra "Até 8 favoritas" e não marca). **Sem Salvar**: cada escolha chama
   `alterarPrefs`, que aplica no `<html>` e grava por usuário, e o próprio modal usa o token `destaque`, então a cor
   nova aparece nele também. "Restaurar padrões" volta só as preferências da aba ativa (`PADROES_DA_ABA`, a partir

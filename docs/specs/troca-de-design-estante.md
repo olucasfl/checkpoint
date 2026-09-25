@@ -1,8 +1,7 @@
 # Spec: troca de design — "Estante de console"
 
-> Status: ✅ aprovada (2026-09-25). Escrita a partir da direção **aprovada** em `docs/design/estante-de-console/`; as decisões 1 a 3
-> e as questões 4 a 14 foram respondidas com "aceito todas as recomendações" (registro em "Decisões tomadas"). A implementação
-> começa pela F1 (branch `feat/design-estante-f1`). Nenhum código foi escrito ainda.
+> Status: 🚧 em andamento (aprovada em 2026-09-25). **F1 implementada** (branch `feat/design-estante-f1`); F2 a F4 não começaram. As
+> decisões 1 a 3 e as questões 4 a 14 foram respondidas com "aceito todas as recomendações" (registro em "Decisões tomadas").
 
 ## Objetivo
 
@@ -73,6 +72,8 @@ commit que muda o comportamento descrito.
 | **F2** catálogo em estante   | barra superior, filtros em pílulas, destaque, prateleiras, _tiles_ com capa em pé, anel da média, "horas · conquistas", ações no hover e no foco, "Adicionar" ao fim da prateleira, celular (filtros e prateleiras rolam), `BottomNav` redesenhada, capa gerada em pé, densidade compacta, prévias do modal de preferências | detalhe e formulário (ficam nas cores novas, com o layout de hoje; o detalhe já ganha a capa em pé)         | o catálogo novo; detalhe e formulário "no meio do caminho" (consistentes nas cores, com os cantos antigos) | CA-13 a CA-41, CA-58, CA-59         |
 | **F3** detalhe e formulários | `/jogos/:id` (anel, barras, bloco Steam, lista de conquistas), formulário "Novo jogo/Editar", diálogos de confirmação                                                                                                                                                                                                       | telas herdadas (perfil, login…)                                                                             | as quatro telas desenhadas prontas                                                                         | CA-40 a CA-54                       |
 | **F4** herdado e fechamento  | conferência visual de tudo que herda (lista abaixo), ajuste de formas nas telas herdadas, `/qa-verify` no app rodando, `ARCHITECTURE.md` e status da spec                                                                                                                                                                   | nada novo                                                                                                   | direção completa                                                                                           | CA-61 a CA-70                       |
+
+**Estado (2026-09-25):** **F1 implementada** em `feat/design-estante-f1` (7 commits, do `feat(web): tokens do tema estante e fontes outfit e manrope` ao de docs); F2, F3 e F4 não começaram.
 
 **Riscos, para quem implementar.** (1) O rename de tokens toca ~39 arquivos (mecânico; o `tsc` e os testes são a rede de
 segurança). (2) `hover: translateY` e a sombra do anel são cortados por contêineres com `overflow` (as prateleiras do
@@ -389,37 +390,74 @@ verificador de contraste), registrado como **"só provável no app rodando"** at
 
 ### F1 — tokens, fontes e efeitos
 
-- [ ] **CA-01** [T] — **Dado** o `@theme` de `styles/index.css`, **quando** o leio, **então** ele declara `fundo`, `painel`, `painel-2`,
+- [x] **CA-01** [T] — **Dado** o `@theme` de `styles/index.css`, **quando** o leio, **então** ele declara `fundo`, `painel`, `painel-2`,
       `painel-3`, `borda`, `borda-controle`, `texto`, `texto-suave`, `acento`, `destaque`, `status-jogando`, `status-quero-jogar`,
       `status-zerado`, `ouro`, `erro`, `erro-texto`, `apagado-2` e `capa-1` a `capa-6` com os valores da tabela; **e** não existem
       `magenta`, `ciano`, `vermelho-neon` nem `painel-hover`.
-- [ ] **CA-02** [T] — **Dado** `apps/web/src`, **quando** procuro literais hexadecimais (`#[0-9a-fA-F]{3,8}`) fora do `@theme`, **então**
+- [x] **CA-02** [T] — **Dado** `apps/web/src`, **quando** procuro literais hexadecimais (`#[0-9a-fA-F]{3,8}`) fora do `@theme`, **então**
       não há nenhum (CA-87 do catálogo, atualizado); **e** nenhum arquivo usa uma classe de token removida (`text-ciano`, `bg-magenta`,
       `border-vermelho-neon`, `glow-*`, `tint-*`).
-- [ ] **CA-03** [T] — **Dado** os tokens, **quando** o `tokens.test.ts` calcula os contrastes WCAG, **então** falha se: `texto` ou
+- [x] **CA-03** [T] — **Dado** os tokens, **quando** o `tokens.test.ts` calcula os contrastes WCAG, **então** falha se: `texto` ou
       `texto-suave` sobre `fundo`, `painel`, `painel-2` ou `painel-3` for < 4,5; `destaque`, `status-*`, `ouro`, `erro` ou `erro-texto`
       sobre `painel` for < 4,5; `fundo` sobre cada uma das quatro cores de destaque for < 4,5; ou `borda-controle` sobre `fundo`, `painel`
       ou `painel-2` for < 3.
 - [ ] **CA-04** [N] — **Dado** o app rodando, **quando** meço com um verificador de contraste os pares realmente usados em `/`,
       `/jogos/:id`, o formulário e `/perfil`, **então** todo texto tem ≥ 4,5:1 (≥ 3:1 acima de 24 px), todo contorno de controle e anel
       de foco tem ≥ 3:1 contra o fundo em que está, e os números batem com as tabelas desta spec.
-- [ ] **CA-05** [T] — **Dado** `apps/web/index.html`, **quando** o leio, **então** carrega **Outfit**, **Manrope** e **Material Symbols
+- [x] **CA-05** [T] — **Dado** `apps/web/index.html`, **quando** o leio, **então** carrega **Outfit**, **Manrope** e **Material Symbols
       Rounded** por `<link>` de `fonts.googleapis.com` (com `display=swap`) e **não** carrega Orbitron nem Rajdhani; **e** o `package.json`
       do web não ganhou dependência.
-- [ ] **CA-06** [T] — **Dado** o `@theme`, **então** `--font-display` começa por `Outfit` e `--font-corpo` por `Manrope`, ambos com
+- [x] **CA-06** [T] — **Dado** o `@theme`, **então** `--font-display` começa por `Outfit` e `--font-corpo` por `Manrope`, ambos com
       `system-ui` de reserva; **e** campos (`input`, `select`, `textarea`) continuam com `font-size` ≥ 16 px.
-- [ ] **CA-07** [T] — **Dado** o `index.css` e o `Backdrop`, **então** não existem `.orb`, `.scanlines`, `.cta-pulse`, `.dot-blink`, os
+- [x] **CA-07** [T] — **Dado** o `index.css` e o `Backdrop`, **então** não existem `.orb`, `.scanlines`, `.cta-pulse`, `.dot-blink`, os
       `@keyframes` `drift`, `scan`, `neon-pulse` e `blink`, nem orbes ou _scanlines_ no `AppFrame`.
-- [ ] **CA-08** [T] — **Dado** `prefers-reduced-motion: reduce` **ou** "Animações: reduzidas", **então** a variante `movimento-reduzido` desliga
+- [x] **CA-08** [T] — **Dado** `prefers-reduced-motion: reduce` **ou** "Animações: reduzidas", **então** a variante `movimento-reduzido` desliga
       toda `animation` e `transition` (o `tokens.test.ts` confere as duas entradas e que nenhum pseudo-elemento anima).
 - [ ] **CA-09** [N] — **Dado** `prefers-reduced-motion: reduce` emulado no DevTools, **quando** passo o mouse pelos _tiles_ e botões,
       abro o formulário e provoco um erro de campo, **então** nada se move (sem elevação, subida da folha, brilho de esqueleto nem
       tremor), e o estado final (anel do hover, borda de erro) aparece.
-- [ ] **CA-10** [T] — **Dado** `#0b0f1a`, **então** o `<meta name="theme-color">`, `theme_color` e `background_color` do manifest e o
+- [x] **CA-10** [T] — **Dado** `#0b0f1a`, **então** o `<meta name="theme-color">`, `theme_color` e `background_color` do manifest e o
       `--color-fundo` são iguais (`pwa.config.test.ts`).
-- [ ] **CA-11** [T] — **Dado** o `git diff` da fase, **então** `apps/api`, `packages/shared` e `prisma/` não mudaram.
-- [ ] **CA-12** [T] — **Dado** o app no fim da F1, **quando** abro `/`, o detalhe, o formulário e `/perfil`, **então** tudo funciona como
+- [x] **CA-11** [T] — **Dado** o `git diff` da fase, **então** `apps/api`, `packages/shared` e `prisma/` não mudaram.
+- [x] **CA-12** [T] — **Dado** o app no fim da F1, **quando** abro `/`, o detalhe, o formulário e `/perfil`, **então** tudo funciona como
       antes (o mesmo conjunto de testes de página passa), agora nas cores e fontes novas, com a linha do jogo ainda em linhas.
+
+#### Evidência da F1 (2026-09-25)
+
+| CA           | Evidência                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| CA-01, CA-02 | `tokens.test.ts`: os tokens novos existem com os hex da tabela e os tokens neon (`magenta`, `ciano`, `vermelho-neon`, `painel-hover`) **não** existem; nenhum hex fora do `@theme`; varredura do `src` que proíbe classes e variáveis removidas (a regex foi conferida contra 10 exemplos)                                                                                                                                                                                                                                                               |
+| CA-03, CA-60 | `tokens.test.ts`: contrastes calculados pela fórmula da spec (texto e texto-suave sobre as 4 superfícies; destaque, status, ouro, erro e erro-texto sobre o painel; `fundo` sobre as 4 cores de destaque; `borda-controle` ≥ 3:1)                                                                                                                                                                                                                                                                                                                        |
+| CA-05, CA-06 | `tokens.test.ts` (links Outfit, Manrope e Material Symbols com `display=swap`, sem Orbitron nem Rajdhani; `--font-display` e `--font-corpo`) e o teste dos 16 px nos campos; no navegador, `document.fonts` confirma Outfit e Manrope carregadas; `package.json` (raiz e web) sem mudança                                                                                                                                                                                                                                                                |
+| CA-07        | `tokens.test.ts` (sem `.orb`, `.scanlines`, `.cta-pulse`, `.dot-blink`, `.glow-*` nem os `@keyframes` neon); no navegador: 0 elementos `.orb` ou `.scanlines` e 1 `.halo`                                                                                                                                                                                                                                                                                                                                                                                |
+| CA-08        | `tokens.test.ts` (uma variante `movimento-reduzido` com os dois ramos; nenhum pseudo-elemento anima)                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| CA-10        | `pwa.config.test.ts` (`theme_color`, `background_color`, `<meta name="theme-color">` e `--color-fundo` iguais a `#0b0f1a`)                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| CA-11        | `git diff d89459f..HEAD -- apps/api packages/shared prisma` vazio                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| CA-12        | suíte do web (1030 testes) e `npm run build` verdes; no navegador (API mockada, sem banco), catálogo, detalhe, formulário, "Buscar na Steam", `/perfil` e `/login` abrem em 360 e 1280 px sem erro de página e sem rolagem horizontal                                                                                                                                                                                                                                                                                                                    |
+| CA-55        | `PreferenciasModal.test.tsx` (Azul marcada, ordem Azul, Violeta, Rosa, Laranja, "Animações") e `prefs.test.ts`; no navegador, o fundo do "Adicionar jogo" e o anel de foco mudam junto: azul `rgb(79,140,255)`, violeta `rgb(167,139,250)`, rosa `rgb(244,114,182)`, laranja `rgb(251,146,60)`                                                                                                                                                                                                                                                           |
+| CA-56        | `migrations.test.ts` (magenta → azul; o antigo azul → azul; violeta e laranja ficam; várias entradas; JSON ilegível; formato inesperado; chave ausente; usuário sem preferência gravada; valor desconhecido; pelo `runStorageMigrations`, idempotente; uma mutação em `magenta` derrubou 5 testes); no navegador com dados da versão 1 semeados: versão vira 2, `u1` e `u2` viram `azul`, `u3` `violeta`, `u4` `laranja`, `ultimoUsuario` e o resto da entrada intactos; sem entrada para o último usuário e com JSON ilegível, abre em `azul`, sem erro |
+| CA-57        | `PreferenciasModal.test.tsx` (a amostra de animações) e `tokens.test.ts`; no navegador, `transition-duration` do botão principal: 0,15 s com "Completas" e **0 s** com "Reduzidas"                                                                                                                                                                                                                                                                                                                                                                       |
+
+**Só prováveis no app rodando** (seguem abertos): **CA-04** (medição de contraste com verificador nos pares reais; a F1 só conferiu os pares por
+cálculo e olhou as telas) e **CA-09** (`prefers-reduced-motion` emulado no DevTools; o ramo do atributo foi provado no navegador, o do sistema só por teste).
+CA-71 a CA-75 são transversais a todas as fases: a F1 os cumpre (testes, gate, viewport, sem dependência) e eles fecham na F4.
+
+#### Conferência no navegador (F1, 2026-09-25)
+
+Roteiro: Vite em `localhost:5199` com a API **mockada** no navegador (dados sintéticos, nenhum banco), Chrome, em 360 × 780 e 1280 × 900, nas
+telas catálogo, detalhe (com e sem vínculo, e com título de 120 caracteres sem espaço), formulário, "Buscar na Steam", `/perfil` e `/login`.
+Nada de rosa ou ciano neon ficou; o rosa que aparece é a **capa gerada `capa-2`** (paleta fixa) e o **favicon e os ícones do PWA**, que continuam
+magenta (questão 11, fora desta spec). Sem rolagem horizontal em nenhuma tela; o layout continua em linhas, de propósito.
+
+| Achado                                                                                               | O que aconteceu                                                                                                              | Estado                                                                             |
+| ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| Botão **Excluir** cortado (só "EXC" à vista) no detalhe em 360 px, quando aparece "Vincular à Steam" | a Manrope é mais larga que a Rajdhani e a fileira de 3 botões passava de 360 px, escondida pelo `overflow-hidden` da moldura | **corrigido** (`flex-wrap`; teste)                                                 |
+| Selo "QUERO JOGAR" quebrava em 2 linhas nas linhas do catálogo (360 px)                              | mesma causa                                                                                                                  | **corrigido** (`whitespace-nowrap`; teste)                                         |
+| Botão "Fechar" do "Buscar na Steam" espremido (texto colado na borda)                                | o botão encolhia ao lado do título                                                                                           | **corrigido** (`shrink-0`)                                                         |
+| Rótulo "QUERO JOGAR" do painel de contagem quebra em 2 linhas em 360 px e desalinha o número         | mesma causa                                                                                                                  | **aberto**: os painéis de contagem saem na F2                                      |
+| "Xbox Series X\|S" aparece como "XIS"                                                                | a barra vertical da Manrope parece um "I"                                                                                    | **aberto**, para a F4: decidir se a lista de plataformas troca o texto ou o estilo |
+| Rótulos em maiúsculas com espaçamento largo e botões de 4 px                                         | só a família da fonte trocou; a forma nova vem com cada tela                                                                 | **esperado**: F2 a F4                                                              |
+| Contraste                                                                                            | nenhum par ruim à vista; texto, acento, status e erro legíveis nas capturas                                                  | conferir com verificador na F4 (CA-04)                                             |
 
 ### F2 — catálogo em estante
 
@@ -530,21 +568,21 @@ verificador de contraste), registrado como **"só provável no app rodando"** at
 
 ### Preferências (F1 e F2)
 
-- [ ] **CA-55** [T] — **Dado** o modal de preferências na aba Aparência, **então** vejo as cores **Azul, Violeta, Rosa e Laranja** (Azul marcada
+- [x] **CA-55** [T] — **Dado** o modal de preferências na aba Aparência, **então** vejo as cores **Azul, Violeta, Rosa e Laranja** (Azul marcada
       no padrão) e **Animações** (Completas e Reduzidas) e **Densidade**; **quando** escolho Violeta, **então** `html[data-destaque]` vira
       `violeta` **na hora** e o logo, "Adicionar jogo", o item ativo da barra e o anel de foco ficam violeta, os status **não** mudam e nenhuma
       request sai. (Substitui os CA-14 e CA-36 do perfil.)
-- [ ] **CA-56** [T] — **Dado** `checkpoint:prefs` gravada na versão 1 com `destaque` `magenta` (uma entrada) e `violeta` (outra), **quando**
+- [x] **CA-56** [T] — **Dado** `checkpoint:prefs` gravada na versão 1 com `destaque` `magenta` (uma entrada) e `violeta` (outra), **quando**
       o app abre, **então** a primeira vale `azul` e a segunda `violeta`, `checkpoint:versao` vira 2 e nenhuma outra chave `checkpoint:*`
       some; **e** uma entrada corrompida volta aos padrões só para o dono (CA-21 do perfil), e o storage bloqueado continua valendo até
       recarregar (CA-22).
-- [ ] **CA-57** [T] — **Dado** "Animações: reduzidas" e o sistema **sem** `prefers-reduced-motion`, **quando** abro `/`, **então** nenhuma
+- [x] **CA-57** [T] — **Dado** "Animações: reduzidas" e o sistema **sem** `prefers-reduced-motion`, **quando** abro `/`, **então** nenhuma
       animação nem transição roda (elevação, folha, esqueleto, tremor). (Substitui os CA-18, CA-37 na parte de efeitos e CA-41 do perfil.)
 - [ ] **CA-58** [T] — **Dado** densidade Compacta, **então** os _tiles_ medem 120 × 160 (desktop) e 108 × 144 (celular), o catálogo fica mais
       baixo, e os links e ações continuam com ≥ 44 px. (Substitui o CA-17 do perfil.)
 - [ ] **CA-59** [T] — **Dado** "Restaurar padrões" na aba Aparência, **então** voltam Azul, Confortável e Completas, e as outras abas ficam
       como estavam (CA-40 do perfil, com o padrão novo); **e** a mini-prévia do modal muda com a densidade e com as animações, na hora.
-- [ ] **CA-60** [T] — **Dado** as quatro cores de destaque, **então** o texto `fundo` sobre cada uma dá ≥ 4,5:1 (`tokens.test.ts`; CA-23 do perfil).
+- [x] **CA-60** [T] — **Dado** as quatro cores de destaque, **então** o texto `fundo` sobre cada uma dá ≥ 4,5:1 (`tokens.test.ts`; CA-23 do perfil).
 
 ### F4 — herdado e fechamento (conferência visual)
 

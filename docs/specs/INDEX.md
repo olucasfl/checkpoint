@@ -12,7 +12,7 @@ commit — `/docs-sync` confere se ela bate com a realidade.
 | Perfil                              | [perfil.md](perfil.md)                                   | 🚧 em andamento |
 | Avaliação de jogos                  | [avaliacao-de-jogos.md](avaliacao-de-jogos.md)           | ✅ implementada |
 | Integração com plataformas (Steam)  | [integracao-plataformas.md](integracao-plataformas.md)   | 🚧 em andamento |
-| Troca de design: Estante de console | [troca-de-design-estante.md](troca-de-design-estante.md) | ✅ aprovada     |
+| Troca de design: Estante de console | [troca-de-design-estante.md](troca-de-design-estante.md) | 🚧 em andamento |
 
 ## Legenda de status
 
