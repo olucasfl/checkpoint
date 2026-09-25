@@ -1,6 +1,6 @@
 # Spec: avaliacao-de-jogos
 
-> Status: em andamento (aprovada em 2026-09-25; etapa 1 feita no código e nos testes, CA-14 e CA-15 dependem da migration, que só roda depois de backup e de um "sim" explícito)
+> Status: em andamento (aprovada em 2026-09-25; etapa 1 feita e verificada, inclusive a migration (aplicada em 2026-09-25 após backup e "sim" explícito; CA-14 e CA-15 conferidos no banco))
 
 ## Objetivo
 
@@ -225,8 +225,8 @@ campos, o `schema.prisma` descrito, o `CHECK` da decisão A, o campo Nota do for
 - [x] **CA-11** — **Dado** `PATCH`/`POST` com `descricao` `"  Ótimo\n\njogo  "`, **então** a resposta traz `"Ótimo\n\njogo"` (aparada, quebras preservadas); com `""`, `"   "` ou `null`, **então** `descricao: null`; com 1000 caracteres, **então** aceita; com 1001, **então** 400 com `fields.descricao` = `"A descrição deve ter no máximo 1000 caracteres"`.
 - [x] **CA-12** — **Dado** o corpo antigo `{"titulo":"X","status":"ZERADO","nota":8}`, **então** 400 (campo desconhecido) e nenhum jogo criado; **e** nenhum response de `GET/POST/PATCH` contém `nota` nem `capaPath`.
 - [x] **CA-13** — **Dado** dois usuários com jogos, **quando** o segundo faz `GET` na lista, `PATCH` ou `DELETE` num id do primeiro, **então** a lista só traz os dele e o `PATCH`/`DELETE` dão 404; **sem** token, 401.
-- [ ] **CA-14** — **Dado** a migration aplicada, **quando** um `INSERT` direto em `"Game"` grava `notaGameplay = 101`, `-1`, ou qualquer nota com `status = 'QUERO_JOGAR'`, **então** o banco rejeita (`CHECK`). _Verificação manual._
-- [ ] **CA-15** — **Dado** o banco com N jogos antes da migration, **quando** ela é aplicada, **então** continuam N jogos, com os mesmos `titulo`, `plataforma`, `status`, `capaPath` e `userId`; as notas antigas não existem mais; e `\d "Game"` não tem a coluna `nota`. _Verificação manual, com a contagem antes e depois._
+- [x] **CA-14** — **Dado** a migration aplicada, **quando** um `INSERT` direto em `"Game"` grava `notaGameplay = 101`, `-1`, ou qualquer nota com `status = 'QUERO_JOGAR'`, **então** o banco rejeita (`CHECK`). _Verificação manual._
+- [x] **CA-15** — **Dado** o banco com N jogos antes da migration, **quando** ela é aplicada, **então** continuam N jogos, com os mesmos `titulo`, `plataforma`, `status`, `capaPath` e `userId`; as notas antigas não existem mais; e `\d "Game"` não tem a coluna `nota`. _Verificação manual, com a contagem antes e depois._
 
 - [x] **CA-32** — **Dado** um jogo `ZERADO` **sem nenhum critério** (o caso dos jogos que já existiam, depois da migration), **quando** `PATCH` com **só** `{"titulo":"Novo nome"}`, **então** 200; **e** `PATCH` com o corpo completo do formulário (`titulo`, `status: "ZERADO"`, `plataforma`, os cinco critérios `null` e `descricao`) mudando **só** o título, **então** 200 (os critérios vieram no body como `null`, mas o valor não mudou); **e** `PATCH` `{"status":"ZERADO"}` num jogo `JOGANDO` sem critérios, **então** 400 com `fields.notas`; **e**, num jogo `ZERADO` com **um único** critério, `PATCH` que o limpa (`null`: o valor mudou e não sobra nenhum), **então** 400 com `fields.notas`.
 
