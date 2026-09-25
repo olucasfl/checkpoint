@@ -43,6 +43,12 @@ describe('parseRatingInput (CA-17, CA-18, CA-20)', () => {
     expect(parseRatingInput(texto)).toEqual({ kind: 'invalido' });
   });
 
+  it('rejeita 9,99999999999 e 9.99999999999: quase 10 não é uma nota de 1 casa', () => {
+    expect(parseRatingInput('9,99999999999')).toEqual({ kind: 'invalido' });
+    expect(parseRatingInput('9.99999999999')).toEqual({ kind: 'invalido' });
+    expect(parseRatingInput('0,30000000000000004')).toEqual({ kind: 'invalido' });
+  });
+
   it('nunca devolve um valor que a API rejeitaria', () => {
     for (const texto of ['0', '5', '7,3', '9.9', '10']) {
       const parsed = parseRatingInput(texto);
@@ -91,7 +97,9 @@ describe('notaMedia e isValidRating do shared, do lado do web', () => {
     expect(notaMedia({ gameplay: 7.3, historia: 8.5 })).toBe(7.9);
   });
 
-  it('isValidRating: 0 a 10 com no máximo 1 casa', () => {
+  it('isValidRating: 0 a 10 com 1 casa exata (9,99999999999 não passa; 7,3 e 0,1 passam)', () => {
+    expect(isValidRating(9.99999999999)).toBe(false);
+    expect(isValidRating(0.1)).toBe(true);
     expect(isValidRating(7.3)).toBe(true);
     expect(isValidRating(7.55)).toBe(false);
     expect(isValidRating(10.1)).toBe(false);

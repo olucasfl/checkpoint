@@ -163,8 +163,10 @@ export function isValidRating(valor: unknown): valor is number {
   if (valor < GAME_RATING_MIN || valor > GAME_RATING_MAX) {
     return false;
   }
-  // 7,3 * 10 = 73,00000000000001: a tolerancia absorve o erro de ponto flutuante, sem aceitar 7,55.
-  return Math.abs(valor * 10 - Math.round(valor * 10)) < 1e-9;
+  // Checagem EXATA, sem tolerancia: `toFixed(1)` arredonda para a casa decimal mais proxima e `Number()` devolve
+  // o double que o literal escrito com 1 casa produz (o mesmo que o JSON.parse de "7.3"), entao 7,3 e 0,1 passam
+  // e 7,55 nao. Uma tolerancia (ex.: 1e-9) deixaria 9.99999999999 passar e ser arredondado em silencio para 10,0.
+  return Number(valor.toFixed(1)) === valor;
 }
 
 /**

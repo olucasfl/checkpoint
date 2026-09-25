@@ -60,6 +60,36 @@ describe('notaMedia', () => {
   });
 });
 
+describe('isValidRating: checagem exata, sem tolerância', () => {
+  it('rejeita 9,99999999999 (quase 10): uma tolerância o aceitaria e o arredondaria em silêncio para 10,0', () => {
+    expect(isValidRating(9.99999999999)).toBe(false);
+    expect(isValidRating(0.30000000000000004)).toBe(false); // 0,1 + 0,2 em ponto flutuante
+    expect(isValidRating(7.000000000001)).toBe(false);
+    expect(isValidRating(0.00000000001)).toBe(false);
+  });
+
+  it('aceita 7,3 e 0,1 (o double do literal com 1 casa, como o JSON.parse o entrega)', () => {
+    expect(isValidRating(JSON.parse('7.3'))).toBe(true);
+    expect(isValidRating(JSON.parse('0.1'))).toBe(true);
+    expect(isValidRating(7.3)).toBe(true);
+    expect(isValidRating(0.1)).toBe(true);
+  });
+
+  it('aceita os 101 valores de 0,0 a 10,0 escritos com 1 casa, e nenhum passa de 10', () => {
+    const rejeitados: string[] = [];
+    for (let decimos = 0; decimos <= 100; decimos++) {
+      const literal = (decimos / 10).toFixed(1);
+      if (!isValidRating(JSON.parse(literal))) {
+        rejeitados.push(literal);
+      }
+    }
+    expect(rejeitados).toEqual([]);
+    expect(isValidRating(10.1)).toBe(false);
+    expect(isValidRating(10.00000000001)).toBe(false);
+    expect(isValidRating(-0.1)).toBe(false);
+  });
+});
+
 describe('isValidRating', () => {
   it.each([0, 10, 5, 7.3, 0.1, 9.9, 8.7, 0.3, 4.6])('aceita %s', (valor) => {
     expect(isValidRating(valor)).toBe(true);
