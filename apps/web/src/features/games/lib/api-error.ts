@@ -1,8 +1,9 @@
 import { isAxiosError } from 'axios';
-import { type ApiErrorResponse } from '@checkpoint/shared';
+import { type ApiErrorResponse, type GameRatingKey } from '@checkpoint/shared';
 
 /** Campos do formulário; `arquivo` da API é a área da capa. */
-export type FormFieldName = 'titulo' | 'plataforma' | 'status' | 'nota' | 'capa';
+export type FormFieldName =
+  'titulo' | 'plataforma' | 'status' | GameRatingKey | 'notas' | 'descricao' | 'capa';
 
 export interface FormError {
   /** Mensagem geral (mostrada no formulário só quando nenhum campo foi apontado). */

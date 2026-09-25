@@ -70,6 +70,12 @@ Consequência prática: se você editar `packages/shared/src` e não ver o tipo/
 `npm run build -w @checkpoint/shared` (ou reinicie `npm run dev`, que já cuida disso via
 `predev`/watch).
 
+**Cuidado com o cache do Vite:** o `shared` emite CommonJS e o Vite o **pré-empacota** em
+`apps/web/node_modules/.vite/deps/@checkpoint_shared.js`, um cache que ele só refaz quando o lockfile ou a
+config mudam. Se você acrescentar uma **exportação nova** ao `shared` e o app (só no `dev`) quebrar com
+"`X is not iterable`" ou "`X is not a function`" para algo que existe no `dist/`, apague esse diretório
+(`rm -rf apps/web/node_modules/.vite`) e reinicie o `dev`. O `build` de produção e os testes não usam esse cache.
+
 `packages/shared` só pode conter código agnóstico de plataforma: tipos, contratos de request/
 response, enums, funções puras. Nada que dependa de `window`, do Node ou do `@prisma/client`.
 
@@ -412,9 +418,26 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
   nesse caso, o axios converte o `FormData` em JSON (a API recebia o arquivo vazio: 400).
 - **`lib/`** (lógica pura, com teste ao lado): `count-by-status`, `status-filter`, `api-error` (mapeia o `fields` da
   `ApiErrorResponse` para os campos do formulário), `cover-file` (pré-checagem de tipo e tamanho),
-  `form-values` (`nota: null` explícito em "Quero jogar"), `platforms` (lista de plataformas) e
+  `form-values` (o estado do formulário em texto: cada critério de nota é `""` = sem nota, que **não** é `"0"`;
+  em "Quero jogar" o corpo leva `null` explícito em cada critério; `toGameRequest` sempre completo, para o
+  `PATCH` não reabrir a regra "Zerado exige ≥ 1", que a API só aplica quando o valor muda), `rating-input`
+  (`parseRatingInput`: vazio, número ou inválido, aceitando vírgula e ponto; `formatRating` com vírgula e 1 casa;
+  usa `isValidRating` do shared), `platforms` (lista de plataformas) e
   `save-game` (salva o jogo e SÓ DEPOIS a capa; se a capa falha, devolve o jogo salvo + o erro da capa e
   o formulário passa a editar aquele jogo, para o próximo Salvar ser `PATCH`, não `POST`/409).
+- **Avaliação** (spec `avaliacao-de-jogos`, etapa 2): o `GameForm` ganha a seção **Avaliação**
+  (`AvaliacaoField`, só com Zerado ou Jogando) com os cinco critérios de `GAME_RATING_CRITERIA` do shared (rótulo,
+  descrição curta, **slider** nativo `<input type="range">` de 0 a 10 com passo 0,1, **campo de texto** com
+  `inputMode="decimal"` sincronizado que aceita vírgula e ponto, e **Limpar**) e a **média ao vivo** (a mesma
+  `notaMedia` do shared). "Sem nota" é `""` e não é 0: o slider fica apagado, e como o `change` do range não
+  dispara se o dedo solta onde ele já está, o `pointerup` num critério vazio grava o valor do slider (é o que
+  permite dar nota 0). O erro de digitação (fora de 0 a 10, ou casa demais) aparece **na hora** e bloqueia o
+  envio; os da API vêm por `fields` (cada critério, `notas` na seção, `descricao`). Em "Quero jogar" a seção some,
+  as notas digitadas ficam no estado (voltar para Jogando as recupera) e um aviso diz que serão apagadas ao salvar.
+  `DescricaoField`: textarea com `maxLength` 1000 e contador `n/1000`. A `GameRow` mostra só a **média**
+  (`RatingBar`: barra de 10 segmentos que preenche `round(média)`, número com vírgula e 1 casa, `aria-label`
+  "Nota 8,3 de 10"; "—" sem média) e o **título é um `<Link>` real** para `/jogos/:id`, esticado sobre a linha
+  por `after:absolute after:inset-0` (sem `<a>` aninhado nem `onClick` no `<li>`), com as ações em `z-10` por cima.
 - **Plataforma** é uma seleção das plataformas mais usadas, agrupadas por família; a API continua
   aceitando texto livre, e uma plataforma antiga fora da lista vira opção extra na edição.
 - **Diálogos** são `<dialog>` nativo com `showModal()` (`shared/components/ModalDialog`): Esc fecha, o

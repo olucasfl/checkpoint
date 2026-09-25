@@ -2,14 +2,15 @@ import { AxiosError, type AxiosResponse } from 'axios';
 import { type Game } from '@checkpoint/shared';
 import { describe, expect, it, vi } from 'vitest';
 import { type GamesApi } from '../api/games-api';
-import { type GameFormValues } from './form-values';
+import { EMPTY_RATING_TEXTS, type GameFormValues } from './form-values';
 import { saveGame } from './save-game';
 
 const values: GameFormValues = {
   titulo: 'Hollow Knight',
   plataforma: 'PC',
   status: 'JOGANDO',
-  nota: '8',
+  notas: { ...EMPTY_RATING_TEXTS, gameplay: '8' },
+  descricao: '',
 };
 const file = new File([new Uint8Array([1, 2, 3])], 'capa.png', { type: 'image/png' });
 
@@ -18,7 +19,9 @@ const game = (overrides: Partial<Game> = {}): Game => ({
   titulo: 'Hollow Knight',
   plataforma: 'PC',
   status: 'JOGANDO',
-  nota: 8,
+  notas: { gameplay: 8, historia: null, graficos: null, trilhaSonora: null, performance: null },
+  notaMedia: 8,
+  descricao: null,
   capaUrl: null,
   criadoEm: '2026-09-23T12:00:00.000Z',
   atualizadoEm: '2026-09-23T12:00:00.000Z',
@@ -60,19 +63,21 @@ describe('saveGame — salva o jogo e DEPOIS a capa', () => {
     expect(result.game.capaUrl).toBe('https://s/capas/g1/a.png');
   });
 
-  it('envia o corpo completo do jogo, com nota: null explícito em "Quero jogar"', async () => {
+  it('envia o corpo completo do jogo, com cada critério null explícito em "Quero jogar"', async () => {
     const { api, mocks } = fakeApi();
 
-    await saveGame(
-      { values: { ...values, status: 'QUERO_JOGAR', nota: '' }, cover: { kind: 'keep' } },
-      api,
-    );
+    await saveGame({ values: { ...values, status: 'QUERO_JOGAR' }, cover: { kind: 'keep' } }, api);
 
     expect(mocks.create).toHaveBeenCalledWith({
       titulo: 'Hollow Knight',
       status: 'QUERO_JOGAR',
       plataforma: 'PC',
-      nota: null,
+      gameplay: null,
+      historia: null,
+      graficos: null,
+      trilhaSonora: null,
+      performance: null,
+      descricao: null,
     });
   });
 

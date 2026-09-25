@@ -25,12 +25,19 @@ vi.mock('@/features/games/api/games-api', () => ({
 
 const api = vi.mocked(gamesApi);
 
+/** Um jogo cuja nota geral (a média) é `media`: a nota vem só do gameplay, para a média ser exata. */
+const comMedia = (media: number | null): Pick<Game, 'notas' | 'notaMedia'> => ({
+  notas: { gameplay: media, historia: null, graficos: null, trilhaSonora: null, performance: null },
+  notaMedia: media,
+});
+
 const game = (overrides: Partial<Game> = {}): Game => ({
   id: 'g1',
   titulo: 'Hollow Knight',
   plataforma: 'Switch',
   status: 'JOGANDO',
-  nota: 8,
+  ...comMedia(8),
+  descricao: null,
   capaUrl: null,
   criadoEm: '2026-09-23T12:00:00.000Z',
   atualizadoEm: '2026-09-23T12:00:00.000Z',
@@ -38,10 +45,16 @@ const game = (overrides: Partial<Game> = {}): Game => ({
 });
 
 const CATALOG: Game[] = [
-  game({ id: '1', titulo: 'Hollow Knight', status: 'JOGANDO', nota: 8 }),
-  game({ id: '2', titulo: 'Celeste', plataforma: 'PC', status: 'ZERADO', nota: 9 }),
-  game({ id: '3', titulo: 'Outer Wilds', plataforma: null, status: 'QUERO_JOGAR', nota: null }),
-  game({ id: '4', titulo: 'Hades', plataforma: 'PC', status: 'ZERADO', nota: 0 }),
+  game({ id: '1', titulo: 'Hollow Knight', status: 'JOGANDO', ...comMedia(8) }),
+  game({ id: '2', titulo: 'Celeste', plataforma: 'PC', status: 'ZERADO', ...comMedia(9) }),
+  game({
+    id: '3',
+    titulo: 'Outer Wilds',
+    plataforma: null,
+    status: 'QUERO_JOGAR',
+    ...comMedia(null),
+  }),
+  game({ id: '4', titulo: 'Hades', plataforma: 'PC', status: 'ZERADO', ...comMedia(0) }),
 ];
 
 /** Mostra a query string atual, para conferir que o filtro vive na URL. */
@@ -75,7 +88,7 @@ function renderPage(url = '/') {
 
 const rows = () => screen.queryAllByRole('listitem');
 const titles = () =>
-  rows().map((row) => within(row).getByText(/./, { selector: 'span.game-title' }).textContent);
+  rows().map((row) => within(row).getByText(/./, { selector: '.game-title' }).textContent);
 const filterButton = (name: RegExp) =>
   within(screen.getByRole('group', { name: 'Filtrar por status' })).getByRole('button', { name });
 
@@ -264,37 +277,106 @@ describe('linha do jogo (CA-72, CA-73, CA-81)', () => {
     expect(document.querySelector('[data-cover="image"]')).toBeNull();
   });
 
-  it('nota como barra de 10 segmentos + número; "SEM NOTA" quando vazia; 0 = nada preenchido (CA-81)', async () => {
+  it('média como barra de 10 segmentos + número com vírgula; "—" sem média; 0 = nada preenchido (CA-23)', async () => {
     renderPage();
     await screen.findByText('Hollow Knight');
     const row = (title: string) => rows().find((r) => within(r).queryByText(title)) as HTMLElement;
     const filled = (title: string) => row(title).querySelectorAll('[data-segment="on"]').length;
 
     expect(
-      within(row('Hollow Knight')).getByRole('img', { name: 'Nota 8 de 10' }),
+      within(row('Hollow Knight')).getByRole('img', { name: 'Nota 8,0 de 10' }),
     ).toBeInTheDocument();
     expect(filled('Hollow Knight')).toBe(8);
     expect(row('Hollow Knight').querySelectorAll('[data-segment]')).toHaveLength(10);
 
-    expect(within(row('Hades')).getByRole('img', { name: 'Nota 0 de 10' })).toBeInTheDocument();
+    expect(within(row('Hades')).getByRole('img', { name: 'Nota 0,0 de 10' })).toBeInTheDocument();
     expect(filled('Hades')).toBe(0);
-    expect(within(row('Hades')).getByText('0')).toBeInTheDocument();
+    expect(within(row('Hades')).getByText('0,0')).toBeInTheDocument();
 
-    expect(within(row('Outer Wilds')).getByText('SEM NOTA')).toBeInTheDocument();
+    expect(within(row('Outer Wilds')).getByRole('img', { name: 'Sem nota' })).toHaveTextContent(
+      '—',
+    );
+    expect(within(row('Outer Wilds')).queryByText('SEM NOTA')).not.toBeInTheDocument();
     expect(filled('Outer Wilds')).toBe(0);
   });
 
-  it('a nota tem legenda "NOTA", estrela e "/10", para não parecer outro número', async () => {
+  it('a média decimal: 8,3 mostra "8,3" e 8 segmentos; 8,5 arredonda a barra para 9 (CA-23)', async () => {
+    api.list.mockResolvedValue([
+      game({ id: '1', titulo: 'Oito e três', ...comMedia(8.3) }),
+      game({ id: '2', titulo: 'Oito e meio', plataforma: 'PC', ...comMedia(8.5) }),
+    ]);
+    renderPage();
+    await screen.findByText('Oito e três');
+    const row = (title: string) => rows().find((r) => within(r).queryByText(title)) as HTMLElement;
+    const filled = (title: string) => row(title).querySelectorAll('[data-segment="on"]').length;
+
+    expect(
+      within(row('Oito e três')).getByRole('img', { name: 'Nota 8,3 de 10' }),
+    ).toBeInTheDocument();
+    expect(within(row('Oito e três')).getByText('8,3')).toBeInTheDocument();
+    expect(filled('Oito e três')).toBe(8);
+    expect(within(row('Oito e meio')).getByText('8,5')).toBeInTheDocument();
+    expect(filled('Oito e meio')).toBe(9);
+  });
+
+  it('a média tem legenda "NOTA", estrela e "/10", para não parecer outro número', async () => {
     renderPage();
     await screen.findByText('Hollow Knight');
     const row = rows().find((r) => within(r).queryByText('Hollow Knight')) as HTMLElement;
 
     expect(within(row).getByText('Nota')).toBeInTheDocument();
-    expect(within(row).getByText('8')).toBeInTheDocument();
+    expect(within(row).getByText('8,0')).toBeInTheDocument();
     expect(within(row).getByText('/10')).toBeInTheDocument();
     // O número é texto comum da fonte legível (Rajdhani), não da Orbitron dos painéis.
-    expect(within(row).getByText('8').closest('.font-corpo')).not.toBeNull();
-    expect(within(row).getByText('8').closest('.font-display')).toBeNull();
+    expect(within(row).getByText('8,0').closest('.font-corpo')).not.toBeNull();
+    expect(within(row).getByText('8,0').closest('.font-display')).toBeNull();
+  });
+
+  it('a lista mostra só a média, nunca os cinco critérios (CA-23)', async () => {
+    renderPage();
+    await screen.findByText('Hollow Knight');
+
+    for (const rotulo of ['Gameplay', 'História', 'Gráficos', 'Trilha sonora', 'Performance']) {
+      expect(screen.queryByText(new RegExp(rotulo))).not.toBeInTheDocument();
+    }
+  });
+
+  it('o título é um link real para /jogos/<id> (CA-24)', async () => {
+    renderPage();
+    await screen.findByText('Hollow Knight');
+
+    const link = screen.getByRole('link', { name: 'Hollow Knight' });
+
+    expect(link).toHaveAttribute('href', '/jogos/1');
+    expect(screen.getByRole('link', { name: 'Celeste' })).toHaveAttribute('href', '/jogos/2');
+  });
+
+  it('a linha inteira leva ao detalhe (o link é esticado sobre ela), e as ações ficam por cima (CA-24)', async () => {
+    renderPage();
+    await screen.findByText('Hollow Knight');
+    const row = rows().find((r) => within(r).queryByText('Hollow Knight')) as HTMLElement;
+
+    expect(row).toHaveClass('relative');
+    expect(within(row).getByRole('link', { name: 'Hollow Knight' })).toHaveClass('after:absolute');
+    expect(within(row).getByRole('link', { name: 'Hollow Knight' })).toHaveClass('after:inset-0');
+    const acoes = within(row).getByRole('button', { name: 'Editar Hollow Knight' }).parentElement;
+    expect(acoes).toHaveClass('z-10');
+    // Botões não ficam dentro do link (nada de <a> com <button> dentro).
+    expect(
+      within(row).getByRole('button', { name: 'Editar Hollow Knight' }).closest('a'),
+    ).toBeNull();
+  });
+
+  it('Editar e Remover abrem seus diálogos SEM navegar para o detalhe (CA-24)', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByText('Hollow Knight');
+
+    await user.click(screen.getByRole('button', { name: 'Editar Hollow Knight' }));
+
+    expect(await screen.findByRole('heading', { name: 'EDITAR JOGO' })).toBeInTheDocument();
+    // Ainda na lista: as outras linhas continuam aqui (a rota do detalhe não existe neste teste).
+    expect(screen.getByText('Celeste')).toBeInTheDocument();
   });
 
   it('plataforma vazia é omitida; a preenchida aparece', async () => {

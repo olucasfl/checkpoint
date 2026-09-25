@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { AxiosError, type AxiosResponse } from 'axios';
 import { type Game } from '@checkpoint/shared';
@@ -27,7 +27,9 @@ const game = (overrides: Partial<Game> = {}): Game => ({
   titulo: 'Hollow Knight',
   plataforma: 'PC',
   status: 'JOGANDO',
-  nota: 7,
+  notas: { gameplay: 7, historia: null, graficos: null, trilhaSonora: null, performance: null },
+  notaMedia: 7,
+  descricao: null,
   capaUrl: null,
   criadoEm: '2026-09-23T12:00:00.000Z',
   atualizadoEm: '2026-09-23T12:00:00.000Z',
@@ -63,29 +65,58 @@ beforeEach(() => {
   vi.resetAllMocks();
 });
 
-describe('nota bloqueada em "Quero jogar" (CA-43, CA-82)', () => {
-  it('ao escolher "Quero jogar" a nota fica desabilitada, vazia e com o cadeado', async () => {
-    const { user } = renderForm();
+const criterio = (rotulo: string) => screen.getByLabelText(rotulo);
+const slider = (rotulo: string) => screen.getByLabelText(`${rotulo}, controle deslizante`);
+const limpar = (rotulo: string) => screen.getByRole('button', { name: `Limpar ${rotulo}` });
+const ROTULOS = ['Gameplay', 'História', 'Gráficos', 'Trilha sonora', 'Performance técnica'];
+const CHAVES = ['gameplay', 'historia', 'graficos', 'trilhaSonora', 'performance'] as const;
 
-    await user.click(screen.getByRole('button', { name: 'Zerado' }));
-    await user.type(screen.getByLabelText('Nota'), '8');
-    expect(screen.getByLabelText('Nota')).toHaveValue(8);
+/** O corpo completo enviado: cada critério aparece sempre, `null` quando sem nota. */
+const corpo = (overrides: Record<string, unknown> = {}) => ({
+  titulo: 'Hades',
+  status: 'JOGANDO',
+  plataforma: null,
+  gameplay: null,
+  historia: null,
+  graficos: null,
+  trilhaSonora: null,
+  performance: null,
+  descricao: null,
+  ...overrides,
+});
 
-    await user.click(screen.getByRole('button', { name: 'Quero jogar' }));
+describe('seção Avaliação (CA-16)', () => {
+  it('em Quero jogar (o padrão de um jogo novo) a seção não existe', () => {
+    renderForm();
 
-    const nota = screen.getByLabelText('Nota');
-    expect(nota).toBeDisabled();
-    expect(nota).toHaveValue(null);
-    expect(screen.getByText('Disponível para Zerado ou Jogando')).toBeInTheDocument();
-    expect(document.querySelector('[data-locked="true"]')).not.toBeNull();
+    expect(screen.queryByRole('group', { name: 'Avaliação' })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Gameplay')).not.toBeInTheDocument();
   });
 
-  it('voltar para Jogando reabilita a nota', async () => {
+  it('com Zerado ou Jogando mostra os cinco critérios: rótulo, descrição, slider, campo e Limpar', async () => {
     const { user } = renderForm();
 
     await user.click(screen.getByRole('button', { name: 'Jogando' }));
 
-    expect(screen.getByLabelText('Nota')).toBeEnabled();
+    const secao = screen.getByRole('group', { name: 'Avaliação' });
+    for (const rotulo of ROTULOS) {
+      expect(criterio(rotulo)).toBeInTheDocument();
+      expect(slider(rotulo)).toBeInTheDocument();
+      expect(limpar(rotulo)).toBeInTheDocument();
+    }
+    expect(secao).toHaveTextContent('Jogabilidade, controles, mecânicas');
+    expect(secao).toHaveTextContent('Estabilidade, desempenho, bugs');
+    await user.click(screen.getByRole('button', { name: 'Zerado' }));
+    expect(screen.getByRole('group', { name: 'Avaliação' })).toBeInTheDocument();
+  });
+
+  it('voltar para Quero jogar esconde a seção', async () => {
+    const { user } = renderForm();
+
+    await user.click(screen.getByRole('button', { name: 'Jogando' }));
+    await user.click(screen.getByRole('button', { name: 'Quero jogar' }));
+
+    expect(screen.queryByRole('group', { name: 'Avaliação' })).not.toBeInTheDocument();
   });
 
   it('o status são três botões com aria-pressed e exatamente um ativo', async () => {
@@ -103,50 +134,339 @@ describe('nota bloqueada em "Quero jogar" (CA-43, CA-82)', () => {
   });
 });
 
-describe('envio de nota: null (CA-43)', () => {
-  it('jogo novo em "Quero jogar" envia nota: null', async () => {
-    api.create.mockResolvedValue(game({ status: 'QUERO_JOGAR', nota: null }));
+describe('"sem nota" é diferente de 0 (CA-17)', () => {
+  it('um jogo novo em Jogando começa com os cinco campos vazios e o slider "sem nota"', async () => {
+    const { user } = renderForm();
+
+    await user.click(screen.getByRole('button', { name: 'Jogando' }));
+
+    for (const rotulo of ROTULOS) {
+      expect(criterio(rotulo)).toHaveValue('');
+      expect(slider(rotulo)).toHaveAttribute('aria-valuetext', 'sem nota');
+      expect(limpar(rotulo)).toBeDisabled();
+    }
+  });
+
+  it('soltar o slider onde ele já está (0) dá nota 0, e o envio leva gameplay: 0', async () => {
+    api.create.mockResolvedValue(game());
+    const { user } = renderForm();
+    await user.type(screen.getByLabelText('Título'), 'Hades');
+    await user.click(screen.getByRole('button', { name: 'Jogando' }));
+
+    fireEvent.pointerUp(slider('Gameplay'));
+
+    expect(criterio('Gameplay')).toHaveValue('0');
+    expect(slider('Gameplay')).toHaveAttribute('aria-valuetext', '0,0');
+    await user.click(save());
+    expect(api.create).toHaveBeenCalledWith(corpo({ gameplay: 0 }));
+  });
+
+  it('Limpar volta a "sem nota": campo vazio e o envio leva gameplay: null', async () => {
+    api.create.mockResolvedValue(game());
+    const { user } = renderForm();
+    await user.type(screen.getByLabelText('Título'), 'Hades');
+    await user.click(screen.getByRole('button', { name: 'Jogando' }));
+    await user.type(criterio('Gameplay'), '6');
+    expect(limpar('Gameplay')).toBeEnabled();
+
+    await user.click(limpar('Gameplay'));
+
+    expect(criterio('Gameplay')).toHaveValue('');
+    expect(slider('Gameplay')).toHaveAttribute('aria-valuetext', 'sem nota');
+    await user.click(save());
+    expect(api.create).toHaveBeenCalledWith(corpo({ gameplay: null }));
+  });
+});
+
+describe('slider e campo sincronizados, vírgula e ponto (CA-18)', () => {
+  it.each(['8,7', '8.7'])(
+    'digitar %s leva o slider a 8,7 e envia o número 8.7',
+    async (digitado) => {
+      api.create.mockResolvedValue(game());
+      const { user } = renderForm();
+      await user.type(screen.getByLabelText('Título'), 'Hades');
+      await user.click(screen.getByRole('button', { name: 'Jogando' }));
+
+      await user.type(criterio('Gráficos'), digitado);
+
+      expect(slider('Gráficos')).toHaveValue('8.7');
+      expect(slider('Gráficos')).toHaveAttribute('aria-valuetext', '8,7');
+      await user.click(save());
+      expect(api.create).toHaveBeenCalledWith(corpo({ graficos: 8.7 }));
+    },
+  );
+
+  it('mover o slider para 8,7 mostra "8,7" (vírgula) no campo', async () => {
+    api.create.mockResolvedValue(game());
+    const { user } = renderForm();
+    await user.type(screen.getByLabelText('Título'), 'Hades');
+    await user.click(screen.getByRole('button', { name: 'Jogando' }));
+
+    fireEvent.change(slider('Trilha sonora'), { target: { value: '8.7' } });
+
+    expect(criterio('Trilha sonora')).toHaveValue('8,7');
+    await user.click(save());
+    expect(api.create).toHaveBeenCalledWith(corpo({ trilhaSonora: 8.7 }));
+  });
+
+  it('o slider é nativo, de 0 a 10 com passo 0,1', async () => {
+    const { user } = renderForm();
+    await user.click(screen.getByRole('button', { name: 'Jogando' }));
+
+    const range = slider('Gameplay');
+    expect(range).toHaveAttribute('type', 'range');
+    expect(range).toHaveAttribute('min', '0');
+    expect(range).toHaveAttribute('max', '10');
+    expect(range).toHaveAttribute('step', '0.1');
+  });
+
+  it('todo controle da seção tem pelo menos 44 px (classe min-h-11 / h-11)', async () => {
+    const { user } = renderForm();
+    await user.click(screen.getByRole('button', { name: 'Jogando' }));
+
+    for (const rotulo of ROTULOS) {
+      expect(criterio(rotulo).className).toContain('min-h-11');
+      expect(limpar(rotulo).className).toContain('min-h-11');
+      expect(limpar(rotulo).className).toContain('min-w-11');
+      expect(slider(rotulo).className).toContain('h-11');
+    }
+  });
+});
+
+describe('média ao vivo (CA-19)', () => {
+  const media = () => document.querySelector('[data-media]') as HTMLElement;
+
+  it('mostra a média do que já foi preenchido, recalcula ao limpar e "—" sem nenhum', async () => {
+    const { user } = renderForm();
+    await user.click(screen.getByRole('button', { name: 'Jogando' }));
+    expect(media()).toHaveTextContent('—');
+
+    await user.type(criterio('Gameplay'), '9');
+    await user.type(criterio('História'), '8,5');
+    expect(media()).toHaveTextContent('8,8');
+
+    await user.click(limpar('História'));
+    expect(media()).toHaveTextContent('9,0');
+
+    await user.click(limpar('Gameplay'));
+    expect(media()).toHaveTextContent('—');
+  });
+
+  it('0 entra na média (é nota); sem nota não', async () => {
+    const { user } = renderForm();
+    await user.click(screen.getByRole('button', { name: 'Jogando' }));
+
+    await user.type(criterio('Gameplay'), '10');
+    await user.type(criterio('Gráficos'), '0');
+
+    expect(media()).toHaveTextContent('5,0');
+  });
+});
+
+describe('erros de digitação e da API (CA-20)', () => {
+  it.each(['10,5', '7,55', '-1', 'abc', '1,2,3'])(
+    'o valor %s mostra o erro do critério na hora e o envio não sai',
+    async (digitado) => {
+      const { user } = renderForm();
+      await user.type(screen.getByLabelText('Título'), 'Hades');
+      await user.click(screen.getByRole('button', { name: 'Jogando' }));
+
+      await user.type(criterio('Gráficos'), digitado);
+
+      const erro = await screen.findByText(
+        'A nota de Gráficos deve ser um número de 0 a 10, com no máximo 1 casa decimal',
+      );
+      expect(erro.id).toBe('f-nota-graficos-err');
+      expect(criterio('Gráficos')).toHaveAttribute('aria-invalid', 'true');
+
+      await user.click(save());
+      expect(api.create).not.toHaveBeenCalled();
+    },
+  );
+
+  it('o erro some quando o valor volta a ser válido', async () => {
+    const { user } = renderForm();
+    await user.click(screen.getByRole('button', { name: 'Jogando' }));
+
+    await user.type(criterio('Gameplay'), '11');
+    expect(screen.getByText(/A nota de Gameplay deve ser/)).toBeInTheDocument();
+
+    await user.clear(criterio('Gameplay'));
+    await user.type(criterio('Gameplay'), '10');
+    expect(screen.queryByText(/A nota de Gameplay deve ser/)).not.toBeInTheDocument();
+  });
+
+  it('fields.notas da API (Zerado sem critério) aparece na seção Avaliação', async () => {
+    api.create.mockRejectedValue(
+      httpError(400, {
+        statusCode: 400,
+        message: 'x',
+        fields: { notas: 'Preencha ao menos um critério para marcar como Zerado' },
+      }),
+    );
+    const { user } = renderForm();
+    await user.type(screen.getByLabelText('Título'), 'Hades');
+    await user.click(screen.getByRole('button', { name: 'Zerado' }));
+    await user.click(save());
+
+    const erro = await screen.findByText('Preencha ao menos um critério para marcar como Zerado');
+    expect(erro.id).toBe('f-notas-err');
+    expect(screen.getByRole('group', { name: 'Avaliação' })).toContainElement(erro);
+  });
+});
+
+describe('mudar para Quero jogar com notas preenchidas (CA-21)', () => {
+  it('avisa, e o PATCH leva null em cada critério', async () => {
+    api.update.mockResolvedValue(game({ status: 'QUERO_JOGAR' }));
+    const { user } = renderForm({ game: game({ status: 'JOGANDO' }) });
+    expect(criterio('Gameplay')).toHaveValue('7');
+
+    await user.click(screen.getByRole('button', { name: 'Quero jogar' }));
+
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'As notas preenchidas serão apagadas ao salvar como Quero jogar.',
+    );
+    expect(screen.queryByRole('group', { name: 'Avaliação' })).not.toBeInTheDocument();
+    await user.click(save());
+    expect(api.update).toHaveBeenCalledWith(
+      'g1',
+      corpo({ titulo: 'Hollow Knight', status: 'QUERO_JOGAR', plataforma: 'PC' }),
+    );
+  });
+
+  it('sem notas preenchidas não há aviso, e um jogo novo em Quero jogar envia tudo null', async () => {
+    api.create.mockResolvedValue(game({ status: 'QUERO_JOGAR' }));
     const { user, onDone } = renderForm();
 
     await user.type(screen.getByLabelText('Título'), 'Hades');
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
     await user.click(save());
 
-    expect(api.create).toHaveBeenCalledWith({
-      titulo: 'Hades',
-      status: 'QUERO_JOGAR',
-      plataforma: null,
-      nota: null,
-    });
+    expect(api.create).toHaveBeenCalledWith(corpo({ status: 'QUERO_JOGAR' }));
     expect(onDone).toHaveBeenCalled();
   });
 
-  it('editar um jogo com nota para "Quero jogar" manda PATCH com nota: null explícito', async () => {
-    api.update.mockResolvedValue(game({ status: 'QUERO_JOGAR', nota: null }));
-    const { user } = renderForm({ game: game({ status: 'JOGANDO', nota: 7 }) });
+  it('desistir (voltar para Jogando) recupera as notas digitadas', async () => {
+    const { user } = renderForm({ game: game({ status: 'JOGANDO' }) });
 
     await user.click(screen.getByRole('button', { name: 'Quero jogar' }));
+    await user.click(screen.getByRole('button', { name: 'Jogando' }));
+
+    expect(criterio('Gameplay')).toHaveValue('7');
+  });
+});
+
+describe('envio das notas', () => {
+  it('editar só o título de um Zerado sem notas manda o corpo completo, com os critérios null (CA-32)', async () => {
+    api.update.mockResolvedValue(game({ status: 'ZERADO' }));
+    const semNotas = game({
+      status: 'ZERADO',
+      notas: {
+        gameplay: null,
+        historia: null,
+        graficos: null,
+        trilhaSonora: null,
+        performance: null,
+      },
+      notaMedia: null,
+    });
+    const { user } = renderForm({ game: semNotas });
+
+    await user.type(screen.getByLabelText('Título'), ' 2');
     await user.click(save());
 
-    expect(api.update).toHaveBeenCalledWith('g1', {
-      titulo: 'Hollow Knight',
-      status: 'QUERO_JOGAR',
-      plataforma: 'PC',
-      nota: null,
-    });
+    expect(api.update).toHaveBeenCalledWith(
+      'g1',
+      corpo({ titulo: 'Hollow Knight 2', status: 'ZERADO', plataforma: 'PC' }),
+    );
   });
 
-  it('com Jogando envia a nota digitada como número', async () => {
+  it('as notas dos cinco critérios vão como número, cada uma na sua chave', async () => {
     api.create.mockResolvedValue(game());
     const { user } = renderForm();
+    await user.type(screen.getByLabelText('Título'), 'Hades');
+    await user.click(screen.getByRole('button', { name: 'Zerado' }));
 
-    await user.type(screen.getByLabelText('Título'), 'Celeste');
-    await user.click(screen.getByRole('button', { name: 'Jogando' }));
-    await user.type(screen.getByLabelText('Nota'), '9');
+    const valores = ['9,2', '8', '7,5', '10', '0'];
+    for (const [i, rotulo] of ROTULOS.entries()) {
+      await user.type(criterio(rotulo), valores[i] ?? '');
+    }
     await user.click(save());
 
     expect(api.create).toHaveBeenCalledWith(
-      expect.objectContaining({ status: 'JOGANDO', nota: 9 }),
+      corpo({
+        status: 'ZERADO',
+        gameplay: 9.2,
+        historia: 8,
+        graficos: 7.5,
+        trilhaSonora: 10,
+        performance: 0,
+      }),
     );
+    expect(Object.keys(api.create.mock.calls[0]?.[0] ?? {})).toEqual(
+      expect.arrayContaining([...CHAVES]),
+    );
+  });
+});
+
+describe('Descrição (CA-22)', () => {
+  const descricao = () => screen.getByLabelText(/Descrição/);
+
+  it('o contador mostra n/1000 e o campo não passa de 1000', async () => {
+    const { user } = renderForm();
+    expect(screen.getByText('0/1000')).toBeInTheDocument();
+
+    await user.type(descricao(), 'abc');
+    expect(screen.getByText('3/1000')).toBeInTheDocument();
+
+    expect(descricao()).toHaveAttribute('maxlength', '1000');
+  });
+
+  it('as quebras de linha vão no corpo e voltam ao reabrir o formulário', async () => {
+    api.create.mockResolvedValue(game());
+    const { user } = renderForm();
+    await user.type(screen.getByLabelText('Título'), 'Hades');
+
+    await user.type(descricao(), 'Linha 1{Enter}{Enter}Linha 3');
+    await user.click(save());
+
+    expect(api.create).toHaveBeenCalledWith(
+      expect.objectContaining({ descricao: 'Linha 1\n\nLinha 3' }),
+    );
+  });
+
+  it('um jogo com descrição abre o formulário com o texto e as mesmas quebras', () => {
+    renderForm({ game: game({ descricao: 'Ótimo\n\njogo' }) });
+
+    expect(descricao()).toHaveValue('Ótimo\n\njogo');
+    expect(screen.getByText('11/1000')).toBeInTheDocument();
+  });
+
+  it('só espaços vão como null', async () => {
+    api.create.mockResolvedValue(game());
+    const { user } = renderForm();
+    await user.type(screen.getByLabelText('Título'), 'Hades');
+
+    await user.type(descricao(), '   ');
+    await user.click(save());
+
+    expect(api.create).toHaveBeenCalledWith(expect.objectContaining({ descricao: null }));
+  });
+
+  it('o erro da API em fields.descricao aparece junto do campo', async () => {
+    api.create.mockRejectedValue(
+      httpError(400, {
+        statusCode: 400,
+        message: 'x',
+        fields: { descricao: 'A descrição deve ter no máximo 1000 caracteres' },
+      }),
+    );
+    const { user } = renderForm();
+    await user.type(screen.getByLabelText('Título'), 'Hades');
+    await user.click(save());
+
+    const erro = await screen.findByText('A descrição deve ter no máximo 1000 caracteres');
+    expect(erro.id).toBe('f-descricao-err');
   });
 });
 
@@ -274,21 +594,24 @@ describe('erros da API no campo certo (CA-44)', () => {
     expect(screen.queryByText('dup')).not.toBeInTheDocument();
   });
 
-  it('400 da regra da nota aparece junto do campo Nota', async () => {
+  it('400 de um critério aparece junto do campo daquele critério', async () => {
     api.create.mockRejectedValue(
       httpError(400, {
         statusCode: 400,
         message: 'x',
-        fields: { nota: 'Nota só pode ser preenchida quando o status é Zerado ou Jogando' },
+        fields: {
+          historia: 'A nota de História deve ser um número de 0 a 10, com no máximo 1 casa decimal',
+        },
       }),
     );
     const { user } = renderForm();
 
     await user.type(screen.getByLabelText('Título'), 'Hades');
+    await user.click(screen.getByRole('button', { name: 'Jogando' }));
     await user.click(save());
 
-    const message = await screen.findByText(/Nota só pode ser preenchida/);
-    expect(message.id).toBe('f-nota-err');
+    const message = await screen.findByText(/A nota de História deve ser/);
+    expect(message.id).toBe('f-nota-historia-err');
   });
 
   it('erro sem campo (404, rede) vira mensagem geral no formulário', async () => {

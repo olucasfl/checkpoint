@@ -43,9 +43,9 @@ describe('gamesApi — o resto continua em JSON', () => {
     expect(String(captured?.headers.get('Content-Type'))).toContain('application/json');
     expect(captured?.data).toBe('{"titulo":"Hades","status":"JOGANDO"}');
 
-    await gamesApi.update('g1', { nota: null });
+    await gamesApi.update('g1', { gameplay: null });
     expect(captured?.method).toBe('patch');
-    expect(captured?.data).toBe('{"nota":null}');
+    expect(captured?.data).toBe('{"gameplay":null}');
   });
 
   it('remover a capa é um DELETE em /games/:id/capa', async () => {

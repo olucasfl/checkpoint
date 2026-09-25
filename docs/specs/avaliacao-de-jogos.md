@@ -1,6 +1,6 @@
 # Spec: avaliacao-de-jogos
 
-> Status: em andamento (aprovada em 2026-09-25; etapa 1 feita e verificada, inclusive a migration (aplicada em 2026-09-25 após backup e "sim" explícito; CA-14 e CA-15 conferidos no banco))
+> Status: em andamento (aprovada em 2026-09-25; etapas 1 e 2 feitas e verificadas: a migration foi aplicada com backup e "sim" explícito, e o formulário e a lista foram conferidos no navegador em 375 px e ≥ 1024 px; falta a etapa 3, a página de detalhes)
 
 ## Objetivo
 
@@ -232,15 +232,15 @@ campos, o `schema.prisma` descrito, o `CHECK` da decisão A, o campo Nota do for
 
 ### Etapa 2 — formulário e lista
 
-- [ ] **CA-16** — **Dado** o formulário aberto, **quando** o status é Zerado ou Jogando, **então** a seção Avaliação mostra cinco critérios, cada um com rótulo, descrição curta, slider, campo numérico e "Limpar"; **quando** escolho Quero jogar, **então** a seção some.
-- [ ] **CA-17** — **Dado** um jogo novo em Jogando, **então** os cinco campos começam vazios e o slider mostra "sem nota" (`aria-valuetext`); **quando** mexo o slider do Gameplay até 0, **então** o campo mostra `0` e o envio leva `gameplay: 0`; **quando** clico em **Limpar**, **então** volta a vazio e o envio leva `gameplay: null`.
-- [ ] **CA-18** — **Dado** o campo do Gameplay, **quando** digito `8,7` ou `8.7`, **então** o slider vai a 8,7 e o envio leva o número `8.7` (JSON); **quando** movo o slider para 8,7, **então** o campo mostra `8,7` (vírgula).
-- [ ] **CA-19** — **Dado** critérios preenchidos com `9`, `8,5` e dois vazios, **então** a média ao vivo mostra `8,8`; **quando** limpo um deles, **então** a média se recalcula na hora; sem nenhum, mostra "—".
-- [ ] **CA-20** — **Dado** o campo com `10,5` ou `7,55`, **então** o campo mostra o erro do critério na hora e o formulário **não envia**; **dado** o 400 da API com `fields.historia`, **então** a mensagem aparece junto da História; **dado** `fields.notas` (Zerado sem critério), **então** aparece na seção Avaliação.
-- [ ] **CA-21** — **Dado** um jogo Zerado com notas, **quando** troco o status para Quero jogar, **então** o formulário avisa que as notas serão limpas e, ao salvar, a request leva `null` nos cinco critérios; **e** o jogo fica sem notas.
-- [ ] **CA-22** — **Dado** o campo Descrição, **quando** digito, **então** o contador mostra `n/1000` e não passa de 1000; **quando** salvo com quebras de linha, **então** reabrir o formulário mostra as mesmas quebras.
-- [ ] **CA-23** — **Dado** um jogo com média 8,3 e outro sem notas, **quando** a lista carrega, **então** a linha do primeiro mostra `8,3` com a barra (8 segmentos) e `aria-label` "Nota 8,3 de 10", e a do segundo mostra "—".
-- [ ] **CA-24** — **Dado** a lista, **então** o título de cada linha é um link para `/jogos/<id>`; **quando** clico na linha (fora dos botões), **então** vou ao detalhe; **quando** clico em Editar ou Excluir, **então** abre o formulário/confirmação **sem** navegar.
+- [x] **CA-16** — **Dado** o formulário aberto, **quando** o status é Zerado ou Jogando, **então** a seção Avaliação mostra cinco critérios, cada um com rótulo, descrição curta, slider, campo numérico e "Limpar"; **quando** escolho Quero jogar, **então** a seção some.
+- [x] **CA-17** — **Dado** um jogo novo em Jogando, **então** os cinco campos começam vazios e o slider mostra "sem nota" (`aria-valuetext`); **quando** mexo o slider do Gameplay até 0, **então** o campo mostra `0` e o envio leva `gameplay: 0`; **quando** clico em **Limpar**, **então** volta a vazio e o envio leva `gameplay: null`.
+- [x] **CA-18** — **Dado** o campo do Gameplay, **quando** digito `8,7` ou `8.7`, **então** o slider vai a 8,7 e o envio leva o número `8.7` (JSON); **quando** movo o slider para 8,7, **então** o campo mostra `8,7` (vírgula).
+- [x] **CA-19** — **Dado** critérios preenchidos com `9`, `8,5` e dois vazios, **então** a média ao vivo mostra `8,8`; **quando** limpo um deles, **então** a média se recalcula na hora; sem nenhum, mostra "—".
+- [x] **CA-20** — **Dado** o campo com `10,5` ou `7,55`, **então** o campo mostra o erro do critério na hora e o formulário **não envia**; **dado** o 400 da API com `fields.historia`, **então** a mensagem aparece junto da História; **dado** `fields.notas` (Zerado sem critério), **então** aparece na seção Avaliação.
+- [x] **CA-21** — **Dado** um jogo Zerado com notas, **quando** troco o status para Quero jogar, **então** o formulário avisa que as notas serão limpas e, ao salvar, a request leva `null` nos cinco critérios; **e** o jogo fica sem notas.
+- [x] **CA-22** — **Dado** o campo Descrição, **quando** digito, **então** o contador mostra `n/1000` e não passa de 1000; **quando** salvo com quebras de linha, **então** reabrir o formulário mostra as mesmas quebras.
+- [x] **CA-23** — **Dado** um jogo com média 8,3 e outro sem notas, **quando** a lista carrega, **então** a linha do primeiro mostra `8,3` com a barra (8 segmentos) e `aria-label` "Nota 8,3 de 10", e a do segundo mostra "—".
+- [x] **CA-24** — **Dado** a lista, **então** o título de cada linha é um link para `/jogos/<id>`; **quando** clico na linha (fora dos botões), **então** vou ao detalhe; **quando** clico em Editar ou Excluir, **então** abre o formulário/confirmação **sem** navegar.
 
 ### Etapa 3 — página de detalhes
 
