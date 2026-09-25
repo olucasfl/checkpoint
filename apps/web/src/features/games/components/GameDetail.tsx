@@ -1,6 +1,7 @@
 import { GAME_RATING_CRITERIA, type Game } from '@checkpoint/shared';
 import { Icon } from '@/shared/components/Icon';
 import { LABEL } from '@/shared/components/form-parts';
+import { BlocoSteam } from '@/features/integracoes/components/BlocoSteam';
 import { capasDoJogo } from '@/features/integracoes/lib/capa';
 import { platformIcon } from '../lib/status-meta';
 import { GameCover } from './GameCover';
@@ -73,6 +74,8 @@ export function GameDetail({ game, onEdit }: GameDetailProps) {
             </p>
           )}
         </section>
+
+        {game.dadosPlataforma.length > 0 && <BlocoSteam game={game} />}
 
         <section
           aria-labelledby="detalhe-criterios"
