@@ -1,16 +1,7 @@
-/** O fundo Neon (orbes + scanlines), decorativo, das telas do app e das de entrada. */
+/**
+ * O fundo das telas do app e das de entrada: um halo estático na cor do destaque (direção "Estante de console").
+ * Sem orbes nem _scanlines_, e nada anima.
+ */
 export function Backdrop() {
-  return (
-    <>
-      <div
-        aria-hidden="true"
-        className="orb orb-magenta -right-[160px] -top-[200px] size-[420px] md:-right-[220px] md:-top-[280px] md:size-[720px]"
-      />
-      <div
-        aria-hidden="true"
-        className="orb orb-ciano -bottom-[220px] -left-[180px] size-[420px] md:-bottom-[320px] md:-left-[260px] md:size-[760px]"
-      />
-      <div aria-hidden="true" className="scanlines" />
-    </>
-  );
+  return <div aria-hidden="true" className="halo" />;
 }

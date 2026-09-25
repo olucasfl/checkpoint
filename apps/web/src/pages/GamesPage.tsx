@@ -66,11 +66,11 @@ export function GamesPage() {
       <main className="relative mx-auto flex max-w-[1168px] flex-col gap-5 md:gap-7">
         <header className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3 md:gap-4">
-            <div className="glow-logo grid size-10 place-items-center rounded-md border border-destaque text-destaque md:size-[52px]">
+            <div className="grid size-10 place-items-center rounded-md border border-destaque text-destaque md:size-[52px]">
               <Icon name="flag" size={26} filled />
             </div>
             <div>
-              <h1 className="glow-text-destaque m-0 font-display text-[22px] font-extrabold tracking-[0.14em] md:text-[30px]">
+              <h1 className="m-0 font-display text-[22px] font-extrabold tracking-[0.14em] md:text-[30px]">
                 CHECKPOINT
               </h1>
               <div className="text-[13px] font-semibold uppercase tracking-[0.2em] text-texto-suave md:text-[15px] md:tracking-[0.28em]">
@@ -83,7 +83,7 @@ export function GamesPage() {
           <button
             type="button"
             onClick={() => setForm({ open: true })}
-            className="cta-pulse hidden h-[52px] items-center gap-2.5 rounded-[4px] bg-destaque px-6 font-display text-sm font-extrabold uppercase tracking-[0.1em] text-fundo transition-transform hover:-translate-y-0.5 md:flex"
+            className="hidden h-[52px] items-center gap-2.5 rounded-[4px] bg-destaque px-6 font-display text-sm font-extrabold uppercase tracking-[0.1em] text-fundo transition-transform hover:-translate-y-0.5 md:flex"
           >
             <Icon name="add_circle" size={22} />
             Adicionar jogo

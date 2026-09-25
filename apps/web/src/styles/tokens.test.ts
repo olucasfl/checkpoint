@@ -115,12 +115,6 @@ describe('movimento reduzido (CA-84)', () => {
     expect(block).toMatch(/animation:\s*none\s*!important/);
     expect(block).toMatch(/transition:\s*none\s*!important/);
   });
-
-  it('o botão principal mantém um brilho estático quando o pulso sai', () => {
-    const block = css.match(/@media \(prefers-reduced-motion: reduce\)\s*\{[\s\S]*$/)?.[0] ?? '';
-
-    expect(block).toMatch(/\.cta-pulse\s*\{[^}]*box-shadow/);
-  });
 });
 
 describe('fontes e ícones (CA-88)', () => {
@@ -245,13 +239,17 @@ describe('cor de destaque e efeitos reduzidos (perfil, etapa 3)', () => {
     expect(css).toMatch(
       /\*,\s*\*::before,\s*\*::after\s*\{\s*@variant movimento-reduzido\s*\{[^}]*animation:\s*none !important;[^}]*transition:\s*none !important/,
     );
-    expect(css).toMatch(/\.cta-pulse\s*\{\s*@variant movimento-reduzido\s*\{[^}]*box-shadow/);
   });
 
-  it('efeitos "Reduzidos" escondem orbes e scanlines (CA-18)', () => {
-    expect(css).toMatch(
-      /html\[data-efeitos='reduzidos'\]\s*:is\(\.orb,\s*\.scanlines\)\s*\{\s*display:\s*none/,
-    );
+  it('não existem mais orbes, scanlines, pulso do botão, ponto piscando nem brilhos neon (CA-07)', () => {
+    for (const nome of ['orb', 'scanlines', 'cta-pulse', 'dot-blink']) {
+      expect(css, nome).not.toMatch(new RegExp(`\\.${nome}\\b`));
+    }
+    expect(css).not.toMatch(/\.glow-[a-z]/);
+    for (const keyframe of ['drift', 'scan', 'neon-pulse', 'blink']) {
+      expect(css, keyframe).not.toContain(`@keyframes ${keyframe}`);
+    }
+    expect(css).not.toMatch(/data-efeitos='reduzidos'\]\s*:is\(/);
   });
 
   it('nenhum pseudo-elemento anima: o ramo do atributo não os alcança', () => {

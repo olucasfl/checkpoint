@@ -69,12 +69,6 @@ html[data-destaque='laranja'] {
   --color-destaque: var(--color-capa-3);
 }
 
-/* Efeitos "Reduzidos" do /perfil: sem orbes nem scanlines (as animações saem pela variante
-   movimento-reduzido, no fim do arquivo). */
-html[data-efeitos='reduzidos'] :is(.orb, .scanlines) {
-  display: none;
-}
-
 /* Tira o atraso do toque duplo (zoom por toque duplo) sem travar o zoom por pinça. */
 html {
   touch-action: manipulation;
@@ -241,6 +235,7 @@ button:disabled {
     max-height: calc(100vh - 16px);
     max-height: calc(100dvh - env(safe-area-inset-top) - 16px);
     border-radius: 16px 16px 0 0;
+    box-shadow: 0 30px 80px color-mix(in srgb, var(--color-fundo) 60%, transparent);
     animation: sheet-up 0.2s ease-out;
   }
 
@@ -295,97 +290,6 @@ button:disabled {
     }
   }
 
-  /* ---- Fundo decorativo ---- */
-  .orb {
-    position: absolute;
-    border-radius: 50%;
-    pointer-events: none;
-    animation: drift 14s ease-in-out infinite;
-  }
-
-  .orb-magenta {
-    background: radial-gradient(
-      circle,
-      color-mix(in srgb, var(--color-magenta) 20%, transparent),
-      transparent 65%
-    );
-  }
-
-  .orb-ciano {
-    background: radial-gradient(
-      circle,
-      color-mix(in srgb, var(--color-ciano) 14%, transparent),
-      transparent 65%
-    );
-  }
-
-  .scanlines {
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    background-image: repeating-linear-gradient(
-      0deg,
-      color-mix(in srgb, var(--color-texto) 3%, transparent) 0 1px,
-      transparent 1px 4px
-    );
-    animation: scan 0.9s linear infinite;
-  }
-
-  /* ---- Brilhos (sempre color-mix dos tokens, nunca hex ou rgba solto) ---- */
-  .glow-logo {
-    box-shadow:
-      0 0 18px color-mix(in srgb, var(--color-destaque) 35%, transparent),
-      inset 0 0 12px color-mix(in srgb, var(--color-destaque) 25%, transparent);
-  }
-
-  .glow-text-destaque {
-    text-shadow: 0 0 20px color-mix(in srgb, var(--color-destaque) 55%, transparent);
-  }
-
-  .glow-text-ouro {
-    text-shadow: 0 0 18px color-mix(in srgb, var(--color-ouro) 45%, transparent);
-  }
-
-  .glow-text-ciano {
-    text-shadow: 0 0 18px color-mix(in srgb, var(--color-ciano) 45%, transparent);
-  }
-
-  .glow-text-vermelho-neon {
-    text-shadow: 0 0 18px color-mix(in srgb, var(--color-vermelho-neon) 40%, transparent);
-  }
-
-  .glow-ciano {
-    box-shadow: 0 0 18px color-mix(in srgb, var(--color-ciano) 45%, transparent);
-  }
-
-  .glow-ouro-soft {
-    box-shadow: 0 0 16px color-mix(in srgb, var(--color-ouro) 25%, transparent);
-  }
-
-  .glow-ciano-soft {
-    box-shadow: 0 0 16px color-mix(in srgb, var(--color-ciano) 25%, transparent);
-  }
-
-  .glow-vermelho-neon-soft {
-    box-shadow: 0 0 16px color-mix(in srgb, var(--color-vermelho-neon) 25%, transparent);
-  }
-
-  .glow-seg {
-    box-shadow: 0 0 6px color-mix(in srgb, var(--color-magenta) 70%, transparent);
-  }
-
-  .glow-primary {
-    box-shadow: 0 0 20px color-mix(in srgb, var(--color-destaque) 50%, transparent);
-  }
-
-  .glow-dialog {
-    box-shadow: 0 0 40px color-mix(in srgb, var(--color-destaque) 35%, transparent);
-  }
-
-  .glow-error {
-    box-shadow: 0 0 14px color-mix(in srgb, var(--color-erro) 35%, transparent);
-  }
-
   /* Chips de status: 18% da cor do status sobre a superfície (>= 4,5:1 do texto na cor do status). */
   .tint-status-jogando {
     background: color-mix(in srgb, var(--color-status-jogando) 18%, transparent);
@@ -399,43 +303,42 @@ button:disabled {
     background: color-mix(in srgb, var(--color-status-zerado) 18%, transparent);
   }
 
-  .tint-ouro {
-    background: color-mix(in srgb, var(--color-ouro) 8%, transparent);
-  }
-
-  .tint-ciano {
-    background: color-mix(in srgb, var(--color-ciano) 8%, transparent);
-  }
-
-  .tint-vermelho-neon {
-    background: color-mix(in srgb, var(--color-vermelho-neon) 8%, transparent);
-  }
-
-  .tint-ouro-strong {
-    background: color-mix(in srgb, var(--color-ouro) 10%, transparent);
-  }
-
-  .tint-ciano-strong {
-    background: color-mix(in srgb, var(--color-ciano) 10%, transparent);
-  }
-
-  .tint-vermelho-neon-strong {
-    background: color-mix(in srgb, var(--color-vermelho-neon) 10%, transparent);
-  }
-
   dialog.modal::backdrop {
     background: color-mix(in srgb, var(--color-fundo) 85%, transparent);
   }
 
+  /* Halo estático atrás do topo (direção "Estante de console"): um degradê radial na cor do destaque. Nada anima. */
+  .halo {
+    position: absolute;
+    left: 50%;
+    top: -260px;
+    width: 700px;
+    height: 500px;
+    margin-left: -350px;
+    border-radius: 50%;
+    pointer-events: none;
+    background: radial-gradient(
+      closest-side,
+      color-mix(in srgb, var(--color-destaque) 20%, transparent),
+      transparent
+    );
+  }
+
+  @media (min-width: 48rem) {
+    .halo {
+      top: -440px;
+      width: 1400px;
+      height: 800px;
+      margin-left: -700px;
+      background: radial-gradient(
+        closest-side,
+        color-mix(in srgb, var(--color-destaque) 18%, transparent),
+        transparent
+      );
+    }
+  }
+
   /* ---- Animações (só CSS) ---- */
-  .cta-pulse {
-    animation: neon-pulse 2.4s ease-in-out infinite;
-  }
-
-  .dot-blink {
-    animation: blink 1.1s steps(2) infinite;
-  }
-
   .shake-error {
     animation: shake 0.35s ease-in-out 3;
   }
@@ -508,45 +411,6 @@ button:disabled {
   }
 }
 
-@keyframes neon-pulse {
-  0%,
-  100% {
-    box-shadow:
-      0 0 0 1px var(--color-destaque),
-      0 0 16px color-mix(in srgb, var(--color-destaque) 45%, transparent);
-  }
-  50% {
-    box-shadow:
-      0 0 0 1px var(--color-destaque),
-      0 0 34px color-mix(in srgb, var(--color-destaque) 85%, transparent);
-  }
-}
-
-@keyframes scan {
-  from {
-    background-position: 0 0;
-  }
-  to {
-    background-position: 0 8px;
-  }
-}
-
-@keyframes blink {
-  50% {
-    opacity: 0.25;
-  }
-}
-
-@keyframes drift {
-  0%,
-  100% {
-    transform: translate(0, 0);
-  }
-  50% {
-    transform: translate(-40px, 30px);
-  }
-}
-
 @keyframes shake {
   0%,
   100% {
@@ -571,7 +435,7 @@ button:disabled {
 
 /*
  * Movimento reduzido: TODAS as animações e transições saem. O estado estático equivalente fica:
- * ponto fixo, brilho do botão sem pulso e campo com erro só com a borda `erro` (sem tremer).
+ * campo com erro só com a borda `erro` (sem tremer) e o esqueleto parado.
  * Dois gatilhos para as MESMAS regras (escritas uma vez): o sistema pedir menos movimento, ou a pessoa
  * escolher efeitos "Reduzidos" no /perfil. O ramo do atributo não alcança ::before/::after (pseudo-
  * elemento não entra em :is()); nenhum pseudo-elemento do app anima (tokens.test.ts vigia).
@@ -591,13 +455,5 @@ button:disabled {
   @variant movimento-reduzido {
     animation: none !important;
     transition: none !important;
-  }
-}
-
-.cta-pulse {
-  @variant movimento-reduzido {
-    box-shadow:
-      0 0 0 1px var(--color-destaque),
-      0 0 22px color-mix(in srgb, var(--color-destaque) 60%, transparent);
   }
 }

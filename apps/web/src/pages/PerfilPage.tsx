@@ -65,7 +65,7 @@ export function PerfilPage() {
   return (
     <div className="safe-x pb-12 pt-6 md:pb-16 md:pt-10">
       <main className="relative mx-auto flex max-w-[640px] flex-col gap-7">
-        <h1 className="glow-text-destaque m-0 font-display text-[22px] font-extrabold tracking-[0.14em] md:text-[30px]">
+        <h1 className="m-0 font-display text-[22px] font-extrabold tracking-[0.14em] md:text-[30px]">
           PERFIL
         </h1>
 

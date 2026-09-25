@@ -8,7 +8,7 @@ const INPUT_BASE =
 
 /** Contorno de controle em `borda-controle`; com erro, borda `erro`, brilho e o tremer curto. */
 export function inputClass(hasError: boolean): string {
-  return `${INPUT_BASE} ${hasError ? 'glow-error shake-error border-erro' : 'border-borda-controle'}`;
+  return `${INPUT_BASE} ${hasError ? 'shake-error border-erro' : 'border-borda-controle'}`;
 }
 
 /** Mensagem de erro junto do campo: ícone + texto em `erro`, anunciada aos leitores de tela. */

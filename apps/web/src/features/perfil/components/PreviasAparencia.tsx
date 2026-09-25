@@ -40,23 +40,18 @@ export function PreviaDensidade({ densidade }: { densidade: Densidade }) {
 }
 
 /**
- * Uma amostra do fundo: os mesmos `.orb` e `.scanlines` do app. A regra de `html[data-efeitos]` os
- * esconde aqui também, então o quadro mostra o que a escolha faz; o texto diz o estado sem depender
- * só da cor ou do movimento.
+ * Uma amostra de movimento: um esqueleto que anima. A regra de `html[data-efeitos]` (variante `movimento-reduzido`)
+ * o para aqui também, então o quadro mostra o que a escolha faz; o texto diz o estado sem depender só do movimento.
  */
 export function PreviaEfeitos({ efeitos }: { efeitos: Efeitos }) {
   return (
     <div
       data-efeitos-previa={efeitos}
-      className="relative flex h-20 items-end overflow-hidden rounded-2xl bg-fundo p-3"
+      className="relative flex h-20 flex-col justify-end gap-2 overflow-hidden rounded-2xl bg-fundo p-3"
     >
-      <div aria-hidden="true" className="orb orb-magenta -right-6 -top-10 size-32" />
-      <div aria-hidden="true" className="orb orb-ciano -bottom-12 -left-6 size-32" />
-      <div aria-hidden="true" className="scanlines" />
+      <div aria-hidden="true" className="skeleton h-3 w-2/3 rounded-full" />
       <span className="relative text-[15px] font-semibold">
-        {efeitos === 'completos'
-          ? 'Orbes e scanlines ligados'
-          : 'Orbes e scanlines desligados, sem animação'}
+        {efeitos === 'completos' ? 'Animações ligadas' : 'Animações desligadas, sem movimento'}
       </span>
     </div>
   );

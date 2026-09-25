@@ -8,7 +8,7 @@ import { BottomNav } from './BottomNav';
 import { TopNav } from './TopNav';
 
 /**
- * A moldura das telas do app: fundo Neon (orbes + scanlines), navegação do topo (>= 768px), o conteúdo
+ * A moldura das telas do app: fundo (halo estático), navegação do topo (>= 768px), o conteúdo
  * e a barra inferior (< 768px). Fora do `AppLayout` para o `RequireAuth` poder mostrar a moldura com
  * uma mensagem (sem conexão) no lugar da rota.
  */

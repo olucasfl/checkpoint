@@ -415,7 +415,7 @@ export function GameForm({ game, onDone, onCancel, onLinkedExisting }: GameFormP
         <button
           type="submit"
           disabled={mutation.isPending}
-          className="glow-primary min-h-12 rounded-[4px] bg-destaque px-[22px] font-display text-[13px] font-extrabold tracking-[0.1em] text-fundo disabled:opacity-70"
+          className="min-h-12 rounded-[4px] bg-destaque px-[22px] font-display text-[13px] font-extrabold tracking-[0.1em] text-fundo disabled:opacity-70"
         >
           {mutation.isPending ? 'SALVANDO…' : 'SALVAR'}
         </button>

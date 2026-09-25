@@ -210,15 +210,13 @@ describe('aparência: prévia ao vivo (CA-36, CA-37)', () => {
     expect(storage.get(PREFS).porUsuario[ANA_ID]).toMatchObject({ densidade: 'compacta' });
   });
 
-  it('efeitos: a amostra diz se orbes e scanlines estão ligados', async () => {
+  it('efeitos: a amostra diz se as animações estão ligadas', async () => {
     const user = await abrir();
-    expect(within(modal()).getByText('Orbes e scanlines ligados')).toBeInTheDocument();
+    expect(within(modal()).getByText('Animações ligadas')).toBeInTheDocument();
 
     await user.click(within(grupo('Efeitos visuais')).getByRole('radio', { name: 'Reduzidos' }));
 
-    expect(
-      within(modal()).getByText('Orbes e scanlines desligados, sem animação'),
-    ).toBeInTheDocument();
+    expect(within(modal()).getByText('Animações desligadas, sem movimento')).toBeInTheDocument();
   });
 });
 
