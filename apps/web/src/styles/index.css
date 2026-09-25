@@ -45,12 +45,6 @@
   --color-capa-5: #facc15;
   --color-capa-6: #a78bfa;
 
-  /* ALIAS TEMPORÁRIOS dos tokens neon: os componentes ainda os citam até o rename (F1, commit 2). Somem no commit 5. */
-  --color-magenta: var(--color-destaque);
-  --color-ciano: var(--color-status-jogando);
-  --color-vermelho-neon: var(--color-status-quero-jogar);
-  --color-painel-hover: var(--color-painel-3);
-
   --font-display: 'Outfit', system-ui, sans-serif;
   --font-corpo: 'Manrope', system-ui, sans-serif;
 }

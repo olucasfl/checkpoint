@@ -55,6 +55,16 @@ describe('tokens de cor (CA-87)', () => {
     expect(offenders).toEqual([]);
   });
 
+  it('nenhum arquivo do web usa uma classe ou variável de token removida (CA-02)', () => {
+    const REMOVIDO =
+      /\b(?:text|bg|border|ring|fill|stroke|from|via|to|shadow|outline|divide|decoration|accent|caret)-(?:magenta|ciano|vermelho-neon|painel-hover)\b|var\(--color-(?:magenta|ciano|vermelho-neon|painel-hover)\)|\bglow-[a-z]|\btint-(?:ouro|ciano|vermelho-neon)|\borb-(?:magenta|ciano)\b|\bcta-pulse\b|\bdot-blink\b/g;
+    const usos = Object.entries(sources).flatMap(([file, source]) =>
+      (source.match(REMOVIDO) ?? []).map((achado) => `${file}: ${achado}`),
+    );
+
+    expect(usos).toEqual([]);
+  });
+
   it('o @theme existe e declara os tokens da spec', () => {
     const theme = css.match(/@theme\s*\{[\s\S]*?\n\}/)?.[0] ?? '';
 
@@ -87,6 +97,10 @@ describe('tokens de cor (CA-87)', () => {
       'capa-6',
     ]) {
       expect(theme, `token --color-${token}`).toContain(`--color-${token}:`);
+    }
+    // Os tokens do tema neon saíram de vez (CA-01): nem alias sobrou.
+    for (const removido of ['magenta', 'ciano', 'vermelho-neon', 'painel-hover']) {
+      expect(theme, `token --color-${removido}`).not.toContain(`--color-${removido}:`);
     }
     // Valores da tabela da spec `troca-de-design-estante`.
     expect(hexDoToken('fundo')).toBe('#0b0f1a');
