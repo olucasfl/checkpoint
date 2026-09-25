@@ -40,10 +40,17 @@ export interface DadosDoJogo {
 export interface GameProvider {
   readonly id: Provedor;
 
-  /** Monta o endereço para onde o navegador vai provar quem é o usuário na plataforma. */
+  /**
+   * Monta o endereço para onde o navegador vai provar quem é o usuário na plataforma. `returnTo` é o
+   * endereço-BASE da rota de retorno (sem query): o provider põe o `state` nele, e o `concluirVinculo` o
+   * refaz da mesma forma para conferir que a plataforma devolveu exatamente o que foi pedido.
+   */
   iniciarVinculo(ctx: { state: string; returnTo: string; realm: string }): { url: string };
 
-  /** Confere o retorno do navegador e devolve o ID (já comprovado) e o nome do usuário na plataforma. */
+  /**
+   * Confere o retorno do navegador (`query` traz o `state` e os parâmetros da plataforma) e devolve o ID (já
+   * comprovado) e o nome do usuário. `returnTo` é o mesmo endereço-base do `iniciarVinculo`.
+   */
   concluirVinculo(
     query: Record<string, string>,
     ctx: { returnTo: string },
