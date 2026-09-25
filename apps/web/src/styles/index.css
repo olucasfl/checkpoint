@@ -1,38 +1,43 @@
 @import 'tailwindcss';
 
 /*
- * Direção "Neon arcade" (spec catalogo-jogos, "Diretrizes visuais").
+ * Direção "Estante de console" (spec troca-de-design-estante; antes, "Neon arcade").
  * Este bloco @theme é o ÚNICO lugar do web onde um hex aparece: componentes usam só as classes
- * (bg-fundo, text-texto-suave, border-borda-controle...) e os brilhos são color-mix() destes tokens.
- * O teste src/styles/tokens.test.ts vigia isso (CA-87).
+ * (bg-fundo, text-texto-suave, border-borda-controle...) e sombras e sobreposições são color-mix() destes tokens.
+ * O teste src/styles/tokens.test.ts vigia isso (CA-87 do catálogo) e os contrastes da spec.
  */
 @theme {
-  --color-fundo: #07040f;
-  --color-painel: #110a20;
-  --color-painel-2: #0f0a1c;
-  /* Estados de hover/carregando, conferidos contra texto-suave/ciano/erro (>= 4,5:1) e a borda de controle (>= 3:1). */
-  --color-painel-hover: #170e2b;
-  --color-acao-hover: #1f1535;
-  --color-esqueleto: #1a1030;
-  /* Só divisórias e contorno decorativo de painel (1,32:1): nunca de controle. */
-  --color-borda: #2a1d45;
-  /* Contorno de controles e anel de foco (4,10:1 sobre painel; >= 3:1, WCAG 1.4.11). */
-  --color-borda-controle: #796ca0;
-  --color-texto: #ece6ff;
-  --color-texto-suave: #9a8cc2;
-  /* Só decorativo (segmentos vazios da nota) e controle desabilitado: nunca cor de texto. */
-  --color-apagado: #5d5080;
-  --color-apagado-2: #6e6194;
-  --color-magenta: #ff3ea5;
-  /* Acento primário (logo, "Adicionar", diálogos, botão principal). Padrão magenta; a pessoa troca no
-     /perfil, só para tokens que já existem (html[data-destaque], abaixo). */
-  --color-destaque: var(--color-magenta);
-  --color-ciano: #22d3ee;
-  /* Status: Zerado = ouro (conquista), Jogando = ciano (ciano neon), Quero jogar = vermelho neon. */
-  --color-ouro: #ffd000;
-  --color-vermelho-neon: #ff3040;
+  --color-fundo: #0b0f1a;
+  --color-painel: #121829;
+  --color-painel-2: #0f1524;
+  /* Contadores, ícones em quadrado, hover de botão e esqueleto. */
+  --color-painel-3: #1a2135;
+  --color-acao-hover: var(--color-painel-3);
+  --color-esqueleto: var(--color-painel-3);
+  /* Só divisórias e contorno decorativo de painel (1,18 a 1,28:1): nunca de controle. */
+  --color-borda: #1e2640;
+  /* Contorno de controles (3,32:1 sobre painel, 3,43 sobre painel-2, 3,60 sobre fundo; >= 3:1, WCAG 1.4.11).
+     O desenho trazia #3a4468 (1,86:1 sobre painel), que reprova. */
+  --color-borda-controle: #606a8e;
+  --color-texto: #eef2ff;
+  --color-texto-suave: #a3abc7;
+  /* Só decorativo (segmentos vazios da nota, até a F2 tirar a barra de segmentos): nunca cor de texto. */
+  --color-apagado: #3a4468;
+  /* Só controle desabilitado: nunca cor de texto (3,78:1 sobre painel). */
+  --color-apagado-2: #6b7391;
+  /* Acento padrão. O `destaque` é o que a pessoa troca no /perfil (html[data-destaque], abaixo). */
+  --color-acento: #4f8cff;
+  --color-destaque: var(--color-acento);
+  /* Status: Jogando = azul claro, Quero jogar = ouro, Zerado = verde. */
+  --color-status-jogando: #7fb0ff;
+  /* Conquistas, estrela da média e avisos. */
+  --color-ouro: #ffd166;
+  --color-status-quero-jogar: var(--color-ouro);
+  --color-status-zerado: #5ee6a8;
   --color-erro: #ff4d6d;
-  /* Paleta fixa da capa gerada; iniciais em `fundo` (7,35 a 13,27:1). */
+  /* Texto e ícone de botão de contorno de perigo (Desvincular, Excluir). */
+  --color-erro-texto: #ff8fa3;
+  /* Paleta fixa da capa gerada; iniciais em `fundo` (6,12 a 8,06:1 no canto com brilho). */
   --color-capa-1: #8ab4f8;
   --color-capa-2: #f472b6;
   --color-capa-3: #fb923c;
@@ -40,8 +45,14 @@
   --color-capa-5: #facc15;
   --color-capa-6: #a78bfa;
 
-  --font-display: 'Orbitron', system-ui, sans-serif;
-  --font-corpo: 'Rajdhani', system-ui, sans-serif;
+  /* ALIAS TEMPORÁRIOS dos tokens neon: os componentes ainda os citam até o rename (F1, commit 2). Somem no commit 5. */
+  --color-magenta: var(--color-destaque);
+  --color-ciano: var(--color-status-jogando);
+  --color-vermelho-neon: var(--color-status-quero-jogar);
+  --color-painel-hover: var(--color-painel-3);
+
+  --font-display: 'Outfit', system-ui, sans-serif;
+  --font-corpo: 'Manrope', system-ui, sans-serif;
 }
 
 /* Cor de destaque escolhida no /perfil (spec perfil, etapa 3). Só tokens existentes, sem hex novo;
@@ -102,9 +113,9 @@ button:disabled {
   cursor: not-allowed;
 }
 
-/* Foco visível em tudo que é clicável: 2px em borda-controle, com offset que o separa do contorno de 1px. */
+/* Foco visível em tudo que é clicável: 2px no destaque (>= 5,49:1 sobre o painel), com offset que o separa do contorno de 1px. */
 :focus-visible {
-  outline: 2px solid var(--color-borda-controle);
+  outline: 2px solid var(--color-destaque);
   outline-offset: 2px;
 }
 
