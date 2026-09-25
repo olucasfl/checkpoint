@@ -21,12 +21,12 @@ export function PerfilCabecalho() {
   return (
     <section
       aria-label="Resumo da conta"
-      className="flex min-w-0 items-start gap-4 rounded-md border border-borda bg-painel p-5 md:p-6"
+      className="flex min-w-0 items-start gap-4 border-b border-borda pb-6"
     >
       <div
         aria-hidden="true"
         data-avatar
-        className={`grid size-16 shrink-0 place-items-center rounded-md font-display text-[24px] font-extrabold text-fundo ${coverBackground(nome)}`}
+        className={`grid size-16 shrink-0 place-items-center rounded-2xl font-display text-[24px] font-extrabold text-fundo ${coverBackground(nome)}`}
       >
         {coverInitials(nome)}
       </div>

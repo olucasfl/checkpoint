@@ -8,7 +8,7 @@ import { useEncerrarOutrasSessoes, useEncerrarSessao, useSessoes } from '../api/
 import { confirmacaoEncerrarOutras, iconeDoDispositivo, ultimoUso } from '../lib/sessoes';
 
 const BUTTON =
-  'min-h-11 min-w-11 shrink-0 rounded-[4px] px-3 font-display text-[13px] uppercase tracking-[0.1em] disabled:cursor-wait disabled:opacity-60';
+  'min-h-11 min-w-11 shrink-0 rounded-xl px-3 font-display text-[13px] uppercase tracking-[0.1em] disabled:cursor-wait disabled:opacity-60';
 
 function LinhaSessao({
   sessao,
@@ -22,7 +22,7 @@ function LinhaSessao({
   return (
     <li
       data-sessao={sessao.id}
-      className="flex min-w-0 items-center gap-3 rounded-md border border-borda bg-painel-2 px-3 py-2.5"
+      className="flex min-w-0 items-center gap-3 rounded-xl bg-painel-2 px-3 py-2.5"
     >
       <Icon
         name={iconeDoDispositivo(sessao.dispositivo)}
@@ -36,7 +36,7 @@ function LinhaSessao({
         <span className="text-[16px] text-texto-suave">{ultimoUso(sessao.ultimoUsoEm)}</span>
       </div>
       {sessao.atual ? (
-        <span className="shrink-0 rounded-[4px] border border-ciano px-2 py-1 text-[13px] font-bold uppercase tracking-[0.08em] text-ciano">
+        <span className="shrink-0 rounded-xl border border-ciano px-2 py-1 text-[13px] font-bold uppercase tracking-[0.08em] text-ciano">
           Este aparelho
         </span>
       ) : (
@@ -55,7 +55,8 @@ function LinhaSessao({
 }
 
 /**
- * "Sessões ativas" da seção Conta do `/perfil` (spec perfil, etapa 2). Uma linha por aparelho, a deste
+ * "Sessões ativas" da seção Conta do `/perfil` (spec perfil, etapa 2), montada quando a linha de mesmo
+ * nome (`id="perfil-sessoes"`, na `PerfilPage`) se expande. Uma linha por aparelho, a deste
  * primeiro com o selo "Este aparelho" e sem botão (ela se encerra pelo Sair). As outras têm Encerrar,
  * sem confirmação (quem encerrou entra de novo se quiser); "Encerrar todas as outras" pede confirmação
  * no `<dialog>` e some quando não há outras. O aparelho encerrado descobre na próxima request (401 →
@@ -91,14 +92,11 @@ export function SessoesAtivas() {
   }
 
   return (
-    <div className="flex flex-col gap-3" aria-labelledby="perfil-sessoes" role="group">
-      <h3
-        id="perfil-sessoes"
-        className="m-0 text-sm font-bold uppercase tracking-[0.22em] text-texto-suave"
-      >
-        Sessões ativas
-      </h3>
-
+    <div
+      className="flex flex-col gap-3 px-4 pb-4 pt-1"
+      aria-labelledby="perfil-sessoes"
+      role="group"
+    >
       {isPending && <p className="m-0 text-[16px] text-texto-suave">Carregando sessões…</p>}
 
       {isError && (
@@ -161,7 +159,7 @@ export function SessoesAtivas() {
               type="button"
               data-autofocus
               onClick={() => setConfirmando(false)}
-              className="min-h-12 rounded-[4px] border border-borda-controle px-5 font-display text-[13px] font-semibold tracking-[0.1em] hover:bg-acao-hover"
+              className="min-h-12 rounded-xl border border-borda-controle px-5 font-display text-[13px] font-semibold tracking-[0.1em] hover:bg-acao-hover"
             >
               CANCELAR
             </button>
@@ -169,7 +167,7 @@ export function SessoesAtivas() {
               type="button"
               onClick={() => void onConfirmarOutras()}
               disabled={encerrarOutras.isPending}
-              className="min-h-12 rounded-[4px] bg-erro px-[22px] font-display text-[13px] font-extrabold tracking-[0.1em] text-fundo disabled:opacity-70"
+              className="min-h-12 rounded-xl bg-erro px-[22px] font-display text-[13px] font-extrabold tracking-[0.1em] text-fundo disabled:opacity-70"
             >
               {encerrarOutras.isPending ? 'ENCERRANDO…' : 'ENCERRAR'}
             </button>

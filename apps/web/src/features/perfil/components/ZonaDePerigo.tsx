@@ -24,7 +24,7 @@ export function textoDaExclusao(totalDeJogos: number | undefined): string {
 }
 
 const BOTAO_BASE =
-  'min-h-12 rounded-[4px] px-5 font-display text-[13px] tracking-[0.1em] disabled:opacity-60';
+  'min-h-12 rounded-xl px-5 font-display text-[13px] tracking-[0.1em] disabled:opacity-60';
 
 /**
  * Confirma a exclusão com a senha. "Cancelar" tem o foco inicial (o padrão seguro) e "Excluir conta"
@@ -120,21 +120,21 @@ export function ZonaDePerigo() {
   return (
     <section
       aria-labelledby="perfil-perigo"
-      className="flex flex-col gap-3 rounded-md border border-erro bg-painel p-5 md:p-6"
+      className="flex flex-col gap-3 border-t border-borda pt-6"
     >
       <h2
         id="perfil-perigo"
-        className="m-0 font-display text-[15px] font-extrabold uppercase tracking-[0.14em] text-erro"
+        className="m-0 px-1 font-display text-sm font-bold uppercase tracking-[0.22em] text-erro"
       >
         Zona de perigo
       </h2>
-      <p className="m-0 text-[16px] text-texto-suave">
+      <p className="m-0 px-1 text-[16px] text-texto-suave">
         Excluir a conta apaga os seus jogos e as capas deles. Não dá para desfazer.
       </p>
       <button
         type="button"
         onClick={() => setAberto(true)}
-        className="min-h-11 min-w-11 self-start rounded-[4px] border border-erro px-5 font-display text-[13px] font-semibold uppercase tracking-[0.1em] text-erro hover:bg-acao-hover"
+        className="min-h-11 min-w-11 self-start rounded-xl border border-erro px-5 font-display text-[13px] font-semibold uppercase tracking-[0.1em] text-erro hover:bg-acao-hover"
       >
         Excluir conta
       </button>

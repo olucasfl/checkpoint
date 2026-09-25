@@ -51,6 +51,13 @@ type AbaId = (typeof ABAS)[number]['id'];
 
 const BASE = 'prefs';
 
+/** O resumo da linha de Preferências no /perfil: a cor e a densidade em uso, ex.: "Magenta · Confortável". */
+export function resumoDasPreferencias(prefs: Prefs): string {
+  const cor = DESTAQUE.find((o) => o.valor === prefs.destaque)?.rotulo;
+  const densidade = DENSIDADE.find((o) => o.valor === prefs.densidade)?.rotulo;
+  return [cor, densidade].filter(Boolean).join(' · ');
+}
+
 /** O que "Restaurar padrões" devolve em cada aba: só as preferências dela. */
 const PADROES_DA_ABA: Record<AbaId, Partial<Prefs>> = {
   aparencia: {

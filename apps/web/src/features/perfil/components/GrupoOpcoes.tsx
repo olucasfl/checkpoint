@@ -1,11 +1,9 @@
-import { useRef, type KeyboardEvent, type ReactNode } from 'react';
+import { useRef, type KeyboardEvent } from 'react';
 import { Icon } from '@/shared/components/Icon';
 
 export interface Opcao<T extends string> {
   valor: T;
   rotulo: string;
-  /** Algo antes do rótulo (a amostra da seção antiga de preferências). */
-  antes?: ReactNode;
   /** Só na variante `bolinha`: classe do token da cor (ex.: `bg-capa-6`), nunca um hex. */
   cor?: string;
 }
@@ -90,10 +88,7 @@ export function GrupoOpcoes<T extends string>({
                   {marcada && <Icon name="check" size={18} />}
                 </span>
               ) : (
-                <>
-                  {opcao.antes}
-                  {opcao.rotulo}
-                </>
+                opcao.rotulo
               )}
             </button>
           );
