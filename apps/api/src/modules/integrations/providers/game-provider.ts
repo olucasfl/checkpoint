@@ -29,6 +29,24 @@ export interface DadosDoJogo {
   capaUrl: string | null;
 }
 
+/** Como buscar o detalhe de um jogo (etapa 4): as horas só se o dado gravado já envelheceu, e o cache só se não for "Atualizar". */
+export interface OpcoesDoDetalhe {
+  /** `false` quando o dado gravado ainda é recente: não consulta as horas (a biblioteca), só as conquistas. */
+  comHoras: boolean;
+  /** O "Atualizar" manual: ignora o cache das conquistas do jogador. */
+  ignorarCache: boolean;
+}
+
+/** O detalhe de UM jogo: as horas (se pedidas), as contagens e a lista completa de conquistas. */
+export interface DetalheDoJogo {
+  horas: { minutosJogados: number; ultimaVezJogadoEm: Date | null; capaUrl: string | null } | null;
+  /** `null` = conquistas negadas; `0` = o jogo não tem conquistas. */
+  conquistasTotal: number | null;
+  conquistasDesbloqueadas: number | null;
+  conquistas: Conquista[];
+  aviso: AvisoPlataforma | null;
+}
+
 /**
  * O que a API espera de uma plataforma de jogos (spec `integracao-plataformas`, decisão 10). A Steam é a
  * primeira implementação; PlayStation, Xbox e Epic entram implementando esta interface e acrescentando um
@@ -71,4 +89,12 @@ export interface GameProvider {
     idExterno: string,
     idJogo: string,
   ): Promise<{ dados: DadosDoJogo; conquistas: Conquista[]; aviso: AvisoPlataforma | null }>;
+
+  /**
+   * O detalhe completo (etapa 4): a lista de conquistas com nome, descrição, ícone, data e raridade. Falha só do
+   * schema ou dos percentuais NÃO derruba (nome vira o id e a raridade `null`). Conquistas negadas dão o aviso
+   * `CONQUISTAS_PRIVADAS` (horas e vínculo ficam). Os outros erros da plataforma sobem: quem chama decide (o `GET`
+   * devolve o valor gravado, nunca 502).
+   */
+  obterDetalhe(idExterno: string, idJogo: string, opcoes: OpcoesDoDetalhe): Promise<DetalheDoJogo>;
 }

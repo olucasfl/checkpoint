@@ -36,6 +36,23 @@ export function avatarUrlSeguro(url: string | null): string | null {
   return host === 'steamstatic.com' || host.endsWith('.steamstatic.com') ? parsed.toString() : null;
 }
 
+/**
+ * O ícone de uma conquista só é devolvido se for `https` num host de imagens da Steam (`steamstatic.com` e
+ * subdomínios, ou o `steamcdn-a.akamaihd.net` que o schema usa): a URL vem de uma resposta externa e vai para um `<img>`.
+ */
+export function iconeUrlSeguro(url: string | null): string | null {
+  const parsed = parseHttps(url);
+  if (!parsed) {
+    return null;
+  }
+  const host = parsed.hostname.toLowerCase();
+  const permitido =
+    host === 'steamstatic.com' ||
+    host.endsWith('.steamstatic.com') ||
+    host === 'steamcdn-a.akamaihd.net';
+  return permitido ? parsed.toString() : null;
+}
+
 /** O link do perfil só vale se for `https` em `steamcommunity.com`. */
 export function perfilUrlSeguro(url: string | null): string | null {
   const parsed = parseHttps(url);

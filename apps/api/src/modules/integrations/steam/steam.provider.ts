@@ -1,9 +1,18 @@
 import { Injectable } from '@nestjs/common';
 import { type AvisoPlataforma, type Conquista } from '@checkpoint/shared';
+import { CarregadorEmCache } from '../cache/carregador-em-cache';
+import {
+  ACHIEVEMENT_SCHEMA_CACHE_TTL_MS,
+  CACHE_MAX_ENTRIES,
+  GLOBAL_PERCENTAGES_CACHE_TTL_MS,
+  PLAYER_ACHIEVEMENTS_CACHE_TTL_MS,
+} from '../integrations.constants';
 import {
   type DadosDoJogo,
+  type DetalheDoJogo,
   type GameProvider,
   type ItemDaBiblioteca,
+  type OpcoesDoDetalhe,
   type PerfilBasico,
 } from '../providers/game-provider';
 import {
@@ -13,8 +22,13 @@ import {
   PlataformaItemNaoEncontradoError,
 } from '../providers/plataforma-errors';
 import { OpenIdInvalidoError, SteamOpenId } from './steam-open-id';
-import { STEAM_VISIBILIDADE_PUBLICA, SteamClient } from './steam.client';
-import { avatarUrlSeguro, capaOficialUrl, perfilUrlSeguro } from './steam-urls';
+import {
+  STEAM_VISIBILIDADE_PUBLICA,
+  SteamClient,
+  type SteamConquistaDoSchema,
+  type SteamConquistasDoJogador,
+} from './steam.client';
+import { avatarUrlSeguro, capaOficialUrl, iconeUrlSeguro, perfilUrlSeguro } from './steam-urls';
 
 /** O nome guardado no vínculo quando a Steam não devolve um (a coluna cabe 80 caracteres). */
 export const NOME_PADRAO_DA_CONTA = 'Conta Steam';
@@ -28,6 +42,21 @@ const NOME_MAX = 80;
 @Injectable()
 export class SteamProvider implements GameProvider {
   readonly id = 'STEAM' as const;
+
+  // Caches em memória (spec, "Custo e cache"): as conquistas do jogador por SteamID e appid (5 min) e o schema e os
+  // percentuais por appid (24 h; dado público, dividido entre usuários). Chamadas simultâneas iguais viram uma só.
+  private readonly conquistasDoJogador = new CarregadorEmCache<SteamConquistasDoJogador>(
+    PLAYER_ACHIEVEMENTS_CACHE_TTL_MS,
+    CACHE_MAX_ENTRIES,
+  );
+  private readonly schemas = new CarregadorEmCache<SteamConquistaDoSchema[]>(
+    ACHIEVEMENT_SCHEMA_CACHE_TTL_MS,
+    CACHE_MAX_ENTRIES,
+  );
+  private readonly percentuais = new CarregadorEmCache<Map<string, number>>(
+    GLOBAL_PERCENTAGES_CACHE_TTL_MS,
+    CACHE_MAX_ENTRIES,
+  );
 
   constructor(
     private readonly client: SteamClient,
@@ -158,6 +187,106 @@ export class SteamProvider implements GameProvider {
       conquistas: [],
       aviso,
     };
+  }
+
+  /**
+   * O detalhe completo de um jogo (etapa 4). No máximo 4 chamadas, todas opcionais conforme o cache: (1) as horas
+   * (biblioteca filtrada pelo appid), só com `comHoras`; (2) as conquistas do jogador (cache de 5 min);
+   * (3) o schema e (4) os percentuais (24 h, por appid). Schema e percentuais são enfeite: se falharem, o nome
+   * cai para o do jogador (ou o id) e a raridade fica `null`, sem derrubar o detalhe.
+   *
+   * "Negado" (403 ou `success:false` do `GetPlayerAchievements`) é SIMULADO, sem fixture real (CA-63): dá o aviso
+   * `CONQUISTAS_PRIVADAS`, com as contagens `null`. Um 403 em QUALQUER outra chamada é `PlataformaIndisponivelError`
+   * (problema com a chave, não com a privacidade do jogador), como o `SteamClient` já faz.
+   */
+  async obterDetalhe(
+    idExterno: string,
+    idJogo: string,
+    opcoes: OpcoesDoDetalhe,
+  ): Promise<DetalheDoJogo> {
+    let horas: DetalheDoJogo['horas'] = null;
+    if (opcoes.comHoras) {
+      const biblioteca = await this.client.listarJogos(idExterno, { appId: idJogo });
+      if (biblioteca.privada) {
+        throw new PerfilPrivadoError();
+      }
+      const jogo = biblioteca.jogos.find((candidato) => candidato.appid === idJogo);
+      if (!jogo) {
+        throw new PlataformaItemNaoEncontradoError();
+      }
+      horas = {
+        minutosJogados: jogo.minutosJogados,
+        ultimaVezJogadoEm: jogo.ultimaVezJogadoEm,
+        capaUrl: capaOficialUrl(jogo.appid),
+      };
+    }
+
+    const jogador = await this.conquistasDoJogador.obter(
+      `${idExterno}:${idJogo}`,
+      () => this.client.obterConquistasDoJogador(idExterno, idJogo),
+      { ignorarCache: opcoes.ignorarCache },
+    );
+    if (jogador.tipo === 'negado') {
+      return {
+        horas,
+        conquistasTotal: null,
+        conquistasDesbloqueadas: null,
+        conquistas: [],
+        aviso: 'CONQUISTAS_PRIVADAS',
+      };
+    }
+    if (jogador.tipo === 'sem-conquistas') {
+      return {
+        horas,
+        conquistasTotal: 0,
+        conquistasDesbloqueadas: 0,
+        conquistas: [],
+        aviso: 'SEM_CONQUISTAS',
+      };
+    }
+
+    const [schema, percentuais] = await Promise.all([
+      this.enfeite(() => this.schemas.obter(idJogo, () => this.client.obterSchema(idJogo))),
+      this.enfeite(() =>
+        this.percentuais.obter(idJogo, () => this.client.obterPercentuaisGlobais(idJogo)),
+      ),
+    ]);
+    const doSchema = new Map((schema ?? []).map((item) => [item.id, item]));
+
+    const conquistas: Conquista[] = jogador.conquistas.map((item) => {
+      const extra = doSchema.get(item.id);
+      return {
+        id: item.id,
+        nome: extra?.nome ?? item.nome ?? item.id,
+        descricao: extra?.descricao ?? item.descricao,
+        oculta: extra?.oculta ?? false,
+        desbloqueada: item.desbloqueada,
+        desbloqueadaEm: item.desbloqueadaEm ? item.desbloqueadaEm.toISOString() : null,
+        iconeUrl: iconeUrlSeguro(
+          (item.desbloqueada ? extra?.iconeUrl : extra?.iconeCinzaUrl) ?? extra?.iconeUrl ?? null,
+        ),
+        raridadePercentual: percentuais?.get(item.id) ?? null,
+      };
+    });
+    return {
+      horas,
+      conquistasTotal: conquistas.length,
+      conquistasDesbloqueadas: conquistas.filter((conquista) => conquista.desbloqueada).length,
+      conquistas,
+      aviso: null,
+    };
+  }
+
+  /** Falha da plataforma no enfeite vira `null`; erro de programação (ID inválido etc.) continua subindo. */
+  private async enfeite<T>(carregar: () => Promise<T>): Promise<T | null> {
+    try {
+      return await carregar();
+    } catch (error) {
+      if (error instanceof PlataformaError) {
+        return null;
+      }
+      throw error;
+    }
   }
 
   private returnToCompleto(base: string, state: string): string {

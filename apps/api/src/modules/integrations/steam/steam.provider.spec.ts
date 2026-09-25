@@ -18,6 +18,7 @@ import { NOME_PADRAO_DA_CONTA, SteamProvider } from './steam.provider';
 import {
   SteamClient,
   type SteamBiblioteca,
+  type SteamConquistaDoSchema,
   type SteamConquistasDoJogador,
   type SteamPerfil,
 } from './steam.client';
@@ -53,6 +54,8 @@ function montar() {
     obterPerfil: jest.fn<Promise<SteamPerfil | null>, [string]>(),
     listarJogos: jest.fn<Promise<SteamBiblioteca>, [string, { appId?: string }?]>(),
     obterConquistasDoJogador: jest.fn<Promise<SteamConquistasDoJogador>, [string, string]>(),
+    obterSchema: jest.fn<Promise<SteamConquistaDoSchema[]>, [string]>(),
+    obterPercentuaisGlobais: jest.fn<Promise<Map<string, number>>, [string]>(),
   };
   const openId = {
     montarUrl: jest.fn<string, [{ returnTo: string; realm: string }]>(
@@ -486,5 +489,285 @@ describe('SteamProvider.obterJogo — o resumo (etapa 3)', () => {
   it.todo(
     'conquistas negadas REAIS no obterJogo: troque o mock "negado" pelo fixture player-achievements.negado.json. Comando: node apps/api/scripts/capturar-fixtures-steam.cjs detalhes-privados',
   );
-  it.todo('etapa 4: a lista completa de conquistas (schema, raridade e cache)');
+});
+
+describe('SteamProvider.obterDetalhe (etapa 4)', () => {
+  const APP = '1794680';
+  const jogador: SteamConquistasDoJogador = {
+    tipo: 'ok',
+    nomeDoJogo: 'Jogo',
+    conquistas: [
+      {
+        id: 'A',
+        desbloqueada: true,
+        desbloqueadaEm: new Date('2026-02-17T18:06:22Z'),
+        nome: 'Nome do jogador A',
+        descricao: 'Descrição A',
+      },
+      { id: 'B', desbloqueada: false, desbloqueadaEm: null, nome: null, descricao: null },
+    ],
+  };
+  const schema: SteamConquistaDoSchema[] = [
+    {
+      id: 'A',
+      nome: 'Asas',
+      descricao: 'Alcance o nível 5.',
+      oculta: false,
+      iconeUrl: 'https://steamcdn-a.akamaihd.net/a.jpg',
+      iconeCinzaUrl: 'https://steamcdn-a.akamaihd.net/a-cinza.jpg',
+    },
+    {
+      id: 'B',
+      nome: 'Segredo',
+      descricao: null,
+      oculta: true,
+      iconeUrl: 'https://steamcdn-a.akamaihd.net/b.jpg',
+      iconeCinzaUrl: 'https://steamcdn-a.akamaihd.net/b-cinza.jpg',
+    },
+  ];
+  const COM_HORAS = { comHoras: true, ignorarCache: false };
+  const SEM_HORAS = { comHoras: false, ignorarCache: false };
+
+  function pronto() {
+    const ctx = montar();
+    ctx.client.listarJogos.mockResolvedValue({
+      privada: false,
+      total: 1,
+      jogos: [
+        {
+          appid: APP,
+          nome: 'Jogo',
+          minutosJogados: 550,
+          ultimaVezJogadoEm: new Date('2026-02-22T17:24:41Z'),
+        },
+      ],
+    });
+    ctx.client.obterConquistasDoJogador.mockResolvedValue(jogador);
+    ctx.client.obterSchema.mockResolvedValue(schema);
+    ctx.client.obterPercentuaisGlobais.mockResolvedValue(new Map([['A', 40.7]]));
+    return ctx;
+  }
+
+  it('junta jogador, schema e raridade: nome, descrição, ícone (cinza se bloqueada), data e percentual (CA-43)', async () => {
+    const { provider } = pronto();
+
+    const detalhe = await provider.obterDetalhe(STEAM_ID, APP, COM_HORAS);
+
+    expect(detalhe.aviso).toBeNull();
+    expect(detalhe.conquistasTotal).toBe(2);
+    expect(detalhe.conquistasDesbloqueadas).toBe(1);
+    expect(detalhe.horas).toMatchObject({ minutosJogados: 550 });
+    expect(detalhe.conquistas).toEqual([
+      {
+        id: 'A',
+        nome: 'Asas',
+        descricao: 'Alcance o nível 5.',
+        oculta: false,
+        desbloqueada: true,
+        desbloqueadaEm: '2026-02-17T18:06:22.000Z',
+        iconeUrl: 'https://steamcdn-a.akamaihd.net/a.jpg',
+        raridadePercentual: 40.7,
+      },
+      {
+        id: 'B',
+        nome: 'Segredo',
+        descricao: null,
+        oculta: true,
+        desbloqueada: false,
+        desbloqueadaEm: null,
+        iconeUrl: 'https://steamcdn-a.akamaihd.net/b-cinza.jpg',
+        raridadePercentual: null,
+      },
+    ]);
+  });
+
+  it('sem horas pedidas: não consulta a biblioteca e `horas` vem null (CA-44)', async () => {
+    const { provider, client } = pronto();
+
+    const detalhe = await provider.obterDetalhe(STEAM_ID, APP, SEM_HORAS);
+
+    expect(client.listarJogos).not.toHaveBeenCalled();
+    expect(detalhe.horas).toBeNull();
+    expect(detalhe.conquistas).toHaveLength(2);
+  });
+
+  it('falha só do schema: continua, com o nome do jogador (ou o id) e sem ícone (CA-50)', async () => {
+    const { provider, client } = pronto();
+    client.obterSchema.mockRejectedValue(new PlataformaIndisponivelError());
+
+    const detalhe = await provider.obterDetalhe(STEAM_ID, APP, SEM_HORAS);
+
+    expect(detalhe.aviso).toBeNull();
+    expect(detalhe.conquistas.map((c) => c.nome)).toEqual(['Nome do jogador A', 'B']);
+    expect(detalhe.conquistas.every((c) => c.iconeUrl === null && !c.oculta)).toBe(true);
+    expect(detalhe.conquistas[0]?.raridadePercentual).toBe(40.7);
+  });
+
+  it('falha só dos percentuais: continua, com a raridade null (CA-50)', async () => {
+    const { provider, client } = pronto();
+    client.obterPercentuaisGlobais.mockRejectedValue(new PlataformaLimiteError());
+
+    const detalhe = await provider.obterDetalhe(STEAM_ID, APP, SEM_HORAS);
+
+    expect(detalhe.conquistas.map((c) => c.raridadePercentual)).toEqual([null, null]);
+    expect(detalhe.conquistas[0]?.nome).toBe('Asas');
+  });
+
+  it('ícone fora de um host da Steam é descartado', async () => {
+    const { provider, client } = pronto();
+    client.obterSchema.mockResolvedValue([
+      {
+        ...schema[0]!,
+        iconeUrl: 'https://exemplo.invalid/a.jpg',
+        iconeCinzaUrl: 'http://x.steamstatic.com/a.jpg',
+      },
+    ]);
+
+    const detalhe = await provider.obterDetalhe(STEAM_ID, APP, SEM_HORAS);
+
+    expect(detalhe.conquistas[0]?.iconeUrl).toBeNull();
+  });
+
+  it('(SIMULADO, sem fixture real) conquistas negadas: aviso CONQUISTAS_PRIVADAS, horas ficam, contagens null e nada de schema (CA-47)', async () => {
+    const { provider, client } = pronto();
+    client.obterConquistasDoJogador.mockResolvedValue({ tipo: 'negado' });
+
+    const detalhe = await provider.obterDetalhe(STEAM_ID, APP, COM_HORAS);
+
+    expect(detalhe).toMatchObject({
+      aviso: 'CONQUISTAS_PRIVADAS',
+      conquistasTotal: null,
+      conquistasDesbloqueadas: null,
+      conquistas: [],
+      horas: { minutosJogados: 550 },
+    });
+    expect(client.obterSchema).not.toHaveBeenCalled();
+  });
+
+  it('jogo sem conquistas (400 "no stats", fixture real): SEM_CONQUISTAS, 0 de 0, sem schema (CA-48)', async () => {
+    const { provider, client } = pronto();
+    client.obterConquistasDoJogador.mockResolvedValue({ tipo: 'sem-conquistas' });
+
+    const detalhe = await provider.obterDetalhe(STEAM_ID, APP, SEM_HORAS);
+
+    expect(detalhe).toMatchObject({
+      aviso: 'SEM_CONQUISTAS',
+      conquistasTotal: 0,
+      conquistasDesbloqueadas: 0,
+      conquistas: [],
+    });
+    expect(client.obterSchema).not.toHaveBeenCalled();
+  });
+
+  it('(SIMULADO, sem fixture real) biblioteca privada com horas pedidas → PerfilPrivadoError; item fora dela → não encontrado', async () => {
+    const { provider, client } = pronto();
+    client.listarJogos.mockResolvedValueOnce({ privada: true, total: 0, jogos: [] });
+    await expect(provider.obterDetalhe(STEAM_ID, APP, COM_HORAS)).rejects.toBeInstanceOf(
+      PerfilPrivadoError,
+    );
+
+    client.listarJogos.mockResolvedValueOnce({ privada: false, total: 0, jogos: [] });
+    await expect(provider.obterDetalhe(STEAM_ID, APP, COM_HORAS)).rejects.toBeInstanceOf(
+      PlataformaItemNaoEncontradoError,
+    );
+    expect(client.obterConquistasDoJogador).not.toHaveBeenCalled();
+  });
+
+  it('falha da plataforma na biblioteca ou nas conquistas do jogador sobe (o GET decide devolver o gravado)', async () => {
+    const { provider, client } = pronto();
+    const erro = new PlataformaIndisponivelError();
+    client.listarJogos.mockRejectedValueOnce(erro);
+    await expect(provider.obterDetalhe(STEAM_ID, APP, COM_HORAS)).rejects.toBe(erro);
+
+    client.obterConquistasDoJogador.mockRejectedValueOnce(erro);
+    await expect(provider.obterDetalhe(STEAM_ID, APP, SEM_HORAS)).rejects.toBe(erro);
+  });
+
+  it('cache: duas aberturas seguidas não chamam a Steam de novo; "Atualizar" refaz só as conquistas do jogador', async () => {
+    const { provider, client } = pronto();
+
+    await provider.obterDetalhe(STEAM_ID, APP, SEM_HORAS);
+    await provider.obterDetalhe(STEAM_ID, APP, SEM_HORAS);
+    expect(client.obterConquistasDoJogador).toHaveBeenCalledTimes(1);
+    expect(client.obterSchema).toHaveBeenCalledTimes(1);
+    expect(client.obterPercentuaisGlobais).toHaveBeenCalledTimes(1);
+
+    await provider.obterDetalhe(STEAM_ID, APP, { comHoras: false, ignorarCache: true });
+    expect(client.obterConquistasDoJogador).toHaveBeenCalledTimes(2);
+    expect(client.obterSchema).toHaveBeenCalledTimes(1);
+    expect(client.obterPercentuaisGlobais).toHaveBeenCalledTimes(1);
+  });
+
+  it('cache: o schema e os percentuais são por jogo, e o do jogador é por SteamID', async () => {
+    const { provider, client } = pronto();
+
+    await provider.obterDetalhe(STEAM_ID, APP, SEM_HORAS);
+    await provider.obterDetalhe('76561190000000001', APP, SEM_HORAS);
+    await provider.obterDetalhe(STEAM_ID, '2076040', SEM_HORAS);
+
+    expect(client.obterConquistasDoJogador).toHaveBeenCalledTimes(3);
+    expect(client.obterSchema).toHaveBeenCalledTimes(2);
+  });
+
+  it('erro nas conquistas do jogador não fica no cache', async () => {
+    const { provider, client } = pronto();
+    client.obterConquistasDoJogador.mockRejectedValueOnce(new PlataformaIndisponivelError());
+
+    await expect(provider.obterDetalhe(STEAM_ID, APP, SEM_HORAS)).rejects.toBeInstanceOf(
+      PlataformaIndisponivelError,
+    );
+    await expect(provider.obterDetalhe(STEAM_ID, APP, SEM_HORAS)).resolves.toMatchObject({
+      aviso: null,
+    });
+  });
+
+  it('com o SteamClient de verdade e as respostas REAIS: percentual em texto vira número e a oculta vem sem descrição', async () => {
+    const resposta = (nome: string) => {
+      const { status, body } = JSON.parse(
+        readFileSync(join(__dirname, '__fixtures__', nome), 'utf8'),
+      ) as { status: number; body: unknown };
+      return new Response(JSON.stringify(body), {
+        status,
+        headers: { 'content-type': 'application/json; charset=UTF-8' },
+      });
+    };
+    let oculta = false;
+    jest.spyOn(globalThis, 'fetch').mockImplementation((input) => {
+      const url = String(input);
+      if (url.includes('GetPlayerAchievements')) {
+        return Promise.resolve(
+          resposta(
+            oculta ? 'player-achievements.oculta.json' : 'player-achievements.com-conquistas.json',
+          ),
+        );
+      }
+      if (url.includes('GetSchemaForGame')) {
+        return Promise.resolve(
+          resposta(oculta ? 'schema.oculta.json' : 'schema.com-conquistas.json'),
+        );
+      }
+      return Promise.resolve(resposta('global-percentages.com-conquistas.json'));
+    });
+    const config = { get: () => 'ABCDEF0123456789ABCDEF0123456789' } as unknown as ConfigService<
+      EnvironmentVariables,
+      true
+    >;
+    const provider = new SteamProvider(new SteamClient(config), {} as SteamOpenId);
+
+    const normal = await provider.obterDetalhe(STEAM_ID, APP, SEM_HORAS);
+    oculta = true;
+    const escondida = await provider.obterDetalhe(STEAM_ID, '730', SEM_HORAS);
+    jest.restoreAllMocks();
+
+    expect(normal.conquistas).toHaveLength(6);
+    expect(normal.conquistas.find((c) => c.id === 'ReachLV5')?.raridadePercentual).toBe(97.2);
+    expect(normal.conquistas.every((c) => c.iconeUrl?.startsWith('https://') ?? false)).toBe(true);
+    expect(escondida.conquistas).toHaveLength(1);
+    expect(escondida.conquistas[0]).toMatchObject({
+      id: 'PLAY_CS2',
+      oculta: true,
+      descricao: null,
+      raridadePercentual: null,
+    });
+  });
 });
