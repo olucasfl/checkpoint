@@ -2,12 +2,13 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { AxiosError } from 'axios';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import { type Game, type Usuario } from '@checkpoint/shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { entrar, getSession, resetSessionForTests } from '@/features/auth/session/session';
 import { authApi } from '@/features/auth/api/auth-api';
 import { gamesApi } from '@/features/games/api/games-api';
+import { integracoesApi } from '@/features/integracoes/api/integracoes-api';
 import { perfilApi } from '@/features/perfil/api/perfil-api';
 import { coverBackground } from '@/shared/lib/game-cover';
 import { definirUsuario, resetPrefsForTests } from '@/shared/lib/prefs/prefs-store';
@@ -26,6 +27,15 @@ vi.mock('@/features/perfil/api/perfil-api', () => ({
     encerrarOutrasSessoes: vi.fn(),
   },
 }));
+vi.mock('@/features/integracoes/api/integracoes-api', () => ({
+  integracoesApi: {
+    listarContas: vi.fn(),
+    iniciarVinculo: vi.fn(),
+    perfil: vi.fn(),
+    atualizarPerfil: vi.fn(),
+    desvincular: vi.fn(),
+  },
+}));
 vi.mock('@/shared/lib/pwa/install-prompt', () => ({
   podeInstalar: vi.fn(),
   pedirInstalacao: vi.fn(),
@@ -35,6 +45,7 @@ vi.mock('@/shared/lib/pwa/display', () => ({ estaInstalado: vi.fn(), ehSafariIos
 
 const games = vi.mocked(gamesApi);
 const perfil = vi.mocked(perfilApi);
+const integracoes = vi.mocked(integracoesApi);
 const auth = vi.mocked(authApi);
 
 const ANA: Usuario = {
@@ -57,12 +68,19 @@ const jogo = (id: string, status: Game['status']): Game => ({
   atualizadoEm: '2026-09-24T12:00:00.000Z',
 });
 
-function renderPerfil() {
+/** Mostra a query da URL atual, para provar que o aviso do retorno da Steam a limpa. */
+function UrlAtual() {
+  // `<span>` e não `<output>`: o `<output>` tem `role="status"` implícito e confundiria as outras buscas.
+  return <span data-testid="url-atual">{useLocation().search}</span>;
+}
+
+function renderPerfil(entrada = '/perfil') {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={['/perfil']}>
+      <MemoryRouter initialEntries={[entrada]}>
         <PerfilPage />
+        <UrlAtual />
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -88,6 +106,7 @@ beforeEach(() => {
   entrar({ accessToken: 'token', usuario: ANA });
   games.list.mockResolvedValue([jogo('1', 'ZERADO'), jogo('2', 'JOGANDO'), jogo('3', 'JOGANDO')]);
   perfil.listarSessoes.mockResolvedValue([]);
+  integracoes.listarContas.mockResolvedValue([]);
   vi.mocked(podeInstalar).mockReturnValue(false);
   vi.mocked(ehSafariIos).mockReturnValue(false);
   vi.mocked(estaInstalado).mockReturnValue(false);
@@ -419,10 +438,71 @@ describe('"Instalar app" só quando dá para instalar (CA-06)', () => {
   it('Safari do iOS: o botão mostra o passo a passo, sem prompt nativo', async () => {
     vi.mocked(ehSafariIos).mockReturnValue(true);
     const user = renderPerfil();
+    // A seção "Contas vinculadas" carrega de forma assíncrona e o esqueleto dela também é um `status`.
+    await screen.findByRole('button', { name: 'Vincular conta' });
 
     await user.click(screen.getByRole('button', { name: 'Instalar app' }));
 
     expect(screen.getByRole('status')).toHaveTextContent('Adicionar à Tela de Início');
     expect(pedirInstalacao).not.toHaveBeenCalled();
+  });
+});
+
+describe('aviso do retorno da Steam e seção "Contas vinculadas" (CA-15)', () => {
+  it('sem vínculo, a seção "Contas vinculadas" fica entre Conta e Preferências, com "Vincular conta"', async () => {
+    renderPerfil();
+
+    const secoes = screen.getAllByRole('region').map((secao) => secao.getAttribute('aria-label'));
+    expect(secoes.indexOf('Conta')).toBeLessThan(secoes.indexOf('Contas vinculadas'));
+    expect(secoes.indexOf('Contas vinculadas')).toBeLessThan(secoes.indexOf('Preferências'));
+    expect(await screen.findByRole('button', { name: 'Vincular conta' })).toBeInTheDocument();
+  });
+
+  it('?steam=vinculada mostra o aviso de sucesso e limpa a URL', async () => {
+    renderPerfil('/perfil?steam=vinculada');
+
+    expect(await screen.findByText('Conta Steam vinculada.')).toBeInTheDocument();
+    expect(screen.getByText('Conta Steam vinculada.')).toHaveAttribute('role', 'status');
+    await waitFor(() => expect(screen.getByTestId('url-atual')).toHaveTextContent(/^$/));
+  });
+
+  it.each([
+    ['cancelado', 'Vínculo cancelado. Nada foi alterado.'],
+    ['invalido', 'Não foi possível confirmar sua conta Steam. Tente de novo.'],
+    ['expirado', 'O vínculo demorou demais e expirou. Tente de novo.'],
+    ['indisponivel', 'A Steam não respondeu agora. Tente de novo em instantes.'],
+    [
+      'ja-vinculada',
+      'Você já tem outra conta Steam vinculada. Desvincule-a antes de vincular esta.',
+    ],
+  ])('?steam=erro&motivo=%s mostra o texto próprio e limpa a URL', async (motivo, texto) => {
+    renderPerfil(`/perfil?steam=erro&motivo=${motivo}`);
+
+    expect(await screen.findByRole('alert', { name: '' })).toHaveTextContent(texto);
+    await waitFor(() => expect(screen.getByTestId('url-atual')).toHaveTextContent(/^$/));
+  });
+
+  it.each([
+    '/perfil?steam=qualquer',
+    '/perfil?steam=erro&motivo=desconhecido',
+    '/perfil?steam=erro',
+  ])('%s é ignorado: nenhum aviso', async (entrada) => {
+    renderPerfil(entrada);
+
+    await screen.findByRole('button', { name: 'Vincular conta' });
+    expect(screen.queryByText(/Steam vinculada|Vínculo|Não foi possível confirmar/)).toBeNull();
+  });
+
+  it('só os parâmetros do retorno saem da URL: outros parâmetros ficam', async () => {
+    renderPerfil('/perfil?steam=vinculada&outro=1');
+
+    await waitFor(() => expect(screen.getByTestId('url-atual')).toHaveTextContent('?outro=1'));
+  });
+
+  it('o aviso continua na tela depois de a URL ser limpa (é lido uma vez)', async () => {
+    renderPerfil('/perfil?steam=vinculada');
+
+    await waitFor(() => expect(screen.getByTestId('url-atual')).toHaveTextContent(/^$/));
+    expect(screen.getByText('Conta Steam vinculada.')).toBeInTheDocument();
   });
 });

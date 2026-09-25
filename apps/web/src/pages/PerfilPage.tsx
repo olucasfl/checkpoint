@@ -1,10 +1,16 @@
-import { useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useLocation, useSearchParams } from 'react-router-dom';
 import { FieldError } from '@/shared/components/form-parts';
 import { usePrefs } from '@/shared/hooks/use-prefs';
 import { UNEXPECTED_MESSAGE } from '@/features/auth/lib/auth-errors';
 import { avisoDoPerfil } from '@/features/auth/lib/perfil-avisos';
 import { useAuth } from '@/features/auth/session/use-auth';
+import { ContasVinculadas } from '@/features/integracoes/components/ContasVinculadas';
+import {
+  avisoDoRetorno,
+  semParametrosDoRetorno,
+  type AvisoDoRetorno,
+} from '@/features/integracoes/lib/avisos-steam';
 import { InstalarApp } from '@/features/perfil/components/InstalarApp';
 import { LinhaBotao, LinhaLink, ListaDeLinhas } from '@/features/perfil/components/LinhaConta';
 import { PerfilCabecalho } from '@/features/perfil/components/PerfilCabecalho';
@@ -29,10 +35,20 @@ export function PerfilPage() {
   const { sair } = useAuth();
   const prefs = usePrefs();
   const avisoRecebido = avisoDoPerfil(useLocation().state);
+  const [searchParams, setSearchParams] = useSearchParams();
+  // O retorno da Steam chega como `/perfil?steam=…` (um redirecionamento externo: não dá para usar o `state`).
+  // O aviso é lido UMA vez e a URL é limpa, para recarregar a página não repeti-lo.
+  const [avisoSteam] = useState<AvisoDoRetorno | undefined>(() => avisoDoRetorno(searchParams));
   const [saindo, setSaindo] = useState(false);
   const [aviso, setAviso] = useState('');
   const [sessoesAbertas, setSessoesAbertas] = useState(false);
   const [prefsAbertas, setPrefsAbertas] = useState(false);
+
+  useEffect(() => {
+    if (searchParams.has('steam') || searchParams.has('motivo')) {
+      setSearchParams(semParametrosDoRetorno(searchParams), { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   async function onSair() {
     setAviso('');
@@ -62,6 +78,18 @@ export function PerfilPage() {
           </p>
         )}
 
+        {avisoSteam?.tipo === 'sucesso' && (
+          <p
+            role="status"
+            className="m-0 rounded-2xl bg-painel px-4 py-3 text-[16px] font-semibold text-ciano"
+          >
+            {avisoSteam.texto}
+          </p>
+        )}
+        {avisoSteam?.tipo === 'erro' && (
+          <FieldError id="perfil-aviso-steam" message={avisoSteam.texto} />
+        )}
+
         <PerfilCabecalho />
 
         <ListaDeLinhas rotulo="Conta">
@@ -89,6 +117,8 @@ export function PerfilPage() {
           />
         </ListaDeLinhas>
         {aviso && <FieldError id="perfil-aviso" message={aviso} />}
+
+        <ContasVinculadas />
 
         <ListaDeLinhas rotulo="Preferências">
           <LinhaBotao
