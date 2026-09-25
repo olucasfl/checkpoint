@@ -1,0 +1,89 @@
+{
+  "status": 200,
+  "body": {
+    "response": {
+      "game_count": 6,
+      "games": [
+        {
+          "appid": 1794680,
+          "name": "Vampire Survivors",
+          "playtime_forever": 550,
+          "img_icon_url": "3677cf1be3be1f4ea42261c62ce10519715ade58",
+          "has_community_visible_stats": true,
+          "playtime_windows_forever": 550,
+          "playtime_mac_forever": 0,
+          "playtime_linux_forever": 0,
+          "playtime_deck_forever": 0,
+          "rtime_last_played": 1771783481,
+          "playtime_disconnected": 0
+        },
+        {
+          "appid": 2076040,
+          "name": "THE FINALS PLAYTEST",
+          "playtime_forever": 848,
+          "img_icon_url": "5c445c6a035d0e462068ec4d164e2224a2e7cc94",
+          "playtime_windows_forever": 848,
+          "playtime_mac_forever": 0,
+          "playtime_linux_forever": 0,
+          "playtime_deck_forever": 0,
+          "rtime_last_played": 1699123882,
+          "playtime_disconnected": 0
+        },
+        {
+          "appid": 1774580,
+          "name": "STAR WARS Jedi: Survivor™",
+          "playtime_forever": 0,
+          "img_icon_url": "25578ffb2c6070c5d4e6569624efaadb8a0f5538",
+          "has_community_visible_stats": true,
+          "playtime_windows_forever": 0,
+          "playtime_mac_forever": 0,
+          "playtime_linux_forever": 0,
+          "playtime_deck_forever": 0,
+          "rtime_last_played": 0,
+          "playtime_disconnected": 0
+        },
+        {
+          "appid": 730,
+          "name": "Counter-Strike 2",
+          "playtime_forever": 17445,
+          "img_icon_url": "8dbc71957312bbd3baea65848b545be9eae2a355",
+          "has_community_visible_stats": true,
+          "playtime_windows_forever": 17445,
+          "playtime_mac_forever": 0,
+          "playtime_linux_forever": 0,
+          "playtime_deck_forever": 0,
+          "rtime_last_played": 1787791145,
+          "content_descriptorids": [2, 5],
+          "playtime_disconnected": 118
+        },
+        {
+          "appid": 2357570,
+          "name": "Overwatch®",
+          "playtime_forever": 2891,
+          "img_icon_url": "da42bd294c941d5947b1bc2c2b2efa1313d36a91",
+          "has_community_visible_stats": true,
+          "playtime_windows_forever": 2891,
+          "playtime_mac_forever": 0,
+          "playtime_linux_forever": 0,
+          "playtime_deck_forever": 0,
+          "rtime_last_played": 1713586524,
+          "playtime_disconnected": 536
+        },
+        {
+          "appid": 2767030,
+          "name": "Marvel Rivals",
+          "playtime_2weeks": 41,
+          "playtime_forever": 2531,
+          "img_icon_url": "839b4712925b95702ca56e0c4d399adf54f4d617",
+          "has_community_visible_stats": true,
+          "playtime_windows_forever": 2531,
+          "playtime_mac_forever": 0,
+          "playtime_linux_forever": 0,
+          "playtime_deck_forever": 0,
+          "rtime_last_played": 1789478006,
+          "playtime_disconnected": 1
+        }
+      ]
+    }
+  }
+}

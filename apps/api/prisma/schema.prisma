@@ -58,6 +58,9 @@ model Game {
   criadoEm     DateTime @default(now())
   atualizadoEm DateTime @updatedAt
 
+  // Camada de dados vinda de uma plataforma (spec integracao-plataformas); no maximo uma por provedor.
+  dadosPlataforma JogoPlataforma[]
+
   // Unicidade por dono. Com userId na frente, tambem serve de indice para `where: { userId }`.
   @@unique([userId, tituloNormalizado, plataformaNormalizada])
   @@index([status])
@@ -75,8 +78,57 @@ model User {
   criadoEm     DateTime @default(now())
   atualizadoEm DateTime @updatedAt
 
-  sessoes RefreshSession[]
-  games   Game[]
+  sessoes          RefreshSession[]
+  games            Game[]
+  contasVinculadas ContaVinculada[]
+  jogosPlataforma  JogoPlataforma[]
+}
+
+// Plataformas de jogos que a API sabe integrar (spec integracao-plataformas). Codigos sem acento; o texto
+// de tela vive so no web. Acrescentar um valor depois e `ALTER TYPE ... ADD VALUE`, tambem aditivo.
+enum Provedor {
+  STEAM
+}
+
+// A conta do usuario numa plataforma, com a posse ja comprovada (na Steam, pelo OpenID). Uma por provedor.
+// Desvincular apaga esta linha e todos os JogoPlataforma do provedor (feito no service, numa transacao).
+model ContaVinculada {
+  id           String   @id @default(uuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provedor     Provedor
+  // Na Steam, o SteamID64. Ja comprovado pelo provedor: o usuario nunca o digita.
+  idExterno    String   @db.VarChar(40)
+  nomeExibicao String   @db.VarChar(80)
+  vinculadaEm  DateTime @default(now())
+
+  @@unique([userId, provedor])
+  @@unique([userId, provedor, idExterno])
+}
+
+// A camada da plataforma sobre um jogo do catalogo: o ULTIMO valor consultado, nunca substitui titulo,
+// status, notas ou capa do usuario. 1 para 1 nos dois sentidos. A lista de conquistas NAO e gravada
+// (e buscada ao abrir o detalhe). CHECKs (minutos >= 0 e desbloqueadas <= total) na migration.
+model JogoPlataforma {
+  id                      String    @id @default(uuid())
+  // Repetido de Game.userId para a unicidade por usuario; o service sempre grava com where: { id, userId }.
+  userId                  String
+  user                    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  gameId                  String
+  game                    Game      @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  provedor                Provedor
+  // Na Steam, o appid.
+  idExterno               String    @db.VarChar(40)
+  minutosJogados          Int
+  ultimaVezJogadoEm       DateTime?
+  // null = nunca consultado ou negado (privado); 0 = o jogo nao tem conquistas.
+  conquistasTotal         Int?
+  conquistasDesbloqueadas Int?
+  capaUrl                 String?   @db.VarChar(300)
+  atualizadoEm            DateTime
+
+  @@unique([userId, provedor, idExterno])
+  @@unique([gameId, provedor])
 }
 
 // Uma linha por dispositivo logado. O `id` e o `sid` dos tokens.

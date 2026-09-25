@@ -1,3 +1,4 @@
+import { DADOS_PLATAFORMA_INCLUDE } from './games.service';
 import { type INestApplication } from '@nestjs/common';
 import { Prisma, type Game as GameRow } from '@prisma/client';
 import { ANA_ID, BIA_ID, startGamesApp } from './testing/games-http-app';
@@ -136,6 +137,7 @@ describe('GET /api/games', () => {
         capaUrl: null,
         criadoEm: '2026-09-23T12:00:00.000Z',
         atualizadoEm: '2026-09-23T12:00:00.000Z',
+        dadosPlataforma: [],
       },
     ]);
   });
@@ -421,7 +423,10 @@ describe('PATCH /api/games/:id', () => {
     expect(status).toBe(200);
     expect(json).toMatchObject({ id: ID, status: 'JOGANDO' });
     expect(json).not.toHaveProperty('userId');
-    expect(game.findUnique).toHaveBeenCalledWith({ where: { id: ID, userId: ANA_ID } });
+    expect(game.findUnique).toHaveBeenCalledWith({
+      where: { id: ID, userId: ANA_ID },
+      include: DADOS_PLATAFORMA_INCLUDE,
+    });
   });
 
   it('a resposta do PATCH nunca traz nota nem capaPath: só capaUrl (CA-12)', async () => {

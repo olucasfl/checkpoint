@@ -1,0 +1,19 @@
+{
+  "status": 200,
+  "body": {
+    "playerstats": {
+      "steamID": "STEAMID_SINTETICO",
+      "gameName": "Counter-Strike 2",
+      "achievements": [
+        {
+          "apiname": "PLAY_CS2",
+          "achieved": 1,
+          "unlocktime": 1748618534,
+          "name": "Um Novo Começo",
+          "description": ""
+        }
+      ],
+      "success": true
+    }
+  }
+}

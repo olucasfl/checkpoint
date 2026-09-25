@@ -5,6 +5,11 @@ interface GameCoverProps {
   titulo: string;
   /** URL pública da capa enviada, ou `null` para mostrar a capa gerada. */
   capaUrl: string | null;
+  /**
+   * Imagens de reserva, em ordem (a capa oficial da plataforma e o `header.jpg`): a primeira que carregar aparece.
+   * Se todas faltarem ou falharem, vale a capa gerada.
+   */
+  alternativas?: readonly string[];
   /** `row` = 52×52 da lista; `compacta` = 40×40 (densidade compacta); `preview` = 96×96 do formulário; `detalhe` = a capa grande da página do jogo (quadrada, até 320 px). */
   variant?: 'row' | 'compacta' | 'preview' | 'detalhe';
 }
@@ -18,21 +23,25 @@ const SIZE = {
 
 /**
  * A imagem enviada ou, sem ela, a capa gerada: cor por hash do título + iniciais. Se a imagem falhar
- * ao carregar, volta para a gerada (CA-73). É decorativa: o título já está ao lado.
+ * ao carregar, tenta a próxima de `alternativas` e, esgotadas, volta para a gerada (CA-73). É decorativa: o título já
+ * está ao lado.
  */
-export function GameCover({ titulo, capaUrl, variant = 'row' }: GameCoverProps) {
-  const [failedUrl, setFailedUrl] = useState<string | null>(null);
-  const showImage = capaUrl !== null && failedUrl !== capaUrl;
+export function GameCover({ titulo, capaUrl, alternativas = [], variant = 'row' }: GameCoverProps) {
+  const [failedUrls, setFailedUrls] = useState<readonly string[]>([]);
+  const candidatas = [capaUrl, ...alternativas].filter((url): url is string => url !== null);
+  const shownUrl = candidatas.find((url) => !failedUrls.includes(url)) ?? null;
+  const showImage = shownUrl !== null;
   const base = `grid shrink-0 place-items-center overflow-hidden rounded-[4px] ${SIZE[variant]}`;
 
   if (showImage) {
     return (
       <div className={base} data-cover="image">
         <img
-          src={capaUrl}
+          src={shownUrl}
           alt=""
+          referrerPolicy="no-referrer"
           className="block size-full object-cover"
-          onError={() => setFailedUrl(capaUrl)}
+          onError={() => setFailedUrls((atuais) => [...atuais, shownUrl])}
         />
       </div>
     );

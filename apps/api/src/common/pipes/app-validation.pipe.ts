@@ -18,6 +18,10 @@ const FIELDS: readonly ApiErrorField[] = [
   'senha',
   'senhaAtual',
   'novaSenha',
+  'busca',
+  'limite',
+  'idExterno',
+  'mover',
 ];
 
 function isApiErrorField(property: string): property is ApiErrorField {

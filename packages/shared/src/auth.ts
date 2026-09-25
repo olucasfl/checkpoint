@@ -135,5 +135,15 @@ export const API_ERROR_CODES = [
   // Sessões ativas (spec perfil, etapa 2).
   'SESSAO_ATUAL',
   'SESSAO_NAO_ENCONTRADA',
+  // Integrações com plataformas (spec integracao-plataformas).
+  'PLATAFORMA_NAO_VINCULADA',
+  'PLATAFORMA_JA_VINCULADA',
+  'PLATAFORMA_PERFIL_PRIVADO',
+  'PLATAFORMA_ITEM_NAO_ENCONTRADO',
+  'PLATAFORMA_ITEM_JA_VINCULADO',
+  'PLATAFORMA_JOGO_JA_VINCULADO',
+  'PLATAFORMA_VINCULO_NAO_ENCONTRADO',
+  'PLATAFORMA_INDISPONIVEL',
+  'PLATAFORMA_LIMITE',
 ] as const;
 export type ApiErrorCode = (typeof API_ERROR_CODES)[number];

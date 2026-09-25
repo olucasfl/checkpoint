@@ -47,6 +47,7 @@ const jogo = (id: string): Game => ({
   descricao: null,
   capaUrl: null,
   criadoEm: '2026-09-24T12:00:00.000Z',
+  dadosPlataforma: [],
   atualizadoEm: '2026-09-24T12:00:00.000Z',
 });
 

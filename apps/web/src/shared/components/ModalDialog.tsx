@@ -37,7 +37,13 @@ export function ModalDialog({ open, onClose, labelledBy, children }: ModalDialog
     <dialog
       ref={ref}
       aria-labelledby={labelledBy}
-      onClose={onClose}
+      // O React propaga o `close` de um diálogo aninhado (ex.: "Buscar na Steam" dentro de "Novo jogo") até o
+      // `onClose` do de fora, que fecharia o formulário inteiro junto. Só vale o `close` deste próprio elemento.
+      onClose={(event) => {
+        if (event.target === event.currentTarget) {
+          onClose();
+        }
+      }}
       className="modal glow-dialog border border-destaque bg-painel p-0 text-texto"
     >
       {open ? children : null}

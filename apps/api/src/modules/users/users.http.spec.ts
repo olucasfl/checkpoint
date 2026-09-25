@@ -224,6 +224,38 @@ describe('POST /api/users/me/exclusao (perfil CA-24, CA-25, CA-29)', () => {
     expect(storage.remove.mock.calls).toEqual([[`${anaId}/g1/nova.png`], ['g2/antiga.webp']]);
   });
 
+  it('a camada da Steam (conta vinculada e jogos ligados) some junto; a de outra pessoa continua (integracao-plataformas CA-56)', async () => {
+    const token = await registerAna();
+    const anaId = db.users[0]?.id as string;
+    await call('POST', '/auth/registro', {
+      body: { nome: 'Bia Teste', email: 'bia@exemplo.com', senha: 'segredo-forte' },
+    });
+    const biaId = db.users.find((u) => u.email === 'bia@exemplo.com')?.id as string;
+    db.contasVinculadas.push({ userId: anaId }, { userId: biaId });
+    db.jogosPlataforma.push({ userId: anaId }, { userId: anaId }, { userId: biaId });
+
+    const reply = await excluir(token, { senha: 'segredo-forte' });
+
+    expect(reply.status).toBe(204);
+    expect(db.contasVinculadas).toEqual([{ userId: biaId }]);
+    expect(db.jogosPlataforma).toEqual([{ userId: biaId }]);
+    expect(db.users.map((u) => u.id)).toEqual([biaId]);
+  });
+
+  it('senha errada: a camada da Steam também fica intacta (a senha confere antes de qualquer escrita)', async () => {
+    const token = await registerAna();
+    const anaId = db.users[0]?.id as string;
+    db.contasVinculadas.push({ userId: anaId });
+    db.jogosPlataforma.push({ userId: anaId });
+
+    const reply = await excluir(token, { senha: 'nao-e-esta' });
+
+    expect(reply.status).toBe(400);
+    expect(db.contasVinculadas).toHaveLength(1);
+    expect(db.jogosPlataforma).toHaveLength(1);
+    expect(db.user.delete).not.toHaveBeenCalled();
+  });
+
   it('depois, o mesmo token já não vale e o e-mail pode ser registrado de novo', async () => {
     const token = await registerAna();
     await excluir(token, { senha: 'segredo-forte' });

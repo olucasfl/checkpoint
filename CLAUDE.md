@@ -52,8 +52,14 @@ Pre-commit já roda `lint-staged` (`eslint --fix` + `prettier --write`).
 Definições em `.claude/commands/`; agentes em `.claude/agents/`; skills em `.claude/skills/`
 (`checkpoint-testing`, `bug-research`).
 
-## O que este projeto ainda não tem
+## O que existe e o que ainda não existe
 
-Sem auth, sem PWA, sem pipeline de deploy (`ARCHITECTURE.md` §1). A única entidade de domínio é o
-`Game` do catálogo de jogos. Não assuma nenhum desses como implícito — cada um é uma decisão de
+**Existe:** autenticação (e-mail e senha, access token + refresh em cookie), catálogo de jogos com avaliação por
+critérios e capas (Supabase Storage), perfil e preferências, PWA, integração com a Steam (vínculo por OpenID,
+biblioteca, horas e conquistas) e deploy em produção (web na Vercel, API no Render, banco e bucket no Supabase). As
+entidades são as de `apps/api/prisma/schema.prisma` (`User`, `RefreshSession`, `Game`, `ContaVinculada`,
+`JogoPlataforma`). O estado detalhado está em `ARCHITECTURE.md` §1 e em `docs/specs/INDEX.md`.
+
+**Ainda não existe:** pipeline de CI, Dockerfile, staging e outras plataformas além da Steam (a interface
+`GameProvider` já está pronta para elas). Não assuma nenhum desses como implícito — cada um é uma decisão de
 arquitetura própria, com spec, quando chegar a hora.

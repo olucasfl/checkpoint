@@ -29,6 +29,16 @@ export const AUTH_MESSAGES: Record<ApiErrorCode, string> = {
   // Sessões ativas do /perfil (spec perfil, etapa 2).
   SESSAO_ATUAL: 'Para encerrar esta sessão, use Sair.',
   SESSAO_NAO_ENCONTRADA: 'Essa sessão já foi encerrada.',
+  // Integrações com plataformas (spec integracao-plataformas).
+  PLATAFORMA_NAO_VINCULADA: 'Vincule sua conta no perfil para continuar.',
+  PLATAFORMA_JA_VINCULADA: 'Você já tem outra conta vinculada. Desvincule-a antes.',
+  PLATAFORMA_PERFIL_PRIVADO: 'Seu perfil está privado. Deixe-o público e tente de novo.',
+  PLATAFORMA_ITEM_NAO_ENCONTRADO: 'Esse jogo não está na sua biblioteca.',
+  PLATAFORMA_ITEM_JA_VINCULADO: 'Esse jogo da biblioteca já está ligado a outro jogo seu.',
+  PLATAFORMA_JOGO_JA_VINCULADO: 'Este jogo já está ligado a um item da plataforma.',
+  PLATAFORMA_VINCULO_NAO_ENCONTRADO: 'Este jogo não está ligado à plataforma.',
+  PLATAFORMA_INDISPONIVEL: 'Não foi possível falar com a plataforma agora. Tente de novo.',
+  PLATAFORMA_LIMITE: 'Muitas consultas à plataforma. Tente de novo em alguns minutos.',
 };
 
 export const NO_CONNECTION_MESSAGE = 'Sem conexão. Tente de novo quando a conexão voltar.';

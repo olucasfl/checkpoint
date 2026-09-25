@@ -5,6 +5,7 @@ import { JwtService } from '@nestjs/jwt';
 import { Public } from '../../common/decorators/public.decorator';
 import { type RequestWithUser } from '../../common/decorators/current-user.decorator';
 import { type PrismaService } from '../../database/prisma.service';
+import { VinculoStateService } from '../integrations/vinculo/vinculo-state.service';
 import { AccessTokenGuard } from './access-token.guard';
 import { AuthTokensService } from './auth-tokens.service';
 import { TOKEN_ISSUER } from './auth.constants';
@@ -220,5 +221,31 @@ describe('AccessTokenGuard — a sessão manda (encerramento imediato)', () => {
     const { context } = contextFor(ProtectedController, `bearer ${token}`);
 
     await expect(guard.canActivate(context)).resolves.toBe(true);
+  });
+});
+
+// O `state` do vínculo reaproveita o `JWT_ACCESS_SECRET` (spec integracao-plataformas). Só é seguro se o
+// guard global o RECUSAR como access token (CA-61); o outro sentido (o fluxo recusar um access token como
+// `state`) está em `integrations/vinculo/vinculo-state.service.spec.ts` (CA-62).
+describe('AccessTokenGuard — o state do vínculo não vale como access token (CA-61)', () => {
+  const state = new VinculoStateService(jwt, config as never);
+
+  it('um state real, com a assinatura certa, é recusado (401 AUTH_NAO_AUTENTICADO) e a sessão nem é consultada', async () => {
+    const emitido = await state.emitir(USER_ID, 'STEAM');
+    const { context } = contextFor(ProtectedController, `Bearer ${emitido.state}`);
+
+    await expect(codeOf(guard.canActivate(context))).resolves.toBe('AUTH_NAO_AUTENTICADO');
+    expect(refreshSession.findUnique).not.toHaveBeenCalled();
+  });
+
+  it('mesmo forjado com o emissor dos tokens de acesso, o typ "vinculo" é recusado', async () => {
+    const forjado = await jwt.signAsync(
+      { sub: USER_ID, sid: SESSION_ID, typ: 'vinculo', prov: 'STEAM', nonce: 'n' },
+      { secret: ACCESS_SECRET, issuer: TOKEN_ISSUER, expiresIn: 600, algorithm: 'HS256' },
+    );
+    const { context } = contextFor(ProtectedController, `Bearer ${forjado}`);
+
+    await expect(codeOf(guard.canActivate(context))).resolves.toBe('AUTH_NAO_AUTENTICADO');
+    expect(refreshSession.findUnique).not.toHaveBeenCalled();
   });
 });

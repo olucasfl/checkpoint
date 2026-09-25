@@ -26,6 +26,14 @@ export const JWT_SECRET_MIN_LENGTH = 32;
 /** Limite de registros por hora e por IP quando `AUTH_REGISTRATION_LIMIT_PER_HOUR` não está definida. */
 export const DEFAULT_REGISTRATION_LIMIT_PER_HOUR = 3;
 
+/** Só a origem: `http(s)://host[:porta]`, sem barra final, caminho, query nem espaço. */
+const ORIGIN_PATTERN = /^https?:\/\/[^\s/?#]+$/;
+const ORIGIN_MESSAGE = (name: string) =>
+  `${name} deve ser uma origem http(s) sem barra final nem caminho, ex.: http://localhost:3333`;
+
+/** Saltos de proxy confiáveis quando `TRUST_PROXY_HOPS` não está definida: nenhum. */
+export const DEFAULT_TRUST_PROXY_HOPS = 0;
+
 const CORS_WILDCARD_MESSAGE =
   'CORS_ORIGIN não pode ser * com cookies de sessão; liste as origens, ex.: http://localhost:5173';
 
@@ -109,6 +117,39 @@ export class EnvironmentVariables {
   @IsInt()
   @Min(1)
   AUTH_REGISTRATION_LIMIT_PER_HOUR?: number;
+
+  /**
+   * Chave da Steam Web API (spec integracao-plataformas): 32 hexadecimais. SÓ o backend a usa e ela viaja
+   * na query string das chamadas, então nunca vai para o web nem para log. A mensagem de erro não ecoa o valor.
+   */
+  @Matches(/^[0-9a-fA-F]{32}$/, {
+    message: 'STEAM_API_KEY deve ter 32 caracteres hexadecimais (a chave da Steam Web API)',
+  })
+  STEAM_API_KEY: string;
+
+  /**
+   * Endereço em que o NAVEGADOR alcança a API, usado no `return_to` e no `realm` do OpenID da Steam. Em
+   * produção é o domínio da Vercel (o `/api` passa pelo rewrite até o Render), não o do Render: o cookie do
+   * vínculo é gravado no host da Vercel e só volta para ele. Origem sem barra final e sem caminho.
+   */
+  @Matches(ORIGIN_PATTERN, { message: ORIGIN_MESSAGE('API_PUBLIC_URL') })
+  API_PUBLIC_URL: string;
+
+  /** Origem do web, para onde o retorno do vínculo redireciona (`/perfil?steam=…`). Sem barra final. */
+  @Matches(ORIGIN_PATTERN, { message: ORIGIN_MESSAGE('WEB_PUBLIC_URL') })
+  WEB_PUBLIC_URL: string;
+
+  /**
+   * Quantos proxies CONFIÁVEIS existem entre o cliente e a API (Vercel, Render…). Ausente = 0: o
+   * `X-Forwarded-For` é ignorado e o `req.ip` é o do socket (dev, sem proxy). Um número MENOR que o real deixa
+   * o limite por IP quebrado (todo mundo com o IP do proxy); MAIOR deixa o cabeçalho forjável. Por isso é
+   * um número medido, nunca `true` (que confiaria em qualquer cabeçalho): ver `ARCHITECTURE.md` §4.1.
+   */
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(10)
+  TRUST_PROXY_HOPS?: number;
 }
 
 /** Regras que envolvem mais de uma variável (ou uma lista), fora do alcance de um decorator só. */

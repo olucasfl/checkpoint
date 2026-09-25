@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { type Game } from '@checkpoint/shared';
 import { Icon } from '@/shared/components/Icon';
 import { ModalDialog } from '@/shared/components/ModalDialog';
@@ -26,6 +26,7 @@ type FormDialog = { open: false } | { open: true; game?: Game };
  */
 export function GamesPage() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const { filtroInicial, densidade } = usePrefs();
   // Sem `?status=`, já filtra pelo inicial no 1º render (a URL é acertada logo abaixo): a lista
   // inteira não pisca antes do filtro.
@@ -135,6 +136,10 @@ export function GamesPage() {
             game={form.game}
             onDone={() => setForm({ open: false })}
             onCancel={() => setForm({ open: false })}
+            onLinkedExisting={(jogoId) => {
+              setForm({ open: false });
+              navigate(`/jogos/${jogoId}`);
+            }}
           />
         )}
       </ModalDialog>

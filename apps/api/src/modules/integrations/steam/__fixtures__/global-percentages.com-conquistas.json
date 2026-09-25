@@ -1,0 +1,33 @@
+{
+  "status": 200,
+  "body": {
+    "achievementpercentages": {
+      "achievements": [
+        {
+          "name": "Survive1Minute",
+          "percent": "97.8"
+        },
+        {
+          "name": "ReachLV5",
+          "percent": "97.2"
+        },
+        {
+          "name": "ReachLV10",
+          "percent": "95.4"
+        },
+        {
+          "name": "FindAStoneMask",
+          "percent": "68.2"
+        },
+        {
+          "name": "EvolveCross",
+          "percent": "67.4"
+        },
+        {
+          "name": "Survive20MinutesWithCross",
+          "percent": "51.0"
+        }
+      ]
+    }
+  }
+}

@@ -1,5 +1,9 @@
 import 'reflect-metadata';
-import { DEFAULT_REGISTRATION_LIMIT_PER_HOUR, validateEnv } from './env.validation';
+import {
+  DEFAULT_REGISTRATION_LIMIT_PER_HOUR,
+  DEFAULT_TRUST_PROXY_HOPS,
+  validateEnv,
+} from './env.validation';
 
 // Valores sintéticos e óbvios (RULES.md §8): nenhum segredo real em teste.
 const valid = {
@@ -11,6 +15,10 @@ const valid = {
   JWT_ACCESS_SECRET: 'segredo-de-acesso-sintetico-com-mais-de-32-caracteres',
   JWT_REFRESH_SECRET: 'segredo-de-refresh-sintetico-com-mais-de-32-caracteres',
   AUTH_REGISTRATION_OPEN: 'true',
+  // 32 hexadecimais óbvios, nunca a chave real da Steam.
+  STEAM_API_KEY: '0123456789ABCDEF0123456789ABCDEF',
+  API_PUBLIC_URL: 'http://localhost:3333',
+  WEB_PUBLIC_URL: 'http://localhost:5173',
 };
 
 function messageOf(env: Record<string, unknown>): string {
@@ -145,6 +153,71 @@ describe('validateEnv — autenticação (CA-18)', () => {
   });
 });
 
+describe('validateEnv — integração com plataformas (CA-02)', () => {
+  const NAMES = ['STEAM_API_KEY', 'API_PUBLIC_URL', 'WEB_PUBLIC_URL'];
+
+  it('aceita a configuração válida (chave com maiúsculas ou minúsculas; origem de produção)', () => {
+    expect(validateEnv(valid)).toMatchObject({ STEAM_API_KEY: valid.STEAM_API_KEY });
+    expect(() =>
+      validateEnv({
+        ...valid,
+        STEAM_API_KEY: 'abcdefabcdefabcdefabcdefabcdefab',
+        API_PUBLIC_URL: 'https://checkpoint.exemplo.vercel.app',
+        WEB_PUBLIC_URL: 'https://checkpoint.exemplo.vercel.app',
+      }),
+    ).not.toThrow();
+  });
+
+  it.each(NAMES)('falha listando %s quando ela está ausente', (name) => {
+    const { [name]: _removida, ...env } = valid as Record<string, string>;
+
+    expect(messageOf(env)).toContain(name);
+  });
+
+  it.each(NAMES)('falha quando %s está vazia', (name) => {
+    expect(messageOf({ ...valid, [name]: '' })).toContain(name);
+  });
+
+  it.each([
+    'abc',
+    '0123456789ABCDEF0123456789ABCDE',
+    '0123456789ABCDEF0123456789ABCDEFF',
+    'G'.repeat(32),
+  ])('STEAM_API_KEY=%j (fora de 32 hexadecimais) falha', (value) => {
+    expect(messageOf({ ...valid, STEAM_API_KEY: value })).toContain('STEAM_API_KEY');
+  });
+
+  it.each([
+    'http://localhost:3333/',
+    'localhost:3333',
+    'ftp://localhost',
+    'http://localhost/api',
+    'http://a b',
+  ])('API_PUBLIC_URL=%j (não é uma origem http(s) sem barra final) falha', (value) => {
+    expect(messageOf({ ...valid, API_PUBLIC_URL: value })).toContain('API_PUBLIC_URL');
+    expect(messageOf({ ...valid, WEB_PUBLIC_URL: value })).toContain('WEB_PUBLIC_URL');
+  });
+
+  it('a mensagem de erro NUNCA ecoa o valor da chave da Steam', () => {
+    const message = messageOf({ ...valid, STEAM_API_KEY: 'CHAVE-STEAM-SINTETICA-INVALIDA' });
+
+    expect(message).toContain('STEAM_API_KEY');
+    expect(message).not.toContain('CHAVE-STEAM-SINTETICA-INVALIDA');
+  });
+
+  it('a validação bem-sucedida não escreve o valor da chave em nenhum log de boot', () => {
+    const spies = (['log', 'warn', 'error', 'info', 'debug'] as const).map((method) =>
+      jest.spyOn(console, method).mockImplementation(() => undefined),
+    );
+
+    validateEnv(valid);
+
+    const printed = spies.flatMap((spy) => spy.mock.calls.flat().map(String)).join('\n');
+    spies.forEach((spy) => spy.mockRestore());
+    expect(printed).not.toContain(valid.STEAM_API_KEY);
+  });
+});
+
 describe('validateEnv — AUTH_REGISTRATION_LIMIT_PER_HOUR (opcional)', () => {
   it('ausente é válida (o padrão vive no código: 3 por hora)', () => {
     expect(validateEnv(valid).AUTH_REGISTRATION_LIMIT_PER_HOUR).toBeUndefined();
@@ -162,4 +235,29 @@ describe('validateEnv — AUTH_REGISTRATION_LIMIT_PER_HOUR (opcional)', () => {
       'AUTH_REGISTRATION_LIMIT_PER_HOUR',
     );
   });
+});
+
+describe('validateEnv — TRUST_PROXY_HOPS (opcional, saltos de proxy confiáveis)', () => {
+  it('ausente é válida (o padrão vive no código: 0, não confia em cabeçalho nenhum)', () => {
+    expect(validateEnv(valid).TRUST_PROXY_HOPS).toBeUndefined();
+    expect(DEFAULT_TRUST_PROXY_HOPS).toBe(0);
+  });
+
+  it.each([
+    ['0', 0],
+    ['1', 1],
+    ['2', 2],
+    ['10', 10],
+  ])('aceita o inteiro %j', (value, esperado) => {
+    expect(validateEnv({ ...valid, TRUST_PROXY_HOPS: value })).toMatchObject({
+      TRUST_PROXY_HOPS: esperado,
+    });
+  });
+
+  it.each(['-1', '11', '1.5', 'abc', 'true', '*'])(
+    '%j falha no boot (só um número de saltos, nunca `true` nem `*`)',
+    (value) => {
+      expect(messageOf({ ...valid, TRUST_PROXY_HOPS: value })).toContain('TRUST_PROXY_HOPS');
+    },
+  );
 });

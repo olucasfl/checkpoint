@@ -12,22 +12,22 @@ comportamento que ela descreve.
 
 ## 1. Visão geral
 
-|                      |                                                                                                                                                                                                                                                                  |
-| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Tipo de repo         | Monorepo único, npm workspaces (`apps/*`, `packages/*`) — não é multi-repo                                                                                                                                                                                       |
-| Gerenciador          | npm 10+ (workspaces). Não usar pnpm nem yarn                                                                                                                                                                                                                     |
-| Node                 | 20.19+ (`engines` do `package.json` da raiz; `.nvmrc` = `20.19`). O piso vem do `jsdom@27`; as versões de teste do web foram escolhidas para rodar em Node 20.19                                                                                                 |
-| Linguagem            | TypeScript 5, strict, em todos os workspaces                                                                                                                                                                                                                     |
-| `apps/api`           | `@checkpoint/api` — NestJS 11, Express, Prisma 6, PostgreSQL 16                                                                                                                                                                                                  |
-| `apps/web`           | `@checkpoint/web` — React 19, Vite 6, React Router 7, TanStack Query 5, Tailwind CSS 4, axios                                                                                                                                                                    |
-| `packages/shared`    | `@checkpoint/shared` — tipos/contratos/utils puros, compilado para `dist/` (CommonJS + `.d.ts`)                                                                                                                                                                  |
-| Storage de arquivos  | Supabase Storage (bucket público `capas`, mesmo projeto do banco), só para as capas dos jogos; acessado pelo backend pela REST com `fetch` (sem SDK). Leitura pública; escrita só pelo backend, com a secret key                                                 |
-| Banco                | PostgreSQL 16, instância local ou gerenciada (ex.: Supabase) — sem Docker no projeto                                                                                                                                                                             |
-| Qualidade            | ESLint 9 (flat config, `eslint.config.mjs` na raiz), Prettier, Husky, lint-staged, commitlint (Conventional Commits)                                                                                                                                             |
-| Testes               | Jest 30 + ts-jest na API e Vitest 4 + Testing Library + jsdom na web (`npm test -w <workspace>`); `packages/shared` não tem runner próprio. `npm test` na raiz compila o `shared` antes (`pretest`). Convenções em `.claude/skills/checkpoint-testing/SKILL.md`  |
-| Auth                 | Spec `autenticacao`, etapas 1 a 5: e-mail e senha, access token (JWT, 15 min) + refresh token (30 dias) em cookie HttpOnly, com rotação e guard global (§4.5); troca de senha; telas no web (§5.10); cada jogo tem dono obrigatório e `games` exige login (§4.4) |
-| PWA / service worker | Não existe                                                                                                                                                                                                                                                       |
-| Deploy / CI          | Não existe (sem Dockerfile de produção, sem workflow de CI, sem manifest de hospedagem)                                                                                                                                                                          |
+|                      |                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Tipo de repo         | Monorepo único, npm workspaces (`apps/*`, `packages/*`) — não é multi-repo                                                                                                                                                                                                                                                                                                                                                                     |
+| Gerenciador          | npm 10+ (workspaces). Não usar pnpm nem yarn                                                                                                                                                                                                                                                                                                                                                                                                   |
+| Node                 | 20.19+ (`engines` do `package.json` da raiz; `.nvmrc` = `20.19`). O piso vem do `jsdom@27`; as versões de teste do web foram escolhidas para rodar em Node 20.19                                                                                                                                                                                                                                                                               |
+| Linguagem            | TypeScript 5, strict, em todos os workspaces                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `apps/api`           | `@checkpoint/api` — NestJS 11, Express, Prisma 6, PostgreSQL 16                                                                                                                                                                                                                                                                                                                                                                                |
+| `apps/web`           | `@checkpoint/web` — React 19, Vite 6, React Router 7, TanStack Query 5, Tailwind CSS 4, axios                                                                                                                                                                                                                                                                                                                                                  |
+| `packages/shared`    | `@checkpoint/shared` — tipos/contratos/utils puros, compilado para `dist/` (CommonJS + `.d.ts`)                                                                                                                                                                                                                                                                                                                                                |
+| Storage de arquivos  | Supabase Storage (bucket público `capas`, mesmo projeto do banco), só para as capas dos jogos; acessado pelo backend pela REST com `fetch` (sem SDK). Leitura pública; escrita só pelo backend, com a secret key                                                                                                                                                                                                                               |
+| Banco                | PostgreSQL 16, instância local ou gerenciada (ex.: Supabase) — sem Docker no projeto                                                                                                                                                                                                                                                                                                                                                           |
+| Qualidade            | ESLint 9 (flat config, `eslint.config.mjs` na raiz), Prettier, Husky, lint-staged, commitlint (Conventional Commits)                                                                                                                                                                                                                                                                                                                           |
+| Testes               | Jest 30 + ts-jest na API e Vitest 4 + Testing Library + jsdom na web (`npm test -w <workspace>`); `packages/shared` não tem runner próprio. `npm test` na raiz compila o `shared` antes (`pretest`). Convenções em `.claude/skills/checkpoint-testing/SKILL.md`                                                                                                                                                                                |
+| Auth                 | Spec `autenticacao`, etapas 1 a 5: e-mail e senha, access token (JWT, 15 min) + refresh token (30 dias) em cookie HttpOnly, com rotação e guard global (§4.5); troca de senha; telas no web (§5.10); cada jogo tem dono obrigatório e `games` exige login (§4.4)                                                                                                                                                                               |
+| PWA / service worker | Spec `pwa-e-mobile`: manifest e service worker gerados no build (`vite-plugin-pwa`, `generateSW`; só existem no build, não no `npm run dev`), com precache só do shell (offline: só o shell, sem API, fontes nem capas) e atualização que só se ativa quando o usuário clica em Atualizar (§5.8); instalação do app em §5.9                                                                                                                    |
+| Deploy / CI          | Em produção: web na **Vercel** (`apps/web/vercel.json`: rewrite de `/api/*` para a API no Render, o que mantém o cookie de sessão no mesmo site, e fallback do SPA para `index.html`), API no **Render** (o script `start` é `node dist/main.js`; as variáveis de ambiente ficam no painel, §8), banco e bucket no **Supabase**. Sem Dockerfile nem workflow de CI no repositório: a configuração de build de Vercel e Render vive nos painéis |
 
 Não assuma nenhuma dessas ausências como "esquecimento" a corrigir de lado — são decisões de
 escopo do esqueleto. Adicionar qualquer uma delas é uma feature própria, com spec (`docs/specs/`),
@@ -90,17 +90,18 @@ checkpoint/
 ├── apps/
 │   ├── api/                          # @checkpoint/api
 │   │   ├── prisma/
-│   │   │   ├── schema.prisma         # datasource + generator + enum GameStatus + models Game, User e RefreshSession
+│   │   │   ├── schema.prisma         # datasource + generator + enums GameStatus e Provedor + models Game, User, RefreshSession, ContaVinculada e JogoPlataforma
 │   │   │   └── migrations/           # migrations versionadas (commitadas)
 │   │   └── src/
 │   │       ├── common/                # errors/ (ApiErrorResponse), pipes/ (ValidationPipe global), decorators/ (@Public, @CurrentUser), dto/ (transforms); filters/ e interceptors/ vazias (.gitkeep)
 │   │       ├── config/                 # app.config.ts, env.validation.ts, index.ts
 │   │       ├── database/               # PrismaModule (@Global) + PrismaService
-│   │       ├── modules/                # um módulo por domínio — hoje health/, games/, auth/ e users/
+│   │       ├── modules/                # um módulo por domínio — hoje health/, games/, auth/, users/ e integrations/
 │   │       │   ├── health/             # GET /api/health → status da API + do banco
 │   │       │   ├── games/              # catálogo de jogos: GET/POST/PATCH/DELETE /api/games
 │   │       │   ├── auth/               # registro, login, refresh, logout, me; guard global de access token (§4.5)
-│   │       │   └── users/              # a conta do usuário logado: PATCH /api/users/me (nome), POST /api/users/me/exclusao; lista branca do Usuario
+│   │       │   ├── users/              # a conta do usuário logado: PATCH /api/users/me (nome), POST /api/users/me/exclusao; lista branca do Usuario
+│   │       │   └── integrations/       # integrações com plataformas de jogos (Steam): vínculo por OpenID, cartão do perfil, GameProvider/SteamClient (§4.4)
 │   │       ├── app.module.ts           # inclui o guard global (APP_GUARD)
 │   │       ├── app.setup.ts            # setupApp(): prefixo /api, cookie-parser, CORS, ValidationPipe, Swagger (o main.ts e a verificação manual usam o mesmo)
 │   │       └── main.ts                 # bootstrap: cria o app, setupApp() e listen
@@ -110,7 +111,7 @@ checkpoint/
 │       └── src/
 │           ├── app/                    # providers.tsx (AppProviders) + routes.tsx (as rotas) + router.tsx (AppRouter)
 │           │   └── layout/             # AppLayout/AppFrame, AuthLayout, RequireAuth, LoadingScreen, Backdrop, BottomNav, TopNav, nav-items.ts
-│           ├── features/               # uma pasta por feature — hoje games/, auth/ e perfil/ (api/, lib/, session/, components/)
+│           ├── features/               # uma pasta por feature — hoje games/, auth/, perfil/ e integracoes/ (api/, lib/, session/, components/)
 │           ├── pages/                  # páginas de rota — GamesPage (/), GameDetailPage (/jogos/:id), PerfilPage (/perfil), TrocarSenhaPage (/perfil/senha), LoginPage, RegistroPage e StatusPage (/status)
 │           ├── shared/
 │           │   ├── components/         # Icon (Material Symbols), ModalDialog (<dialog> nativo), OverlayPortal, ConnectionBanner, UpdatePrompt, InstallNudge
@@ -123,6 +124,7 @@ checkpoint/
 │   └── shared/
 │       └── src/
 │           ├── games.ts               # contrato do catálogo de jogos (tipos, constantes, notas por critério e notaMedia)
+│           ├── integracoes.ts         # contrato das integrações com plataformas (Provedor, tipos, constantes de atualização, chaveDeTitulo)
 │           └── index.ts               # reexporta games; HealthCheckResponse, APP_NAME — exemplos
 │
 ├── eslint.config.mjs                   # config compartilhada por todos os workspaces
@@ -141,7 +143,14 @@ implementado.
 ### 4.1 Ciclo de vida da request (`src/main.ts` + `src/app.setup.ts`)
 
 1. **Prefixo global** `api` (`API_GLOBAL_PREFIX`, `src/config/app.config.ts`) — toda rota fica sob
-   `/api/*`.
+   `/api/*`. Logo em seguida, **`trust proxy`**: `app.set('trust proxy', TRUST_PROXY_HOPS)`, com a env
+   opcional validada em `env.validation.ts` (inteiro de 0 a 10; **ausente = 0**, que ignora o
+   `X-Forwarded-For`). É um **número de saltos, nunca `true`**: sem isso o `req.ip` é o endereço do socket,
+   que atrás de Vercel → Render é o do proxy, e o limite por IP (§4.5) agrupava todos os usuários num contador
+   só (bug corrigido em `fix/trust-proxy`, com regressão em `app.setup.trust-proxy.http.spec.ts`). Com N saltos o
+   Express só confia nos **últimos N** endereços do cabeçalho e usa o anterior a eles como IP do cliente, então
+   o que o cliente forjar **antes** disso não muda o IP usado. O número **precisa ser medido em produção** (um
+   valor menor que o real deixa o limite quebrado; um maior deixa o cabeçalho forjável).
 2. **`cookie-parser`** (para ler o cookie `checkpoint_refresh`) e **CORS** com `credentials: true`. A origem
    vem de `CORS_ORIGIN`, parseada por `parseCorsOrigin()` **sempre para uma lista** (com uma string única o
    `cors` responderia `Access-Control-Allow-Origin` para qualquer origem). **`CORS_ORIGIN=*` é recusado no
@@ -176,7 +185,13 @@ implementado.
   `JWT_REFRESH_SECRET` (≥ 32 caracteres, **diferentes** entre si), `AUTH_REGISTRATION_OPEN`
   (`true`/`false`, sem padrão; o texto é lido cru porque a conversão implícita transformaria `"false"` em
   `true`), `AUTH_REGISTRATION_LIMIT_PER_HOUR` (opcional, inteiro ≥ 1; ausente = 3) e `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`,
-  `SUPABASE_STORAGE_BUCKET` (capas, §4.4) no boot; falta ou valor inválido **derruba a aplicação** com a
+  `SUPABASE_STORAGE_BUCKET` (capas, §4.4) no boot, mais as três da integração com plataformas (spec
+  `integracao-plataformas`): `STEAM_API_KEY` (32 hexadecimais, **só o backend**: viaja na query string das
+  chamadas à Steam, então nunca vai para o web nem para log, e a mensagem de erro não a ecoa),
+  `API_PUBLIC_URL` (o endereço em que o **navegador** alcança a API, usado no `return_to`/`realm` do OpenID: em
+  produção o domínio da Vercel, por causa do rewrite de `/api`; em dev `http://localhost:3333`) e
+  `WEB_PUBLIC_URL` (a origem do web, para onde o retorno do vínculo redireciona), as duas **sem barra final e
+  sem caminho**; falta ou valor inválido **derruba a aplicação** com a
   lista de erros. `SUPABASE_SERVICE_ROLE_KEY` também recusa uma chave que comece com
   `sb_publishable_` (a chave pública, sujeita a RLS, com que todo upload falharia com 403). Variável de ambiente nova em `apps/api/.env` **precisa** ganhar um campo aqui, ou
   o `ConfigService` não a expõe (nem para leitura).
@@ -207,6 +222,20 @@ implementado.
   único e sempre normalizado, `senhaHash`) e `RefreshSession` (uma linha por dispositivo logado; o `id` é o
   `sid` dos tokens; guarda só o **SHA-256** do refresh token e o do anterior, mais um rótulo do dispositivo
   derivado do `User-Agent`, sem IP), com `onDelete: Cascade`.
+- **`Provedor`, `ContaVinculada` e `JogoPlataforma`** (spec `integracao-plataformas`, etapa 1, migration
+  `integracao_plataformas`, **só aditiva**: um enum e duas tabelas, nenhuma coluna existente tocada).
+  `Provedor` é um enum do Postgres (`STEAM`; acrescentar um valor é `ALTER TYPE … ADD VALUE`). `ContaVinculada`
+  é a conta do usuário na plataforma, com a posse já comprovada (na Steam, o SteamID64 pelo OpenID): `userId`,
+  `provedor`, `idExterno`, `nomeExibicao`, `vinculadaEm`, com `@@unique([userId, provedor])` (uma por provedor).
+  `JogoPlataforma` é a camada da plataforma sobre um `Game` (o **último valor** consultado, nunca substitui
+  título, status, notas nem a capa do usuário): `gameId`, `userId` (repetido de `Game.userId` para a unicidade
+  por usuário; o service grava sempre com `where: { id, userId }`), `provedor`, `idExterno` (o appid),
+  `minutosJogados`, `ultimaVezJogadoEm`, `conquistasTotal`/`conquistasDesbloqueadas` (`null` = nunca consultado
+  ou negado; `0` = o jogo não tem conquistas), `capaUrl` e `atualizadoEm`, com `@@unique([userId, provedor,
+idExterno])` e `@@unique([gameId, provedor])` (1 para 1 nos dois sentidos). As duas tabelas têm `onDelete:
+Cascade` a partir de `User` (e `JogoPlataforma` também de `Game`): excluir a conta leva os vínculos e os dados
+  por provedor. `CHECK`s escritos à mão na migration: `minutosJogados >= 0` e conquistas nunca negativas, com as
+  desbloqueadas nunca acima do total. A lista de conquistas **não** é gravada (é buscada ao abrir o detalhe).
 - **`Game.userId`** (spec `autenticacao`): **obrigatório** (`String`, `NOT NULL`), com FK para `User` e
   `onDelete: Cascade` (excluir a conta apaga os jogos no banco; as capas no bucket ficam por conta de quem
   exclui). Veio em duas migrações **destrutivas**, aprovadas na spec: a A3 (`game_dono`) criou a coluna
@@ -218,8 +247,8 @@ implementado.
 ### 4.4 Módulo por domínio (`src/modules/`)
 
 Convenção NestJS padrão, um módulo por domínio, cada um com `*.module.ts` + `*.controller.ts` +
-`*.service.ts` (+ `dto/` quando a rota aceitar body). Hoje há quatro (`health/`, `games/`, `auth/`, §4.5 —
-que também guarda as **sessões ativas** do perfil —, e `users/`):
+`*.service.ts` (+ `dto/` quando a rota aceitar body). Hoje há cinco (`health/`, `games/`, `auth/`, §4.5 —
+que também guarda as **sessões ativas** do perfil —, `users/` e `integrations/`):
 
 - `health/` — `GET /api/health`, sem domínio; serve de modelo de forma.
 - `games/` — o catálogo de jogos (spec `docs/specs/catalogo-jogos.md`, etapas 1 e 2; o web está em §5.5):
@@ -311,6 +340,124 @@ apps/api/src/modules/games/
     `users.http.spec.ts` (porta local, com a auth de verdade e o Prisma falso de `auth/testing/`, que ganhou o
     `user.delete` com o cascade: 204 e o cookie limpo, 400, 401, 429 no 6º pedido e o contador próprio).
 
+- `integrations/` — integrações com plataformas de jogos (spec `docs/specs/integracao-plataformas.md`, **etapas 1 a 4**: a base, o **vínculo da conta com o cartão do perfil**, a **biblioteca**, o **vínculo de jogo** e o **detalhe do jogo** com horas e a lista de conquistas). Prefixo `/api/integracoes`, tag Swagger `integracoes`. Rotas (todas protegidas
+  pelo guard global, **exceto o retorno**): `GET /` (contas vinculadas), `POST :provedor/vinculo`,
+  `GET :provedor/retorno` (`@Public()`), `DELETE :provedor`, `GET :provedor/perfil` e
+  `POST :provedor/perfil/atualizacao`, `GET :provedor/biblioteca`, `PUT :provedor/jogos/:jogoId` (200), `GET :provedor/jogos/:jogoId` (o detalhe), `POST :provedor/jogos/:jogoId/atualizacao` e `DELETE :provedor/jogos/:jogoId` (204). O `:provedor` é o _slug_ minúsculo (`steam`), validado pelo
+  `ProvedorSlugPipe` (400 `VALIDACAO`).
+  - **`GameProvider`** (`providers/game-provider.ts`) é a interface que cada plataforma implementa
+    (`iniciarVinculo`, `concluirVinculo`, `listarBiblioteca` — que devolve também o perfil, porque o cartão do
+    `/perfil` precisa dos dois e a detecção de privacidade cruza as duas chamadas —, e `obterJogo`). A Steam é
+    a primeira implementação; PlayStation, Xbox e Epic entram implementando a interface e acrescentando um
+    valor a `Provedor`. O **`ProviderRegistry`** acha o provider pelo `:provedor` da rota (o _slug_ em
+    minúsculas, `steam`) ou pelo enum; a lista vem do token `GAME_PROVIDERS` (hoje só a Steam). Os erros de
+    domínio (`providers/plataforma-errors.ts`: `PlataformaIndisponivelError`, `PlataformaLimiteError`,
+    `PerfilPrivadoError`, `IdExternoInvalidoError`, `ProvedorNaoSuportadoError`, `VinculoCanceladoError`,
+    `VinculoRecusadoError`) **não** são `HttpException`: carregam o `code` estável (`ApiErrorCode`), e quem
+    responde HTTP os mapeia (`plataforma-http-errors.ts`: `PlataformaExceptionFilter` no controller; falha da
+    plataforma é **502**, nunca 500; perfil privado é 409; ID malformado e provedor desconhecido são 400).
+  - **`SteamClient`** (`steam/steam.client.ts`) fala com a Steam Web API (`api.steampowered.com`) pelo `fetch`
+    nativo, **sem SDK**, no padrão do `StorageService`: timeout de 8 s, sem _retry_, isolado atrás de métodos
+    simples (`obterPerfil`, `listarJogos`, `obterConquistasDoJogador`, `obterSchema`,
+    `obterPercentuaisGlobais`) e mockado nos testes. Regras vindas da chamada real: **a chave viaja na query
+    string, então o log tem só o nome da chamada e o status, nunca a URL**; **sem `JSON.parse` cego** (a
+    Steam responde o 401 da chave inválida e o 400 de ID malformado em **HTML**, então o corpo só é lido como
+    JSON quando o `content-type` é JSON); **SteamID (`^7656\d{13}$`) e appid são validados antes de chamar**
+    (malformado é erro de validação, nunca "perfil privado"); 429 → `PlataformaLimiteError`; timeout, 5xx, 401
+    (com um `error` de "chave recusada" no log), 403 fora das conquistas e resposta ilegível →
+    `PlataformaIndisponivelError`; biblioteca sem `game_count` = privada (`game_count: 0` = vazia); jogo sem
+    conquistas (400 "no stats") e conquistas negadas são **estados**, não erros; `percent` (texto) vira número
+    com 1 casa e `rtime_last_played: 0` vira `null`.
+  - **Números nomeados** em `integrations.constants.ts` (timeout, host, TTLs e teto do cache em memória, vida do
+    `state`, emissor e nome do cookie, limites por usuário). Os intervalos de atualização (1 h e 30 s) ficam no
+    `shared`. O cache (`cache/ttl-cache.ts`, `TtlCache`, com validade e teto que descarta o mais antigo) guarda a
+    biblioteca **por SteamID** por 10 min (dado público: duas contas do checkpoint com a mesma Steam dividem a consulta).
+  - **Vínculo da conta (Steam OpenID 2.0, só para vincular; o login do app continua e-mail e senha)**:
+    - **`SteamOpenId`** (`steam/steam-open-id.ts`, código próprio, `fetch` nativo): `montarUrl` (`checkid_setup`
+      com `return_to` e `realm`) e `validarRetorno`, cujas checagens **locais vêm primeiro e não gastam rede**
+      (`mode`, `ns`, `op_endpoint`, `return_to` idêntico, `claimed_id` em https com 17 dígitos `7656`, `identity`
+      igual, `signed` cobrindo `claimed_id`, `identity`, `return_to`, `op_endpoint` e `response_nonce`, parâmetro
+      `openid.*` repetido) e só então o `POST check_authentication` (sem seguir redirecionamento, sem _retry_,
+      timeout de 8 s). O SteamID só é aceito depois de a Steam confirmar; a Steam invalida o _nonce_ na primeira
+      checagem (barra o replay).
+    - **`state` e cookie** (`vinculo/`): o retorno da Steam é um GET do navegador sem `Authorization` e o cookie
+      do refresh tem `Path=/api/auth`, então o `POST vinculo` emite um **`state`** (JWT HS256, **10 min**,
+      `typ: 'vinculo'`, `prov`, `nonce` de 256 bits; assinado com o `JWT_ACCESS_SECRET`, sem segredo novo, mas com
+      **emissor próprio** `checkpoint-api:vinculo`) e grava o cookie **`checkpoint_vinculo`** com o mesmo `nonce`
+      (`HttpOnly`, `SameSite=Lax`, `Path=/api/integracoes`, 10 min, sem `Domain`, `Secure` em produção). O retorno
+      só vale se o `state` conferir **e** o nonce do cookie for o dele (comparação em tempo constante): sem o cookie,
+      o link de outra pessoa, aberto no navegador da vítima, vincularia a Steam da vítima à conta do atacante. Como
+      o segredo é reaproveitado, os **dois sentidos são travados por teste**: o guard global recusa um `state` como
+      access token (emissor e `typ`) e o serviço recusa um access token ou refresh token como `state`.
+    - **O retorno** (`GET :provedor/retorno`, `@Public()`) **nunca responde JSON de erro**: todo desfecho é um
+      **302** para `${WEB_PUBLIC_URL}/perfil?steam=vinculada` ou `?steam=erro&motivo=cancelado|invalido|expirado|
+indisponivel|ja-vinculada`, sem SteamID nem `state` na URL. A ordem é a defesa: `state` → nonce do cookie →
+      só então a Steam; um `state` ruim nunca gasta rede. Sem DTO de propósito (o `ValidationPipe` global recusaria
+      as chaves `openid.*` com `forbidNonWhitelisted`); quem valida é o provider. O cookie é limpo em toda volta.
+      Em produção o `return_to` e o `realm` são `API_PUBLIC_URL` (o domínio da **Vercel**, por causa do rewrite de
+      `/api`: o cookie é gravado nesse host e só volta para ele), nunca o do Render.
+    - **Regras de gravação**: mesmo SteamID já vinculado → sucesso sem duplicar (atualiza o nome); outro SteamID →
+      `ja-vinculada`; falha ao ler o nome (`GetPlayerSummaries`) **não** desfaz o vínculo (o nome vira "Conta Steam").
+      **A mesma conta Steam pode ser vinculada por mais de um usuário do checkpoint** (a unicidade é por usuário,
+      provedor e id externo): cada vínculo é isolado. Desvincular apaga a `ContaVinculada` e todos os
+      `JogoPlataforma` do provedor **do usuário**, numa transação, sem tocar em jogo, nota, status ou capa.
+  - **`SteamProvider`** (`steam/steam.provider.ts`) junta `SteamOpenId` e `SteamClient`: `listarBiblioteca` trata
+    visibilidade diferente de 3 ou falta de `game_count` como `PerfilPrivadoError` (biblioteca **vazia** não é
+    erro); avatar e link do perfil só saem se forem https em host da Steam (`steam/steam-urls.ts`); a capa oficial
+    é `cdn.cloudflare.steamstatic.com/steam/apps/<appid>/library_600x900.jpg` (404 em alguns apps: o web cai em
+    `header.jpg`). `obterJogo` (etapa 3) devolve só o **resumo**: a biblioteca filtrada pelo appid (`appids_filter`, confere que o jogo é do
+    usuário) e depois `GetPlayerAchievements` para as contagens; conquistas negadas não derrubam (contagens `null` e
+    aviso `CONQUISTAS_PRIVADAS`), jogo sem conquistas dá `0` de `0` (o 400 "no stats" é fixture real); a lista completa vem do `obterDetalhe` (etapa 4, abaixo). **"Negado" (403 ou `success:false`) e "perfil privado" (visibilidade ≠ 3, biblioteca sem `game_count`) são
+    suposições SEM fixture real (CA-63)**: os testes as chamam de "SIMULADO" e `apps/api/scripts/capturar-fixtures-steam.cjs`
+    (modos `privado`, `detalhes-privados`, `vazio`; uma captura, sanitizada, sem gravar o ID) as troca por fixtures reais.
+  - **Limite por USUÁRIO, não por IP** (`IntegrationsThrottlerGuard`, contador por rota e por usuário, em memória):
+    30 por minuto, 5 por minuto em `POST vinculo`; 429 `LIMITE_TENTATIVAS` com `Retry-After`. Não depende do
+    `TRUST_PROXY_HOPS`. O retorno usa `@SkipThrottle()`: quem o protege é o `state`, o cookie e a Steam.
+  - **O cartão do perfil** (`GET :provedor/perfil`): total de jogos, horas totais e os 3 mais jogados vêm da
+    biblioteca (cache de 10 min); as **conquistas são a soma dos jogos vinculados, já gravada no banco**, sem
+    chamada extra (`{ desbloqueadas, total, jogosVinculados }`). `POST .../perfil/atualizacao` ignora o cache, mas
+    no máximo uma consulta a cada 30 s: antes disso devolve o que tem, sem chamar a Steam.
+  - **Biblioteca e vínculo de jogo (etapa 3)**: `GET :provedor/biblioteca?busca=&limite=` (padrão 30, máximo 50, busca de
+    até 100 caracteres, sem paginação) lê a biblioteca do **mesmo cache de 10 min por SteamID** do cartão do perfil
+    (`obterBiblioteca`; erro não entra no cache), ordena por horas e traz `jogosParecidos` (mesma `chaveDeTitulo`, até 3,
+    sem vínculo) e `vinculadoA`. `PUT :provedor/jogos/:jogoId` (`{ idExterno, mover? }`, DTO com regex e `mover` booleano
+    estrito) segue **esta ordem**: (1) o jogo é do usuário e há conta vinculada; (2) o jogo já tem vínculo → mesmo item
+    responde 200 idempotente, outro item é 409 `PLATAFORMA_JOGO_JA_VINCULADO` (mesmo com `mover`); (3) o item está ligado a
+    outro jogo → sem `mover`, 409 `PLATAFORMA_ITEM_JA_VINCULADO` com `jogoAtual`, **sem chamar a Steam**; (4) a Steam
+    (`obterJogo`); (5) grava, e com `mover` numa `$transaction([deleteMany, create])`. Falha da Steam não muda nada
+    (CA-66/67); o jogo antigo perde só a camada e **nada é copiado**; P2002 é traduzido pelo `meta.target`. `DELETE
+.../jogos/:jogoId` tira só a camada (404 `PLATAFORMA_VINCULO_NAO_ENCONTRADO` se não há). O `games` devolve
+    `Game.dadosPlataforma` (lista, lida com `include`, **sem chamar a Steam**) para o web saber quais jogos já têm vínculo.
+  - **Detalhe do jogo (etapa 4)**: `GET :provedor/jogos/:jogoId` devolve `{ dados, conquistas, aviso }`. Ordem: (1) o jogo é do
+    usuário → 404 `Jogo não encontrado`; (2) tem vínculo → 404 `PLATAFORMA_VINCULO_NAO_ENCONTRADO`; (3) há conta; **só então**
+    a Steam (jogo de outro usuário e jogo sem vínculo nunca gastam cota). As **horas** só são reconsultadas se o dado gravado
+    é mais velho que `ATUALIZACAO_AUTOMATICA_MS` (1 h); a **lista** vem do cache. O `POST .../atualizacao` (`ATUALIZACAO_MANUAL_MIN_MS`,
+    30 s) ignora o cache das conquistas do jogador e reconsulta as horas; antes de 30 s devolve o gravado (a lista sai do
+    cache). **O `GET` nunca dá 502**: se a plataforma falhar, 200 com o valor gravado e `aviso` (`INDISPONIVEL`, ou
+    `PERFIL_PRIVADO`), sem escrever nada e logando só o tipo do erro; só o `POST` propaga 502/409. Grava **só o que mudou**:
+    horas e `atualizadoEm` quando reconsultadas; contagens se diferem e **nunca** quando negadas (`null`: o valor antigo fica);
+    duas aberturas seguidas não escrevem duas vezes. `SteamProvider.obterDetalhe` faz até 4 chamadas (horas por
+    `appids_filter`, `GetPlayerAchievements`, `GetSchemaForGame` e os percentuais, estes sem chave) atrás de `CarregadorEmCache`
+    (`cache/carregador-em-cache.ts`: `TtlCache` + junção de chamadas simultâneas): conquistas do jogador 5 min por SteamID e
+    appid; schema e percentuais 24 h por appid (dado público, dividido entre usuários). Schema ou percentuais falhando não
+    derruba: o nome cai para o do jogador (ou o id) e a raridade fica `null`. A conquista oculta vem sem descrição; o percentual
+    (texto na Steam) vira número com 1 casa; ícones só de host da Steam (`iconeUrlSeguro`). **A regra do 403**: um 403 do
+    `GetPlayerAchievements` (ou `success:false`) é "conquistas negadas" (`CONQUISTAS_PRIVADAS`, horas e vínculo ficam); um 403 em
+    QUALQUER outra chamada é `INDISPONIVEL` (problema com a chave), e o 400 "no stats" é jogo sem conquistas (`SEM_CONQUISTAS`).
+    O "negado" e o "perfil privado" no detalhe são **suposições sem fixture real (CA-63)**.
+  - **Testes** (Jest, sem rede e sem banco): `steam/steam.client.spec.ts` (com **fixtures reais e
+    sanitizados** em `steam/__fixtures__/`: respostas de uma conta de teste com SteamID, nome e avatar
+    sintéticos; `steam/fixtures.spec.ts` falha se um SteamID ou uma chave passar), `steam/steam-open-id.spec.ts`,
+    `steam/steam.provider.spec.ts`, `steam/steam-urls.spec.ts`, `vinculo/vinculo-state.service.spec.ts` (os dois
+    sentidos do `state`) e `vinculo-cookie.spec.ts`, `integrations.service.spec.ts` (Prisma e provider mockados),
+    `integrations.http.spec.ts` (**porta local com o guard global real**, cookie, redirecionamento, limite por
+    usuário e o SteamID e o `state` fora do redirecionamento e do log; o Prisma em memória e o `SteamClient` falso
+    ficam em `testing/integrations-http-app.ts`), `access-token.guard.spec.ts` (o `state` não vale como access
+    token), `cache/ttl-cache.spec.ts`, `provedor-slug.pipe.spec.ts`, `plataforma-http-errors.spec.ts`,
+    `providers/provider-registry.spec.ts`, `integrations.module.spec.ts` (a injeção resolve) e
+    `chave-de-titulo.spec.ts`. Perfil privado real, conquistas negadas e biblioteca vazia estão como `it.todo`
+    até a captura dos fixtures reais.
+
 Registre o módulo novo em `app.module.ts` (`imports: [...]`).
 
 ### 4.5 Autenticação (`modules/auth/`, spec `docs/specs/autenticacao.md`, etapas 1 e 5; sessões: spec `perfil`, etapa 2)
@@ -352,7 +499,8 @@ Registre o módulo novo em `app.module.ts` (`imports: [...]`).
   CORS). Sem ele: 403 `AUTH_ORIGEM_INVALIDA`.
 - **Limite por IP** (`@nestjs/throttler`, memória, uma instância) só no `AuthController`: login 5/min, refresh
   30/min, troca de senha **5 a cada 15 min**, registro **3/h** (constante no código; a env opcional `AUTH_REGISTRATION_LIMIT_PER_HOUR` só existe
-  para verificação manual). 429 com `code: LIMITE_TENTATIVAS` e `Retry-After`.
+  para verificação manual). 429 com `code: LIMITE_TENTATIVAS` e `Retry-After`. O "IP" é o `req.ip`, que só é o
+  do cliente atrás de proxy com `TRUST_PROXY_HOPS` correto (§4.1); sem ele o contador vira um só para o site.
 - **Hash de senha: `node:crypto.scrypt`** (`password-hasher.ts`, N=2^17, r=8, p=1, sal de 16 bytes, formato
   `scrypt$N$r$p$sal$hash`), **não argon2**: o `argon2` não instala nesta máquina (sem binário pré-compilado e sem
   toolchain do Visual Studio), e a spec já previa esse plano B. `PasswordHasher` isola o algoritmo. Login com
@@ -644,7 +792,8 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
 - **`/perfil`** (dentro do `RequireAuth` + `AppLayout`; etapa 5): **uma coluna** centralizada (`max-w-[640px]`, sem
   grid de duas colunas), seções separadas por espaço e divisores finos, contêineres `rounded-2xl` sem borda. Ordem:
   **Cabeçalho**; **Conta** (`ListaDeLinhas` de `LinhaConta.tsx`: **Trocar senha** → `/perfil/senha`, **Sessões ativas**
-  e **Sair**, linhas de 56 px com ícone, rótulo e seta; **sem repetir o nome**); **Preferências** (uma linha,
+  e **Sair**, linhas de 56 px com ícone, rótulo e seta; **sem repetir o nome**); **Contas vinculadas** (o cartão Steam, §5.13; spec `integracao-plataformas`);
+  **Preferências** (uma linha,
   "Preferências do aparelho", com o resumo "Cor · Densidade" de `resumoDasPreferencias`, que abre o modal de
   §5.12); **Instalar app** (só quando dá); **Zona de perigo** (discreta, no fim). **Sessões ativas** é uma linha
   que se expande no lugar (`aria-expanded`, `aria-controls`): `SessoesAtivas` só monta aberta, então a lista
@@ -750,6 +899,62 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
   `features/games/lib/initial-filter.test.ts`, `features/games/components/PlatformField.test.tsx`,
   acréscimos em `styles/tokens.test.ts` e `pages/GamesPage.test.tsx`.
 
+### 5.13 Integrações no web (`features/integracoes/`, spec `docs/specs/integracao-plataformas.md`, etapas 2 a 4)
+
+- **`/perfil`** ganha a seção **Contas vinculadas** (`ContasVinculadas`, entre "Conta" e "Preferências"), com o
+  **cartão Steam** (`ContaSteamCard`). Dados pelo `apiClient` (`api/integracoes-api.ts`) e TanStack Query
+  (`['integracoes', 'contas']` e `['integracoes', 'perfil', provedor]`, esta só habilitada com conta vinculada e
+  **sem _retry_**: 409 e 502 se resolvem com "Tentar de novo", não com repetição automática).
+- **Estados do cartão**: carregando (esqueleto com `role="status"`); sem vínculo (**Vincular conta**); vinculado
+  (nome, avatar, jogos, horas, "X conquistas em N jogos vinculados" e os 3 mais jogados, com **Atualizar** e
+  **Desvincular**, este com confirmação no `<dialog>` e o foco em Cancelar); **perfil privado** ("Seu perfil Steam
+  está privado", passo a passo numerado e **Tentar de novo**); falha da Steam e sem conexão (mensagem própria e
+  **Tentar de novo**; o nome gravado, Atualizar e Desvincular seguem na tela). Biblioteca vazia: "Nenhum jogo na sua
+  biblioteca". Falha ao atualizar mantém os números que já estavam. Botões com `min-h-11`; avatar decorativo
+  (`alt=""`, `referrerPolicy="no-referrer"`, `width`/`height`); só classes de token do tema (nenhum hex novo).
+- **Vincular**: `POST vinculo` com **`withCredentials: true` só nesta chamada** (em produção o `/api` é do mesmo
+  site pelo rewrite da Vercel e não muda nada; em dev, localhost:5173 → :3333, o navegador só aceita o cookie
+  `checkpoint_vinculo` com ele). O navegador só vai à URL devolvida se ela for a tela de login da Steam
+  (`lib/steam-url.ts`: `https`, `steamcommunity.com`, sem porta nem usuário, `/openid/login`); qualquer outra é
+  recusada com uma mensagem. A navegação passa por `lib/navegar.ts` (`irPara`), que os testes mockam.
+- **Aviso do retorno**: a API redireciona para `/perfil?steam=vinculada` ou `?steam=erro&motivo=…` (um
+  redirecionamento externo não carrega o `state` da navegação, então o aviso vem na query). A `PerfilPage` o lê
+  **uma vez** (`useState`), mostra (sucesso em `role="status"`, erro em `role="alert"`) e limpa só `steam` e
+  `motivo` da URL com `replace`. Parâmetro desconhecido é ignorado (`lib/avisos-steam.ts`).
+- **Formatação** (`lib/format.ts`): `horasCurtas` ("45 min", "1,5 h", "42 h", "1.234 h", arredondando para baixo) e
+  `textoDasConquistas` (singular e plural). `lib/estado-do-cartao.ts` classifica a falha (`privado`, `sem-conexao`,
+  `erro`).
+- **Biblioteca e vínculo de jogo (etapa 3)**: `BibliotecaSteamDialog` (dois modos: `novo` e `vincular`, num `ModalDialog`;
+  busca com _debounce_ de 300 ms; estados carregando, vazia, privada e erro com **Tentar de novo**). No modo `novo`, cada item
+  é **Criar jogo** (ou **Criar outro jogo**, quando há parecidos, que ganham **Vincular a este**), mais **Vincular a outro
+  jogo que já tenho** (seletor só dos jogos sem `dadosPlataforma`); item já ligado mostra "Já ligado a «X»" e não cria. Nunca
+  vincula sozinho. Jogo de plataforma ≠ vazio/"PC" pede **confirmação** ("horas e conquistas são as da Steam"); o 409
+  `PLATAFORMA_ITEM_JA_VINCULADO` mostra o aviso com **Mover o vínculo**, que reenvia com `mover: true`. `GameForm` (jogo novo)
+  ganha **Buscar na Steam** (só com conta vinculada; senão o link "Vincule sua Steam no perfil"): preenche título, "PC" e o
+  status sugerido (`lib/biblioteca.ts`: 0 min = Quero jogar, >0 = Jogando, **nunca** Zerado), a capa oficial é só **prévia**;
+  ao salvar cria o jogo e **só depois** liga (falha da ligação: jogo salvo, formulário passa a editar, o próximo Salvar
+  reenvia sem 409); a confirmação de plataforma vem **antes** de criar qualquer coisa. A página do jogo tem **Vincular à
+  Steam** (modo `vincular`). Ligar invalida `['games']` e o cartão do perfil.
+- **Horas e conquistas (etapa 4)**: a página `/jogos/:id` de um jogo ligado ganha o bloco **Steam** (`BlocoSteam`, dentro do
+  `GameDetail`): tempo jogado ("42 h 30 min"), "Último jogo em dd/mm/aaaa" ou "Nunca jogado", a barra `role="progressbar"`
+  ("12 de 40 conquistas"), **Atualizar**, **Desvincular** (confirmação; só a camada da Steam some: título, status, notas e capa
+  ficam, e **Vincular à Steam** volta) e **Abrir na Steam** (`rel="noopener noreferrer"`). A lista tem dois `<details>`:
+  **Desbloqueadas** (fechada, por data decrescente) e **Faltam** (aberta, da mais comum à mais rara), com ícone (`width`/`height`/
+  `loading="lazy"`), nome, descrição ("Conquista oculta" se oculta e bloqueada), data e "12,4% dos jogadores" (ou "Raridade
+  indisponível"); uma coluna no celular e, a partir de 1024 px, data e raridade à direita. O detalhe **só é pedido nesta página**
+  (`useDetalheJogo`, sem _retry_; abrir `/` não faz nenhuma request de conquistas) e os valores novos entram direto no cache do
+  catálogo (`comDadosAtualizados`). Enquanto carrega, mostra o último valor gravado; os avisos são discretos: conquistas privadas
+  (horas mantidas, sem barra), perfil privado e Steam indisponível (valor antigo mantido). Sem nenhuma animação nova.
+- **Linha do catálogo**: só "42 h · 12/40" (`resumoDoCatalogo`, `role="img"` com o rótulo completo), a partir de `dadosPlataforma`,
+  sem consultar a plataforma; só as horas quando não há total; "0 h" com 0 minutos.
+- **Precedência da capa** (`lib/capa.ts` + `GameCover`): a enviada, depois a oficial (`library_600x900.jpg`), depois o
+  `header.jpg` do mesmo app (derivado da URL oficial, só na CDN conhecida) e por fim a gerada (cor e inicial). O `GameCover` tenta
+  a próxima quando uma falha ao carregar (`onError`); nada é gravado, então remover a enviada faz a oficial reaparecer.
+- **Testes** (Vitest): `components/BlocoSteam.test.tsx`, `lib/capa.test.ts`, `lib/conquistas.test.ts`, `games/components/GameCover.test.tsx`, `components/BibliotecaSteamDialog.test.tsx`, `lib/biblioteca.test.ts`, `games/components/GameForm.steam.test.tsx`, `components/ContaSteamCard.test.tsx` (todos os estados, o desvio da URL fora da Steam, o
+  diálogo, Atualizar, privacidade), `lib/lib.test.ts` (URL da Steam, avisos, horas, classificação),
+  `pages/PerfilPage.test.tsx` (a seção entre Conta e Preferências e os avisos do retorno; a API de integrações é
+  mockada).
+
 ---
 
 ## 6. `packages/shared`
@@ -777,7 +982,14 @@ antes de `api`/`web` (§2). Hoje tem:
   puras (`normalizeEmail`, `utf8ByteLength`, `passwordProblem`), `API_ERROR_CODES`/`ApiErrorCode` (com
   `SESSAO_ATUAL` e `SESSAO_NAO_ENCONTRADA`; o web tem um texto para cada, e o `Record<ApiErrorCode, string>`
   quebra o `typecheck` se faltar) e `CSRF_HEADER`.
-- `index.ts` — reexporta `auth` e `games` e mantém dois exemplos herdados do esqueleto
+- `integracoes.ts` — contrato das integrações com plataformas (spec `integracao-plataformas`): `PROVEDORES`/
+  `Provedor` (`STEAM`) e `PROVEDOR_SLUG`, as constantes `ATUALIZACAO_AUTOMATICA_MS` (1 h) e
+  `ATUALIZACAO_MANUAL_MIN_MS` (30 s), os tipos (`ContaVinculada`, `ItemBiblioteca`, `PerfilPlataforma`,
+  `DadosJogoPlataforma`, `Conquista`, `DetalheJogoPlataforma`, `AvisoPlataforma`, `VincularJogoRequest`,
+  `PlataformaItemJaVinculadoError`…) e a função pura `chaveDeTitulo` (compara títulos sem caixa, acento, ™ ® © nem
+  pontuação, **por igualdade**; só os acentos combinados do latim são tirados, para "ペ" não virar "ヘ").
+  `API_ERROR_CODES` (em `auth.ts`) ganhou os nove `PLATAFORMA_*`, cada um com texto no web.
+- `index.ts` — reexporta `auth`, `games` e `integracoes` e mantém dois exemplos herdados do esqueleto
   (`HealthCheckResponse`, `APP_NAME`).
 
 O que entra aqui: tipos de request/response compartilhados entre API e web, enums de domínio,
@@ -825,12 +1037,59 @@ mudanças de schema por um agente.
 | `apps/api/.env` | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_STORAGE_BUCKET` | Storage das capas; validadas em `env.validation.ts` (obrigatórias). O valor da chave é a **secret key** (`sb_secret_…`) e só o backend a usa: nunca vai para o web nem para log                                                                                                                               |
 | `apps/api/.env` | `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `AUTH_REGISTRATION_OPEN`    | Autenticação; obrigatórias em `env.validation.ts`. Os dois segredos têm ≥ 32 caracteres e são **diferentes**; gere cada um localmente (`node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"`). Nunca vão para o web, spec, log ou PR. `AUTH_REGISTRATION_OPEN` é `true` ou `false` |
 | `apps/api/.env` | `AUTH_REGISTRATION_LIMIT_PER_HOUR`                                     | **Opcional**, só dev/teste: sobrescreve o limite de 3 registros por hora por IP. Em ambiente exposto, deixe ausente                                                                                                                                                                                           |
+| `apps/api/.env` | `STEAM_API_KEY`, `API_PUBLIC_URL`, `WEB_PUBLIC_URL`                    | Integração com plataformas (spec `integracao-plataformas`); **obrigatórias**: a API não sobe sem elas, cadastre no Render **antes** do deploy. `STEAM_API_KEY` só no backend, nunca no web nem em log. `API_PUBLIC_URL` e `WEB_PUBLIC_URL`: origens sem barra final (produção: o domínio da Vercel; §4.2)     |
 | `apps/api/.env` | `DIRECT_URL`                                                           | Só o Prisma CLI lê (via `schema.prisma`); necessária apenas se `DATABASE_URL` for uma conexão pooled (ex.: Supabase)                                                                                                                                                                                          |
+| `apps/api/.env` | `TRUST_PROXY_HOPS`                                                     | **Opcional**, inteiro de 0 a 10; ausente = 0 (dev, sem proxy). Quantos proxies confiáveis há entre o cliente e a API, para o limite por IP ver o cliente e não o proxy (§4.1). Em produção, o número **medido** (Vercel + Render); nunca um chute                                                             |
 | `apps/web/.env` | `VITE_API_URL`                                                         | Consumida em `src/shared/lib/env.ts`, `baseURL` do `apiClient`                                                                                                                                                                                                                                                |
 
 `CORS_ORIGIN` deixou de ter padrão e **recusa `*`** (cookie de sessão): liste as origens, ex.:
 `http://localhost:5173`. Cada arquivo tem um `.env.example` correspondente, versionado. Nunca commitar `.env` real nem
 colar valor real em spec, teste, commit ou log.
+
+### 8.1 Deploy (Vercel + Render + Supabase)
+
+**Topologia.** O web é estático na **Vercel** (`https://checkpoint-web-rust.vercel.app`). O `apps/web/vercel.json` reescreve `/api/:path*` para
+`https://checkpoint-api-l0hk.onrender.com/api/:path*` (a API no **Render**) e devolve `/index.html` para o resto (SPA). Por isso o navegador só
+enxerga **um** site: o cookie do refresh (`checkpoint_refresh`) e o do vínculo com a Steam (`checkpoint_vinculo`) são gravados no
+host da **Vercel**, e é o domínio da Vercel (não o do Render) que vai em `API_PUBLIC_URL`, `WEB_PUBLIC_URL` e `CORS_ORIGIN`. Banco
+e bucket ficam no **Supabase**. As variáveis da API vivem no painel do Render; o web só tem `VITE_API_URL` (nunca um segredo).
+
+**Variáveis da API em produção (painel do Render)**
+
+| Variável           | Valor                                    | Observação                                                                             |
+| ------------------ | ---------------------------------------- | -------------------------------------------------------------------------------------- |
+| `NODE_ENV`         | `production`                             | o cookie do vínculo passa a `Secure`                                                   |
+| `CORS_ORIGIN`      | `https://checkpoint-web-rust.vercel.app` | lista de origens; `*` é recusado no boot                                               |
+| `API_PUBLIC_URL`   | `https://checkpoint-web-rust.vercel.app` | sem barra final; é o `return_to` e o `realm` do OpenID da Steam                        |
+| `WEB_PUBLIC_URL`   | `https://checkpoint-web-rust.vercel.app` | sem barra final; para onde o retorno do vínculo redireciona                            |
+| `STEAM_API_KEY`    | 32 hexadecimais (segredo)                | gerada em `steamcommunity.com/dev/apikey`; "domínio": `checkpoint-web-rust.vercel.app` |
+| `TRUST_PROXY_HOPS` | o número **medido**                      | ver o passo 2; nunca um chute e nunca `true`                                           |
+
+As demais (`DATABASE_URL`, `DIRECT_URL`, `SUPABASE_*`, `JWT_*`, `AUTH_REGISTRATION_OPEN`, `PORT`) já existem e não mudam.
+
+**Checklist, em ordem** (cada passo só depois do anterior):
+
+1. **Segredos expostos** (opcional, mas recomendado antes): rotacionar o que apareceu em conversa ou log. Trocar os `JWT_*` desloga todo
+   mundo; a `SUPABASE_SERVICE_ROLE_KEY` e a `STEAM_API_KEY` só valem no Render.
+2. **Medir os saltos do proxy** (nunca chutar). A branch `diag/trust-proxy-medicao` tem um endpoint **temporário**, `GET /api/diag/proxy`,
+   que devolve só o que a própria request trouxe (`socketRemoteAddress`, `xForwardedForEntradas`, `reqIp`, cabeçalhos de proxy). Suba-o no
+   Render, chame `https://checkpoint-web-rust.vercel.app/api/diag/proxy` de uma rede cujo IP público você conhece (e outra vez com um `X-Forwarded-For` forjado) e compare:
+   N = os endereços à direita do IP real, mais o socket. Esta conta é a hipótese; a prova é o passo 3.
+3. **`TRUST_PROXY_HOPS=<N>`** no Render e nova chamada ao diag: `reqIp` tem que ser o IP real, e o cabeçalho forjado **não** pode mudar
+   o `reqIp`. Só então remova o endpoint de diagnóstico (ele não vai para `main`).
+4. **As três variáveis da Steam** no Render, **antes do deploy** (a API não sobe sem elas): `STEAM_API_KEY=<a chave>`,
+   `API_PUBLIC_URL=https://checkpoint-web-rust.vercel.app` e `WEB_PUBLIC_URL=https://checkpoint-web-rust.vercel.app`, sem barra final.
+5. **`CORS_ORIGIN=https://checkpoint-web-rust.vercel.app`** e **`NODE_ENV=production`**.
+6. **Migration `integracao_plataformas`: conferir, não aplicar de novo.** Ela já foi aplicada no banco na etapa 1 (aditiva), e esse
+   banco provavelmente é o de produção. Com o `DIRECT_URL` (porta 5432, modo session) em `apps/api/.env`, rode
+   `npx prisma migrate status` em `apps/api`: **deve mostrar "Database schema is up to date", sem migrations pendentes**. Assim, o
+   `npx prisma migrate deploy` seria um **no-op**. Se aparecer qualquer migration pendente, **pare** e confirme qual banco é o do
+   `DIRECT_URL` antes de aplicar (`RULES.md` §3).
+7. **Deploy do Render** (com as variáveis já cadastradas) e **depois o da Vercel**. Confirme que o destino do rewrite em `vercel.json`
+   continua `https://checkpoint-api-l0hk.onrender.com`. As etapas 3 e 4 da spec vão juntas nesse deploy.
+8. **Fumaça:** `GET https://checkpoint-web-rust.vercel.app/api/health` (200), `GET https://checkpoint-web-rust.vercel.app/api/integracoes` sem token (401) e o Swagger em `https://checkpoint-web-rust.vercel.app/api/docs`. O Render dorme quando
+   ocioso: a primeira request demora, e os caches em memória (biblioteca da Steam, conquistas, limite por usuário) recomeçam vazios.
+9. **`/qa-verify`** contra o app no ar, pelo roteiro da spec `integracao-plataformas` (seção "Verificação em produção").
 
 ---
 
