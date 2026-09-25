@@ -107,6 +107,11 @@ commit — `/docs-sync` confere se ela bate com a realidade.
       mantém o problema). Cobrir por teste e conferir o `req.ip` real depois do deploy. A spec
       `integracao-plataformas` não depende dela (limite por usuário), mas a etapa 2 só começa depois.
 
+**`integracao-plataformas` — deploy e verificação (execução humana; a spec continua 🚧 até aqui):** fazer o checklist de `ARCHITECTURE.md` §8.1
+(medir o proxy → `TRUST_PROXY_HOPS` → `STEAM_API_KEY`, `API_PUBLIC_URL`, `WEB_PUBLIC_URL` → `CORS_ORIGIN`, `NODE_ENV` → `migrate status` sem pendências →
+deploy), rodar o `/qa-verify` (CA-15, CA-22, CA-39, CA-53, CA-55) e conferir o `count` do CA-56 com uma conta descartável. A spec vira
+✅ implementada quando isso fechar; o CA-63 (fixtures reais) fica aberto sem bloquear.
+
 **`integracao-plataformas` — fixtures reais de privacidade (CA-63; execução humana, quando der):** perfil privado, conquistas negadas
 ("detalhes do jogo" privados) e biblioteca vazia ainda são resposta **simulada** (CA-20, CA-30, CA-47, CA-49 ficam `[~]`). Para fechar: deixe a
 conta de teste no estado certo no site da Steam, espere alguns minutos e rode `node apps/api/scripts/capturar-fixtures-steam.cjs privado`,
@@ -125,8 +130,9 @@ simuladas pelos fixtures e reveja os CAs.
       fixtures (perfil privado, biblioteca vazia, jogo sem conquistas, conquistas negadas, 403). Se possível,
       também uma conta com perfil privado. O SteamID e o nome dessas contas não entram em fixture, teste, log
       nem documentação (`RULES.md` §8).
-- [ ] Aplicar a migration aditiva no banco de produção antes ou junto do deploy da etapa 1 (confirmar qual
-      banco é o `DATABASE_URL`).
+- [ ] **Migration `integracao_plataformas`: já aplicada no banco na etapa 1.** Conferir que esse banco é o de produção:
+      `npx prisma migrate status` deve mostrar "sem migrations pendentes" (o `migrate deploy` seria um no-op); se aparecer
+      pendência, parar e confirmar qual banco é o `DATABASE_URL`/`DIRECT_URL` antes de aplicar.
 
 Mudanças destrutivas de schema (`/db-change`) e outras aprovações explícitas exigidas por
 `.claude/rules/RULES.md` entram aqui quando existirem.

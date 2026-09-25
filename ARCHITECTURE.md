@@ -1046,6 +1046,51 @@ mudanças de schema por um agente.
 `http://localhost:5173`. Cada arquivo tem um `.env.example` correspondente, versionado. Nunca commitar `.env` real nem
 colar valor real em spec, teste, commit ou log.
 
+### 8.1 Deploy (Vercel + Render + Supabase)
+
+**Topologia.** O web é estático na **Vercel** (`https://checkpoint-web-rust.vercel.app`). O `apps/web/vercel.json` reescreve `/api/:path*` para
+`https://checkpoint-api-l0hk.onrender.com/api/:path*` (a API no **Render**) e devolve `/index.html` para o resto (SPA). Por isso o navegador só
+enxerga **um** site: o cookie do refresh (`checkpoint_refresh`) e o do vínculo com a Steam (`checkpoint_vinculo`) são gravados no
+host da **Vercel**, e é o domínio da Vercel (não o do Render) que vai em `API_PUBLIC_URL`, `WEB_PUBLIC_URL` e `CORS_ORIGIN`. Banco
+e bucket ficam no **Supabase**. As variáveis da API vivem no painel do Render; o web só tem `VITE_API_URL` (nunca um segredo).
+
+**Variáveis da API em produção (painel do Render)**
+
+| Variável           | Valor                                    | Observação                                                                             |
+| ------------------ | ---------------------------------------- | -------------------------------------------------------------------------------------- |
+| `NODE_ENV`         | `production`                             | o cookie do vínculo passa a `Secure`                                                   |
+| `CORS_ORIGIN`      | `https://checkpoint-web-rust.vercel.app` | lista de origens; `*` é recusado no boot                                               |
+| `API_PUBLIC_URL`   | `https://checkpoint-web-rust.vercel.app` | sem barra final; é o `return_to` e o `realm` do OpenID da Steam                        |
+| `WEB_PUBLIC_URL`   | `https://checkpoint-web-rust.vercel.app` | sem barra final; para onde o retorno do vínculo redireciona                            |
+| `STEAM_API_KEY`    | 32 hexadecimais (segredo)                | gerada em `steamcommunity.com/dev/apikey`; "domínio": `checkpoint-web-rust.vercel.app` |
+| `TRUST_PROXY_HOPS` | o número **medido**                      | ver o passo 2; nunca um chute e nunca `true`                                           |
+
+As demais (`DATABASE_URL`, `DIRECT_URL`, `SUPABASE_*`, `JWT_*`, `AUTH_REGISTRATION_OPEN`, `PORT`) já existem e não mudam.
+
+**Checklist, em ordem** (cada passo só depois do anterior):
+
+1. **Segredos expostos** (opcional, mas recomendado antes): rotacionar o que apareceu em conversa ou log. Trocar os `JWT_*` desloga todo
+   mundo; a `SUPABASE_SERVICE_ROLE_KEY` e a `STEAM_API_KEY` só valem no Render.
+2. **Medir os saltos do proxy** (nunca chutar). A branch `diag/trust-proxy-medicao` tem um endpoint **temporário**, `GET /api/diag/proxy`,
+   que devolve só o que a própria request trouxe (`socketRemoteAddress`, `xForwardedForEntradas`, `reqIp`, cabeçalhos de proxy). Suba-o no
+   Render, chame `https://checkpoint-web-rust.vercel.app/api/diag/proxy` de uma rede cujo IP público você conhece (e outra vez com um `X-Forwarded-For` forjado) e compare:
+   N = os endereços à direita do IP real, mais o socket. Esta conta é a hipótese; a prova é o passo 3.
+3. **`TRUST_PROXY_HOPS=<N>`** no Render e nova chamada ao diag: `reqIp` tem que ser o IP real, e o cabeçalho forjado **não** pode mudar
+   o `reqIp`. Só então remova o endpoint de diagnóstico (ele não vai para `main`).
+4. **As três variáveis da Steam** no Render, **antes do deploy** (a API não sobe sem elas): `STEAM_API_KEY=<a chave>`,
+   `API_PUBLIC_URL=https://checkpoint-web-rust.vercel.app` e `WEB_PUBLIC_URL=https://checkpoint-web-rust.vercel.app`, sem barra final.
+5. **`CORS_ORIGIN=https://checkpoint-web-rust.vercel.app`** e **`NODE_ENV=production`**.
+6. **Migration `integracao_plataformas`: conferir, não aplicar de novo.** Ela já foi aplicada no banco na etapa 1 (aditiva), e esse
+   banco provavelmente é o de produção. Com o `DIRECT_URL` (porta 5432, modo session) em `apps/api/.env`, rode
+   `npx prisma migrate status` em `apps/api`: **deve mostrar "Database schema is up to date", sem migrations pendentes**. Assim, o
+   `npx prisma migrate deploy` seria um **no-op**. Se aparecer qualquer migration pendente, **pare** e confirme qual banco é o do
+   `DIRECT_URL` antes de aplicar (`RULES.md` §3).
+7. **Deploy do Render** (com as variáveis já cadastradas) e **depois o da Vercel**. Confirme que o destino do rewrite em `vercel.json`
+   continua `https://checkpoint-api-l0hk.onrender.com`. As etapas 3 e 4 da spec vão juntas nesse deploy.
+8. **Fumaça:** `GET https://checkpoint-web-rust.vercel.app/api/health` (200), `GET https://checkpoint-web-rust.vercel.app/api/integracoes` sem token (401) e o Swagger em `https://checkpoint-web-rust.vercel.app/api/docs`. O Render dorme quando
+   ocioso: a primeira request demora, e os caches em memória (biblioteca da Steam, conquistas, limite por usuário) recomeçam vazios.
+9. **`/qa-verify`** contra o app no ar, pelo roteiro da spec `integracao-plataformas` (seção "Verificação em produção").
+
 ---
 
 ## 9. Como isto deve evoluir

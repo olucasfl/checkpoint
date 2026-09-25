@@ -1,9 +1,9 @@
 # Spec: integracao-plataformas
 
-> Status: 🚧 em andamento (aprovada em 2026-09-25). **Etapa 1 implementada**, com o CA-63 parcial (faltam os
-> fixtures de perfil privado e de conquistas negadas, que dependem de a conta de teste trocar a privacidade). **Etapa 2
-> implementada**, com o CA-15 e o CA-22 só prováveis depois do deploy (fluxo real com a Steam e 360 px no
-> navegador). Etapas 3 a 5 não começaram.
+> Status: 🚧 em andamento (aprovada em 2026-09-25). **Etapas 1 a 5 implementadas.** Falta o que só o app no ar prova:
+> o deploy e o `/qa-verify` (CA-15, CA-22, CA-39, CA-53, CA-55) e o `count` do CA-56 no banco real. Vira ✅ implementada quando
+> esses fecharem. Os `[~]` (CA-20, CA-30, CA-47, CA-49, respostas simuladas) foram aceitos como estão; o CA-63 (fixtures reais)
+> fica aberto, com o comando do script de captura, **sem bloquear**.
 
 ## Objetivo
 
@@ -835,13 +835,43 @@ como `[~]`, CA-20 e CA-30 (respostas simuladas).
       senha certa, **então** 204 e **nenhuma** linha de `ContaVinculada` nem de `JogoPlataforma` dela resta
       (`SELECT count(*)` = 0); as de **Bia** continuam. Coberto por teste no fluxo de exclusão existente (o Prisma falso ganha o
       _cascade_ das duas tabelas) **e** conferido no banco real.
-- [ ] **CA-57** — **Dado** qualquer rota nova sem `Authorization`, **então** 401, exceto `GET .../retorno` (302).
-- [ ] **CA-58** — **Dado** os logs de uma execução completa dos testes (sucesso e todas as falhas da Steam),
+      _Parcial (2026-09-25):_ os testes provam o `cascade` (fake em memória) e travam a migration e o `schema.prisma`; o `count` no
+      banco real é conferido **pela pessoa, depois do deploy, com uma conta descartável** (roteiro abaixo). Fica aberto até lá.
+
+- [x] **CA-57** — **Dado** qualquer rota nova sem `Authorization`, **então** 401, exceto `GET .../retorno` (302).
+- [x] **CA-58** — **Dado** os logs de uma execução completa dos testes (sucesso e todas as falhas da Steam),
       **então** nenhum contém o valor de `STEAM_API_KEY`, o `state`, o cookie `checkpoint_vinculo` nem uma URL da Steam com `key=`.
-- [ ] **CA-59** — **Dado** `git grep STEAM_API_KEY apps/web`, **então** sem resultado; **e** o bundle do web
+- [x] **CA-59** — **Dado** `git grep STEAM_API_KEY apps/web`, **então** sem resultado; **e** o bundle do web
       (`npm run build`) não contém o valor da chave.
 - [x] **CA-60** — **Dado** o `.env.example` da API, **então** tem `STEAM_API_KEY`, `API_PUBLIC_URL` e `WEB_PUBLIC_URL`
       documentadas e **sem valor real**.
+
+#### Evidência da etapa 5 (2026-09-25)
+
+| CA    | Evidência                                                                                                                                                                                                                                                                                                               |
+| ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| CA-56 | **`[ ]` parcial:** `users.http.spec.ts` (conta e jogos ligados somem; os de outra pessoa ficam; senha errada não apaga nada), `exclusao-de-conta.schema.spec.ts` (`ON DELETE CASCADE` nas 3 chaves da migration e no schema; o fluxo não importa a integração, então **nenhuma chamada à Steam**); falta o `count` real |
+| CA-57 | `integrations.http.spec.ts` (levantamento das rotas pelos metadados do Nest: cada uma sem token dá 401, só o retorno dá 302; o `state` como token também dá 401)                                                                                                                                                        |
+| CA-58 | `integrations.http.spec.ts` (execução completa com sucesso e todas as falhas: sem chave, SteamID, `state`, cookie, token nem URL da Steam nos logs; uma mutação que loga o SteamID derruba o teste) e `steam.client.spec.ts` (log só com o nome da chamada e o status)                                                  |
+| CA-59 | `sem-chave-da-steam.test.ts` (nenhum arquivo do web cita a variável, nem `VITE_*STEAM`, nem a URL da Steam) e verificação do bundle: `npm run build -w @checkpoint/web` e busca do nome e do valor da chave no `dist`, com zero ocorrências                                                                             |
+
+## Verificação em produção (`/qa-verify`)
+
+Contra `https://checkpoint-web-rust.vercel.app`, depois do deploy (checklist em `ARCHITECTURE.md` §8.1), com a conta Steam de teste. Cada prova vira uma linha
+aqui: data, viewport e o que foi observado.
+
+| CA    | O que clicar                                                                          | O que conta como prova                                                                                                                                                                                                                                                                                                                                                                                                             |
+| ----- | ------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| CA-15 | `/perfil` → **Vincular conta** → entrar na Steam → voltar                             | O navegador vai a `steamcommunity.com/openid/login`; volta em `/perfil?steam=vinculada`, com o aviso e o cartão, e a URL vira `/perfil`. No DevTools, `checkpoint_vinculo` tem `HttpOnly`, `Secure`, `SameSite=Lax`, `Path=/api/integracoes` e nenhum `Domain`, no host da Vercel; a URL de volta não traz SteamID nem `state`. Cancelar na Steam mostra o texto de cancelamento; reabrir o link de retorno já usado dá "inválido" |
+| CA-22 | `/perfil` em 360×640 e em 1024 px                                                     | Sem rolagem horizontal; cada botão mede pelo menos 44×44 no inspetor                                                                                                                                                                                                                                                                                                                                                               |
+| CA-39 | "Buscar na Steam" com o perfil público, depois privado, e com a rede da API derrubada | Aparece o bloco de privacidade com **Tentar de novo** ou o erro, sem quebrar o formulário; em 360×640, sem rolagem horizontal e ações de 44 px. Com o perfil privado, rode também o script de captura (CA-63)                                                                                                                                                                                                                      |
+| CA-53 | Um jogo com muitas conquistas, em 360×640 e em 1024 px                                | Coluna única sem rolagem horizontal, ícones lazy com tamanho, botões de 44 px; em 1024 px, data e raridade à direita                                                                                                                                                                                                                                                                                                               |
+| CA-55 | "Efeitos reduzidos" no Perfil e depois `prefers-reduced-motion` no DevTools           | Nada anima no bloco Steam (barra, `<details>`, esqueleto)                                                                                                                                                                                                                                                                                                                                                                          |
+| CA-56 | Conta descartável: registrar, vincular a Steam, ligar um jogo, **Excluir conta**      | `SELECT count(*)` em `"ContaVinculada"` e em `"JogoPlataforma"` filtrando pelo `userId` da conta excluída = **0**, e as linhas de outra conta continuam                                                                                                                                                                                                                                                                            |
+
+**Estado final dos critérios (2026-09-25):** ✅ todos, exceto: `[~]` (resposta simulada, aceitos) CA-20, CA-30, CA-47 e CA-49;
+abertos até o app estar no ar CA-15, CA-22, CA-39, CA-53, CA-55 e o `count` do CA-56; aberto sem bloquear o CA-63 (fixtures reais:
+`node apps/api/scripts/capturar-fixtures-steam.cjs <privado|detalhes-privados|vazio>`).
 
 ## Plano de testes
 
