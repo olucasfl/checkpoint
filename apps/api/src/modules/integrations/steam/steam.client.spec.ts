@@ -80,12 +80,57 @@ describe('SteamClient', () => {
         nome: 'Jogador Sintetico',
         avatarUrl: expect.stringMatching(/^https:\/\/avatars\.steamstatic\.com\//) as string,
         perfilUrl: expect.stringContaining('steamcommunity.com/profiles/') as string,
+        // O fixture real traz `personastate` (1 = online) e NÃO traz `timecreated` nem `gameextrainfo` (CA-63).
+        criadoEmUnix: null,
+        estado: 1,
+        jogandoAgora: null,
       });
       const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
       expect(url).toContain('/ISteamUser/GetPlayerSummaries/v2/');
       expect(url).toContain(`steamids=${STEAM_ID}`);
       expect(init.signal).toBeInstanceOf(AbortSignal);
     });
+
+    it('obterPerfil: timecreated, personastate e gameextrainfo (SIMULADO: o fixture real não os traz todos)', async () => {
+      fetchMock.mockResolvedValueOnce(
+        resposta({
+          status: 200,
+          body: {
+            response: {
+              players: [
+                {
+                  communityvisibilitystate: 3,
+                  personaname: 'Jogador Sintetico',
+                  timecreated: 1300000000,
+                  personastate: 0,
+                  gameextrainfo: 'Celeste',
+                },
+              ],
+            },
+          },
+        }),
+      );
+
+      await expect(client.obterPerfil(STEAM_ID)).resolves.toMatchObject({
+        criadoEmUnix: 1300000000,
+        estado: 0,
+        jogandoAgora: 'Celeste',
+      });
+    });
+
+    it.each([[0], [-5], ['2011'], [null]])(
+      'obterPerfil: timecreated inválido (%p) vira null',
+      async (timecreated) => {
+        fetchMock.mockResolvedValueOnce(
+          resposta({
+            status: 200,
+            body: { response: { players: [{ personaname: 'J', timecreated }] } },
+          }),
+        );
+
+        await expect(client.obterPerfil(STEAM_ID)).resolves.toMatchObject({ criadoEmUnix: null });
+      },
+    );
 
     it('obterPerfil: ID que a Steam não conhece devolve null', async () => {
       fetchMock.mockResolvedValueOnce(

@@ -31,8 +31,8 @@ vi.mock('@/features/integracoes/api/integracoes-api', () => ({
   integracoesApi: {
     listarContas: vi.fn(),
     iniciarVinculo: vi.fn(),
-    perfil: vi.fn(),
-    atualizarPerfil: vi.fn(),
+    resumo: vi.fn(),
+    atualizarResumo: vi.fn(),
     desvincular: vi.fn(),
   },
 }));

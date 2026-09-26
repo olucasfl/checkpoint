@@ -51,6 +51,8 @@ interface GameFormProps {
   onLinkedExisting?: (jogoId: string) => void;
   /** Jogo novo aberto pelo "Adicionar" de uma prateleira: começa com o status dela. Sem isso, o padrão. */
   statusInicial?: GameStatus;
+  /** Jogo NOVO que já nasce ligado a um item da Steam ("Ver e importar" do popup): título, plataforma e status vêm dele. */
+  itemInicial?: ItemBiblioteca;
 }
 
 const NO_ERROR: FormError = { message: '', fields: {} };
@@ -69,12 +71,20 @@ export function GameForm({
   onCancel,
   onLinkedExisting,
   statusInicial,
+  itemInicial,
 }: GameFormProps) {
   const [saved, setSaved] = useState<Game | undefined>(game);
   const [values, setValues] = useState<GameFormValues>(
     game
       ? valuesFromGame(game)
-      : { ...EMPTY_FORM_VALUES, status: statusInicial ?? EMPTY_FORM_VALUES.status },
+      : itemInicial
+        ? {
+            ...EMPTY_FORM_VALUES,
+            titulo: tituloDoItem(itemInicial.titulo),
+            plataforma: PLATAFORMA_PADRAO,
+            status: statusSugerido(itemInicial.minutosJogados),
+          }
+        : { ...EMPTY_FORM_VALUES, status: statusInicial ?? EMPTY_FORM_VALUES.status },
   );
   const [file, setFile] = useState<File | null>(null);
   const [removing, setRemoving] = useState(false);
@@ -85,7 +95,9 @@ export function GameForm({
   const noRouter = useInRouterContext();
   // O item da Steam escolhido em "Buscar na Steam" (só jogo novo). O vínculo só é gravado DEPOIS de o jogo ser
   // criado; a capa oficial dele é só prévia (o arquivo de capa continua sendo escolha da pessoa).
-  const [ligacao, setLigacao] = useState<ItemBiblioteca | null>(null);
+  const [ligacao, setLigacao] = useState<ItemBiblioteca | null>(
+    game ? null : (itemInicial ?? null),
+  );
   const [ligado, setLigado] = useState(false);
   const [erroLigacao, setErroLigacao] = useState('');
   const [buscando, setBuscando] = useState(false);

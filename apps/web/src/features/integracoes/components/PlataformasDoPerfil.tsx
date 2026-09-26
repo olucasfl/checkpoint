@@ -5,7 +5,7 @@ import { FieldError } from '@/shared/components/form-parts';
 import { Icon } from '@/shared/components/Icon';
 import { PlataformaMarca } from '@/shared/components/PlataformaMarca';
 import { describeAuthError } from '@/features/auth/lib/auth-errors';
-import { useContas, useIniciarVinculo, usePerfilPlataforma } from '../api/use-integracoes';
+import { useContas, useIniciarVinculo, useResumoPlataforma } from '../api/use-integracoes';
 import { dataCurta } from '../lib/conquistas';
 import { irPara } from '../lib/navegar';
 import { urlDaSteamSegura } from '../lib/steam-url';
@@ -30,7 +30,7 @@ function LinhaVinculada({
   onAbrir: () => void;
 }) {
   const provedor = plataforma.id as Provedor;
-  const cache = usePerfilPlataforma(provedor, false);
+  const cache = useResumoPlataforma(provedor, false);
   const atualizado = cache.data ? atualizadoHaTexto(cache.data.consultadoEm) : null;
   const detalhe = atualizado ?? `Vinculada em ${dataCurta(conta.vinculadaEm) ?? '—'}`;
 

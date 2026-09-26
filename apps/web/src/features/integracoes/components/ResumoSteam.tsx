@@ -1,14 +1,27 @@
 import { useState } from 'react';
-import { type ContaVinculada, type PerfilPlataforma } from '@checkpoint/shared';
+import {
+  type ContaVinculada,
+  type ItemBiblioteca,
+  type ResumoContaPlataforma,
+} from '@checkpoint/shared';
 import { FieldError } from '@/shared/components/form-parts';
 import { Icon } from '@/shared/components/Icon';
 import { ModalDialog } from '@/shared/components/ModalDialog';
 import { describeAuthError } from '@/features/auth/lib/auth-errors';
-import { useAtualizarPerfil, useDesvincular, usePerfilPlataforma } from '../api/use-integracoes';
+import { GameForm } from '@/features/games/components/GameForm';
+import { useAtualizarResumo, useDesvincular, useResumoPlataforma } from '../api/use-integracoes';
 import { classificarFalhaDoCartao } from '../lib/estado-do-cartao';
 import { horasCurtas, textoDasConquistas } from '../lib/format';
-
 import { PROVEDOR_STEAM } from '../lib/provedores';
+import {
+  percentualDoBacklog,
+  textoDoBacklog,
+  textoDoStatus,
+  textoNoCheckpoint,
+} from '../lib/resumo';
+import { atualizadoHaTexto } from '../lib/tempo-relativo';
+import { BibliotecaSteamDialog } from './BibliotecaSteamDialog';
+
 const PROVEDOR = PROVEDOR_STEAM;
 
 const BOTAO =
@@ -23,6 +36,11 @@ export const PASSOS_DE_PRIVACIDADE = [
   'Espere alguns minutos (a Steam demora a aplicar) e toque em "Tentar de novo".',
 ] as const;
 
+/** A atribuição legal da Valve e a declaração de que o app não é afiliado a ela (spec, "Marca e logos"). */
+export const ATRIBUICAO_DA_VALVE =
+  '©2024 Valve Corporation. Steam and the Steam logo are trademarks and/or registered trademarks of Valve Corporation in the U.S. and/or other countries. All rights reserved.';
+export const NAO_AFILIADO = 'Não afiliado à Valve';
+
 export function Esqueleto({ rotulo }: { rotulo: string }) {
   return (
     <div role="status" aria-label={rotulo} className="flex flex-col gap-3 p-4">
@@ -33,13 +51,14 @@ export function Esqueleto({ rotulo }: { rotulo: string }) {
   );
 }
 
-function Cabecalho({ nome, avatarUrl }: { nome: string; avatarUrl?: string | null }) {
+function Cabecalho({ nome, resumo }: { nome: string; resumo?: ResumoContaPlataforma }) {
+  const status = resumo ? textoDoStatus(resumo.status, resumo.jogandoAgora) : null;
   return (
     <div className="flex min-w-0 items-center gap-3">
-      {avatarUrl ? (
+      {resumo?.avatarUrl ? (
         // Decorativo (o nome já está ao lado) e sem `Referer`: a imagem vem de um domínio da Steam.
         <img
-          src={avatarUrl}
+          src={resumo.avatarUrl}
           alt=""
           width={56}
           height={56}
@@ -50,9 +69,32 @@ function Cabecalho({ nome, avatarUrl }: { nome: string; avatarUrl?: string | nul
       ) : (
         <Icon name="account_circle" size={56} className="shrink-0 text-texto-suave" />
       )}
-      <div className="flex min-w-0 flex-col">
-        <span className="font-display text-[15px] font-bold text-texto-suave">Steam</span>
+      <div className="flex min-w-0 flex-col gap-0.5">
         <span className="text-[19px] font-semibold [overflow-wrap:anywhere]">{nome}</span>
+        {resumo?.membroDesde != null && (
+          <span className="text-[14px] font-medium text-texto-suave">
+            Na Steam desde {resumo.membroDesde}
+          </span>
+        )}
+        {status && (
+          <span
+            data-status-steam={resumo?.status ?? undefined}
+            className="text-[14px] font-semibold text-texto-suave"
+          >
+            {status}
+          </span>
+        )}
+        {resumo?.perfilUrl && (
+          <a
+            href={resumo.perfilUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex min-h-11 items-center gap-1 text-[14px] font-semibold text-destaque underline underline-offset-4"
+          >
+            Abrir perfil na Steam
+            <Icon name="open_in_new" size={16} />
+          </a>
+        )}
       </div>
     </div>
   );
@@ -112,10 +154,18 @@ function PerfilPrivado({
   );
 }
 
-function Estatistica({ rotulo, valor }: { rotulo: string; valor: string }) {
+function Estatistica({
+  rotulo,
+  valor,
+  className = '',
+}: {
+  rotulo: string;
+  valor: string;
+  className?: string;
+}) {
   return (
-    <div className="flex flex-col rounded-xl bg-painel-2 px-3 py-2.5">
-      <dt className="text-[14px] font-semibold uppercase tracking-[0.08em] text-texto-suave">
+    <div className={`flex flex-col rounded-xl bg-painel-2 px-3 py-2.5 ${className}`}>
+      <dt className="text-[13px] font-semibold uppercase tracking-[0.08em] text-texto-suave">
         {rotulo}
       </dt>
       <dd className="m-0 font-display text-[20px] font-bold">{valor}</dd>
@@ -123,38 +173,69 @@ function Estatistica({ rotulo, valor }: { rotulo: string; valor: string }) {
   );
 }
 
-function DadosDoPerfil({ perfil }: { perfil: PerfilPlataforma }) {
+const TITULO_BLOCO = 'm-0 text-[14px] font-semibold uppercase tracking-[0.08em] text-texto-suave';
+
+function DadosDoResumo({
+  resumo,
+  onVerBacklog,
+}: {
+  resumo: ResumoContaPlataforma;
+  onVerBacklog: () => void;
+}) {
+  const percentual = percentualDoBacklog(resumo.nuncaJogados, resumo.totalJogos);
   return (
-    <div className="flex flex-col gap-3">
-      <dl className="m-0 grid grid-cols-2 gap-2.5">
-        <Estatistica rotulo="Jogos" valor={String(perfil.totalJogos)} />
-        <Estatistica rotulo="Horas" valor={horasCurtas(perfil.minutosTotais)} />
+    <div className="flex flex-col gap-4">
+      <dl className="m-0 grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+        <Estatistica rotulo="Jogos" valor={String(resumo.totalJogos)} />
+        <Estatistica rotulo="Horas" valor={horasCurtas(resumo.minutosTotais)} />
+        <Estatistica rotulo="Já jogados" valor={`${resumo.jogosJogados} de ${resumo.totalJogos}`} />
       </dl>
-      <p className="m-0 text-[16px]">{textoDasConquistas(perfil.conquistas)}</p>
-      {perfil.totalJogos === 0 ? (
+
+      {resumo.totalJogos === 0 ? (
         <p className="m-0 text-[16px] text-texto-suave">Nenhum jogo na sua biblioteca.</p>
       ) : (
-        perfil.maisJogados.length > 0 && (
-          <div className="flex flex-col gap-1.5">
-            <h3 className="m-0 text-[14px] font-semibold uppercase tracking-[0.08em] text-texto-suave">
-              Mais jogados
-            </h3>
-            <ol className="m-0 flex list-none flex-col gap-1.5 p-0">
-              {perfil.maisJogados.map((jogo) => (
-                <li
-                  key={jogo.idExterno}
-                  className="flex min-w-0 items-baseline justify-between gap-3 text-[17px]"
-                >
-                  <span className="min-w-0 [overflow-wrap:anywhere]">{jogo.titulo}</span>
-                  <span className="shrink-0 font-semibold text-texto-suave">
-                    {horasCurtas(jogo.minutosJogados)}
-                  </span>
-                </li>
-              ))}
-            </ol>
-          </div>
-        )
+        <>
+          {resumo.maisJogados.length > 0 && (
+            <section aria-label="Mais jogados de sempre" className="flex flex-col gap-1.5">
+              <h3 className={TITULO_BLOCO}>Mais jogados</h3>
+              <ol className="m-0 flex list-none flex-col gap-1.5 p-0">
+                {resumo.maisJogados.map((jogo) => (
+                  <li
+                    key={jogo.idExterno}
+                    className="flex min-w-0 items-baseline justify-between gap-3 text-[17px]"
+                  >
+                    <span className="min-w-0 [overflow-wrap:anywhere]">{jogo.titulo}</span>
+                    <span className="shrink-0 font-semibold text-texto-suave">
+                      {horasCurtas(jogo.minutosJogados)}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            </section>
+          )}
+
+          <section aria-label="Backlog" className="flex flex-col gap-2">
+            <h3 className={TITULO_BLOCO}>Backlog</h3>
+            <p className="m-0 text-[17px]">
+              {textoDoBacklog(resumo.nuncaJogados)} · {percentual}%
+            </p>
+            {resumo.nuncaJogados > 0 && (
+              <button
+                type="button"
+                onClick={onVerBacklog}
+                className={`${BOTAO_CONTORNO} self-start`}
+              >
+                Ver e importar
+              </button>
+            )}
+          </section>
+        </>
       )}
+
+      <p className="m-0 text-[16px]">
+        {textoNoCheckpoint(resumo.noCheckpoint.ligados, resumo.noCheckpoint.naBiblioteca)}
+      </p>
+      <p className="m-0 text-[16px]">{textoDasConquistas(resumo.conquistas)}</p>
     </div>
   );
 }
@@ -210,19 +291,22 @@ function DesvincularDialog({
 }
 
 /**
- * O resumo da conta Steam dentro do popup (spec `integracao-plataformas`, etapa 2, agora no popup da aba Plataformas):
- * nome e avatar, jogos, horas, conquistas dos jogos vinculados e os mais jogados, com Atualizar e Desvincular (com
- * confirmação). Perfil privado mostra o passo a passo e "Tentar de novo"; falha da Steam e falta de conexão têm
- * mensagem própria.
+ * O resumo da conta Steam dentro do popup (spec `plataformas-e-pagina-do-jogo`, F4a): cabeçalho (avatar, nome, "Na Steam
+ * desde", status, link do perfil), números, mais jogados (5), backlog com "Ver e importar", "X dos seus Y jogos já estão
+ * no checkpoint", conquistas dos jogos vinculados e as ações (Atualizar, Importar jogos, Desvincular). Tudo vem do mesmo
+ * cache de 10 min do cartão: abrir o popup a quente não chama a Steam. Perfil privado mostra o passo a passo e "Tentar
+ * de novo"; falha da Steam e falta de conexão têm mensagem própria. O rodapé traz a atribuição legal da Valve.
  */
 export function ResumoSteam({ conta }: { conta: ContaVinculada }) {
-  const nomeGravado = conta.nomeExibicao;
-  const perfil = usePerfilPlataforma(PROVEDOR, true);
-  const atualizar = useAtualizarPerfil(PROVEDOR);
+  const resumo = useResumoPlataforma(PROVEDOR, true);
+  const atualizar = useAtualizarResumo(PROVEDOR);
   const desvincular = useDesvincular(PROVEDOR);
   const [confirmando, setConfirmando] = useState(false);
   const [erroAtualizar, setErroAtualizar] = useState('');
   const [erroDesvincular, setErroDesvincular] = useState('');
+  // A biblioteca aberta pelo popup: só o backlog ("Ver e importar") ou tudo ("Importar jogos").
+  const [importando, setImportando] = useState<'backlog' | 'todos' | null>(null);
+  const [criando, setCriando] = useState<ItemBiblioteca | null>(null);
 
   async function onAtualizar() {
     setErroAtualizar('');
@@ -243,22 +327,23 @@ export function ResumoSteam({ conta }: { conta: ContaVinculada }) {
     }
   }
 
-  const dados = perfil.data;
+  const dados = resumo.data;
   const falha = dados
     ? undefined
-    : perfil.isError
-      ? classificarFalhaDoCartao(perfil.error)
+    : resumo.isError
+      ? classificarFalhaDoCartao(resumo.error)
       : undefined;
-  const tentando = perfil.isFetching;
+  const tentando = resumo.isFetching;
+  const atualizado = dados ? atualizadoHaTexto(dados.consultadoEm) : null;
 
   return (
-    <div className="flex flex-col gap-4 p-4">
-      <Cabecalho nome={dados?.nomeExibicao ?? nomeGravado} avatarUrl={dados?.avatarUrl} />
+    <div className="flex flex-col gap-4 pb-1">
+      <Cabecalho nome={dados?.nomeExibicao ?? conta.nomeExibicao} resumo={dados} />
 
-      {perfil.isPending && <Esqueleto rotulo="Carregando sua conta Steam" />}
-      {dados && <DadosDoPerfil perfil={dados} />}
+      {resumo.isPending && <Esqueleto rotulo="Carregando sua conta Steam" />}
+      {dados && <DadosDoResumo resumo={dados} onVerBacklog={() => setImportando('backlog')} />}
       {falha === 'privado' && (
-        <PerfilPrivado onTentarDeNovo={() => void perfil.refetch()} tentando={tentando} />
+        <PerfilPrivado onTentarDeNovo={() => void resumo.refetch()} tentando={tentando} />
       )}
       {(falha === 'erro' || falha === 'sem-conexao') && (
         <Falha
@@ -267,13 +352,13 @@ export function ResumoSteam({ conta }: { conta: ContaVinculada }) {
               ? 'Sem conexão. Tente de novo quando a conexão voltar.'
               : 'Não foi possível falar com a Steam agora.'
           }
-          onTentarDeNovo={() => void perfil.refetch()}
+          onTentarDeNovo={() => void resumo.refetch()}
           tentando={tentando}
         />
       )}
 
       <FieldError id="steam-atualizar-erro" message={erroAtualizar} />
-      <div className="flex flex-wrap gap-2.5">
+      <div className="flex flex-wrap items-center gap-2.5">
         <button
           type="button"
           onClick={() => void onAtualizar()}
@@ -281,6 +366,9 @@ export function ResumoSteam({ conta }: { conta: ContaVinculada }) {
           className={BOTAO_CONTORNO}
         >
           {atualizar.isPending ? 'Atualizando…' : 'Atualizar'}
+        </button>
+        <button type="button" onClick={() => setImportando('todos')} className={BOTAO_CONTORNO}>
+          Importar jogos
         </button>
         <button
           type="button"
@@ -293,6 +381,12 @@ export function ResumoSteam({ conta }: { conta: ContaVinculada }) {
           Desvincular
         </button>
       </div>
+      {atualizado && <p className="m-0 text-[13px] font-medium text-texto-suave">{atualizado}</p>}
+
+      <footer className="flex flex-col gap-1 border-t border-borda pt-3 text-[12px] leading-snug text-texto-suave">
+        <p className="m-0">{ATRIBUICAO_DA_VALVE}</p>
+        <p className="m-0 font-semibold">{NAO_AFILIADO}</p>
+      </footer>
 
       <DesvincularDialog
         open={confirmando}
@@ -301,6 +395,31 @@ export function ResumoSteam({ conta }: { conta: ContaVinculada }) {
         desvinculando={desvincular.isPending}
         erro={erroDesvincular}
       />
+      <BibliotecaSteamDialog
+        open={importando !== null}
+        modo={{ tipo: 'novo' }}
+        soNuncaJogados={importando === 'backlog'}
+        onClose={() => setImportando(null)}
+        onCriar={(item) => {
+          setImportando(null);
+          setCriando(item);
+        }}
+        onVinculado={() => setImportando(null)}
+      />
+      <ModalDialog
+        open={criando !== null}
+        onClose={() => setCriando(null)}
+        labelledBy="game-dialog-title"
+      >
+        {criando && (
+          <GameForm
+            itemInicial={criando}
+            onDone={() => setCriando(null)}
+            onCancel={() => setCriando(null)}
+            onLinkedExisting={() => setCriando(null)}
+          />
+        )}
+      </ModalDialog>
     </div>
   );
 }

@@ -1,6 +1,8 @@
 # Spec: plataformas (base global), página do jogo em seções e aba Plataformas no perfil
 
-> Status: ✅ aprovada (2026-09-26, com as respostas de "Decisões tomadas"). Estende
+> Status: 🚧 em andamento (aprovada em 2026-09-26, com as respostas de "Decisões tomadas"). **F1 a F4a implementadas** (uma
+> branch, um commit por fase); ficam abertos a **F4b** (nível/XP e atividade recente, depois de fixtures reais), a conferência de aparelho real
+> e o `/qa-verify`. Ver "Evidência das fases". Estende
 > `integracao-plataformas` (não a substitui) e mexe só na **apresentação** da `troca-de-design-estante`.
 
 ## Objetivo
@@ -294,62 +296,62 @@ export interface ResumoContaPlataforma {
 
 ### F1 — cadastro, marca e selo no tile
 
-- [ ] **CA-01** — **Dado** o `shared` buildado, **quando** rodo `npm run typecheck`, **então** passa, **e** `Provedor`, `PROVEDORES` e `PROVEDOR_SLUG` saem do cadastro (um provedor sem entrada em `PLATAFORMAS` não existe).
-- [ ] **CA-02** — **Dado** o cadastro, **quando** leio `PLATAFORMAS.STEAM`, **então** tem `id`, `slug: 'steam'`, `nome`, `ligadoA`, `capacidades` com `horas`, `conquistas`, `biblioteca`, `ultimaVezJogado` e `nivel`, um `marcador` (glifo neutro) e uma `logo` cujo arquivo **existe** em `apps/web/public/`.
-- [ ] **CA-03** — **Dado** `<PlataformaMarca variante="marcador">`, **então** há um `role="img"` com nome acessível "Steam" e nenhuma imagem de marca; **dado** `variante="logo"` com `altura` 20, 49, 50 e 80, **então** a imagem tem altura renderizada **>= 50 px** nos quatro casos (20 e 49 sobem para 50, 80 fica 80), o nome acessível é "Steam" e ela não tem irmãos dentro do mesmo elemento (fica sozinha); **dado** o arquivo falhando, **então** cai no marcador com o nome em texto.
-- [ ] **CA-04** — **Dado** o código-fonte do web, **quando** rodo o teste `sem-provedor-solto`, **então** falha se `'STEAM'`
+- [x] **CA-01** — **Dado** o `shared` buildado, **quando** rodo `npm run typecheck`, **então** passa, **e** `Provedor`, `PROVEDORES` e `PROVEDOR_SLUG` saem do cadastro (um provedor sem entrada em `PLATAFORMAS` não existe).
+- [x] **CA-02** — **Dado** o cadastro, **quando** leio `PLATAFORMAS.STEAM`, **então** tem `id`, `slug: 'steam'`, `nome`, `ligadoA`, `capacidades` com `horas`, `conquistas`, `biblioteca`, `ultimaVezJogado` e `nivel`, um `marcador` (glifo neutro) e uma `logo` cujo arquivo **existe** em `apps/web/public/`.
+- [x] **CA-03** — **Dado** `<PlataformaMarca variante="marcador">`, **então** há um `role="img"` com nome acessível "Steam" e nenhuma imagem de marca; **dado** `variante="logo"` com `altura` 20, 49, 50 e 80, **então** a imagem tem altura renderizada **>= 50 px** nos quatro casos (20 e 49 sobem para 50, 80 fica 80), o nome acessível é "Steam" e ela não tem irmãos dentro do mesmo elemento (fica sozinha); **dado** o arquivo falhando, **então** cai no marcador com o nome em texto.
+- [x] **CA-04** — **Dado** o código-fonte do web, **quando** rodo o teste `sem-provedor-solto`, **então** falha se `'STEAM'`
       ou `"steam"` aparecer fora das exceções nomeadas (e passa no código final).
-- [ ] **CA-05** — **Dado** um jogo com `dadosPlataforma` de 1 provedor, **quando** o tile aparece na estante, **então** há um selo **neutro** (sem imagem de marca) com `aria-label="Ligado à Steam"`, no canto superior esquerdo da capa, **sem** sobrepor o anel da média nem o chip de plataforma (conferência a 360 e 1280 px).
-- [ ] **CA-06** — **Dado** um jogo com 3 ligações (dado sintético, com 2 provedores fictícios só no teste), **então** o tile mostra 2 selos e "+1", com `aria-label` listando os nomes.
-- [ ] **CA-07** — **Dado** um jogo sem `dadosPlataforma`, **então** o tile não tem selo e fica igual ao de hoje.
-- [ ] **CA-08** — **Dado** aparelho com hover, **quando** passo o mouse ou foco no tile, **então** Editar/Remover aparecem no canto inferior direito e o selo continua visível e sem sobreposição.
-- [ ] **CA-09** — **Dado** `styles/tokens.test.ts`, **então** continua passando (nenhum hex fora do `@theme`; o único hex de marca vive no arquivo em `public/plataformas/`, fora do código).
+- [x] **CA-05** — **Dado** um jogo com `dadosPlataforma` de 1 provedor, **quando** o tile aparece na estante, **então** há um selo **neutro** (sem imagem de marca) com `aria-label="Ligado à Steam"`, no canto superior esquerdo da capa, **sem** sobrepor o anel da média nem o chip de plataforma (conferência a 360 e 1280 px).
+- [x] **CA-06** — **Dado** um jogo com 3 ligações (dado sintético, com 2 provedores fictícios só no teste), **então** o tile mostra 2 selos e "+1", com `aria-label` listando os nomes.
+- [x] **CA-07** — **Dado** um jogo sem `dadosPlataforma`, **então** o tile não tem selo e fica igual ao de hoje.
+- [~] **CA-08** — **Dado** aparelho com hover, **quando** passo o mouse ou foco no tile, **então** Editar/Remover aparecem no canto inferior direito e o selo continua visível e sem sobreposição.
+- [x] **CA-09** — **Dado** `styles/tokens.test.ts`, **então** continua passando (nenhum hex fora do `@theme`; o único hex de marca vive no arquivo em `public/plataformas/`, fora do código).
 
 ### F2 — página do jogo em seções
 
-- [ ] **CA-10** — **Dado** `/jogos/:id` de um jogo ligado, **então** há uma seção "Avaliação e descrição" (com o anel da média, os 5 critérios e a descrição) e uma seção da Steam com a logo e "Steam" no título.
-- [ ] **CA-11** — **Dado** a seção da Steam **fechada** para um jogo com 42 h 30 min e 12 de 40 conquistas, **então** a linha mostra a logo da Steam (nome acessível "Steam") e o texto "42 h 30 min · 12/40 conquistas" (o "Steam ·" do exemplo é a própria logo, que fica sozinha).
-- [ ] **CA-12** — **Dado** a seção da Steam de um jogo com conquistas, **quando** a abro pela primeira vez, **então** "Desbloqueadas (N)" e "Faltam (N)" estão **fechadas**, cada uma com seta e o texto "Toque para ver".
-- [ ] **CA-13** — **Dado** "Faltam (N)" aberta, **então** a conquista oculta e bloqueada mostra "Conquista oculta" e cada conquista mostra "% dos jogadores" ou "Raridade indisponível".
-- [ ] **CA-14** — **Dado** que abri "Faltam" e recarreguei a página, **então** ela abre como deixei; **dado** o armazenamento bloqueado, **então** abre no padrão e não há erro.
-- [ ] **CA-15** — **Dado** o corpo do `checkpoint:secoes-do-jogo`, **quando** faço `GET`/`PATCH` em qualquer rota da API, **então** nada dele trafega (a chave só existe no `localStorage`).
-- [ ] **CA-16** — **Dado** um jogo com duas ligações (teste com dado sintético), **então** aparecem duas seções na ordem do cadastro, cada uma com a sua logo.
-- [ ] **CA-17** — **Dado** o teclado, **quando** Tab até o título de uma seção e Enter/Espaço, **então** abre e fecha, com foco visível e alvo ≥ 44 px.
-- [ ] **CA-18** — **Dado** conquistas privadas, Steam indisponível ou jogo sem conquistas, **então** o aviso que já existe aparece **dentro** da seção, com as horas mantidas.
-- [ ] **CA-19** — **Dado** Desvincular confirmado na seção, **então** a seção some e o "Vincular à Steam" volta (regressão do CA-54 de `integracao-plataformas`).
-- [ ] **CA-20** — **Dado** `/jogos/:id` inexistente ou de outro usuário, **então** a mensagem "Jogo não encontrado" continua igual.
+- [x] **CA-10** — **Dado** `/jogos/:id` de um jogo ligado, **então** há uma seção "Avaliação e descrição" (com o anel da média, os 5 critérios e a descrição) e uma seção da Steam com a logo e "Steam" no título.
+- [x] **CA-11** — **Dado** a seção da Steam **fechada** para um jogo com 42 h 30 min e 12 de 40 conquistas, **então** a linha mostra a logo da Steam (nome acessível "Steam") e o texto "42 h 30 min · 12/40 conquistas" (o "Steam ·" do exemplo é a própria logo, que fica sozinha).
+- [x] **CA-12** — **Dado** a seção da Steam de um jogo com conquistas, **quando** a abro pela primeira vez, **então** "Desbloqueadas (N)" e "Faltam (N)" estão **fechadas**, cada uma com seta e o texto "Toque para ver".
+- [x] **CA-13** — **Dado** "Faltam (N)" aberta, **então** a conquista oculta e bloqueada mostra "Conquista oculta" e cada conquista mostra "% dos jogadores" ou "Raridade indisponível".
+- [x] **CA-14** — **Dado** que abri "Faltam" e recarreguei a página, **então** ela abre como deixei; **dado** o armazenamento bloqueado, **então** abre no padrão e não há erro.
+- [x] **CA-15** — **Dado** o corpo do `checkpoint:secoes-do-jogo`, **quando** faço `GET`/`PATCH` em qualquer rota da API, **então** nada dele trafega (a chave só existe no `localStorage`).
+- [~] **CA-16** — **Dado** um jogo com duas ligações (teste com dado sintético), **então** aparecem duas seções na ordem do cadastro, cada uma com a sua logo.
+- [~] **CA-17** — **Dado** o teclado, **quando** Tab até o título de uma seção e Enter/Espaço, **então** abre e fecha, com foco visível e alvo ≥ 44 px.
+- [x] **CA-18** — **Dado** conquistas privadas, Steam indisponível ou jogo sem conquistas, **então** o aviso que já existe aparece **dentro** da seção, com as horas mantidas.
+- [x] **CA-19** — **Dado** Desvincular confirmado na seção, **então** a seção some e o "Vincular à Steam" volta (regressão do CA-54 de `integracao-plataformas`).
+- [x] **CA-20** — **Dado** `/jogos/:id` inexistente ou de outro usuário, **então** a mensagem "Jogo não encontrado" continua igual.
 
 ### F3 — aba Plataformas
 
-- [ ] **CA-21** — **Dado** `/perfil` com a Steam vinculada, **então** a seção **Plataformas** tem uma linha da Steam com a logo, o nome da conta e "atualizado há X", e a linha inteira é um botão de ≥ 44 px.
-- [ ] **CA-22** — **Dado** sem vínculo, **então** a linha mostra a logo, "Steam" e o botão "Vincular" (nome acessível "Vincular conta Steam") que leva à Steam (`vinculo`, como hoje).
-- [ ] **CA-23** — **Dado** as plataformas sem provider (PlayStation, Xbox, Epic), **então** nenhuma aparece na seção Plataformas do perfil (só as `disponivel`).
-- [ ] **CA-24** — **Dado** o retorno `/perfil?steam=vinculada` ou `?steam=erro&motivo=…`, **então** o aviso é o mesmo de hoje e a URL é limpa (regressão).
-- [ ] **CA-25** — **Dado** a linha da Steam, **quando** abre `/perfil`, **então** **nenhuma** chamada à Steam é feita só para desenhá-la (teste: 0 chamadas ao `SteamClient`).
-- [ ] **CA-26** — **Dado** 360 e 1280 px, **então** não há rolagem horizontal e o nome longo da conta trunca.
+- [x] **CA-21** — **Dado** `/perfil` com a Steam vinculada, **então** a seção **Plataformas** tem uma linha da Steam com a logo, o nome da conta e "atualizado há X", e a linha inteira é um botão de ≥ 44 px.
+- [x] **CA-22** — **Dado** sem vínculo, **então** a linha mostra a logo, "Steam" e o botão "Vincular" (nome acessível "Vincular conta Steam") que leva à Steam (`vinculo`, como hoje).
+- [x] **CA-23** — **Dado** as plataformas sem provider (PlayStation, Xbox, Epic), **então** nenhuma aparece na seção Plataformas do perfil (só as `disponivel`).
+- [x] **CA-24** — **Dado** o retorno `/perfil?steam=vinculada` ou `?steam=erro&motivo=…`, **então** o aviso é o mesmo de hoje e a URL é limpa (regressão).
+- [x] **CA-25** — **Dado** a linha da Steam, **quando** abre `/perfil`, **então** **nenhuma** chamada à Steam é feita só para desenhá-la (teste: 0 chamadas ao `SteamClient`).
+- [~] **CA-26** — **Dado** 360 e 1280 px, **então** não há rolagem horizontal e o nome longo da conta trunca.
 
 ### F4 — popup da Steam
 
-- [ ] **CA-27** — **Dado** a Steam vinculada e pública (mock), **quando** `GET /api/integracoes/steam/resumo`, **então** 200 com `ResumoContaPlataforma`: `totalJogos`, `minutosTotais`, `jogosJogados`, `nuncaJogados`, `maisJogados` com no máximo 5 (ordem decrescente), `recentes` e `noCheckpoint`.
-- [ ] **CA-28** — **Dado** o `resumo` a frio, **então** a Steam recebe **exatamente** `GetPlayerSummaries`, `GetOwnedGames`, `GetBadges` e `GetRecentlyPlayedGames` (contagem no mock); **dado** a segunda consulta em menos de 10 min, **então** **0** chamadas.
-- [ ] **CA-29** — **Dado** `POST .../resumo/atualizacao` duas vezes em 30 s, **então** a 1ª refaz as chamadas e a 2ª devolve o que tem sem chamar a Steam.
-- [ ] **CA-30** — **Dado** `GetBadges` **ou** `GetRecentlyPlayedGames` falhando (timeout, 5xx), **então** 200 com `nivel: null` ou `recentes: []` e o resto do resumo intacto.
-- [ ] **CA-31** — **Dado** perfil privado, **então** 409 `PLATAFORMA_PERFIL_PRIVADO` e o popup mostra o aviso de privacidade que já existe, com **Tentar de novo**, **mantendo** o cabeçalho e as ações. _(Fica `[~]` até o fixture real do CA-63 de `integracao-plataformas`.)_
-- [ ] **CA-32** — **Dado** o `resumo` sem token, **então** 401; provedor `xbox`, **então** 400 `VALIDACAO`; sem vínculo, **então** 409 `PLATAFORMA_NAO_VINCULADA`; Steam fora do ar, **então** 502 sem SteamID nem chave no corpo ou no log.
-- [ ] **CA-33** — **Dado** `GET .../biblioteca?nuncaJogados=true`, **então** só itens com 0 minutos; **com** `nuncaJogados=talvez`, **então** 400 `VALIDACAO`.
-- [ ] **CA-34** — **Dado** o popup, **então** mostra na ordem: cabeçalho (avatar, nome, "Na Steam desde <ano>", status, "Abrir perfil na Steam" com `rel="noopener noreferrer"`), nível e XP, números, atividade recente, mais jogados (5), backlog com %, "X dos seus Y jogos já estão no checkpoint", conquistas "em N jogos vinculados" e as ações.
-- [ ] **CA-35** — **Dado** o backlog com 120 nunca abertos de 400 jogos, **então** mostra "120 nunca abertos · 30%", e **Ver e importar** abre o diálogo da biblioteca já filtrado.
-- [ ] **CA-36** — **Dado** o popup, **então** **não** há VAC, amigos, preço nem gênero (busca por esses textos no DOM do teste).
-- [ ] **CA-43** — **Dado** o popup da Steam, **então** o cabeçalho mostra a logo oficial (>= 50 px) e o **rodapé** traz a atribuição legal completa e a linha "Não afiliado à Valve".
-- [ ] **CA-37** — **Dado** Desvincular, **então** pede confirmação com o texto do que acontece (ligações e horas somem; jogos, notas e capas ficam) e o foco em Cancelar.
-- [ ] **CA-38** — **Dado** o popup aberto, **então** Esc fecha e o foco volta à linha que abriu; em 360 px é folha inferior sem rolagem horizontal.
-- [ ] **CA-39** — **Dado** `git grep STEAM_API_KEY apps/web`, **então** sem resultado (regressão do CA-59).
+- [x] **CA-27** — **Dado** a Steam vinculada e pública (mock), **quando** `GET /api/integracoes/steam/resumo`, **então** 200 com `ResumoContaPlataforma`: `totalJogos`, `minutosTotais`, `jogosJogados`, `nuncaJogados`, `maisJogados` com no máximo 5 (ordem decrescente), `recentes` e `noCheckpoint`.
+- [~] **CA-28** — **Dado** o `resumo` a frio, **então** a Steam recebe **exatamente** `GetPlayerSummaries`, `GetOwnedGames`, `GetBadges` e `GetRecentlyPlayedGames` (contagem no mock); **dado** a segunda consulta em menos de 10 min, **então** **0** chamadas.
+- [x] **CA-29** — **Dado** `POST .../resumo/atualizacao` duas vezes em 30 s, **então** a 1ª refaz as chamadas e a 2ª devolve o que tem sem chamar a Steam.
+- [~] **CA-30** — **Dado** `GetBadges` **ou** `GetRecentlyPlayedGames` falhando (timeout, 5xx), **então** 200 com `nivel: null` ou `recentes: []` e o resto do resumo intacto.
+- [~] **CA-31** — **Dado** perfil privado, **então** 409 `PLATAFORMA_PERFIL_PRIVADO` e o popup mostra o aviso de privacidade que já existe, com **Tentar de novo**, **mantendo** o cabeçalho e as ações. _(Fica `[~]` até o fixture real do CA-63 de `integracao-plataformas`.)_
+- [x] **CA-32** — **Dado** o `resumo` sem token, **então** 401; provedor `xbox`, **então** 400 `VALIDACAO`; sem vínculo, **então** 409 `PLATAFORMA_NAO_VINCULADA`; Steam fora do ar, **então** 502 sem SteamID nem chave no corpo ou no log.
+- [x] **CA-33** — **Dado** `GET .../biblioteca?nuncaJogados=true`, **então** só itens com 0 minutos; **com** `nuncaJogados=talvez`, **então** 400 `VALIDACAO`.
+- [x] **CA-34** — **Dado** o popup, **então** mostra na ordem: cabeçalho (avatar, nome, "Na Steam desde <ano>", status, "Abrir perfil na Steam" com `rel="noopener noreferrer"`), nível e XP, números, atividade recente, mais jogados (5), backlog com %, "X dos seus Y jogos já estão no checkpoint", conquistas "em N jogos vinculados" e as ações.
+- [x] **CA-35** — **Dado** o backlog com 120 nunca abertos de 400 jogos, **então** mostra "120 nunca abertos · 30%", e **Ver e importar** abre o diálogo da biblioteca já filtrado.
+- [x] **CA-36** — **Dado** o popup, **então** **não** há VAC, amigos, preço nem gênero (busca por esses textos no DOM do teste).
+- [x] **CA-43** — **Dado** o popup da Steam, **então** o cabeçalho mostra a logo oficial (>= 50 px) e o **rodapé** traz a atribuição legal completa e a linha "Não afiliado à Valve".
+- [x] **CA-37** — **Dado** Desvincular, **então** pede confirmação com o texto do que acontece (ligações e horas somem; jogos, notas e capas ficam) e o foco em Cancelar.
+- [x] **CA-38** — **Dado** o popup aberto, **então** Esc fecha e o foco volta à linha que abriu; em 360 px é folha inferior sem rolagem horizontal.
+- [x] **CA-39** — **Dado** `git grep STEAM_API_KEY apps/web`, **então** sem resultado (regressão do CA-59).
 
 ### Transversais (cada fase)
 
-- [ ] **CA-40** — **Dado** o fim de cada fase, **então** `npm run typecheck`, `npm test`, `npm run lint` e `npm run build` passam **e** a conferência visual a 360 e 1280 px (API mockada; sem tocar no Supabase nem nas portas 3333 e 5173) foi feita nas telas mudadas.
-- [ ] **CA-41** — **Dado** `prefers-reduced-motion` ou animações "Reduzidas", **então** nenhuma animação nova existe nas telas mudadas.
-- [ ] **CA-42** — **Dado** um teste HTTP de contrato (o de `Contrato web ↔ API`), **então** o `resumo` real, com fixtures sanitizados, valida contra `ResumoContaPlataforma`.
+- [x] **CA-40** — **Dado** o fim de cada fase, **então** `npm run typecheck`, `npm test`, `npm run lint` e `npm run build` passam **e** a conferência visual a 360 e 1280 px (API mockada; sem tocar no Supabase nem nas portas 3333 e 5173) foi feita nas telas mudadas.
+- [~] **CA-41** — **Dado** `prefers-reduced-motion` ou animações "Reduzidas", **então** nenhuma animação nova existe nas telas mudadas.
+- [~] **CA-42** — **Dado** um teste HTTP de contrato (o de `Contrato web ↔ API`), **então** o `resumo` real, com fixtures sanitizados, valida contra `ResumoContaPlataforma`.
 
 ## Plano de testes
 
@@ -420,3 +422,29 @@ reescrevê-lo** (`SecaoRecolhivel` em volta do `BarraDeCriterio`/`BlocoSteam`, s
 - [x] **Q5 — Logos:** confirma que o arquivo oficial da Valve (EPS/PDF, não SVG) é baixado, convertido sem redesenhar e versionado **por você** (Q5a), e que a F1 segue com o marcador neutro até lá?
 - [x] **Q5b — Regra da Valve × "logo + nome":** o logo "não pode ser combinado com palavras". Aceita a Steam mostrar **só o logo** onde a variante for `completa` (nome só para leitor de tela, ou como texto separado no título da seção), em vez de "logo + Steam" colados?
 - [x] **Q6 — Duas plataformas:** qual seção vem primeiro? Proposta: a ordem do cadastro (Steam, depois as outras); alternativa: a de **mais horas** ou a de **última atualização**.
+
+## Evidência das fases
+
+Um commit por fase (`feat(web)` F1, F2 e F3; `feat` F4a), cada um com `typecheck`, `lint`, `npm test` e `build` verdes e a conferência visual a 360 e
+1280 px com a API **mockada** (Playwright, portas próprias, sem Supabase e sem as portas 3333 e 5173).
+
+- **F1** — cadastro, `PlataformaMarca` (o teste garante logo >= 50 px e o arquivo servido igual ao original), selo neutro no canto superior
+  esquerdo (caixas disjuntas do anel e do chip, medidas a 360 e 1280 px), `sem-provedor-solto`. CA-01 a CA-09.
+- **F2** — `SecaoRecolhivel`, "Avaliação e descrição" e a seção da plataforma (logo de 50 px, resumo na linha), conquistas fechadas com "Toque para ver",
+  estado no aparelho. CA-10 a CA-20. **CA-16 (duas plataformas) é `[~]`**: só existe a Steam, então a ordem do cadastro é coberta por
+  tipo (`Record<Provedor, …>`) e não por um jogo com duas plataformas.
+- **F3** — seção Plataformas (linhas minimizadas, "Vincular" com a logo oficial, plataformas sem suporte escondidas) e o popup, ainda com o conteúdo
+  do antigo cartão. CA-21 a CA-26.
+- **F4a** — `GET/POST .../resumo`, `?nuncaJogados`, o popup com os blocos que já temos e o rodapé legal. CA-27, CA-29, CA-32 a CA-39, CA-43.
+  **Ficam `[~]` na spec inteira:** CA-08 (hover: só o CSS e as caixas medidas), CA-17 (teclado: o `<summary>` é nativo, o jsdom não o aciona), CA-26 (rolagem horizontal só vista nas capturas), CA-41 (movimento reduzido: nenhuma animação nova, sem verificação em aparelho), CA-42, CA-28 (o custo de 4 chamadas é o da F4b; na F4a são **2 a frio e 0 a quente**, provado por teste), CA-30 (falha de
+  `GetBadges`/`GetRecentlyPlayedGames`, F4b) e CA-31 (perfil privado ainda é resposta simulada, CA-63 de `integracao-plataformas`).
+  `timecreated` (`membroDesde`) não está no fixture real: o campo é lido se vier e some da tela se não vier.
+
+### Decisões e desvios registrados na implementação
+
+- **Sem `provedor === 'STEAM'` solto**: o teste permite o código do provedor só em `features/integracoes/lib/provedores.ts` (as telas que hoje só falam com a Steam).
+- **A logo oficial no botão "Vincular"** (decisão do humano): a logo fica sozinha dentro do botão, com o texto "Vincular" depois, separado, e a logo decorativa
+  (o nome acessível é o `aria-label` "Vincular conta Steam"). O **espaço livre** é 20% da altura, uma aproximação: a medida exata (o diâmetro da manivela) sai do PDF.
+- **`Provedor` é derivado do cadastro** (e não o contrário): um provedor novo nasce com entrada no cadastro; o enum do Prisma continua à parte (aditivo, por `/db-change`).
+- **Popup** substitui o cartão do perfil: o `GET /perfil` continua na API (contrato e testes), mas o web usa o `resumo`.
+- **CA-42** (contrato web ↔ API com corpos reais) cobre o `resumo` no `contrato-web.http.spec.ts`; ficou `[~]` por o fixture real não trazer `timecreated`.

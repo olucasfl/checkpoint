@@ -1,4 +1,9 @@
-import { type AvisoPlataforma, type Conquista, type Provedor } from '@checkpoint/shared';
+import {
+  type AvisoPlataforma,
+  type Conquista,
+  type Provedor,
+  type StatusNaPlataforma,
+} from '@checkpoint/shared';
 
 /** Quem é o usuário na plataforma, sem os dados de jogo. */
 export interface PerfilBasico {
@@ -7,6 +12,11 @@ export interface PerfilBasico {
   perfilUrl: string | null;
   /** `false` quando o perfil é privado: a biblioteca e as conquistas não vêm. */
   publico: boolean;
+  /** O ano de criação da conta; só com o perfil público e só se a plataforma o devolver. */
+  membroDesdeAno?: number | null;
+  status?: StatusNaPlataforma | null;
+  /** O jogo em andamento, quando `status` é `jogando`. */
+  jogandoAgora?: string | null;
 }
 
 /** Um item da biblioteca do usuário, do jeito neutro da plataforma. */

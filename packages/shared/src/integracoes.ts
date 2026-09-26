@@ -66,6 +66,43 @@ export interface PerfilPlataforma {
   consultadoEm: string; // ISO 8601
 }
 
+/** Como a pessoa aparece na plataforma agora. `jogando` = em jogo (a plataforma diz qual). */
+export type StatusNaPlataforma = 'online' | 'offline' | 'jogando';
+
+/**
+ * O que o popup da plataforma mostra (spec `plataformas-e-pagina-do-jogo`, F4a). Tudo sai da biblioteca e do perfil
+ * que o cartão já consultava (mesmo cache) e do que está gravado no banco: nenhuma chamada nova à plataforma.
+ * `membroDesde` e `status` só vêm com o perfil público (`null` quando a plataforma não os devolve).
+ */
+export interface ResumoContaPlataforma {
+  provedor: Provedor;
+  nomeExibicao: string;
+  avatarUrl: string | null;
+  perfilUrl: string | null;
+  /** O ano em que a conta foi criada. */
+  membroDesde: number | null;
+  status: StatusNaPlataforma | null;
+  /** O nome do jogo em andamento; só com `status: 'jogando'`. */
+  jogandoAgora: string | null;
+  totalJogos: number;
+  minutosTotais: number;
+  /** Jogos com mais de 0 minutos. */
+  jogosJogados: number;
+  /** O backlog: jogos com 0 minutos (`totalJogos - jogosJogados`). */
+  nuncaJogados: number;
+  /** Até 5, do mais jogado para o menos. */
+  maisJogados: {
+    idExterno: string;
+    titulo: string;
+    capaUrl: string | null;
+    minutosJogados: number;
+  }[];
+  /** `ligados` dos `naBiblioteca` jogos da biblioteca já estão ligados a um jogo do catálogo. */
+  noCheckpoint: { ligados: number; naBiblioteca: number };
+  conquistas: { desbloqueadas: number; total: number; jogosVinculados: number };
+  consultadoEm: string; // ISO 8601
+}
+
 /** A camada da plataforma sobre um jogo do catálogo (o último valor gravado). */
 export interface DadosJogoPlataforma {
   provedor: Provedor;

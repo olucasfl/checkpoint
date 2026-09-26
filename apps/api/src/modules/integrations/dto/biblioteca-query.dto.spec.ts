@@ -66,4 +66,18 @@ describe('BibliotecaQueryDto (CA-23)', () => {
   it('um campo desconhecido é 400 (o pipe global recusa o que o DTO não declara)', async () => {
     await expect(parse({ userId: 'outro' })).rejects.toBeInstanceOf(BadRequestException);
   });
+
+  it.each([
+    ['true', true],
+    ['false', false],
+  ])('aceita nuncaJogados=%s (só true ou false, em texto)', async (texto, valor) => {
+    await expect(parse({ nuncaJogados: texto })).resolves.toMatchObject({ nuncaJogados: valor });
+  });
+
+  it.each([['talvez'], ['1'], ['0'], ['TRUE'], [''], [['true', 'false']], [{ a: 1 }]])(
+    'rejeita nuncaJogados %p com fields.nuncaJogados',
+    async (nuncaJogados) => {
+      expect((await camposDoErro({ nuncaJogados }))?.nuncaJogados).toEqual(expect.any(String));
+    },
+  );
 });

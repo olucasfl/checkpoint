@@ -50,6 +50,9 @@ export const INTEGRACOES_VINCULO_LIMIT = { limit: 5, ttl: 60_000 } as const;
 /** Quantos jogos "mais jogados" o cartão do perfil mostra. */
 export const MAIS_JOGADOS_NO_CARTAO = 3;
 
+/** Quantos "mais jogados de sempre" o popup da plataforma mostra. */
+export const MAIS_JOGADOS_NO_RESUMO = 5;
+
 // A biblioteca do diálogo "Buscar na Steam": sem paginação, a busca e o limite mantêm a resposta pequena.
 export const BIBLIOTECA_LIMITE_PADRAO = 30;
 export const BIBLIOTECA_LIMITE_MAXIMO = 50;

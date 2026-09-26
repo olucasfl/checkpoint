@@ -343,7 +343,7 @@ apps/api/src/modules/games/
 - `integrations/` — integrações com plataformas de jogos (spec `docs/specs/integracao-plataformas.md`, **etapas 1 a 4**: a base, o **vínculo da conta com o cartão do perfil**, a **biblioteca**, o **vínculo de jogo** e o **detalhe do jogo** com horas e a lista de conquistas). Prefixo `/api/integracoes`, tag Swagger `integracoes`. Rotas (todas protegidas
   pelo guard global, **exceto o retorno**): `GET /` (contas vinculadas), `POST :provedor/vinculo`,
   `GET :provedor/retorno` (`@Public()`), `DELETE :provedor`, `GET :provedor/perfil` e
-  `POST :provedor/perfil/atualizacao`, `GET :provedor/biblioteca`, `PUT :provedor/jogos/:jogoId` (200), `GET :provedor/jogos/:jogoId` (o detalhe), `POST :provedor/jogos/:jogoId/atualizacao` e `DELETE :provedor/jogos/:jogoId` (204). O `:provedor` é o _slug_ minúsculo (`steam`), validado pelo
+  `POST :provedor/perfil/atualizacao`, **`GET :provedor/resumo` e `POST :provedor/resumo/atualizacao`** (o popup da conta), `GET :provedor/biblioteca` (com `?nuncaJogados=true|false`, o backlog), `PUT :provedor/jogos/:jogoId` (200), `GET :provedor/jogos/:jogoId` (o detalhe), `POST :provedor/jogos/:jogoId/atualizacao` e `DELETE :provedor/jogos/:jogoId` (204). O `:provedor` é o _slug_ minúsculo (`steam`), validado pelo
   `ProvedorSlugPipe` (400 `VALIDACAO`).
   - **`GameProvider`** (`providers/game-provider.ts`) é a interface que cada plataforma implementa
     (`iniciarVinculo`, `concluirVinculo`, `listarBiblioteca` — que devolve também o perfil, porque o cartão do
@@ -417,6 +417,15 @@ indisponivel|ja-vinculada`, sem SteamID nem `state` na URL. A ordem é a defesa:
     biblioteca (cache de 10 min); as **conquistas são a soma dos jogos vinculados, já gravada no banco**, sem
     chamada extra (`{ desbloqueadas, total, jogosVinculados }`). `POST .../perfil/atualizacao` ignora o cache, mas
     no máximo uma consulta a cada 30 s: antes disso devolve o que tem, sem chamar a Steam.
+  - **O resumo da conta (popup da aba Plataformas; spec `plataformas-e-pagina-do-jogo`, F4a)**: `GET :provedor/resumo` e `POST
+:provedor/resumo/atualizacao` (mesmo intervalo de 30 s do cartão) devolvem `ResumoContaPlataforma`: totais e horas, `jogosJogados` e
+    `nuncaJogados` (0 minutos, o backlog), o top 5, `noCheckpoint` (`ligados` dos `naBiblioteca`: a **interseção** entre os `JogoPlataforma` do
+    banco e os itens da biblioteca atual), as conquistas dos vinculados (banco) e, só com o perfil público, `membroDesde` (ano de `timecreated`) e
+    `status` (`online`, `offline` ou `jogando`, por `personastate` e `gameextrainfo`). **Nenhuma chamada nova à Steam**: sai da biblioteca e do
+    perfil do MESMO cache de 10 min (`obterBiblioteca`), então o popup custa 2 chamadas a frio (as mesmas do cartão) e **zero a quente**; o
+    cartão e o popup dividem o cache. `timecreated` não está no fixture real (CA-63): o campo é lido se vier e vira `null` se não. Nível/XP
+    (`GetBadges`) e atividade recente (`GetRecentlyPlayedGames`) são a **F4b**, depois de fixtures reais. `nuncaJogados` é booleano estrito
+    (só `true` ou `false`, senão 400 `VALIDACAO` com `fields.nuncaJogados`).
   - **Biblioteca e vínculo de jogo (etapa 3)**: `GET :provedor/biblioteca?busca=&limite=` (padrão 30, máximo 50, busca de
     até 100 caracteres, sem paginação) lê a biblioteca do **mesmo cache de 10 min por SteamID** do cartão do perfil
     (`obterBiblioteca`; erro não entra no cache), ordena por horas e traz `jogosParecidos` (mesma `chaveDeTitulo`, até 3,
@@ -597,7 +606,7 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
   ou oficial sob `.destaque-scrim`, senão a cor gerada; a coluna de texto tem no máximo 50%; o cartão **cresce** em vez de cortar o texto
   se a fonte de reserva alargar os chips; no celular o `<Link>` cobre o cartão inteiro e o texto "Ver detalhes" vira `sr-only`),
   `Prateleira` (`<section>` + `<ul aria-label>`; **grade de colunas do tamanho da capa** (no celular também, sem rolar de lado; no filtro Todos só os 4 primeiros jogos de cada prateleira aparecem, com "Ver mais (N)" que troca o filtro para o status dela); no celular cada prateleira é um cartão (`painel`, borda) com o título sublinhado na cor do status; o botão-bloco "Adicionar em …" fecha a lista e abre o `GameForm` com
-  `statusInicial` = o status dela, enquanto o "Adicionar jogo" do topo mantém o padrão), `GameTile` e `AnelDeNota`. **Editar e Remover**
+  `statusInicial` = o status dela, enquanto o "Adicionar jogo" do topo mantém o padrão), `GameTile` e `AnelDeNota`. **Selo das plataformas** (spec `plataformas-e-pagina-do-jogo`, F1): `SeloDePlataformas` no canto **superior esquerdo** da capa (o anel é o superior direito, o chip de plataforma o inferior esquerdo e as ações o inferior direito): um marcador NEUTRO por ligação (glifo do cadastro, sem marca registrada), na ordem do cadastro, até 2 e depois "+N", com um `role="img"` "Ligado à Steam" (`lib/selo.ts`). **Editar e Remover**
   ficam em `.tile-acoes`: `display: none` por padrão (em toque nem existem na tela, e o caminho é abrir o jogo) e, **só dentro de
   `@media (hover: hover)`**, aparecem em `:hover` e `:focus-within`, junto da elevação de −6 px e do anel; a variante `movimento-reduzido`
   tira o `transform` e as transições (o anel continua). `StatusFilter` são pílulas de 44 px (a ativa com fundo `texto`); no desktop o grupo
@@ -614,6 +623,7 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
   quando ela veio do app (o catálogo volta com o filtro) ou vai a `/` num link direto (`location.key === 'default'`).
   Carregando: esqueleto (`DetailLoading`, `role="status"`); id inexistente **ou de outro usuário** (a lista só
   traz os dele): "Jogo não encontrado" com link para `/`, a mesma mensagem nos dois casos, sem revelar o id.
+- **Página do jogo em seções** (spec `plataformas-e-pagina-do-jogo`, F2): o cabeçalho (capa, título, chips, anel, Editar/Excluir) não mudou; abaixo dele, `SecaoRecolhivel` (`shared/components/`: `<details>` nativo, seta que gira sem transição e o resumo na linha fechada) embrulha **"Avaliação e descrição"** (h2; "Avaliação" e "Descrição" viram h3; resumo "Média 8,3 · 5 de 5 critérios" ou "Sem nota"; aberta por padrão) e, por plataforma ligada, `SecoesDasPlataformas` (`features/integracoes/`: um `Record<Provedor, …>` com o corpo de cada plataforma, na ordem do cadastro). O estado aberto/fechado fica **só no aparelho**: `checkpoint:secoes-do-jogo` (`shared/lib/secoes.ts`, escopo `dispositivo`, `Record<string, boolean>` por TIPO de seção, não por jogo), lido por `useSecaoAberta`, que só grava quando a pessoa muda (montar não grava o padrão).
 - **Plataforma** é uma seleção das plataformas mais usadas, agrupadas por família; a API continua
   aceitando texto livre, e uma plataforma antiga fora da lista vira opção extra na edição.
 - **Diálogos** são `<dialog>` nativo com `showModal()` (`shared/components/ModalDialog`): Esc fecha, o
@@ -810,7 +820,7 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
 - **`/perfil`** (dentro do `RequireAuth` + `AppLayout`; etapa 5): **uma coluna** centralizada (`max-w-[640px]`, sem
   grid de duas colunas), seções separadas por espaço e divisores finos, contêineres `rounded-2xl` sem borda. Ordem:
   **Cabeçalho**; **Conta** (`ListaDeLinhas` de `LinhaConta.tsx`: **Trocar senha** → `/perfil/senha`, **Sessões ativas**
-  e **Sair**, linhas de 56 px com ícone, rótulo e seta; **sem repetir o nome**); **Contas vinculadas** (o cartão Steam, §5.13; spec `integracao-plataformas`);
+  e **Sair**, linhas de 56 px com ícone, rótulo e seta; **sem repetir o nome**); **Plataformas** (linhas por plataforma e o popup, §5.13; specs `integracao-plataformas` e `plataformas-e-pagina-do-jogo`);
   **Preferências** (uma linha,
   "Preferências do aparelho", com o resumo "Cor · Densidade" de `resumoDasPreferencias`, que abre o modal de
   §5.12); **Instalar app** (só quando dá); **Zona de perigo** (discreta, no fim). **Sessões ativas** é uma linha
@@ -915,17 +925,30 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
 
 ### 5.13 Integrações no web (`features/integracoes/`, spec `docs/specs/integracao-plataformas.md`, etapas 2 a 4)
 
-- **`/perfil`** ganha a seção **Contas vinculadas** (`ContasVinculadas`, entre "Conta" e "Preferências"), com o
-  **cartão Steam** (`ContaSteamCard`). Dados pelo `apiClient` (`api/integracoes-api.ts`) e TanStack Query
-  (`['integracoes', 'contas']` e `['integracoes', 'perfil', provedor]`, esta só habilitada com conta vinculada e
-  **sem _retry_**: 409 e 502 se resolvem com "Tentar de novo", não com repetição automática).
-- **Estados do cartão**: carregando (esqueleto com `role="status"`); sem vínculo (**Vincular conta**); vinculado
-  (nome, avatar, jogos, horas, "X conquistas em N jogos vinculados" e os 3 mais jogados, com **Atualizar** e
-  **Desvincular**, este com confirmação no `<dialog>` e o foco em Cancelar); **perfil privado** ("Seu perfil Steam
-  está privado", passo a passo numerado e **Tentar de novo**); falha da Steam e sem conexão (mensagem própria e
-  **Tentar de novo**; o nome gravado, Atualizar e Desvincular seguem na tela). Biblioteca vazia: "Nenhum jogo na sua
-  biblioteca". Falha ao atualizar mantém os números que já estavam. Botões com `min-h-11`; avatar decorativo
-  (`alt=""`, `referrerPolicy="no-referrer"`, `width`/`height`); só classes de token do tema (nenhum hex novo).
+- **`/perfil`** ganha a seção **Plataformas** (`PlataformasDoPerfil`, entre "Conta" e "Preferências"; antes, "Contas vinculadas" com o cartão
+  Steam): uma linha por plataforma **com suporte** (`plataformasDisponiveis()` do cadastro; as outras não aparecem, nem "Em breve"). Vinculada:
+  linha minimizada (marcador neutro, nome da plataforma, nome da conta e "Atualizado há X" só do que já está no cache, ou "Vinculada em
+  dd/mm/aaaa"; **desenhar a linha nunca chama a plataforma**), toda ela um botão de 56 px que abre o **popup** (`PlataformaDialog`, `<dialog>` nativo com a
+  logo oficial no título e "Fechar"; o conteúdo é `Record<Provedor, …>`). Não vinculada: nome e o botão **Vincular** (nome acessível "Vincular
+  conta Steam") com a **logo oficial** dentro (>= 50 px). Dados pelo `apiClient` (`api/integracoes-api.ts`) e TanStack Query (`['integracoes',
+'contas']` e `['integracoes', 'resumo', provedor]`, esta só habilitada com conta vinculada e **sem _retry_**: 409 e 502 se resolvem com
+  "Tentar de novo").
+- **Marca da plataforma** (spec `plataformas-e-pagina-do-jogo`, F1): o cadastro `PLATAFORMAS` (`packages/shared/src/plataformas.ts`: `id`,
+  `slug`, `nome`, `ligadoA`, `disponivel`, `capacidades`, `marcador` e `logo`) é a fonte de `Provedor`, `PROVEDORES` e `PROVEDOR_SLUG`.
+  `PlataformaMarca` (`shared/components/`) é o único lugar que desenha plataforma: `marcador` (glifo NEUTRO, sem marca registrada, para selos e
+  botões pequenos) e `logo` (a marca oficial, **sozinha**, com espaço livre ao redor e **nunca abaixo de 50 px de altura**: um valor menor sobe para
+  50; sem arquivo, ou se ele falhar, cai no marcador com o nome). A logo da Steam é o vetor extraído do PDF oficial da Valve, sem alteração
+  (`docs/design/plataformas/steam/`, o inverso branco em `apps/web/public/plataformas/steam-logo.svg`; um teste compara os dois byte a byte). Só
+  `features/integracoes/lib/provedores.ts` escreve o código do provedor à mão (`sem-provedor-solto.test.ts`).
+- **Popup da Steam** (`ResumoSteam`, F4a): cabeçalho (avatar decorativo, nome, "Na Steam desde <ano>", status, "Abrir perfil na Steam" com `rel="noopener
+noreferrer"`), números (jogos, horas, "já jogados"), mais jogados (5), backlog ("N nunca abertos · P%" e **Ver e importar**, que abre o
+  `BibliotecaSteamDialog` só com os nunca abertos e, em "Criar jogo", o `GameForm` com `itemInicial`), "X dos seus Y jogos já estão no checkpoint",
+  conquistas dos vinculados e as ações (**Atualizar** com "Atualizado há X", **Importar jogos**, **Desvincular** com confirmação), mais o rodapé com a
+  **atribuição legal da Valve** e "Não afiliado à Valve". Perfil privado: o aviso e o passo a passo de sempre, mantendo o cabeçalho e as ações. Sem
+  VAC, amigos, preço nem gênero. Nível/XP e atividade recente ficam para a F4b.
+- **Estados do popup**: carregando (esqueleto com `role="status"`); perfil privado ("Seu perfil Steam está privado", passo a passo e **Tentar de novo**);
+  falha da Steam e sem conexão (mensagem própria e **Tentar de novo**; o nome gravado, Atualizar e Desvincular seguem). Biblioteca vazia: "Nenhum jogo na
+  sua biblioteca". Falha ao atualizar mantém os números que já estavam. Botões com `min-h-11`; só classes de token do tema (nenhum hex novo).
 - **Vincular**: `POST vinculo` com **`withCredentials: true` só nesta chamada** (em produção o `/api` é do mesmo
   site pelo rewrite da Vercel e não muda nada; em dev, localhost:5173 → :3333, o navegador só aceita o cookie
   `checkpoint_vinculo` com ele). O navegador só vai à URL devolvida se ela for a tela de login da Steam
@@ -949,10 +972,9 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
   ao salvar cria o jogo e **só depois** liga (falha da ligação: jogo salvo, formulário passa a editar, o próximo Salvar
   reenvia sem 409); a confirmação de plataforma vem **antes** de criar qualquer coisa. A página do jogo tem **Vincular à
   Steam** (modo `vincular`). Ligar invalida `['games']` e o cartão do perfil.
-- **Horas e conquistas (etapa 4)**: a página `/jogos/:id` de um jogo ligado ganha o bloco **Steam** (`BlocoSteam`, dentro do
-  `GameDetail`): o cabeçalho com o ícone, "Steam" (`h2`) e **"Atualizado há 12 minutos"** (`lib/tempo-relativo.ts`, `Intl.RelativeTimeFormat` pt-BR, a partir do `atualizadoEm` do dado; "agora" abaixo de 1 min; nunca "Invalid Date"), três cartões de dados ("Tempo jogado na Steam" "42 h 30 min", "Último jogo em" dd/mm/aaaa ou "Nunca jogado", "Conquistas · 12 de 40" com a barra `role="progressbar"` em `ouro` e a porcentagem), **Atualizar**, **Desvincular** (confirmação; só a camada da Steam some: título, status, notas e capa
-  ficam, e **Vincular à Steam** volta) e **Abrir na Steam** (`rel="noopener noreferrer"`). A lista tem dois `<details>`:
-  **Desbloqueadas** (fechada, por data decrescente) e **Faltam** (aberta, da mais comum à mais rara), com contador, ícone de 52 px (`width`/`height`/`loading="lazy"`; cadeado ou `visibility_off` sem ícone), nome, descrição ("Conquista oculta" se oculta e bloqueada), data e "12,4% dos jogadores" (ou "Raridade indisponível"); uma coluna no celular e, a partir de 1024 px, as duas listas lado a lado. O detalhe **só é pedido nesta página**
+- **Horas e conquistas (etapa 4)**: a página `/jogos/:id` de um jogo ligado ganha a seção **Steam** (`BlocoSteam`, uma `SecaoRecolhivel` aberta por padrão, com a **logo oficial** de 50 px sozinha no `h2` e o resumo "42 h 30 min · 12/40 conquistas" na linha fechada): dentro dela, **"Atualizado há 12 minutos"** (`lib/tempo-relativo.ts`, `Intl.RelativeTimeFormat` pt-BR, a partir do `atualizadoEm` do dado; "agora" abaixo de 1 min; nunca "Invalid Date"), três cartões de dados ("Tempo jogado na Steam" "42 h 30 min", "Último jogo em" dd/mm/aaaa ou "Nunca jogado", "Conquistas · 12 de 40" com a barra `role="progressbar"` em `ouro` e a porcentagem), **Atualizar**, **Desvincular** (confirmação; só a camada da Steam some: título, status, notas e capa
+  ficam, e **Vincular à Steam** volta) e **Abrir na Steam** (`rel="noopener noreferrer"`). A lista tem dois `<details>`,
+  **os dois FECHADOS por padrão**, com seta e "Toque para ver" ("Toque para fechar" aberto) e o estado guardado no aparelho: **Desbloqueadas** (por data decrescente) e **Faltam** (da mais comum à mais rara), com contador, ícone de 52 px (`width`/`height`/`loading="lazy"`; cadeado ou `visibility_off` sem ícone), nome, descrição ("Conquista oculta" se oculta e bloqueada), data e "12,4% dos jogadores" (ou "Raridade indisponível"); uma coluna no celular e, a partir de 1024 px, as duas listas lado a lado. O detalhe **só é pedido nesta página**
   (`useDetalheJogo`, sem _retry_; abrir `/` não faz nenhuma request de conquistas) e os valores novos entram direto no cache do
   catálogo (`comDadosAtualizados`). Enquanto carrega, mostra o último valor gravado; os avisos são discretos: conquistas privadas
   (horas mantidas, sem barra), perfil privado e Steam indisponível (valor antigo mantido). Sem nenhuma animação nova.
@@ -961,7 +983,7 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
 - **Precedência da capa** (`lib/capa.ts` + `GameCover`): a enviada, depois a oficial (`library_600x900.jpg`), depois o
   `header.jpg` do mesmo app (derivado da URL oficial, só na CDN conhecida) e por fim a gerada (cor e inicial). O `GameCover` tenta
   a próxima quando uma falha ao carregar (`onError`); nada é gravado, então remover a enviada faz a oficial reaparecer.
-- **Testes** (Vitest): `components/BlocoSteam.test.tsx`, `lib/capa.test.ts`, `lib/conquistas.test.ts`, `games/components/GameCover.test.tsx`, `components/BibliotecaSteamDialog.test.tsx`, `lib/biblioteca.test.ts`, `games/components/GameForm.steam.test.tsx`, `components/ContaSteamCard.test.tsx` (todos os estados, o desvio da URL fora da Steam, o
+- **Testes** (Vitest): `components/BlocoSteam.test.tsx`, `lib/capa.test.ts`, `lib/conquistas.test.ts`, `games/components/GameCover.test.tsx`, `components/BibliotecaSteamDialog.test.tsx`, `lib/biblioteca.test.ts`, `games/components/GameForm.steam.test.tsx`, `components/PlataformasDoPerfil.test.tsx` (as linhas, o popup e todos os estados, o desvio da URL fora da Steam, o
   diálogo, Atualizar, privacidade), `lib/lib.test.ts` (URL da Steam, avisos, horas, classificação),
   `pages/PerfilPage.test.tsx` (a seção entre Conta e Preferências e os avisos do retorno; a API de integrações é
   mockada).
@@ -1008,14 +1030,14 @@ antes de `api`/`web` (§2). Hoje tem:
   puras (`normalizeEmail`, `utf8ByteLength`, `passwordProblem`), `API_ERROR_CODES`/`ApiErrorCode` (com
   `SESSAO_ATUAL` e `SESSAO_NAO_ENCONTRADA`; o web tem um texto para cada, e o `Record<ApiErrorCode, string>`
   quebra o `typecheck` se faltar) e `CSRF_HEADER`.
-- `integracoes.ts` — contrato das integrações com plataformas (spec `integracao-plataformas`): `PROVEDORES`/
-  `Provedor` (`STEAM`) e `PROVEDOR_SLUG`, as constantes `ATUALIZACAO_AUTOMATICA_MS` (1 h) e
-  `ATUALIZACAO_MANUAL_MIN_MS` (30 s), os tipos (`ContaVinculada`, `ItemBiblioteca`, `PerfilPlataforma`,
+- `plataformas.ts` — o **cadastro global de plataformas** (spec `plataformas-e-pagina-do-jogo`): `PLATAFORMAS`/`PlataformaInfo` (id, slug, nome, `ligadoA`, `disponivel`, `capacidades`, `marcador` neutro, `logo` oficial), `plataformaPorId`, `temCapacidade`, `plataformasDisponiveis`, `ALTURA_MINIMA_DA_LOGO_PX` (50) e, **derivados dele**, `Provedor`, `PROVEDORES` e `PROVEDOR_SLUG`. Só dados, sem `window`, Node nem Prisma.
+- `integracoes.ts` — contrato das integrações com plataformas (spec `integracao-plataformas`): as constantes `ATUALIZACAO_AUTOMATICA_MS` (1 h) e
+  `ATUALIZACAO_MANUAL_MIN_MS` (30 s), os tipos (`ContaVinculada`, `ItemBiblioteca`, `PerfilPlataforma`, **`ResumoContaPlataforma`** (o popup) e `StatusNaPlataforma`,
   `DadosJogoPlataforma`, `Conquista`, `DetalheJogoPlataforma`, `AvisoPlataforma`, `VincularJogoRequest`,
   `PlataformaItemJaVinculadoError`…) e a função pura `chaveDeTitulo` (compara títulos sem caixa, acento, ™ ® © nem
   pontuação, **por igualdade**; só os acentos combinados do latim são tirados, para "ペ" não virar "ヘ").
   `API_ERROR_CODES` (em `auth.ts`) ganhou os nove `PLATAFORMA_*`, cada um com texto no web.
-- `index.ts` — reexporta `auth`, `games` e `integracoes` e mantém dois exemplos herdados do esqueleto
+- `index.ts` — reexporta `auth`, `games`, `integracoes` e `plataformas` e mantém dois exemplos herdados do esqueleto
   (`HealthCheckResponse`, `APP_NAME`).
 
 O que entra aqui: tipos de request/response compartilhados entre API e web, enums de domínio,

@@ -39,6 +39,7 @@ import {
   type DetalheJogoPlataforma,
   type ItemBiblioteca,
   type PerfilPlataforma,
+  type ResumoContaPlataforma,
   type Provedor,
 } from '@checkpoint/shared';
 import { Public } from '../../common/decorators/public.decorator';
@@ -57,6 +58,7 @@ import {
   DetalheJogoPlataformaDto,
   ItemBibliotecaDto,
   PerfilPlataformaDto,
+  ResumoContaPlataformaDto,
 } from './dto/integracao-response.dto';
 import {
   INTEGRACOES_LIMIT,
@@ -218,6 +220,56 @@ export class IntegrationsController {
     return this.integrations.perfil(user.id, provedor);
   }
 
+  @Get(':provedor/resumo')
+  @Header('cache-control', 'no-store')
+  @ApiOperation({
+    summary:
+      'O resumo da conta para o popup: totais, backlog, mais jogados e a ligação com o catálogo',
+    description:
+      'Sem chamada nova à plataforma: usa a biblioteca e o perfil do mesmo cache de 10 min do cartão e o que já ' +
+      'está gravado no banco. `membroDesde` e `status` só vêm com o perfil público.',
+  })
+  @ApiParam(PROVEDOR_PARAM)
+  @ApiOkResponse({ type: ResumoContaPlataformaDto })
+  @ApiBadRequestResponse({ type: ApiErrorResponseDto, description: '`VALIDACAO`' })
+  @ApiConflictResponse({
+    type: ApiErrorResponseDto,
+    description: '`PLATAFORMA_NAO_VINCULADA` ou `PLATAFORMA_PERFIL_PRIVADO`',
+  })
+  @ApiUnauthorizedResponse({ type: ApiErrorResponseDto })
+  @ApiTooManyRequestsResponse({ type: ApiErrorResponseDto, description: '`LIMITE_TENTATIVAS`' })
+  @ApiResponse502()
+  resumo(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('provedor', ProvedorSlugPipe) provedor: Provedor,
+  ): Promise<ResumoContaPlataforma> {
+    return this.integrations.resumo(user.id, provedor);
+  }
+
+  @Post(':provedor/resumo/atualizacao')
+  @HttpCode(HttpStatus.OK)
+  @Header('cache-control', 'no-store')
+  @ApiOperation({
+    summary: 'Atualiza o resumo (ignora o cache, no máximo uma consulta a cada 30 s)',
+    description: 'Antes de 30 s da última consulta, devolve o que já tem, sem chamar a plataforma.',
+  })
+  @ApiParam(PROVEDOR_PARAM)
+  @ApiOkResponse({ type: ResumoContaPlataformaDto })
+  @ApiBadRequestResponse({ type: ApiErrorResponseDto, description: '`VALIDACAO`' })
+  @ApiConflictResponse({
+    type: ApiErrorResponseDto,
+    description: '`PLATAFORMA_NAO_VINCULADA` ou `PLATAFORMA_PERFIL_PRIVADO`',
+  })
+  @ApiUnauthorizedResponse({ type: ApiErrorResponseDto })
+  @ApiTooManyRequestsResponse({ type: ApiErrorResponseDto, description: '`LIMITE_TENTATIVAS`' })
+  @ApiResponse502()
+  atualizarResumo(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('provedor', ProvedorSlugPipe) provedor: Provedor,
+  ): Promise<ResumoContaPlataforma> {
+    return this.integrations.resumo(user.id, provedor, { atualizar: true });
+  }
+
   @Get(':provedor/biblioteca')
   @Header('cache-control', 'no-store')
   @ApiOperation({
@@ -233,7 +285,7 @@ export class IntegrationsController {
   @ApiBadRequestResponse({
     type: ApiErrorResponseDto,
     description:
-      '`VALIDACAO`: provedor desconhecido, `busca` com mais de 100 caracteres ou `limite` fora de 1 a 50',
+      '`VALIDACAO`: provedor desconhecido, `busca` com mais de 100 caracteres, `limite` fora de 1 a 50 ou `nuncaJogados` que não é `true` nem `false`',
   })
   @ApiConflictResponse({
     type: ApiErrorResponseDto,

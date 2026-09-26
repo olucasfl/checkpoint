@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { type AvisoPlataforma, type Conquista } from '@checkpoint/shared';
+import { type AvisoPlataforma, type Conquista, type StatusNaPlataforma } from '@checkpoint/shared';
 import { CarregadorEmCache } from '../cache/carregador-em-cache';
 import {
   ACHIEVEMENT_SCHEMA_CACHE_TTL_MS,
@@ -133,6 +133,9 @@ export class SteamProvider implements GameProvider {
         avatarUrl: avatarUrlSeguro(perfil.avatarUrl),
         perfilUrl: perfilUrlSeguro(perfil.perfilUrl),
         publico: true,
+        membroDesdeAno: anoDaCriacao(perfil.criadoEmUnix),
+        status: statusDaSteam(perfil.estado, perfil.jogandoAgora),
+        jogandoAgora: perfil.jogandoAgora ?? null,
       },
     };
   }
@@ -297,4 +300,26 @@ export class SteamProvider implements GameProvider {
     const aparado = (nome ?? '').trim();
     return aparado === '' ? NOME_PADRAO_DA_CONTA : aparado.slice(0, NOME_MAX);
   }
+}
+
+/** O ano (UTC) de `timecreated`; ausente ou inválido vira `null`. */
+export function anoDaCriacao(criadoEmUnix: number | null | undefined): number | null {
+  if (typeof criadoEmUnix !== 'number' || !Number.isFinite(criadoEmUnix) || criadoEmUnix <= 0) {
+    return null;
+  }
+  return new Date(criadoEmUnix * 1000).getUTCFullYear();
+}
+
+/** `gameextrainfo` presente = em jogo; senão `personastate` 0 é offline e qualquer outro valor é online. */
+export function statusDaSteam(
+  estado: number | null | undefined,
+  jogandoAgora: string | null | undefined,
+): StatusNaPlataforma | null {
+  if (jogandoAgora) {
+    return 'jogando';
+  }
+  if (typeof estado !== 'number') {
+    return null;
+  }
+  return estado === 0 ? 'offline' : 'online';
 }
