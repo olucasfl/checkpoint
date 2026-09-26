@@ -79,7 +79,6 @@ describe('tokens de cor (CA-87)', () => {
       'borda-controle',
       'texto',
       'texto-suave',
-      'apagado',
       'apagado-2',
       'acento',
       'destaque',
@@ -99,7 +98,7 @@ describe('tokens de cor (CA-87)', () => {
       expect(theme, `token --color-${token}`).toContain(`--color-${token}:`);
     }
     // Os tokens do tema neon saíram de vez (CA-01): nem alias sobrou.
-    for (const removido of ['magenta', 'ciano', 'vermelho-neon', 'painel-hover']) {
+    for (const removido of ['magenta', 'ciano', 'vermelho-neon', 'painel-hover', 'apagado']) {
       expect(theme, `token --color-${removido}`).not.toContain(`--color-${removido}:`);
     }
     // Valores da tabela da spec `troca-de-design-estante`.

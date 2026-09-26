@@ -12,9 +12,6 @@ import { useTemContaSteam } from '@/features/integracoes/api/use-integracoes';
 import { BibliotecaSteamDialog } from '@/features/integracoes/components/BibliotecaSteamDialog';
 import { ListError } from '@/features/games/components/ListStates';
 
-const ACAO =
-  'flex min-h-11 items-center gap-2 rounded-xl border px-4 font-display text-[13px] font-semibold uppercase tracking-[0.1em]';
-
 /**
  * `/jogos/:id` (spec avaliacao-de-jogos, etapa 3). Não há rota nova na API: o jogo é achado na query `['games']`
  * que o catálogo já usa (a lista de uma pessoa é pequena). Carregando: esqueleto. Id inexistente ou de outro
@@ -46,48 +43,15 @@ export function GameDetailPage() {
 
   return (
     <div className="safe-x pb-24 pt-6 md:pb-16 md:pt-10">
-      <main className="relative mx-auto flex max-w-[1000px] flex-col gap-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <button
-            type="button"
-            onClick={voltar}
-            className="flex min-h-11 items-center gap-2 rounded-xl px-2 text-[16px] font-semibold text-texto-suave hover:text-destaque"
-          >
-            <Icon name="arrow_back" size={22} />
-            Voltar
-          </button>
-
-          {game && (
-            <div data-acoes-do-jogo className="flex flex-wrap gap-2">
-              {temContaSteam === true && game.dadosPlataforma.length === 0 && (
-                <button
-                  type="button"
-                  onClick={() => setVinculando(true)}
-                  className={`${ACAO} border-borda-controle hover:bg-acao-hover`}
-                >
-                  <Icon name="link" size={20} />
-                  Vincular à Steam
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={() => setEditing(true)}
-                className={`${ACAO} border-borda-controle hover:bg-acao-hover`}
-              >
-                <Icon name="edit" size={20} />
-                Editar
-              </button>
-              <button
-                type="button"
-                onClick={() => setRemoving(true)}
-                className={`${ACAO} border-erro text-erro hover:bg-acao-hover`}
-              >
-                <Icon name="delete" size={20} />
-                Excluir
-              </button>
-            </div>
-          )}
-        </div>
+      <main className="relative mx-auto flex max-w-[1168px] flex-col gap-6">
+        <button
+          type="button"
+          onClick={voltar}
+          className="flex min-h-11 items-center gap-1.5 self-start rounded-full px-1 font-bold text-texto-suave transition-colors hover:text-texto"
+        >
+          <Icon name="arrow_back" size={20} />
+          Voltar
+        </button>
 
         {game && temContaSteam === false && game.dadosPlataforma.length === 0 && (
           <p className="m-0 text-[16px] text-texto-suave">
@@ -104,7 +68,25 @@ export function GameDetailPage() {
           <ListError onRetry={() => void refetch()} offline={connection !== 'online'} />
         )}
         {data !== undefined && !game && <GameNotFound />}
-        {game && <GameDetail game={game} onEdit={() => setEditing(true)} />}
+        {game && (
+          <GameDetail
+            game={game}
+            onEdit={() => setEditing(true)}
+            onRemove={() => setRemoving(true)}
+            acoesExtras={
+              temContaSteam === true && game.dadosPlataforma.length === 0 ? (
+                <button
+                  type="button"
+                  onClick={() => setVinculando(true)}
+                  className="flex h-12 items-center gap-2 rounded-full border border-borda-controle px-[22px] font-display text-[15px] font-bold transition-colors hover:bg-painel-3"
+                >
+                  <Icon name="link" size={20} />
+                  Vincular à Steam
+                </button>
+              ) : null
+            }
+          />
+        )}
       </main>
 
       <ModalDialog open={editing} onClose={() => setEditing(false)} labelledBy="game-dialog-title">

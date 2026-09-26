@@ -21,8 +21,6 @@
   --color-borda-controle: #606a8e;
   --color-texto: #eef2ff;
   --color-texto-suave: #a3abc7;
-  /* Só decorativo (segmentos vazios da nota, até a F2 tirar a barra de segmentos): nunca cor de texto. */
-  --color-apagado: #3a4468;
   /* Só controle desabilitado: nunca cor de texto (3,78:1 sobre painel). */
   --color-apagado-2: #6b7391;
   /* Acento padrão. O `destaque` é o que a pessoa troca no /perfil (html[data-destaque], abaixo). */
@@ -269,6 +267,11 @@ button:disabled {
       var(--color-texto) calc(var(--pct) * 1%),
       color-mix(in srgb, var(--color-fundo) 60%, transparent) 0
     );
+  }
+
+  /* Anel da média do detalhe: arco `destaque` sobre o trilho `borda` (>= 4,64:1). */
+  .anel-nota-grande {
+    background: conic-gradient(var(--color-destaque) calc(var(--pct) * 1%), var(--color-borda) 0);
   }
 
   .capa-iniciais {

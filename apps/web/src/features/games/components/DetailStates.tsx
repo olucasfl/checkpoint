@@ -10,7 +10,7 @@ export function DetailLoading() {
       aria-busy="true"
       className="flex flex-col gap-6 lg:flex-row lg:gap-10"
     >
-      <div className="skeleton aspect-square w-full max-w-[320px] self-center rounded-[4px] lg:self-start" />
+      <div className="skeleton aspect-[3/4] w-full max-w-[300px] self-center rounded-[20px] lg:self-start" />
       <div className="flex flex-1 flex-col gap-4">
         <div className="skeleton h-9 w-2/3 rounded-md" />
         <div className="skeleton h-6 w-1/3 rounded-md" />

@@ -42,3 +42,20 @@ describe('AnelDeNota (CA-21)', () => {
     expect(screen.getByRole('img')).toHaveClass('anel-nota', 'rounded-full');
   });
 });
+
+describe('AnelDeNota grande, o do detalhe (CA-42)', () => {
+  it('é a mesma imagem "Nota 8,6 de 10", com o número e "de 10", e o arco em `destaque`', () => {
+    const { container } = render(<AnelDeNota nota={8.6} tamanho="grande" />);
+
+    const anel = screen.getByRole('img', { name: 'Nota 8,6 de 10' });
+    expect(anel).toHaveClass('anel-nota-grande', 'size-[92px]');
+    expect(anel.style.getPropertyValue('--pct')).toBe('86');
+    expect(container).toHaveTextContent('8,6de 10');
+  });
+
+  it('sem média, sem anel', () => {
+    const { container } = render(<AnelDeNota nota={null} tamanho="grande" />);
+
+    expect(container).toBeEmptyDOMElement();
+  });
+});
