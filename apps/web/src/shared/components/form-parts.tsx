@@ -1,10 +1,10 @@
 import { type ReactNode } from 'react';
 import { Icon } from '@/shared/components/Icon';
 
-export const LABEL = 'text-sm font-bold uppercase tracking-[0.22em] text-texto-suave';
+export const LABEL = 'text-[13px] font-bold uppercase tracking-[0.14em] text-texto-suave';
 
 const INPUT_BASE =
-  'h-12 rounded-[4px] border bg-fundo px-3.5 font-corpo text-[19px] font-semibold text-texto placeholder:text-texto-suave';
+  'h-[52px] rounded-xl border bg-fundo px-3.5 font-corpo text-base font-semibold text-texto placeholder:text-texto-suave focus:border-destaque focus:shadow-[0_0_0_3px_color-mix(in_srgb,var(--color-destaque)_35%,transparent)]';
 
 /** Contorno de controle em `borda-controle`; com erro, borda `erro`, brilho e o tremer curto. */
 export function inputClass(hasError: boolean): string {

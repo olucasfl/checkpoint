@@ -57,7 +57,7 @@ describe('GameCover em pé, 3:4 (CA-37, CA-38, CA-41)', () => {
     ['tile', ['w-[132px]', 'md:w-[150px]', 'aspect-[3/4]']],
     ['tileCompacto', ['w-[108px]', 'md:w-[120px]', 'aspect-[3/4]']],
     ['detalhe', ['max-w-[300px]', 'aspect-[3/4]']],
-    ['preview', ['w-[72px]', 'aspect-[3/4]']],
+    ['preview', ['w-14', 'aspect-[3/4]']],
   ] as const)('a capa gerada %s é em pé (3:4)', (variant, classes) => {
     const { container } = render(
       <GameCover titulo="Hollow Knight" capaUrl={null} variant={variant} />,

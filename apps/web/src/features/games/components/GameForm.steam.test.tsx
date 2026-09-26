@@ -88,7 +88,7 @@ async function buscarECriar(user: ReturnType<typeof userEvent.setup>) {
   await user.click(await screen.findByRole('button', { name: /Criar jogo: Jogo Sintetico/ }));
 }
 
-const salvar = () => screen.getByRole('button', { name: 'SALVAR' });
+const salvar = () => screen.getByRole('button', { name: 'Salvar' });
 
 beforeEach(() => {
   vi.resetAllMocks();
@@ -136,6 +136,21 @@ describe('GameForm — buscar na Steam (jogo novo)', () => {
     expect(screen.getByLabelText('Título')).toHaveValue('Jogo Sintetico');
   });
 
+  it('o cartão "Ligado à Steam" mostra as horas, a capa oficial em pé só como prévia, e "Trocar" reabre a busca (CA-49)', async () => {
+    const { user } = renderForm();
+    await buscarECriar(user);
+
+    expect(screen.getByText('1 h 30 min. A capa oficial é só prévia.')).toBeInTheDocument();
+    expect(screen.getByText('Prévia da capa oficial da Steam')).toBeInTheDocument();
+    const miniatura = document.querySelector('img[src="https://cdn.steamstatic.com/capa.jpg"]');
+    expect(miniatura).toHaveAttribute('width', '44');
+    expect(miniatura).toHaveAttribute('height', '58');
+
+    await user.click(screen.getByRole('button', { name: 'Trocar' }));
+    expect(await screen.findByRole('button', { name: /Criar jogo: Jogo Sintetico/ })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Remover ligação' })).toBeInTheDocument();
+  });
+
   it('0 minutos sugere "Quero jogar" (e nunca "Zerado")', async () => {
     integ.biblioteca.mockResolvedValue([item({ minutosJogados: 0 })]);
     const { user } = renderForm();
@@ -180,7 +195,7 @@ describe('GameForm — buscar na Steam (jogo novo)', () => {
       await screen.findByText(/O jogo foi salvo, mas não foi ligado à Steam/),
     ).toBeInTheDocument();
     expect(onDone).not.toHaveBeenCalled();
-    expect(screen.getByText('EDITAR JOGO')).toBeInTheDocument();
+    expect(screen.getByText('Editar jogo')).toBeInTheDocument();
 
     await user.click(salvar());
 

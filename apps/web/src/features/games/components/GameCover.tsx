@@ -42,7 +42,7 @@ const FORMA: Record<Variante, Forma> = {
     anel: '-bottom-[70px] -left-[60px] size-[280px] border-[40px]',
   },
   preview: {
-    caixa: 'w-[72px] aspect-[3/4] rounded-lg',
+    caixa: 'w-14 aspect-[3/4] rounded-lg',
     iniciais: 'left-2 top-1.5 text-[24px]',
   },
 };

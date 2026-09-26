@@ -1,4 +1,4 @@
-import { GAME_STATUS, type GameStatus } from '@checkpoint/shared';
+import { type GameStatus } from '@checkpoint/shared';
 import { Icon } from '@/shared/components/Icon';
 import { STATUS_META } from '../lib/status-meta';
 import { LABEL } from '@/shared/components/form-parts';
@@ -8,7 +8,10 @@ interface StatusPickerProps {
   onChange: (status: GameStatus) => void;
 }
 
-/** Status como 3 botões com ícone e aria-pressed: exatamente um fica ativo. */
+/** A ordem da estante e dos filtros (o formulário antigo usava Zerado, Jogando, Quero jogar). */
+const ORDEM: readonly GameStatus[] = ['JOGANDO', 'QUERO_JOGAR', 'ZERADO'];
+
+/** Status como 3 botões de 52 px com ícone e aria-pressed: exatamente um fica ativo (fundo `texto`, texto `fundo`). */
 export function StatusPicker({ value, onChange }: StatusPickerProps) {
   return (
     <div className="flex flex-col gap-2">
@@ -16,7 +19,7 @@ export function StatusPicker({ value, onChange }: StatusPickerProps) {
         Status
       </div>
       <div role="group" aria-labelledby="f-status" className="grid grid-cols-3 gap-2">
-        {GAME_STATUS.map((status) => {
+        {ORDEM.map((status) => {
           const meta = STATUS_META[status];
           const pressed = status === value;
 
@@ -26,13 +29,13 @@ export function StatusPicker({ value, onChange }: StatusPickerProps) {
               type="button"
               aria-pressed={pressed}
               onClick={() => onChange(status)}
-              className={`flex min-h-16 flex-col items-center justify-center gap-1 rounded-[4px] border text-[15px] font-bold uppercase tracking-[0.08em] ${
+              className={`flex h-[52px] items-center justify-center gap-1.5 rounded-xl border px-1 font-display text-[13px] font-bold transition-colors sm:gap-2 sm:text-[15px] ${
                 pressed
-                  ? `${meta.border} ${meta.text} ${meta.tint}`
+                  ? 'border-transparent bg-texto text-fundo'
                   : 'border-borda-controle bg-fundo text-texto-suave hover:text-texto'
               }`}
             >
-              <Icon name={meta.icon} size={22} filled={pressed} />
+              <Icon name={meta.icon} size={20} filled={pressed} />
               {meta.label}
             </button>
           );

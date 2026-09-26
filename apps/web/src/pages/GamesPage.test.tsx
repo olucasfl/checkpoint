@@ -146,7 +146,7 @@ describe('estante e contagens (CA-13, CA-14, CA-27)', () => {
     await user.click(screen.getByRole('button', { name: 'Adicionar jogo' }));
     await user.type(await screen.findByLabelText('Título'), 'Novo');
     await user.click(screen.getByRole('button', { name: 'Jogando' }));
-    await user.click(screen.getByRole('button', { name: 'SALVAR' }));
+    await user.click(screen.getByRole('button', { name: 'Salvar' }));
 
     await aparece('Novo');
     expect(
@@ -211,7 +211,7 @@ describe('destaque e contagens acompanham a edição, sem recarregar (CA-19, CA-
     api.update.mockResolvedValue(editado);
     api.list.mockResolvedValue([editado, alfa, gama]);
     await user.click(screen.getByRole('button', { name: 'Editar Beta' }));
-    await user.click(await screen.findByRole('button', { name: 'SALVAR' }));
+    await user.click(await screen.findByRole('button', { name: 'Salvar' }));
 
     await waitFor(() => expect(destaqueTitulo()).toBe('Beta'));
   });
@@ -235,7 +235,7 @@ describe('destaque e contagens acompanham a edição, sem recarregar (CA-19, CA-
     api.list.mockResolvedValue([novo, ...dois]);
     await user.click(screen.getByRole('button', { name: 'Adicionar jogo' }));
     await user.type(await screen.findByLabelText('Título'), 'Delta');
-    await user.click(screen.getByRole('button', { name: 'SALVAR' }));
+    await user.click(screen.getByRole('button', { name: 'Salvar' }));
     await waitFor(() => expect(filterButton(/^Todos ?4$/)).toBeInTheDocument());
     expect(filterButton(/^Jogando ?3$/)).toBeInTheDocument();
     expect(contador('Jogando agora')).toBe('3');
@@ -267,7 +267,7 @@ describe('"Adicionar" ao fim da prateleira (CA-14)', () => {
 
     await user.click(screen.getByRole('button', { name: 'Adicionar em Zerados' }));
 
-    expect(await screen.findByRole('heading', { name: 'NOVO JOGO' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Novo jogo' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Zerado' })).toHaveAttribute('aria-pressed', 'true');
   });
 
@@ -277,7 +277,7 @@ describe('"Adicionar" ao fim da prateleira (CA-14)', () => {
 
     await user.click(screen.getByRole('button', { name: 'Adicionar jogo' }));
 
-    await screen.findByRole('heading', { name: 'NOVO JOGO' });
+    await screen.findByRole('heading', { name: 'Novo jogo' });
     expect(screen.getByRole('button', { name: 'Quero jogar' })).toHaveAttribute(
       'aria-pressed',
       'true',
@@ -515,7 +515,7 @@ describe('tile do jogo (CA-15 a CA-19)', () => {
 
     await user.click(screen.getByRole('button', { name: 'Editar Hollow Knight' }));
 
-    expect(await screen.findByRole('heading', { name: 'EDITAR JOGO' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Editar jogo' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Celeste' })).toBeInTheDocument();
   });
 
@@ -555,7 +555,7 @@ describe('diálogos (CA-42, CA-49)', () => {
 
     await user.click(screen.getByRole('button', { name: 'Adicionar jogo' }));
 
-    expect(await screen.findByRole('heading', { name: 'NOVO JOGO' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Novo jogo' })).toBeInTheDocument();
     expect(screen.getByLabelText('Título')).toHaveValue('');
   });
 
@@ -590,7 +590,7 @@ describe('diálogos (CA-42, CA-49)', () => {
 
     await user.click(screen.getByRole('button', { name: 'Editar Celeste' }));
 
-    expect(await screen.findByRole('heading', { name: 'EDITAR JOGO' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Editar jogo' })).toBeInTheDocument();
     expect(screen.getByLabelText('Título')).toHaveValue('Celeste');
   });
 
@@ -619,7 +619,7 @@ describe('?novo=1 abre o formulário de novo jogo (pwa-e-mobile CA-04)', () => {
   it('abre o diálogo vazio e tira só o "novo" da URL, mantendo o filtro', async () => {
     renderPage('/?status=ZERADO&novo=1');
 
-    expect(await screen.findByRole('heading', { name: 'NOVO JOGO' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Novo jogo' })).toBeInTheDocument();
     expect(screen.getByLabelText('Título')).toHaveValue('');
     await waitFor(() => expect(screen.getByTestId('search')).toHaveTextContent('?status=ZERADO'));
     expect(screen.getByTestId('search').textContent).not.toContain('novo');
@@ -629,7 +629,7 @@ describe('?novo=1 abre o formulário de novo jogo (pwa-e-mobile CA-04)', () => {
     renderPage('/');
     await aparece('Celeste');
 
-    expect(screen.queryByRole('heading', { name: 'NOVO JOGO' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Novo jogo' })).not.toBeInTheDocument();
   });
 });
 
@@ -697,12 +697,12 @@ describe('sem conexão (pwa-e-mobile CA-23, CA-24)', () => {
     await aparece('Celeste');
 
     await user.click(screen.getByRole('button', { name: 'Editar Celeste' }));
-    await user.click(await screen.findByRole('button', { name: 'SALVAR' }));
+    await user.click(await screen.findByRole('button', { name: 'Salvar' }));
 
     expect(await screen.findByText(OFFLINE_NOT_SAVED)).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'EDITAR JOGO' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Editar jogo' })).toBeInTheDocument();
     expect(screen.getByLabelText('Título')).toHaveValue('Celeste');
-    expect(screen.getByRole('button', { name: 'SALVAR' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Salvar' })).toBeEnabled();
   });
 
   it('remover sem resposta: mesma mensagem, confirmação aberta e o jogo continua na lista', async () => {

@@ -13,6 +13,7 @@ import { usePrefs } from '@/shared/hooks/use-prefs';
 import { describeAuthError } from '@/features/auth/lib/auth-errors';
 import { useTemContaSteam, useVincularJogo } from '@/features/integracoes/api/use-integracoes';
 import { BibliotecaSteamDialog } from '@/features/integracoes/components/BibliotecaSteamDialog';
+import { horasEMinutos } from '@/features/integracoes/lib/conquistas';
 import {
   PLATAFORMA_PADRAO,
   precisaConfirmarPlataforma,
@@ -51,6 +52,9 @@ interface GameFormProps {
 }
 
 const NO_ERROR: FormError = { message: '', fields: {} };
+
+const BOTAO_PEQUENO =
+  'min-h-11 rounded-full border border-borda-controle px-4 font-display text-sm font-bold transition-colors hover:bg-painel-3';
 
 /**
  * Formulário de criar/editar (o mesmo componente, aberto no diálogo). Salva o jogo primeiro e só
@@ -218,24 +222,24 @@ export function GameForm({
 
   return (
     <form onSubmit={submit} noValidate className="flex flex-col gap-4 p-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         <h2
           id="game-dialog-title"
-          className="m-0 flex items-center gap-2.5 font-display text-xl font-extrabold tracking-[0.12em]"
+          className="m-0 flex items-center gap-2.5 font-display text-[26px] font-extrabold"
         >
           <Icon
             name={editing ? 'edit_square' : 'add_box'}
-            size={26}
+            size={28}
             filled
             className="text-destaque"
           />
-          {editing ? 'EDITAR JOGO' : 'NOVO JOGO'}
+          {editing ? 'Editar jogo' : 'Novo jogo'}
         </h2>
         <button
           type="button"
           aria-label="Fechar"
           onClick={onCancel}
-          className="grid size-11 place-items-center rounded-[4px] text-texto-suave transition-colors hover:bg-acao-hover hover:text-destaque"
+          className="grid size-11 shrink-0 place-items-center rounded-full text-texto-suave transition-colors hover:bg-painel-3 hover:text-texto"
         >
           <Icon name="close" size={24} />
         </button>
@@ -246,39 +250,50 @@ export function GameForm({
       {!editing && temContaSteam === true && (
         <div className="flex flex-col gap-2">
           {ligacao ? (
-            <div className="flex flex-wrap items-center gap-3 rounded-xl bg-painel-2 p-3">
+            <div className="flex flex-wrap items-center gap-3 rounded-2xl bg-painel-2 p-3.5">
               {ligacao.capaUrl && (
                 // Só prévia (decorativa, sem `Referer`): a capa oficial NÃO é salva com o jogo.
                 <img
                   src={ligacao.capaUrl}
                   alt=""
-                  width={92}
-                  height={43}
+                  width={44}
+                  height={58}
                   referrerPolicy="no-referrer"
-                  className="h-[43px] w-[92px] shrink-0 rounded-md bg-fundo object-cover"
+                  className="h-[58px] w-11 shrink-0 rounded-lg bg-fundo object-cover"
                 />
               )}
-              <span className="min-w-0 flex-1 text-[16px] font-semibold [overflow-wrap:anywhere]">
-                Ligado à Steam: «{ligacao.titulo}»
-              </span>
-              <button
-                type="button"
-                onClick={() => {
-                  setLigacao(null);
-                  setErroLigacao('');
-                }}
-                className="min-h-11 rounded-xl border border-borda-controle px-4 font-display text-[13px] font-semibold uppercase tracking-[0.1em] hover:bg-acao-hover"
-              >
-                Remover ligação
-              </button>
+              <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <span className="flex items-start gap-1.5 text-[15px] font-bold [overflow-wrap:anywhere]">
+                  <Icon name="link" size={18} className="mt-0.5 shrink-0 text-status-jogando" />
+                  Ligado à Steam: «{ligacao.titulo}»
+                </span>
+                <span className="text-[13px] font-medium text-texto-suave">
+                  {horasEMinutos(ligacao.minutosJogados)}. A capa oficial é só prévia.
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" onClick={() => setBuscando(true)} className={BOTAO_PEQUENO}>
+                  Trocar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLigacao(null);
+                    setErroLigacao('');
+                  }}
+                  className={BOTAO_PEQUENO}
+                >
+                  Remover ligação
+                </button>
+              </div>
             </div>
           ) : (
             <button
               type="button"
               onClick={() => setBuscando(true)}
-              className="min-h-11 rounded-xl border border-borda-controle px-4 font-display text-[13px] font-semibold uppercase tracking-[0.1em] hover:bg-acao-hover flex items-center gap-2 self-start"
+              className="flex h-[52px] items-center justify-center gap-2 rounded-xl border-2 border-dashed border-destaque bg-destaque/10 px-4 font-display text-[15px] font-bold text-destaque transition-colors hover:bg-destaque/20"
             >
-              <Icon name="search" size={20} />
+              <Icon name="search" size={22} />
               Buscar na Steam
             </button>
           )}
@@ -362,6 +377,7 @@ export function GameForm({
         currentUrl={saved?.capaUrl ?? null}
         file={file}
         removing={removing}
+        oficialUrl={ligacao?.capaUrl ?? null}
         error={fields.capa}
         onPick={(picked) => {
           setFile(picked);
@@ -378,7 +394,7 @@ export function GameForm({
         <div
           role="group"
           aria-label="Confirmar a plataforma"
-          className="flex flex-col gap-3 rounded-xl bg-painel-2 p-4"
+          className="flex flex-col gap-3 rounded-2xl bg-painel-2 p-4"
         >
           <p className="m-0 text-[17px]">
             «{values.titulo.trim()}» é um jogo de {values.plataforma.trim()}. Ao ligá-lo à Steam, as
@@ -388,14 +404,14 @@ export function GameForm({
             <button
               type="button"
               onClick={() => setConfirmandoPlataforma(false)}
-              className="min-h-11 rounded-xl border border-borda-controle px-4 font-display text-[13px] font-semibold uppercase tracking-[0.1em] hover:bg-acao-hover"
+              className={BOTAO_PEQUENO}
             >
               Voltar
             </button>
             <button
               type="button"
               onClick={() => void salvar(true)}
-              className="min-h-11 rounded-xl bg-destaque px-4 font-display text-[13px] font-extrabold uppercase tracking-[0.1em] text-fundo"
+              className="min-h-11 rounded-full bg-destaque px-[18px] font-display text-[15px] font-extrabold text-fundo"
             >
               Salvar mesmo assim
             </button>
@@ -418,16 +434,16 @@ export function GameForm({
         <button
           type="button"
           onClick={onCancel}
-          className="min-h-12 rounded-[4px] border border-borda-controle px-5 font-display text-[13px] font-semibold tracking-[0.1em] hover:bg-acao-hover"
+          className="h-[52px] rounded-full border border-borda-controle px-6 font-display text-[15px] font-bold transition-colors hover:bg-painel-3"
         >
-          CANCELAR
+          Cancelar
         </button>
         <button
           type="submit"
           disabled={mutation.isPending}
-          className="min-h-12 rounded-[4px] bg-destaque px-[22px] font-display text-[13px] font-extrabold tracking-[0.1em] text-fundo disabled:opacity-70"
+          className="h-[52px] rounded-full bg-destaque px-8 font-display text-base font-extrabold text-fundo transition-transform hover:-translate-y-0.5 disabled:opacity-70"
         >
-          {mutation.isPending ? 'SALVANDO…' : 'SALVAR'}
+          {mutation.isPending ? 'Salvando…' : 'Salvar'}
         </button>
       </div>
     </form>

@@ -189,7 +189,7 @@ describe('barra do topo em pílulas (CA-12, CA-28)', () => {
 
     await user.click(within(topo()).getByRole('button', { name: 'Adicionar' }));
 
-    expect(await screen.findByRole('heading', { name: 'NOVO JOGO' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Novo jogo' })).toBeInTheDocument();
   });
 });
 
@@ -222,7 +222,7 @@ describe('"Adicionar" na barra (CA-03, CA-04)', () => {
 
     await user.click(within(mainNav()).getByRole('button', { name: 'Adicionar' }));
 
-    expect(await screen.findByRole('heading', { name: 'NOVO JOGO' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Novo jogo' })).toBeInTheDocument();
     expect(screen.getByLabelText('Título')).toHaveFocus();
     await waitFor(() =>
       expect(screen.getByTestId('location')).toHaveTextContent('/?status=ZERADO'),
@@ -234,7 +234,7 @@ describe('"Adicionar" na barra (CA-03, CA-04)', () => {
 
     await user.click(within(mainNav()).getByRole('button', { name: 'Adicionar' }));
 
-    expect(await screen.findByRole('heading', { name: 'NOVO JOGO' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Novo jogo' })).toBeInTheDocument();
     await waitFor(() => expect(screen.getByTestId('location').textContent).toBe('/'));
   });
 });

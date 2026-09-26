@@ -44,7 +44,7 @@ export function ModalDialog({ open, onClose, labelledBy, children }: ModalDialog
           onClose();
         }
       }}
-      className="modal border border-destaque bg-painel p-0 text-texto"
+      className="modal border border-borda bg-painel p-0 text-texto"
     >
       {open ? children : null}
     </dialog>

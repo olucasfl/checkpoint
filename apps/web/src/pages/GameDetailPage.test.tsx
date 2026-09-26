@@ -214,7 +214,7 @@ describe('descrição (CA-26)', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Adicionar descrição' }));
 
-    expect(await screen.findByRole('heading', { name: 'EDITAR JOGO' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Editar jogo' })).toBeInTheDocument();
     expect(screen.getByRole('textbox', { name: /Descrição/ })).toBeInTheDocument();
   });
 
@@ -256,12 +256,12 @@ describe('Editar, Excluir e Voltar (CA-27)', () => {
     const user = renderAt();
 
     await user.click(await screen.findByRole('button', { name: 'Editar' }));
-    const dialogo = await screen.findByRole('heading', { name: 'EDITAR JOGO' });
+    const dialogo = await screen.findByRole('heading', { name: 'Editar jogo' });
     expect(dialogo).toBeInTheDocument();
     expect(screen.getByLabelText('Gameplay')).toHaveValue('9,2');
     await user.clear(screen.getByLabelText('Gameplay'));
     await user.type(screen.getByLabelText('Gameplay'), '5');
-    await user.click(screen.getByRole('button', { name: 'SALVAR' }));
+    await user.click(screen.getByRole('button', { name: 'Salvar' }));
 
     expect(api.update).toHaveBeenCalledWith(
       'g1',
@@ -270,7 +270,7 @@ describe('Editar, Excluir e Voltar (CA-27)', () => {
     expect(await screen.findByRole('img', { name: 'Gameplay 5,0 de 10' })).toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'Nota 6,5 de 10' })).toBeInTheDocument();
     await waitFor(() =>
-      expect(screen.queryByRole('heading', { name: 'EDITAR JOGO' })).not.toBeInTheDocument(),
+      expect(screen.queryByRole('heading', { name: 'Editar jogo' })).not.toBeInTheDocument(),
     );
     expect(onde()).toBe('/jogos/g1');
   });

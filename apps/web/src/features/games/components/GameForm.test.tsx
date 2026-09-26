@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { AxiosError, type AxiosResponse } from 'axios';
 import { type Game } from '@checkpoint/shared';
@@ -63,7 +63,7 @@ function renderForm(props: { game?: Game } = {}) {
   return { onDone, onCancel, user: userEvent.setup({ applyAccept: false }) };
 }
 
-const save = () => screen.getByRole('button', { name: 'SALVAR' });
+const save = () => screen.getByRole('button', { name: 'Salvar' });
 const cover = () => screen.getByLabelText('Arquivo da capa');
 
 beforeEach(() => {
@@ -88,6 +88,35 @@ const corpo = (overrides: Record<string, unknown> = {}) => ({
   performance: null,
   descricao: null,
   ...overrides,
+});
+
+describe('cabeçalho, status e rodapé do formulário novo (CA-48, CA-51)', () => {
+  it('o título é "Novo jogo" e o rodapé tem Cancelar e Salvar de 52 px', () => {
+    renderForm();
+
+    expect(screen.getByRole('heading', { name: 'Novo jogo' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Fechar' })).toHaveClass('size-11');
+    expect(screen.getByRole('button', { name: 'Cancelar' })).toHaveClass('h-[52px]');
+    expect(screen.getByRole('button', { name: 'Salvar' })).toHaveClass('h-[52px]');
+  });
+
+  it('o status tem três botões na ordem Jogando, Quero jogar, Zerado, de 52 px, com exatamente um pressionado', () => {
+    renderForm();
+
+    const grupo = screen.getByRole('group', { name: 'Status' });
+    const botoes = within(grupo).getAllByRole('button');
+    expect(botoes.map((b) => b.textContent)).toEqual(['Jogando', 'Quero jogar', 'Zerado']);
+    for (const botao of botoes) {
+      expect(botao).toHaveClass('h-[52px]');
+    }
+    expect(botoes.filter((b) => b.getAttribute('aria-pressed') === 'true')).toHaveLength(1);
+  });
+
+  it('a miniatura da capa é em pé, 56 px de largura', () => {
+    renderForm();
+
+    expect(document.querySelector('[data-cover="generated"]')).toHaveClass('w-14', 'aspect-[3/4]');
+  });
 });
 
 describe('seção Avaliação (CA-16)', () => {
@@ -695,7 +724,7 @@ describe('capa: preview, salvar o jogo e depois a capa (CA-74 a CA-78)', () => {
     const message = await screen.findByText('Falha ao acessar o armazenamento de capas');
     expect(message.id).toBe('f-capa-err');
     expect(onDone).not.toHaveBeenCalled();
-    expect(screen.getByRole('heading', { name: 'EDITAR JOGO' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Editar jogo' })).toBeInTheDocument();
     expect(api.create).toHaveBeenCalledTimes(1);
 
     // Tentar de novo: PATCH no jogo já salvo (nada de POST, que daria 409) e reenvia a capa.
@@ -731,7 +760,7 @@ describe('capa: preview, salvar o jogo e depois a capa (CA-74 a CA-78)', () => {
   it('"Remover capa" fica desabilitado quando não há capa nem arquivo', () => {
     renderForm();
 
-    expect(screen.getByRole('button', { name: 'REMOVER CAPA' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Remover capa' })).toBeDisabled();
   });
 
   it('remover a capa de um jogo que a tem chama DELETE /capa ao salvar (CA-78)', async () => {
@@ -740,7 +769,7 @@ describe('capa: preview, salvar o jogo e depois a capa (CA-74 a CA-78)', () => {
     api.removeCover.mockResolvedValue(game({ capaUrl: null }));
     const { user, onDone } = renderForm({ game: withCover });
 
-    await user.click(screen.getByRole('button', { name: 'REMOVER CAPA' }));
+    await user.click(screen.getByRole('button', { name: 'Remover capa' }));
     expect(api.removeCover).not.toHaveBeenCalled(); // só vale ao Salvar
     await user.click(save());
 
@@ -753,8 +782,8 @@ describe('capa: preview, salvar o jogo e depois a capa (CA-74 a CA-78)', () => {
       game: game({ capaUrl: 'https://s/capas/g1/a.png' }),
     });
 
-    await user.click(screen.getByRole('button', { name: 'REMOVER CAPA' }));
-    await user.click(screen.getByRole('button', { name: 'CANCELAR' }));
+    await user.click(screen.getByRole('button', { name: 'Remover capa' }));
+    await user.click(screen.getByRole('button', { name: 'Cancelar' }));
 
     expect(onCancel).toHaveBeenCalled();
     expect(api.update).not.toHaveBeenCalled();
@@ -765,7 +794,7 @@ describe('capa: preview, salvar o jogo e depois a capa (CA-74 a CA-78)', () => {
     const { user } = renderForm();
 
     await user.upload(cover(), png());
-    await user.click(screen.getByRole('button', { name: 'REMOVER CAPA' }));
+    await user.click(screen.getByRole('button', { name: 'Remover capa' }));
 
     expect(screen.queryByAltText('Prévia da capa selecionada')).not.toBeInTheDocument();
     expect(api.removeCover).not.toHaveBeenCalled();
