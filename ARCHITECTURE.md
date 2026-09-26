@@ -628,7 +628,7 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
   é o `destaque`. O token `apagado` e a `RatingBar` de segmentos **saíram na F3** (o detalhe era o último consumidor); sobra `apagado-2` (só controle desabilitado). `prefers-reduced-motion: reduce` desliga todas as animações e
   transições (variante `movimento-reduzido`, §5.12). Fontes **Outfit** (`--font-display`) e **Manrope** (`--font-corpo`) e ícones
   (Material Symbols Rounded) vêm por `<link>` no `index.html` (`display=swap`, `system-ui` de reserva), sem pacote npm; offline cai a fonte do
-  sistema, como antes. Sem orbes, _scanlines_, pulso nem brilhos neon: o `Backdrop` é só um halo estático (`.halo`).
+  sistema, como antes. Sem orbes, _scanlines_, pulso nem brilhos neon: o `Backdrop` é só um halo estático (`.halo`). **Telas herdadas (F4):** `/perfil`, `/login`, `/registro`, `/perfil/senha`, `/status`, os diálogos de confirmação, o "Buscar na Steam" e os avisos (`ConnectionBanner`, `UpdatePrompt`, `InstallNudge`) não têm layout novo: só a linguagem (botões em pílula com Outfit e sem maiúsculas espaçadas, cartões de 16 a 22 px de raio, `BrandLogo` redondo). O rótulo de seção continua em maiúsculas de 13 a 14 px com `tracking-[0.14em]`. `tokens.test.ts` proíbe a volta do visual antigo (`rounded-[4px]`, cores padrão do Tailwind, maiúsculas espaçadas em botão), e a variante `movimento-reduzido` também desliga o `hover:-translate-y-*` (o Tailwind 4 usa a propriedade `translate`).
 - **Build de produção:** o `@checkpoint/shared/dist` é CommonJS e linkado; o `vite.config.ts` libera
   esse caminho em `build.commonjsOptions`, senão o Rollup não enxerga os valores exportados (o `dev`
   esconde o problema).

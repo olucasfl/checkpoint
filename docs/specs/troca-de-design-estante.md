@@ -1,6 +1,6 @@
 # Spec: troca de design — "Estante de console"
 
-> Status: 🚧 em andamento (aprovada em 2026-09-25). **F1, F2 e F3 implementadas** (branches `feat/design-estante-f1`, `-f2` e `-f3`); a F4 vem a seguir. As
+> Status: 🚧 em andamento (aprovada em 2026-09-25). **F1 a F4 implementadas** (branches `feat/design-estante-f1` a `-f4`, em cadeia). **Ficam abertos só os critérios que dependem do app rodando de verdade** (CA-04, CA-09 em parte, CA-61, CA-63, CA-66, CA-67 em parte, CA-69 e CA-70): ver a evidência da F4. O `/qa-verify` ainda não foi rodado. As
 > decisões 1 a 3 e as questões 4 a 14 foram respondidas com "aceito todas as recomendações" (registro em "Decisões tomadas").
 
 ## Objetivo
@@ -73,7 +73,7 @@ commit que muda o comportamento descrito.
 | **F3** detalhe e formulários | `/jogos/:id` (anel, barras, bloco Steam, lista de conquistas), formulário "Novo jogo/Editar", diálogos de confirmação                                                                                                                                                                                                       | telas herdadas (perfil, login…)                                                                             | as quatro telas desenhadas prontas                                                                         | CA-40 a CA-54                       |
 | **F4** herdado e fechamento  | conferência visual de tudo que herda (lista abaixo), ajuste de formas nas telas herdadas, `/qa-verify` no app rodando, `ARCHITECTURE.md` e status da spec                                                                                                                                                                   | nada novo                                                                                                   | direção completa                                                                                           | CA-61 a CA-70                       |
 
-**Estado (2026-09-25):** **F1 implementada** em `feat/design-estante-f1` (7 commits, do `feat(web): tokens do tema estante e fontes outfit e manrope` ao de docs) e **F2 implementada** em `feat/design-estante-f2` (do `feat(web): capa em pe 3:4` ao de docs, mais os `fix` e `test` da conferência); **F3 implementada** em `feat/design-estante-f3` (detalhe, bloco Steam e formulário); a F4 é a seguinte. Nada foi mesclado na `main`.
+**Estado (2026-09-25):** **F1 implementada** em `feat/design-estante-f1` (7 commits, do `feat(web): tokens do tema estante e fontes outfit e manrope` ao de docs) e **F2 implementada** em `feat/design-estante-f2` (do `feat(web): capa em pe 3:4` ao de docs, mais os `fix` e `test` da conferência); **F3 implementada** em `feat/design-estante-f3` (detalhe, bloco Steam e formulário) e **F4 implementada** em `feat/design-estante-f4` (telas herdadas e conferência final). Nada foi mesclado na `main`.
 
 **Riscos, para quem implementar.** (1) O rename de tokens toca ~39 arquivos (mecânico; o `tsc` e os testes são a rede de
 segurança). (2) `hover: translateY` e a sombra do anel são cortados por contêineres com `overflow` (as prateleiras do
@@ -654,37 +654,76 @@ Legenda: **T** = teste automatizado; **N** = conferência no navegador (registra
 - [ ] **CA-61** [N] — **Dado** `/perfil`, **então** o cabeçalho (avatar de iniciais), a seção Conta, o cartão Steam nos seus estados
       (esqueleto, vinculado, perfil privado, erro), Preferências, Instalar app e Zona de perigo aparecem no visual novo, sem rolagem
       horizontal em 360 px, com todo botão ≥ 44 × 44 px.
-- [ ] **CA-62** [N] — **Dado** `/login`, `/registro` e `/perfil/senha`, **então** o logo, os campos, os erros e os botões estão no visual
+- [x] **CA-62** [N] — **Dado** `/login`, `/registro` e `/perfil/senha`, **então** o logo, os campos, os erros e os botões estão no visual
       novo, com campos de 16 px, botão "mostrar senha" de 44 px e nenhum efeito neon.
 - [ ] **CA-63** [N] — **Dado** o diálogo "Buscar na Steam", **então** a busca, os itens, "Criar jogo", "Vincular a este", "Vincular a outro jogo
       que já tenho", os estados vazio, privado e erro e o "Mover o vínculo" estão no visual novo, sem rolagem horizontal em 360 px.
-- [ ] **CA-64** [N] — **Dado** o detalhe em 360 px, **então** coluna única, sem rolagem horizontal, botões ≥ 44 px, o bloco Steam com a lista
+- [x] **CA-64** [N] — **Dado** o detalhe em 360 px, **então** coluna única, sem rolagem horizontal, botões ≥ 44 px, o bloco Steam com a lista
       de conquistas legível (uma coluna).
-- [ ] **CA-65** [N] — **Dado** os estados carregando, erro e vazio do catálogo e do detalhe, **então** estão no visual novo e mantêm os
+- [x] **CA-65** [N] — **Dado** os estados carregando, erro e vazio do catálogo e do detalhe, **então** estão no visual novo e mantêm os
       papéis (`role="status"`, `role="alert"`).
 - [ ] **CA-66** [N] — **Dado** o `ConnectionBanner` (offline e "Conexão restabelecida"), o `UpdatePrompt` e o `InstallNudge`, **então** ficam
       legíveis (≥ 4,5:1), acima da barra inferior no celular e no canto no desktop.
 - [ ] **CA-67** [N] — **Dado** os diálogos de confirmação (remover jogo, desvincular, encerrar sessões, excluir conta), **então** o foco
       inicial, o Esc e o texto são os de hoje, no visual novo.
-- [ ] **CA-68** [N] — **Dado** `/status`, **então** o diagnóstico de health aparece no visual novo.
+- [x] **CA-68** [N] — **Dado** `/status`, **então** o diagnóstico de health aparece no visual novo.
 - [ ] **CA-69** [N] — **Dado** o app instalado (PWA), **então** a barra de status, a tela de abertura e a cor do tema são `#0b0f1a`; e os
       ícones (questão 11) estão coerentes com o resultado.
 - [ ] **CA-70** [N] — **Dado** um celular Android e um iPhone reais, **quando** uso o catálogo, o formulário (com o teclado aberto) e o
       detalhe, **então** as prateleiras rolam com o dedo sem mover a página, os campos não dão zoom e o retrato e a paisagem respeitam a
       safe-area.
 
+#### Evidência da F4 e conferência final no navegador (2026-09-25)
+
+Roteiro: Vite em `localhost:5199` com a API **mockada** no navegador (dados sintéticos; nada foi ao Supabase, ao bucket nem às portas 3333 e 5173), Chromium
+headless (Playwright) em 360 × 780 (com toque, `hover: none`) e 1280 × 900 (`hover: hover`), mais 1024 px com toque, 767 e 768 px, e 640 px (o zoom de
+200% de uma janela de 1280). Dados: 15 jogos (14 em Jogando, ou seja, mais de 12 numa prateleira), título de 120 caracteres sem espaço, capas enviadas
+**quadrada** e **larga**, capa oficial da Steam, com e sem vínculo Steam, com e sem média, "Xbox Series X|S" e sem plataforma. Medi posições,
+tamanhos de alvo, menor fonte e rolagem horizontal do que estava à vista (não só o `scrollWidth`). **Sem erro de página nem de console** em nenhuma tela.
+
+Legenda: ✅ verificado; [~] verificado em parte (diz o quê); "só no app rodando" = depende de aparelho real, do app instalado ou de verificador.
+
+| CA               | Estado            | Evidência                                                                                                                                                                                                                                                                           |
+| ---------------- | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| CA-04            | [~]               | contrastes **calculados** (`tokens.test.ts`, com as tabelas da spec) e menor texto de 12 px; o **verificador de contraste no app rodando não foi usado**                                                                                                                            |
+| CA-09            | [~]               | com `prefers-reduced-motion`: o tile e o botão Editar ficam parados no hover (0 px; antes da correção o Editar subia 2 px), a folha do formulário sem animação e as transições em 0 s. **O tremor do campo com erro só foi provado pela regra (teste), não provocado no navegador** |
+| CA-61            | [~]               | `/perfil` em 1280 e 360 px: cabeçalho, Conta, cartão Steam **vinculado**, Preferências, Zona de perigo, sem rolagem horizontal e **0 alvos abaixo de 44 × 44**. Os estados esqueleto, privado e erro do cartão só por teste (`ContaSteamCard.test.tsx`)                             |
+| CA-62 ✅         | ✅                | `/login`, `/registro` e `/perfil/senha` nos dois tamanhos: logo redondo, campos de 52 px e 16 px, "mostrar senha" de 44 px, botão em pílula, sem efeito neon                                                                                                                        |
+| CA-63            | [~]               | "Buscar na Steam" em 1280 e 360 px: busca, itens, "Criar jogo", "Vincular a outro jogo que já tenho", "Vincular a este", sem rolagem e 0 alvos pequenos. Os estados vazio, privado, erro e "Mover o vínculo" só por teste                                                           |
+| CA-64 ✅         | ✅                | detalhe em 360 px: coluna única, capa 300 × 400 centralizada, anel abaixo do título, botões de 48 px, listas em uma coluna, raridade da conquista **abaixo** do texto, 0 alvos pequenos, sem rolagem                                                                                |
+| CA-65 ✅         | ✅                | catálogo vazio, com erro e carregando, no visual novo, com `role="status"` e `role="alert"` (testes) e sem rolagem                                                                                                                                                                  |
+| CA-66            | [~]               | `ConnectionBanner` offline capturado; `UpdatePrompt` e `InstallNudge` **não foram acionados no navegador**: só o visual novo do código e os testes                                                                                                                                  |
+| CA-67            | [~]               | "Remover jogo" e "Desvincular" vistos no navegador; "Encerrar sessões" e "Excluir conta" só por teste; foco inicial e Esc pelos testes existentes                                                                                                                                   |
+| CA-68 ✅         | ✅                | `StatusPage.test.tsx` e captura: o diagnóstico usa só tokens (saiu o `slate` do Tailwind)                                                                                                                                                                                           |
+| CA-69, CA-70     | só no app rodando | app instalado (barra de status, tela de abertura) e celulares Android e iPhone reais (dedo, teclado virtual, paisagem, safe-area): **não testados**. Os ícones instaláveis seguem magenta (questão 11)                                                                              |
+| CA-71 a CA-74 ✅ | ✅                | testes de `GamesPage`, `GameForm`, `GameDetailPage`, `AppLayout`, `BottomNav` e `BlocoSteam` atualizados para os novos textos, sem apagar nenhum; `typecheck`, `lint`, `npm test` e `build` verdes; viewport sem `maximum-scale`; `package.json` sem dependência nova               |
+| CA-75 ✅         | ✅                | 640 × 450 (200% de zoom) com `prefers-reduced-motion`: catálogo, detalhe, `/perfil` e o formulário sem rolagem horizontal, o formulário cabe na tela                                                                                                                                |
+
+**Casos difíceis (medidos):** detalhe a 1280 px: capa 300 × 400 em x = 56 e a coluna de texto em x = 396; anel de 92 px no canto direito; barras de 524 × 10 px preenchidas em 90, 80, 85, 95 e 65%; as duas listas de conquistas lado a lado (x = 85 e x = 652, 543 px de largura) e em uma coluna a 360 px; `progressbar` "12 de 40 conquistas". Formulário: 640 px de largura e raio 24 no desktop, folha de 360 px no celular, campos de 52 px e 16 px, foco com borda `destaque` e anel de 3 px a 35%, status Jogando, Quero jogar, Zerado em botões de 52 px, média ao vivo (8,3 → 7,9 ao digitar 7 no Gameplay), miniatura de 44 × 58 no "Ligado à Steam", "Trocar" (77 × 44) e "Remover ligação" (141 × 44). Em `hover: none` (390 px e 1024 px com toque) as ações do tile não existem.
+
+| Achado da conferência final                                                                                             | Estado                                                                                                            |
+| ----------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| Itens de conquista no celular espremiam o texto ("Segred o") por causa da raridade ao lado                              | **corrigido** (a raridade desce para baixo do texto em < 640 px)                                                  |
+| "Quero jogar" quebrava em duas linhas no seletor de status do formulário em 360 px                                      | **corrigido** (ícone em cima e texto numa linha em < 640 px)                                                      |
+| Botões `hover:-translate-y` subiam 2 px com movimento reduzido (o Tailwind 4 usa `translate`, não `transform`)          | **corrigido** (regra na variante `movimento-reduzido`; teste)                                                     |
+| Telas herdadas com o visual antigo: cantos de 4 px, botões em maiúsculas espaçadas, `/status` em `slate`, logo em caixa | **corrigido** (pílulas, raio de 16 px, logo redondo; uma trava no `tokens.test.ts` impede a volta)                |
+| Título de 120 caracteres sem espaço ocupa 6 linhas de 52 px no detalhe em 1280 px                                       | **aberto, feio mas correto** (quebra sem estourar; a alternativa seria cortar com reticências, decisão de design) |
+| Em 768 a ~1100 px só parte das pílulas de filtro do catálogo fica à vista                                               | **aberto** (ver a conferência da F2)                                                                              |
+| O cartão de item da Steam sem capa deixa um espaço vazio à esquerda no "Buscar na Steam"                                | **aberto, cosmético**                                                                                             |
+| Sem o ícone real das conquistas nos dados do mock, o quadrado com o ícone é um marcador                                 | **esperado**                                                                                                      |
+
 ### Transversais
 
-- [ ] **CA-71** [T] — **Dado** os testes existentes de `GamesPage`, do substituto da `GameRow`, `GameForm`, `GameDetailPage`, `AppLayout`,
+- [x] **CA-71** [T] — **Dado** os testes existentes de `GamesPage`, do substituto da `GameRow`, `GameForm`, `GameDetailPage`, `AppLayout`,
       `BottomNav` e `BlocoSteam`, **então** continuam cobrindo os mesmos comportamentos com o layout novo (mesmos papéis e nomes
       acessíveis da tabela de "Requisitos de saída"); nenhum teste é apagado sem substituto.
-- [ ] **CA-72** [T] — **Dado** cada fase, **quando** rodo `npm run typecheck`, `npm run lint`, `npm test` e `npm run build`, **então**
+- [x] **CA-72** [T] — **Dado** cada fase, **quando** rodo `npm run typecheck`, `npm run lint`, `npm test` e `npm run build`, **então**
       passam, e `ARCHITECTURE.md` descreve o que a fase mudou (§5.5, §5.6, §5.11, §5.12 e §5.13).
-- [ ] **CA-73** [T] — **Dado** o `<meta name="viewport">`, **então** continua sem `maximum-scale` nem `user-scalable` (zoom livre) e o
+- [x] **CA-73** [T] — **Dado** o `<meta name="viewport">`, **então** continua sem `maximum-scale` nem `user-scalable` (zoom livre) e o
       ponto de quebra único é 768 px.
-- [ ] **CA-74** [T] — **Dado** `apps/web/package.json`, **então** não ganhou nenhuma dependência de runtime, de fonte, de ícone, de UI, de
+- [x] **CA-74** [T] — **Dado** `apps/web/package.json`, **então** não ganhou nenhuma dependência de runtime, de fonte, de ícone, de UI, de
       gráfico ou de animação.
-- [ ] **CA-75** [N] — **Dado** o app rodando com `prefers-reduced-motion: reduce` e com o zoom do navegador em 200%, **então** o catálogo, o
+- [x] **CA-75** [N] — **Dado** o app rodando com `prefers-reduced-motion: reduce` e com o zoom do navegador em 200%, **então** o catálogo, o
       detalhe e o formulário continuam utilizáveis, sem sobreposição nem texto cortado.
 
 ## Substitui ou atualiza critérios de outras specs
