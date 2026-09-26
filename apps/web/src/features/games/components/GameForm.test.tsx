@@ -105,7 +105,10 @@ describe('cabeçalho, status e rodapé do formulário novo (CA-48, CA-51)', () =
 
     const grupo = screen.getByRole('group', { name: 'Status' });
     const botoes = within(grupo).getAllByRole('button');
-    expect(botoes.map((b) => b.textContent)).toEqual(['Jogando', 'Quero jogar', 'Zerado']);
+    expect(botoes).toHaveLength(3);
+    ['Jogando', 'Quero jogar', 'Zerado'].forEach((nome, i) =>
+      expect(botoes[i]).toHaveAccessibleName(nome),
+    );
     for (const botao of botoes) {
       expect(botao).toHaveClass('h-[52px]');
     }
