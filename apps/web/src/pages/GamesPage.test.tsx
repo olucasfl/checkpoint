@@ -187,11 +187,15 @@ describe('destaque "Continue de onde parou" (CA-22, CA-23)', () => {
 });
 
 describe('destaque e contagens acompanham a edição, sem recarregar (CA-19, CA-29)', () => {
-  const dois = [
-    game({ id: '1', titulo: 'Alfa', atualizadoEm: '2026-09-25T10:00:00.000Z' }),
-    game({ id: '2', titulo: 'Beta', atualizadoEm: '2026-09-24T10:00:00.000Z' }),
-    game({ id: '3', titulo: 'Gama', status: 'ZERADO', atualizadoEm: '2026-09-23T10:00:00.000Z' }),
-  ];
+  const alfa = game({ id: '1', titulo: 'Alfa', atualizadoEm: '2026-09-25T10:00:00.000Z' });
+  const beta = game({ id: '2', titulo: 'Beta', atualizadoEm: '2026-09-24T10:00:00.000Z' });
+  const gama = game({
+    id: '3',
+    titulo: 'Gama',
+    status: 'ZERADO',
+    atualizadoEm: '2026-09-23T10:00:00.000Z',
+  });
+  const dois = [alfa, beta, gama];
   const destaqueTitulo = () =>
     within(document.querySelector('[data-destaque-catalogo]') as HTMLElement).getByRole('heading')
       .textContent;
@@ -202,9 +206,9 @@ describe('destaque e contagens acompanham a edição, sem recarregar (CA-19, CA-
     await aparece('Gama');
     expect(destaqueTitulo()).toBe('Alfa');
 
-    const editado = { ...dois[1], atualizadoEm: '2026-09-25T11:00:00.000Z' };
+    const editado = { ...beta, atualizadoEm: '2026-09-25T11:00:00.000Z' };
     api.update.mockResolvedValue(editado);
-    api.list.mockResolvedValue([editado, dois[0], dois[2]]);
+    api.list.mockResolvedValue([editado, alfa, gama]);
     await user.click(screen.getByRole('button', { name: 'Editar Beta' }));
     await user.click(await screen.findByRole('button', { name: 'SALVAR' }));
 
@@ -216,7 +220,7 @@ describe('destaque e contagens acompanham a edição, sem recarregar (CA-19, CA-
     const user = renderPage();
     await aparece('Gama');
     const contador = (nome: string) =>
-      within(screen.getByRole('region', { name: nome })).getAllByText(/^\d+$/)[0].textContent;
+      within(screen.getByRole('region', { name: nome })).getAllByText(/^\d+$/)[0]?.textContent;
     expect(filterButton(/^Todos ?3$/)).toBeInTheDocument();
     expect(filterButton(/^Jogando ?2$/)).toBeInTheDocument();
     expect(filterButton(/^Quero jogar ?0$/)).toBeInTheDocument();
@@ -237,7 +241,7 @@ describe('destaque e contagens acompanham a edição, sem recarregar (CA-19, CA-
 
     // remover um Zerado
     api.remove.mockResolvedValue(undefined);
-    api.list.mockResolvedValue([novo, dois[0], dois[1]]);
+    api.list.mockResolvedValue([novo, alfa, beta]);
     await user.click(screen.getByRole('button', { name: 'Remover Gama' }));
     await user.click(await screen.findByRole('button', { name: 'REMOVER' }));
     await waitFor(() => expect(filterButton(/^Zerado ?0$/)).toBeInTheDocument());
