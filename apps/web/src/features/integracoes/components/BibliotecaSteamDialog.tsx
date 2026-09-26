@@ -383,7 +383,7 @@ function Conteudo({
 
   return (
     <div className="sheet-pad flex max-h-[85dvh] flex-col gap-4 overflow-y-auto px-5 pt-6">
-      <div className="sticky top-0 z-10 -mx-5 -mt-6 flex items-start justify-between gap-3 border-b border-borda bg-painel px-5 pb-3 pt-6">
+      <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 flex-col gap-1">
           <h2
             id="biblioteca-steam-titulo"
