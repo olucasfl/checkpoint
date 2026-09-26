@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { type Game, type GameStatus } from '@checkpoint/shared';
+import { Chek } from '@/shared/components/Chek/Chek';
 import { Icon } from '@/shared/components/Icon';
 import { ModalDialog } from '@/shared/components/ModalDialog';
 import { useConnectivity } from '@/shared/hooks/use-connectivity';
@@ -75,12 +76,7 @@ export function GamesPage() {
               aria-current="page"
               className="flex min-h-11 shrink-0 items-center gap-2.5 font-display text-xl font-extrabold tracking-[-0.01em] text-texto no-underline md:text-[22px]"
             >
-              <span
-                aria-hidden="true"
-                className="grid size-8 place-items-center rounded-full bg-destaque text-fundo md:size-9"
-              >
-                <Icon name="flag" size={20} filled />
-              </span>
+              <Chek className="h-9 w-auto md:h-11" />
               Checkpoint
             </Link>
           </div>

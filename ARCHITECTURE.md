@@ -966,6 +966,19 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
   `pages/PerfilPage.test.tsx` (a seção entre Conta e Preferências e os avisos do retorno; a API de integrações é
   mockada).
 
+### 5.14 O Chek e o movimento (`shared/components/Chek/`, spec `docs/specs/personalizacao-chek-e-animacoes.md`)
+
+- **`Chek`** é o mascote (um cartucho com carinha e uma bandeira de checkpoint como antena) em **SVG inline**, com as cores por
+  tokens (`var(--color-*)`; os seis do mascote que o tema não tinha entram no `@theme`: `chek-corpo-1`, `chek-corpo-2`, `chek-base`,
+  `chek-mastro`, `ouro-1`, `ouro-2`). É a marca: **não segue** o `destaque` do /perfil. O corpo é o do mestre em `docs/design/marca/`; só o
+  rosto muda em cinco expressões (`feliz`, `dormindo`, `confuso`, `comemorando`, `cadeado`; `Rostos.tsx`). Decorativo (`aria-hidden`) por padrão;
+  com `titulo` vira `role="img"`. Gradientes com id por instância (`useId`). `altura` em px ou a altura vem do `className`.
+- **Marca:** o logo do topo (`TopNav` e cabeçalho do catálogo) é o Chek (44 px no desktop, 36 no celular) + "Checkpoint"; `BrandLogo` (Chek + nome)
+  serve às telas fora do catálogo; `AuthCard` põe o Chek de 96 px acima do cartão. O nome da marca é **"Checkpoint"** (C maiúsculo).
+- **`index.html`** ganha `description`, Open Graph (`og:image` etc.), `twitter:card` e `favicon.ico`. O domínio de produção mora só em
+  `apps/web/site.config.ts` (`SITE_URL`): o `index.html` escreve `%SITE_URL%` e o plugin `sitePlugin` (no `vite.config.ts`) o troca. O
+  `og-image-1200x630.png` (355 KB) fica **fora do precache** (`globIgnores` em `pwa.config.ts`).
+
 ---
 
 ### Contrato web ↔ API (testes)

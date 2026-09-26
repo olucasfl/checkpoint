@@ -3,9 +3,10 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 import { pwaPlugin } from './pwa.config';
+import { sitePlugin } from './site.config';
 
 export default defineConfig({
-  plugins: [react(), tailwindcss(), pwaPlugin],
+  plugins: [react(), tailwindcss(), sitePlugin, pwaPlugin],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),

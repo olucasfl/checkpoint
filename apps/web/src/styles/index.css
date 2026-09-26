@@ -43,6 +43,15 @@
   --color-capa-5: #facc15;
   --color-capa-6: #a78bfa;
 
+  /* O mascote Chek (a marca): o corpo, a base do cartucho, o mastro e o degradê dourado da bandeira. O resto do Chek
+     reusa `fundo`, `texto`, `ouro` e `acento`. Nunca segue o `destaque` do /perfil. */
+  --color-chek-corpo-1: #8fbaff;
+  --color-chek-corpo-2: #3f79f0;
+  --color-chek-base: #2a4fa3;
+  --color-chek-mastro: #dfe8ff;
+  --color-ouro-1: #ffe08a;
+  --color-ouro-2: #ffbf47;
+
   --font-display: 'Outfit', system-ui, sans-serif;
   --font-corpo: 'Manrope', system-ui, sans-serif;
 }
