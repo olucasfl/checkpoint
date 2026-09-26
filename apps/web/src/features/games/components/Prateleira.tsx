@@ -53,7 +53,7 @@ export function Prateleira({
 
       <ul
         aria-label={titulo}
-        className={`scroll-row m-0 -mx-4 flex list-none snap-x gap-3.5 overflow-x-auto px-4 pb-1 pt-1.5 md:mx-0 md:grid md:overflow-visible md:px-0 md:pb-0 md:pt-0 ${
+        className={`scroll-row m-0 -mx-4 flex list-none snap-x scroll-px-4 gap-3.5 overflow-x-auto px-4 pb-1 pt-1.5 md:mx-0 md:grid md:overflow-visible md:px-0 md:scroll-px-0 md:pb-0 md:pt-0 ${
           compacta
             ? 'md:grid-cols-[repeat(auto-fill,120px)] md:gap-x-4 md:gap-y-5'
             : 'md:grid-cols-[repeat(auto-fill,150px)] md:gap-x-[22px] md:gap-y-6'

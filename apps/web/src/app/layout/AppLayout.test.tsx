@@ -194,12 +194,12 @@ describe('barra do topo em pílulas (CA-12, CA-28)', () => {
 });
 
 describe('barra inferior de 68 px (CA-28)', () => {
-  it('fundo painel-2, altura 68, itens de 44 de altura e o ativo com ícone cheio', () => {
+  it('fundo painel-2, altura 68 (67 da lista + 1 da borda), itens de 44 de altura e o ativo com ícone cheio', () => {
     renderAt('/perfil');
 
     const nav = mainNav();
     expect(nav).toHaveClass('bg-painel-2');
-    expect(nav.querySelector('ul')).toHaveClass('h-[68px]');
+    expect(nav.querySelector('ul')).toHaveClass('h-[67px]');
     const ativo = within(nav).getByRole('link', { name: 'Perfil' });
     expect(ativo).toHaveClass('h-11', 'min-w-[88px]', 'text-destaque');
     expect(ativo.querySelector('.icon-fill')).not.toBeNull();

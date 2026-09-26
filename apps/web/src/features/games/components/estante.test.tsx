@@ -152,6 +152,32 @@ describe('DestaqueContinue (CA-22 a CA-26)', () => {
     expect(container.textContent).toContain('HK');
   });
 
+  it('o título nunca encolhe e o link do celular cobre o cartão (a coluna só é posicionada no desktop)', () => {
+    const { container } = noRouter(
+      <DestaqueContinue game={jogo('a', { titulo: 'Hollow', dadosPlataforma: [steam] })} />,
+    );
+
+    expect(screen.getByRole('heading', { name: 'Hollow' })).toHaveClass('shrink-0');
+    const coluna = screen.getByRole('heading', { name: 'Hollow' }).parentElement;
+    expect(coluna).toHaveClass('md:relative');
+    expect(coluna).not.toHaveClass('relative');
+    expect(container.querySelector('section')).toHaveClass('relative', 'isolate');
+    expect(screen.getByRole('link', { name: 'Ver detalhes' })).toHaveClass('absolute', 'inset-0');
+  });
+
+  it('no celular as horas e as conquistas vêm curtas ("42 h 30 min", "12/40") e sem o chip da plataforma', () => {
+    noRouter(
+      <DestaqueContinue
+        game={jogo('a', { plataforma: 'PC', notaMedia: 9, dadosPlataforma: [steam] })}
+      />,
+    );
+
+    expect(screen.getByText('42 h 30 min na Steam')).toHaveClass('max-md:hidden');
+    expect(screen.getByText('42 h 30 min')).toHaveClass('md:hidden');
+    expect(screen.getByText('12/40')).toHaveClass('md:hidden');
+    expect(screen.getByText('PC').closest('span.chip-escuro')).toHaveClass('max-md:hidden');
+  });
+
   it('com capa enviada, ela é o fundo', () => {
     const { container } = noRouter(
       <DestaqueContinue game={jogo('a', { capaUrl: 'https://exemplo.com/c.jpg' })} />,

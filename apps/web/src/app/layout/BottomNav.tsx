@@ -27,7 +27,7 @@ export function BottomNav() {
         aria-label="Navegação principal"
         className="bottom-nav fixed inset-x-0 bottom-0 z-40 border-t border-borda bg-painel-2 md:hidden"
       >
-        <ul className="m-0 flex h-[68px] list-none items-center justify-around gap-1 px-2">
+        <ul className="m-0 flex h-[67px] list-none items-center justify-around gap-1 px-2">
           {NAV_ITEMS.map((item) => (
             <li key={item.id} className="flex flex-1 justify-center">
               {item.kind === 'link' ? (
