@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { AppProviders } from '@/app/providers';
 import { AppRouter } from '@/app/router';
 import { ErrorBoundary } from '@/shared/components/ErrorBoundary';
+import { Splash } from '@/shared/components/Splash/Splash';
 import { connectivity } from '@/shared/lib/connectivity';
 import { iniciarPrefs } from '@/shared/lib/prefs/prefs-store';
 import { registrarDiaDeUso } from '@/shared/lib/pwa/usage-days';
@@ -32,6 +33,8 @@ createRoot(container).render(
       <AppProviders>
         <AppRouter />
       </AppProviders>
+      {/* A abertura do app instalado, por cima de tudo; fora dos provedores para não depender da sessão. */}
+      <Splash />
     </ErrorBoundary>
   </StrictMode>,
 );

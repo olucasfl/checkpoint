@@ -1043,6 +1043,15 @@ noreferrer"`), números (jogos, horas, "já jogados"), mais jogados (5), backlog
 
 ---
 
+**Abertura do PWA (`shared/components/Splash/`)**: tela de abertura do app instalado (`display-mode: standalone` ou `navigator.standalone`), uma vez por
+carga da página (variável do módulo, porque `sessionStorage` só pode aparecer em `shared/lib/storage/`); `?splash=1` a força em qualquer aba para ver e
+ajustar. Espera a fonte Outfit (no máximo 900 ms), então: o Chek `dormindo` cai de cima e acorda (`feliz`) em 900 ms; as letras de "Checkpoint" chegam
+uma a uma; seis pinos dourados acendem como barra de carregamento; oito peças SVG do mundo dos jogos (`Glifos.tsx`, sem fonte de ícones) pousam girando de fora
+da tela e flutuam de leve; um brilho atravessa o nome. Sai sozinha aos 2,9 s (ou com um toque, depois de 700 ms) e o `#root` fica `inert` enquanto ela existe.
+No CSS (`.splash-*`, `index.css`) o estado de repouso é a tela pronta e cada `@keyframes` só tem `from`, então com movimento reduzido tudo já aparece no lugar e a
+tela some em 0,9 s. Durações pelos tokens `--mov-splash-*`; só `opacity` e `transform`; o laço `splash-flutua` está na lista de laços do `motion.test.ts`.
+Testes: `Splash.test.tsx`.
+
 ### Contrato web ↔ API (testes)
 
 O `@checkpoint/shared` é o contrato; três testes impedem que a API, o web e os mocks divirjam **em silêncio**:
