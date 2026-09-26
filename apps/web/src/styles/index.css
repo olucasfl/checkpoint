@@ -145,9 +145,9 @@ button:disabled {
     padding-right: max(1rem, env(safe-area-inset-right));
   }
 
-  /* Espaço para a última linha da lista não ficar sob a barra inferior (64px + safe-area). */
+  /* Espaço para a última linha da lista não ficar sob a barra inferior (68px + safe-area). */
   .nav-clearance {
-    padding-bottom: calc(64px + env(safe-area-inset-bottom));
+    padding-bottom: calc(68px + env(safe-area-inset-bottom));
   }
 
   .bottom-nav {
@@ -156,11 +156,11 @@ button:disabled {
     padding-right: env(safe-area-inset-right);
   }
 
-  /* Aviso de versão nova: acima da barra inferior (64px + safe-area) no celular; no desktop, no canto. */
+  /* Aviso de versão nova: acima da barra inferior (68px + safe-area) no celular; no desktop, no canto. */
   .update-prompt,
   .install-nudge {
     inset-inline: 16px;
-    bottom: calc(64px + env(safe-area-inset-bottom) + 8px);
+    bottom: calc(68px + env(safe-area-inset-bottom) + 8px);
   }
 
   /* Fileira de filtros que rola na horizontal sem barra visível (o arrasto continua funcionando). */

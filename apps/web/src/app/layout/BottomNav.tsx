@@ -6,7 +6,7 @@ import { newGameHref } from '@/features/games/lib/new-game';
 import { isNavActive, NAV_ITEMS } from './nav-items';
 
 const ITEM =
-  'flex min-h-11 min-w-11 flex-1 flex-col items-center justify-center gap-0.5 rounded-[4px] text-[13px] font-bold uppercase tracking-[0.1em]';
+  'flex h-11 min-w-[88px] flex-1 flex-col items-center justify-center gap-0.5 rounded-xl font-display text-xs font-bold';
 
 /**
  * Barra de navegação inferior, só em tela estreita (< 768px). Fica no `#overlay-root` (portal) e
@@ -25,11 +25,11 @@ export function BottomNav() {
     <OverlayPortal>
       <nav
         aria-label="Navegação principal"
-        className="bottom-nav fixed inset-x-0 bottom-0 z-40 border-t border-borda bg-painel md:hidden"
+        className="bottom-nav fixed inset-x-0 bottom-0 z-40 border-t border-borda bg-painel-2 md:hidden"
       >
-        <ul className="m-0 flex h-16 list-none items-stretch gap-1 px-2 py-1">
+        <ul className="m-0 flex h-[68px] list-none items-center justify-around gap-1 px-2">
           {NAV_ITEMS.map((item) => (
-            <li key={item.id} className="flex flex-1">
+            <li key={item.id} className="flex flex-1 justify-center">
               {item.kind === 'link' ? (
                 <Link
                   to={item.to}
@@ -38,7 +38,7 @@ export function BottomNav() {
                     isNavActive(item, location.pathname) ? 'text-destaque' : 'text-texto-suave'
                   }`}
                 >
-                  <Icon name={item.icon} size={24} />
+                  <Icon name={item.icon} size={24} filled={isNavActive(item, location.pathname)} />
                   {item.label}
                 </Link>
               ) : (
