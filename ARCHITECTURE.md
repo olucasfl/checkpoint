@@ -596,14 +596,13 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
   Manrope; o valor gravado não muda). Componentes: `DestaqueContinue` (cartão de 230 px no desktop e 176 no celular, fundo = capa enviada
   ou oficial sob `.destaque-scrim`, senão a cor gerada; a coluna de texto tem no máximo 50%; o cartão **cresce** em vez de cortar o texto
   se a fonte de reserva alargar os chips; no celular o `<Link>` cobre o cartão inteiro e o texto "Ver detalhes" vira `sr-only`),
-  `Prateleira` (`<section>` + `<ul aria-label>`; **grade de colunas do tamanho da capa no desktop e fileira que rola por dentro no
-  celular**, com `scroll-px-4` para o `snap` não comer o recuo; o botão-bloco "Adicionar em …" fecha a lista e abre o `GameForm` com
+  `Prateleira` (`<section>` + `<ul aria-label>`; **grade de colunas do tamanho da capa** (no celular também, sem rolar de lado; no filtro Todos só os 4 primeiros jogos de cada prateleira aparecem, com "Ver mais (N)" que troca o filtro para o status dela); no celular cada prateleira é um cartão (`painel`, borda) com o título sublinhado na cor do status; o botão-bloco "Adicionar em …" fecha a lista e abre o `GameForm` com
   `statusInicial` = o status dela, enquanto o "Adicionar jogo" do topo mantém o padrão), `GameTile` e `AnelDeNota`. **Editar e Remover**
   ficam em `.tile-acoes`: `display: none` por padrão (em toque nem existem na tela, e o caminho é abrir o jogo) e, **só dentro de
   `@media (hover: hover)`**, aparecem em `:hover` e `:focus-within`, junto da elevação de −6 px e do anel; a variante `movimento-reduzido`
   tira o `transform` e as transições (o anel continua). `StatusFilter` são pílulas de 44 px (a ativa com fundo `texto`); no desktop o grupo
   é um contêiner em pílula que **rola por dentro quando não cabe** (em 768 a 1100 px só parte das pílulas fica à vista), no celular é uma
-  fileira que rola e traz a ativa à vista. **`GameCover`** é sempre em pé (3:4; `tile` 150 × 200 e 132 × 176, `tileCompacto` 120 × 160 e
+  grade 2 × 2 (sem rolar). **`GameCover`** é sempre em pé (3:4; `tile` 150 × 200 e 132 × 176, `tileCompacto` 120 × 160 e
   108 × 144, `detalhe`, `preview`), cadeia **enviada → oficial → gerada** (o `header.jpg` saiu) com `object-fit: cover`. A **densidade
   compacta** só troca as medidas (`compacta` em `Prateleira` e `GameTile`).
 - **Página de detalhes** (spec `avaliacao-de-jogos`, etapa 3): **`/jogos/:id`** (`pages/GameDetailPage.tsx`) acha o jogo

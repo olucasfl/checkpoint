@@ -9,7 +9,7 @@ import { InstallNudge, DISMISS_QUIET_MS, NUDGE_DELAY_MS } from './InstallNudge';
 
 const NOW = new Date(2026, 8, 24, 12, 0, 0);
 const DAY = 24 * 60 * 60 * 1000;
-const CHROME_TEXT = 'Instale o checkpoint para abrir direto da tela inicial, em tela cheia.';
+const CHROME_TEXT = 'Instale o Checkpoint para abrir direto da tela inicial, em tela cheia.';
 const IPHONE_SAFARI =
   'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1';
 

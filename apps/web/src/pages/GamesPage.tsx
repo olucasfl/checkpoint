@@ -81,7 +81,7 @@ export function GamesPage() {
               >
                 <Icon name="flag" size={20} filled />
               </span>
-              checkpoint
+              Checkpoint
             </Link>
           </div>
 
@@ -131,6 +131,7 @@ export function GamesPage() {
               onRemove={setToDelete}
               onAdicionar={(status) => setForm({ open: true, status })}
               compacta={densidade === 'compacta'}
+              onVerMais={filter === 'TODOS' ? changeFilter : undefined}
             />
           ))}
         </main>

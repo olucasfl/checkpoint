@@ -165,10 +165,10 @@ describe('barra do topo em pílulas (CA-12, CA-28)', () => {
       .getAllByRole('navigation', { name: 'Navegação principal' })
       .find((nav) => !nav.classList.contains('bottom-nav')) as HTMLElement;
 
-  it('fora do catálogo: logo "checkpoint" para `/` e as três pílulas, a ativa com fundo `texto`', () => {
+  it('fora do catálogo: logo "Checkpoint" para `/` e as três pílulas, a ativa com fundo `texto`', () => {
     renderAt('/perfil');
 
-    expect(screen.getByRole('link', { name: 'checkpoint' })).toHaveAttribute('href', '/');
+    expect(screen.getByRole('link', { name: 'Checkpoint' })).toHaveAttribute('href', '/');
     const perfil = within(topo()).getByRole('link', { name: 'Perfil' });
     expect(perfil).toHaveAttribute('aria-current', 'page');
     expect(perfil).toHaveClass('bg-texto', 'text-fundo', 'h-11', 'rounded-full');
@@ -181,7 +181,7 @@ describe('barra do topo em pílulas (CA-12, CA-28)', () => {
     await screen.findByText(/nenhum jogo cadastrado/i);
 
     expect(screen.getAllByRole('navigation', { name: 'Navegação principal' })).toHaveLength(1);
-    expect(screen.getAllByRole('link', { name: 'checkpoint' })).toHaveLength(1);
+    expect(screen.getAllByRole('link', { name: 'Checkpoint' })).toHaveLength(1);
   });
 
   it('"Adicionar" do topo, fora do catálogo, leva a `/` com o formulário aberto', async () => {

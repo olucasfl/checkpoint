@@ -3,10 +3,10 @@ import { describe, expect, it } from 'vitest';
 import { BrandLogo } from './BrandLogo';
 
 describe('BrandLogo (F4)', () => {
-  it('círculo `destaque` com a bandeira e o nome "checkpoint" em minúsculas, como no catálogo', () => {
+  it('círculo `destaque` com a bandeira e o nome "Checkpoint", como no catálogo', () => {
     const { container } = render(<BrandLogo />);
 
-    expect(screen.getByText('checkpoint')).toBeInTheDocument();
+    expect(screen.getByText('Checkpoint')).toBeInTheDocument();
     expect(container.querySelector('[aria-hidden="true"]')).toHaveClass(
       'rounded-full',
       'bg-destaque',
