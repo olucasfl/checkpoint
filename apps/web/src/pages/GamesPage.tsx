@@ -1,28 +1,31 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { type Game } from '@checkpoint/shared';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { type Game, type GameStatus } from '@checkpoint/shared';
 import { Icon } from '@/shared/components/Icon';
 import { ModalDialog } from '@/shared/components/ModalDialog';
 import { useConnectivity } from '@/shared/hooks/use-connectivity';
 import { usePrefs } from '@/shared/hooks/use-prefs';
 import { useGames } from '@/features/games/api/use-games';
 import { DeleteGameDialog } from '@/features/games/components/DeleteGameDialog';
+import { DestaqueContinue } from '@/features/games/components/DestaqueContinue';
 import { GameForm } from '@/features/games/components/GameForm';
-import { GameRow } from '@/features/games/components/GameRow';
 import { ListEmpty, ListError, ListLoading } from '@/features/games/components/ListStates';
-import { StatPanels } from '@/features/games/components/StatPanels';
+import { Prateleira } from '@/features/games/components/Prateleira';
 import { StatusFilter } from '@/features/games/components/StatusFilter';
-import { countByStatus, filterGames } from '@/features/games/lib/count-by-status';
+import { countByStatus } from '@/features/games/lib/count-by-status';
+import { agruparEmPrateleiras, destaqueDoCatalogo } from '@/features/games/lib/estante';
 import { comFiltroInicial, paramsDoFiltro } from '@/features/games/lib/initial-filter';
 import { wantsNewGame, withoutNewGameParam } from '@/features/games/lib/new-game';
 import { parseStatusFilter, type StatusFilter as Filter } from '@/features/games/lib/status-filter';
 
-/** Estado do diálogo de criar/editar: fechado, novo jogo, ou edição de um jogo. */
-type FormDialog = { open: false } | { open: true; game?: Game };
+/** Estado do diálogo: fechado, novo jogo (com o status da prateleira que o abriu, se veio de uma) ou edição. */
+type FormDialog = { open: false } | { open: true; game?: Game; status?: GameStatus };
 
 /**
- * Catálogo de jogos (rota `/`). Busca a lista COMPLETA uma vez; o filtro (na URL, `/?status=`) e as
- * contagens dos painéis e dos botões saem dela, no cliente. O fundo e a navegação vêm do AppLayout.
+ * Catálogo de jogos (rota `/`): a estante. Busca a lista COMPLETA uma vez; o filtro (na URL, `/?status=`), as contagens,
+ * o destaque e as prateleiras saem dela, no cliente. A barra superior é desta página (o `TopNav` não renderiza em `/`):
+ * logo, filtros, "Adicionar jogo" e "Perfil" no desktop; no celular, logo e filtros (Adicionar e Perfil ficam na
+ * barra inferior).
  */
 export function GamesPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -40,7 +43,8 @@ export function GamesPage() {
 
   const games = useMemo(() => data ?? [], [data]);
   const counts = useMemo(() => countByStatus(games), [games]);
-  const visible = useMemo(() => filterGames(games, filter), [games, filter]);
+  const prateleiras = useMemo(() => agruparEmPrateleiras(games, filter), [games, filter]);
+  const destaque = useMemo(() => destaqueDoCatalogo(games, filter), [games, filter]);
 
   // Um efeito só acerta a URL (com `replace`, para o "voltar" não voltar a ela): `/?novo=1` abre o
   // formulário e sai da URL (reload não o reabre), e `/` sem `?status=` ganha o filtro inicial do
@@ -62,69 +66,75 @@ export function GamesPage() {
   }
 
   return (
-    <div className="safe-x pb-12 pt-6 md:pb-16 md:pt-10">
-      <main className="relative mx-auto flex max-w-[1168px] flex-col gap-5 md:gap-7">
-        <header className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-3 md:gap-4">
-            <div className="grid size-10 place-items-center rounded-md border border-destaque text-destaque md:size-[52px]">
-              <Icon name="flag" size={26} filled />
-            </div>
-            <div>
-              <h1 className="m-0 font-display text-[22px] font-extrabold tracking-[0.14em] md:text-[30px]">
-                CHECKPOINT
-              </h1>
-              <div className="text-[13px] font-semibold uppercase tracking-[0.2em] text-texto-suave md:text-[15px] md:tracking-[0.28em]">
-                Seu registro de jogos
-              </div>
-            </div>
+    <div className="safe-x pb-12 pt-4 md:pb-16 md:pt-6">
+      <div className="relative mx-auto flex max-w-[1168px] flex-col gap-5 md:gap-7">
+        <header className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:gap-4">
+          <div className="flex items-center justify-between md:contents">
+            <Link
+              to="/"
+              aria-current="page"
+              className="flex items-center gap-2.5 font-display text-xl font-extrabold tracking-[-0.01em] text-texto no-underline md:text-[22px]"
+            >
+              <span
+                aria-hidden="true"
+                className="grid size-8 place-items-center rounded-full bg-destaque text-fundo md:size-9"
+              >
+                <Icon name="flag" size={20} filled />
+              </span>
+              checkpoint
+            </Link>
           </div>
 
-          {/* No celular, "Adicionar" fica na barra inferior. */}
-          <button
-            type="button"
-            onClick={() => setForm({ open: true })}
-            className="hidden h-[52px] items-center gap-2.5 rounded-[4px] bg-destaque px-6 font-display text-sm font-extrabold uppercase tracking-[0.1em] text-fundo transition-transform hover:-translate-y-0.5 md:flex"
-          >
-            <Icon name="add_circle" size={22} />
-            Adicionar jogo
-          </button>
+          <StatusFilter filter={filter} counts={counts} onChange={changeFilter} />
+
+          {/* No celular, "Adicionar" e "Perfil" ficam na barra inferior. */}
+          <div className="hidden items-center gap-2 md:flex">
+            <button
+              type="button"
+              onClick={() => setForm({ open: true })}
+              className="flex h-11 items-center gap-2 rounded-full bg-destaque px-5 font-display text-[15px] font-bold text-fundo transition-transform hover:-translate-y-0.5"
+            >
+              <Icon name="add" size={22} />
+              Adicionar jogo
+            </button>
+            <Link
+              to="/perfil"
+              aria-label="Perfil"
+              className="grid size-11 place-items-center rounded-full border border-borda-controle bg-painel text-texto-suave no-underline transition-colors hover:text-texto"
+            >
+              <Icon name="person" size={22} />
+            </Link>
+          </div>
         </header>
 
-        <StatPanels counts={counts} />
+        <main className="flex flex-col gap-7 md:gap-9">
+          <h1 className="sr-only">Seus jogos</h1>
 
-        <div className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-center md:justify-between">
-          <StatusFilter filter={filter} counts={counts} onChange={changeFilter} />
-          <div className="flex items-center gap-1.5 text-[13px] font-semibold uppercase tracking-[0.14em] text-texto-suave md:text-[15px]">
-            <Icon name="history" size={18} />
-            Última atualização primeiro
-          </div>
-        </div>
+          {isPending && <ListLoading />}
+          {/* Com a lista já carregada, um refetch que falha não a esconde (spec, "Catálogo sem conexão"). */}
+          {isError && data === undefined && (
+            <ListError onRetry={() => void refetch()} offline={connection !== 'online'} />
+          )}
+          {!isPending && data !== undefined && prateleiras.length === 0 && (
+            <ListEmpty filtered={filter !== 'TODOS' && games.length > 0} />
+          )}
 
-        {isPending && <ListLoading />}
-        {/* Com a lista já carregada, um refetch que falha não a esconde (spec, "Catálogo sem conexão"). */}
-        {isError && data === undefined && (
-          <ListError onRetry={() => void refetch()} offline={connection !== 'online'} />
-        )}
-        {!isPending && data !== undefined && visible.length === 0 && (
-          <ListEmpty filtered={filter !== 'TODOS' && games.length > 0} />
-        )}
-        {visible.length > 0 && (
-          <ul
-            aria-label="Jogos"
-            className={`m-0 flex list-none flex-col p-0 ${densidade === 'compacta' ? 'gap-1.5' : 'gap-2.5'}`}
-          >
-            {visible.map((game) => (
-              <GameRow
-                key={game.id}
-                game={game}
-                onEdit={(target) => setForm({ open: true, game: target })}
-                onRemove={setToDelete}
-                compacta={densidade === 'compacta'}
-              />
-            ))}
-          </ul>
-        )}
-      </main>
+          {destaque && <DestaqueContinue game={destaque} />}
+          {prateleiras.map((prateleira) => (
+            <Prateleira
+              key={prateleira.status}
+              status={prateleira.status}
+              titulo={prateleira.titulo}
+              icone={prateleira.icone}
+              jogos={prateleira.jogos}
+              onEdit={(target) => setForm({ open: true, game: target })}
+              onRemove={setToDelete}
+              onAdicionar={(status) => setForm({ open: true, status })}
+              compacta={densidade === 'compacta'}
+            />
+          ))}
+        </main>
+      </div>
 
       <ModalDialog
         open={form.open}
@@ -134,6 +144,7 @@ export function GamesPage() {
         {form.open && (
           <GameForm
             game={form.game}
+            statusInicial={form.status}
             onDone={() => setForm({ open: false })}
             onCancel={() => setForm({ open: false })}
             onLinkedExisting={(jogoId) => {

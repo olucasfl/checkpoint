@@ -46,6 +46,8 @@ interface GameFormProps {
   onCancel: () => void;
   /** Jogo NOVO: a pessoa ligou um item da Steam a um jogo que já existia. Quem abriu leva ao jogo. */
   onLinkedExisting?: (jogoId: string) => void;
+  /** Jogo novo aberto pelo "Adicionar" de uma prateleira: começa com o status dela. Sem isso, o padrão. */
+  statusInicial?: GameStatus;
 }
 
 const NO_ERROR: FormError = { message: '', fields: {} };
@@ -55,10 +57,18 @@ const NO_ERROR: FormError = { message: '', fields: {} };
  * depois a capa. Se o jogo salvou e a capa falhou, o diálogo continua aberto, agora editando AQUELE
  * jogo (o próximo Salvar é PATCH, não POST, e não gera 409) e o erro aparece no campo da capa.
  */
-export function GameForm({ game, onDone, onCancel, onLinkedExisting }: GameFormProps) {
+export function GameForm({
+  game,
+  onDone,
+  onCancel,
+  onLinkedExisting,
+  statusInicial,
+}: GameFormProps) {
   const [saved, setSaved] = useState<Game | undefined>(game);
   const [values, setValues] = useState<GameFormValues>(
-    game ? valuesFromGame(game) : EMPTY_FORM_VALUES,
+    game
+      ? valuesFromGame(game)
+      : { ...EMPTY_FORM_VALUES, status: statusInicial ?? EMPTY_FORM_VALUES.status },
   );
   const [file, setFile] = useState<File | null>(null);
   const [removing, setRemoving] = useState(false);

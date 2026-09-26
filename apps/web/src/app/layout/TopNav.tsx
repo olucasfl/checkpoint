@@ -10,7 +10,8 @@ import { isNavActive, NAV_LINKS } from './nav-items';
 export function TopNav() {
   const { pathname } = useLocation();
 
-  if (NAV_LINKS.length < 2) {
+  // No catálogo (`/`) a barra superior é da própria página (logo, filtros, Adicionar jogo e Perfil).
+  if (NAV_LINKS.length < 2 || pathname === '/') {
     return null;
   }
 

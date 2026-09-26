@@ -178,11 +178,16 @@ describe('mobile-first (pwa-e-mobile, etapa 1)', () => {
     expect(css).toMatch(/input,\s*select,\s*textarea\s*\{[^}]*font-size:\s*16px/);
   });
 
-  it('hover da linha só em aparelho com hover (CA-14)', () => {
-    expect(css).toMatch(/@media \(hover: hover\)\s*\{\s*\.row-hover:hover/);
-    expect(css.replace(/@media \(hover: hover\)\s*\{\s*\.row-hover:hover/, '')).not.toMatch(
-      /\.row-hover:hover/,
-    );
+  it('sem as classes da linha antiga (.game-row, .row-hover, .game-title) (CA-13)', () => {
+    expect(css).not.toMatch(/\.game-row|\.row-hover|\.game-title/);
+  });
+
+  it('o hover do tile só existe dentro de @media (hover: hover) (CA-18)', () => {
+    // Do @media (hover: hover) até a próxima regra de mesmo nível: o que sobra fora dele não pode ter :hover do tile.
+    const inicio = css.indexOf('@media (hover: hover)');
+    const fim = css.indexOf('\n  }\n', inicio);
+    const fora = css.slice(0, inicio) + css.slice(fim);
+    expect(fora).not.toMatch(/\.tile:hover|\.tile:focus-within/);
   });
 
   it('safe-area e 100dvh no layout, na barra inferior e na folha (CA-05, CA-08, CA-09)', () => {

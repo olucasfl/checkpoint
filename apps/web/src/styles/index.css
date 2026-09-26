@@ -173,52 +173,6 @@ button:disabled {
   }
 
   /*
-   * Linha do jogo. Em tela estreita é uma grade: capa | título, plataforma, selo | ações, e a nota
-   * numa segunda linha com a largura toda. Em >= 48rem volta a ser a linha única de hoje.
-   */
-  .game-row {
-    display: grid;
-    grid-template-columns: 52px minmax(0, 1fr) auto;
-    grid-template-areas:
-      'capa texto acoes'
-      'capa selo acoes'
-      'nota nota nota';
-  }
-
-  .game-row-compacta {
-    grid-template-columns: 40px minmax(0, 1fr) auto;
-  }
-
-  .game-row > [data-area='capa'] {
-    grid-area: capa;
-  }
-
-  .game-row > [data-area='texto'] {
-    grid-area: texto;
-  }
-
-  .game-row > [data-area='selo'] {
-    grid-area: selo;
-  }
-
-  .game-row > [data-area='nota'] {
-    grid-area: nota;
-  }
-
-  .game-row > [data-area='acoes'] {
-    grid-area: acoes;
-  }
-
-  /* Título: até 2 linhas no celular (quebrando até palavra de 120 letras); uma linha no desktop. */
-  .game-title {
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    overflow: hidden;
-    overflow-wrap: anywhere;
-  }
-
-  /*
    * Diálogo: folha inferior no celular (largura total, colada embaixo, cantos de cima arredondados,
    * altura limitada à tela menos a safe-area de cima); centralizado em >= 48rem, como antes.
    * O <dialog> modal é o contêiner de rolagem; o rodapé do formulário é sticky dentro dele.
@@ -259,16 +213,6 @@ button:disabled {
       inset-inline: auto 24px;
       bottom: 24px;
       width: 440px;
-    }
-
-    .game-row {
-      display: flex;
-    }
-
-    .game-title {
-      display: block;
-      white-space: nowrap;
-      text-overflow: ellipsis;
     }
 
     dialog.modal {
@@ -474,22 +418,6 @@ button:disabled {
 
   .banner-in {
     animation: banner-in 0.18s ease-out;
-  }
-
-  .row-hover {
-    transition:
-      transform 0.18s ease,
-      border-color 0.18s,
-      background 0.18s;
-  }
-
-  /* Só em aparelho com hover de verdade: no toque, o :hover "gruda" depois do toque. */
-  @media (hover: hover) {
-    .row-hover:hover {
-      transform: translateX(6px);
-      border-color: var(--color-destaque);
-      background: var(--color-painel-3);
-    }
   }
 }
 
