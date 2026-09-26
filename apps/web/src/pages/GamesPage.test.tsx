@@ -186,6 +186,75 @@ describe('destaque "Continue de onde parou" (CA-22, CA-23)', () => {
   });
 });
 
+describe('destaque e contagens acompanham a edição, sem recarregar (CA-19, CA-29)', () => {
+  const dois = [
+    game({ id: '1', titulo: 'Alfa', atualizadoEm: '2026-09-25T10:00:00.000Z' }),
+    game({ id: '2', titulo: 'Beta', atualizadoEm: '2026-09-24T10:00:00.000Z' }),
+    game({ id: '3', titulo: 'Gama', status: 'ZERADO', atualizadoEm: '2026-09-23T10:00:00.000Z' }),
+  ];
+  const destaqueTitulo = () =>
+    within(document.querySelector('[data-destaque-catalogo]') as HTMLElement).getByRole('heading')
+      .textContent;
+
+  it('editar outro jogo Jogando promove ele a destaque', async () => {
+    api.list.mockResolvedValue(dois);
+    const user = renderPage();
+    await aparece('Gama');
+    expect(destaqueTitulo()).toBe('Alfa');
+
+    const editado = { ...dois[1], atualizadoEm: '2026-09-25T11:00:00.000Z' };
+    api.update.mockResolvedValue(editado);
+    api.list.mockResolvedValue([editado, dois[0], dois[2]]);
+    await user.click(screen.getByRole('button', { name: 'Editar Beta' }));
+    await user.click(await screen.findByRole('button', { name: 'SALVAR' }));
+
+    await waitFor(() => expect(destaqueTitulo()).toBe('Beta'));
+  });
+
+  it('as pílulas e os contadores das prateleiras sobem, mudam e descem com criar, editar e remover', async () => {
+    api.list.mockResolvedValue(dois);
+    const user = renderPage();
+    await aparece('Gama');
+    const contador = (nome: string) =>
+      within(screen.getByRole('region', { name: nome })).getAllByText(/^\d+$/)[0].textContent;
+    expect(filterButton(/^Todos ?3$/)).toBeInTheDocument();
+    expect(filterButton(/^Jogando ?2$/)).toBeInTheDocument();
+    expect(filterButton(/^Quero jogar ?0$/)).toBeInTheDocument();
+    expect(filterButton(/^Zerado ?1$/)).toBeInTheDocument();
+    expect([contador('Jogando agora'), contador('Zerados')]).toEqual(['2', '1']);
+    expect(screen.queryByRole('region', { name: 'Quero jogar' })).toBeNull();
+
+    // criar um Jogando
+    const novo = game({ id: '4', titulo: 'Delta', atualizadoEm: '2026-09-25T12:00:00.000Z' });
+    api.create.mockResolvedValue(novo);
+    api.list.mockResolvedValue([novo, ...dois]);
+    await user.click(screen.getByRole('button', { name: 'Adicionar jogo' }));
+    await user.type(await screen.findByLabelText('Título'), 'Delta');
+    await user.click(screen.getByRole('button', { name: 'SALVAR' }));
+    await waitFor(() => expect(filterButton(/^Todos ?4$/)).toBeInTheDocument());
+    expect(filterButton(/^Jogando ?3$/)).toBeInTheDocument();
+    expect(contador('Jogando agora')).toBe('3');
+
+    // remover um Zerado
+    api.remove.mockResolvedValue(undefined);
+    api.list.mockResolvedValue([novo, dois[0], dois[1]]);
+    await user.click(screen.getByRole('button', { name: 'Remover Gama' }));
+    await user.click(await screen.findByRole('button', { name: 'REMOVER' }));
+    await waitFor(() => expect(filterButton(/^Zerado ?0$/)).toBeInTheDocument());
+    expect(filterButton(/^Todos ?3$/)).toBeInTheDocument();
+  });
+
+  it('com o filtro Zerado só a prateleira "Zerados" aparece', async () => {
+    api.list.mockResolvedValue(dois);
+    renderPage('/?status=ZERADO');
+    await aparece('Gama');
+
+    expect(screen.getAllByRole('region').map((r) => r.getAttribute('data-prateleira'))).toEqual([
+      'ZERADO',
+    ]);
+  });
+});
+
 describe('"Adicionar" ao fim da prateleira (CA-14)', () => {
   it('abre o formulário de novo jogo já no status da prateleira', async () => {
     const user = renderPage();
