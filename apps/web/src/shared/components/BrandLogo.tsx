@@ -1,15 +1,16 @@
 import { Icon } from '@/shared/components/Icon';
 
-/** O logo "CHECKPOINT" (bandeira + nome, com o brilho Neon), das telas fora do catálogo. */
+/** O logo "checkpoint" (círculo `destaque` com a bandeira em `fundo` e o nome), das telas fora do catálogo. */
 export function BrandLogo() {
   return (
-    <div className="flex items-center justify-center gap-3">
-      <div className="glow-logo grid size-10 place-items-center rounded-md border border-destaque text-destaque">
-        <Icon name="flag" size={26} filled />
+    <div className="flex items-center justify-center gap-2.5">
+      <div
+        aria-hidden="true"
+        className="grid size-10 place-items-center rounded-full bg-destaque text-fundo"
+      >
+        <Icon name="flag" size={22} filled />
       </div>
-      <span className="glow-text-destaque font-display text-[22px] font-extrabold tracking-[0.14em]">
-        CHECKPOINT
-      </span>
+      <span className="font-display text-2xl font-extrabold tracking-[-0.01em]">checkpoint</span>
     </div>
   );
 }

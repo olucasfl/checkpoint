@@ -743,10 +743,10 @@ como `[~]`, CA-20 e CA-30 (respostas simuladas).
 
 ### Etapa 4 — horas, conquistas, atualização e privacidade
 
-- [x] **CA-41** — **Dado** o catálogo (`/`), **então** a linha do jogo ligado mostra "42 h · 12/40" com o
+- [x] **CA-41** — _(atualizado por `troca-de-design-estante`, F2: o tile mostra "42 h · 12/40"; ver CA-22)_ **Dado** o catálogo (`/`), **então** a linha do jogo ligado mostra "42 h · 12/40" com o
       `aria-label` completo e a do jogo sem ligação não mostra nada; **dado** Y = 0, **então** só as horas; **dado**
       0 minutos, **então** "0 h".
-- [x] **CA-42** — **Dado** um jogo com capa enviada **e** vínculo, **então** a capa mostrada é a enviada; **dado**
+- [x] **CA-42** — _(atualizado por `troca-de-design-estante`, F2: a cadeia da capa é enviada → oficial → gerada (sem `header.jpg`); ver CA-39)_ **Dado** um jogo com capa enviada **e** vínculo, **então** a capa mostrada é a enviada; **dado**
       só o vínculo, **então** a oficial (e se ela falhar ao carregar, a de `header.jpg`, e depois a gerada); **dado**
       que removo a capa enviada, **então** a oficial reaparece.
       _Implementação:_ nada é gravado no web; `lib/capa.ts` põe as imagens em ordem (enviada, oficial, `header.jpg` do

@@ -5,25 +5,26 @@ import {
   type DadosJogoPlataforma,
   type Game,
 } from '@checkpoint/shared';
-import { FieldError, LABEL } from '@/shared/components/form-parts';
+import { FieldError } from '@/shared/components/form-parts';
 import { Icon } from '@/shared/components/Icon';
 import { ModalDialog } from '@/shared/components/ModalDialog';
 import { describeAuthError } from '@/features/auth/lib/auth-errors';
 import { useAtualizarJogo, useDesvincularJogo, useDetalheJogo } from '../api/use-integracoes';
 import {
+  dataCurta,
   desbloqueadaEmTexto,
   horasEMinutos,
   progressoDasConquistas,
   raridadeTexto,
   separarConquistas,
-  ultimoJogoTexto,
 } from '../lib/conquistas';
+import { atualizadoHaTexto } from '../lib/tempo-relativo';
 
 const PROVEDOR = 'STEAM' as const;
 
 const BOTAO =
-  'min-h-11 min-w-11 rounded-xl px-4 font-display text-[13px] uppercase tracking-[0.1em] disabled:cursor-wait disabled:opacity-60';
-const BOTAO_CONTORNO = `${BOTAO} inline-flex items-center justify-center gap-2 border border-borda-controle font-semibold hover:bg-acao-hover`;
+  'min-h-11 min-w-11 rounded-full px-[18px] font-display text-[15px] disabled:cursor-wait disabled:opacity-60';
+const BOTAO_CONTORNO = `${BOTAO} inline-flex items-center justify-center gap-2 border border-borda-controle font-bold transition-colors hover:bg-painel-3`;
 const BOTAO_PRIMARIO = `${BOTAO} bg-destaque font-extrabold text-fundo`;
 
 /** O que cada aviso do servidor vira na tela: discreto, e sempre com o que continua valendo. */
@@ -50,34 +51,41 @@ function Aviso({ texto }: { texto: string }) {
 
 function Estatistica({ rotulo, valor }: { rotulo: string; valor: string }) {
   return (
-    <div className="flex min-w-0 flex-col rounded-xl bg-painel-2 px-3 py-2.5">
-      <dt className="text-[14px] font-semibold uppercase tracking-[0.08em] text-texto-suave">
-        {rotulo}
-      </dt>
-      <dd className="m-0 font-display text-[19px] font-bold [overflow-wrap:anywhere]">{valor}</dd>
+    <div className="flex min-w-0 flex-col gap-1 rounded-2xl bg-painel-2 px-[18px] py-4">
+      <dt className="text-[13px] font-semibold text-texto-suave">{rotulo}</dt>
+      <dd className="m-0 font-display text-2xl font-extrabold [overflow-wrap:anywhere]">{valor}</dd>
     </div>
   );
 }
 
+/** O cartão "Conquistas · 12 de 40": a barra `role="progressbar"` em `ouro` (10,35:1 sobre o trilho `borda`) e a porcentagem. */
 function Progresso({ desbloqueadas, total }: { desbloqueadas: number; total: number }) {
   const progresso = progressoDasConquistas(desbloqueadas, total);
   if (!progresso) {
     return null;
   }
   return (
-    <div className="flex flex-col gap-1.5">
-      <div
-        role="progressbar"
-        aria-label="Conquistas desbloqueadas"
-        aria-valuemin={0}
-        aria-valuemax={progresso.total}
-        aria-valuenow={progresso.desbloqueadas}
-        aria-valuetext={progresso.texto}
-        className="h-3 w-full overflow-hidden rounded-full bg-painel-2"
-      >
-        <div className="h-full bg-destaque" style={{ width: `${progresso.percentual}%` }} />
+    <div className="flex min-w-0 flex-col gap-2 rounded-2xl bg-painel-2 px-[18px] py-4">
+      <span className="text-[13px] font-semibold text-texto-suave">
+        Conquistas · {progresso.desbloqueadas} de {progresso.total}
+      </span>
+      <div className="flex items-center gap-3">
+        <div
+          role="progressbar"
+          aria-label={progresso.texto}
+          aria-valuemin={0}
+          aria-valuemax={progresso.total}
+          aria-valuenow={progresso.desbloqueadas}
+          aria-valuetext={progresso.texto}
+          className="h-2.5 flex-1 overflow-hidden rounded-full bg-borda"
+        >
+          <div
+            className="h-full rounded-full bg-ouro"
+            style={{ width: `${progresso.percentual}%` }}
+          />
+        </div>
+        <span className="font-display text-lg font-extrabold">{progresso.percentual}%</span>
       </div>
-      <span className="text-[16px] font-semibold">{progresso.texto}</span>
     </div>
   );
 }
@@ -85,49 +93,59 @@ function Progresso({ desbloqueadas, total }: { desbloqueadas: number; total: num
 function ItemDeConquista({ conquista }: { conquista: Conquista }) {
   const escondida = conquista.oculta && !conquista.desbloqueada;
   const data = desbloqueadaEmTexto(conquista.desbloqueadaEm);
+  const iconeVazio = conquista.desbloqueada
+    ? 'military_tech'
+    : escondida
+      ? 'visibility_off'
+      : 'lock';
   return (
     <li
       data-conquista={conquista.id}
-      className="flex min-w-0 flex-col gap-2 py-3 lg:flex-row lg:items-center lg:justify-between lg:gap-6"
+      className="flex min-w-0 flex-wrap items-center gap-x-3.5 gap-y-1.5 rounded-2xl bg-painel-2 px-3.5 py-3"
     >
-      <div className="flex min-w-0 items-start gap-3">
-        {conquista.iconeUrl ? (
-          // Decorativo (o nome está ao lado), sem `Referer` e com tamanho fixo: a lista pode ter centenas de ícones.
-          <img
-            src={conquista.iconeUrl}
-            alt=""
-            width={64}
-            height={64}
-            loading="lazy"
-            referrerPolicy="no-referrer"
-            className="size-16 shrink-0 rounded-md bg-painel-2"
-          />
-        ) : (
-          <div aria-hidden="true" className="size-16 shrink-0 rounded-md bg-painel-2" />
-        )}
-        <div className="flex min-w-0 flex-col">
-          <span className="text-[18px] font-semibold [overflow-wrap:anywhere]">
-            {conquista.nome}
-          </span>
-          <span className="text-[16px] text-texto-suave [overflow-wrap:anywhere]">
-            {escondida ? 'Conquista oculta' : (conquista.descricao ?? '')}
-          </span>
+      {conquista.iconeUrl ? (
+        // Decorativo (o nome está ao lado), sem `Referer` e com tamanho fixo: a lista pode ter centenas de ícones.
+        <img
+          src={conquista.iconeUrl}
+          alt=""
+          width={52}
+          height={52}
+          loading="lazy"
+          referrerPolicy="no-referrer"
+          className="size-[52px] shrink-0 rounded-[10px] bg-painel-3"
+        />
+      ) : (
+        <div
+          aria-hidden="true"
+          className="grid size-[52px] shrink-0 place-items-center rounded-[10px] bg-painel-3 text-texto-suave"
+        >
+          <Icon name={iconeVazio} size={26} />
         </div>
+      )}
+      <div className="flex min-w-0 flex-1 basis-40 flex-col gap-0.5">
+        <span className="text-[15px] font-bold [overflow-wrap:anywhere]">{conquista.nome}</span>
+        <span className="text-[13px] font-medium text-texto-suave [overflow-wrap:anywhere]">
+          {escondida ? 'Conquista oculta' : (conquista.descricao ?? '')}
+        </span>
+        {data && <span className="text-xs font-semibold text-status-zerado">{data}</span>}
       </div>
-      <div className="flex min-w-0 flex-col text-[15px] text-texto-suave lg:shrink-0 lg:text-right">
-        {data && <span>{data}</span>}
-        <span>{raridadeTexto(conquista.raridadePercentual)}</span>
-      </div>
+      <span className="shrink-0 text-xs font-bold text-texto-suave max-sm:basis-full max-sm:pl-[66px] sm:text-right">
+        {raridadeTexto(conquista.raridadePercentual)}
+      </span>
     </li>
   );
 }
 
 function ListaDeConquistas({
   titulo,
+  icone,
+  cor,
   conquistas,
   aberta,
 }: {
   titulo: string;
+  icone: string;
+  cor: string;
   conquistas: Conquista[];
   aberta: boolean;
 }) {
@@ -135,11 +153,15 @@ function ListaDeConquistas({
     return null;
   }
   return (
-    <details open={aberta} data-lista={titulo} className="flex flex-col">
-      <summary className="flex min-h-11 cursor-pointer items-center gap-2 font-display text-[15px] font-bold uppercase tracking-[0.1em]">
-        {titulo} ({conquistas.length})
+    <details open={aberta} data-lista={titulo} className="flex min-w-0 flex-col gap-3">
+      <summary className="flex min-h-11 cursor-pointer items-center gap-2.5 font-display text-lg font-bold">
+        <Icon name={icone} size={22} filled className={cor} />
+        {titulo}
+        <span className="inline-flex h-[22px] items-center rounded-full bg-painel-3 px-2.5 text-[13px] font-bold text-texto-suave">
+          {conquistas.length}
+        </span>
       </summary>
-      <ul className="m-0 flex list-none flex-col divide-y divide-borda p-0">
+      <ul className="m-0 flex list-none flex-col gap-2.5 p-0">
         {conquistas.map((conquista) => (
           <ItemDeConquista key={conquista.id} conquista={conquista} />
         ))}
@@ -254,67 +276,107 @@ export function BlocoSteam({ game }: { game: Game }) {
     }
   }
 
+  const atualizadoEm = atualizadoHaTexto(dados.atualizadoEm);
+
   return (
     <section
       aria-labelledby="detalhe-steam"
       data-secao="steam"
-      className="flex min-w-0 flex-col gap-4 rounded-2xl bg-painel p-4 md:p-5"
+      className="flex min-w-0 flex-col gap-5 rounded-[22px] border border-borda bg-painel p-4 md:gap-[22px] md:px-7 md:py-6"
     >
-      <h2 id="detalhe-steam" className={`m-0 ${LABEL}`}>
-        Steam
-      </h2>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div
+            aria-hidden="true"
+            className="grid size-11 place-items-center rounded-xl bg-painel-3 text-status-jogando"
+          >
+            <Icon name="sports_esports" size={26} filled />
+          </div>
+          <div className="flex flex-col">
+            <h2 id="detalhe-steam" className="m-0 font-display text-xl font-extrabold">
+              Steam
+            </h2>
+            {atualizadoEm && (
+              <span className="text-[13px] font-medium text-texto-suave">{atualizadoEm}</span>
+            )}
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2.5">
+          <button
+            type="button"
+            onClick={() => void onAtualizar()}
+            disabled={atualizar.isPending}
+            className={BOTAO_CONTORNO}
+          >
+            <Icon name="refresh" size={20} />
+            {atualizar.isPending ? 'Atualizando…' : 'Atualizar'}
+          </button>
+          {steamUrl && (
+            <a href={steamUrl} target="_blank" rel="noopener noreferrer" className={BOTAO_CONTORNO}>
+              <Icon name="open_in_new" size={20} />
+              Abrir na Steam
+            </a>
+          )}
+          <button
+            type="button"
+            onClick={() => {
+              setErroDesvincular('');
+              setConfirmando(true);
+            }}
+            className={`${BOTAO_CONTORNO} text-erro-texto`}
+          >
+            <Icon name="link_off" size={20} />
+            Desvincular
+          </button>
+        </div>
+      </div>
 
-      <dl className="m-0 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-        <Estatistica rotulo="Tempo jogado" valor={horasEMinutos(dados.minutosJogados)} />
-        <Estatistica rotulo="Última vez" valor={ultimoJogoTexto(dados.ultimaVezJogadoEm)} />
-      </dl>
-
+      <FieldError id="steam-jogo-atualizar-erro" message={erroAtualizar} />
       {textoDoAviso && <Aviso texto={textoDoAviso} />}
       {detalhe.isError && (
         <Aviso texto="Não foi possível carregar as conquistas agora. Mostrando o último valor salvo." />
       )}
 
-      {semConquistas && <p className="m-0 text-[16px]">Este jogo não tem conquistas.</p>}
-      {mostrarBarra && dados.conquistasTotal !== null && dados.conquistasDesbloqueadas !== null && (
-        <Progresso desbloqueadas={dados.conquistasDesbloqueadas} total={dados.conquistasTotal} />
-      )}
+      <dl className="m-0 grid grid-cols-1 gap-3 md:grid-cols-3">
+        <Estatistica rotulo="Tempo jogado na Steam" valor={horasEMinutos(dados.minutosJogados)} />
+        <Estatistica
+          rotulo="Último jogo em"
+          valor={dataCurta(dados.ultimaVezJogadoEm) ?? 'Nunca jogado'}
+        />
+        {mostrarBarra &&
+          dados.conquistasTotal !== null &&
+          dados.conquistasDesbloqueadas !== null && (
+            <Progresso
+              desbloqueadas={dados.conquistasDesbloqueadas}
+              total={dados.conquistasTotal}
+            />
+          )}
+      </dl>
+
+      {semConquistas && <p className="m-0 text-base">Este jogo não tem conquistas.</p>}
 
       {detalhe.isPending && (
         <div role="status" aria-label="Carregando conquistas" className="flex flex-col gap-2">
-          <div className="h-4 w-1/2 rounded-lg bg-painel-2" />
-          <div className="h-4 w-2/3 rounded-lg bg-painel-2" />
+          <div className="skeleton h-4 w-1/2 rounded-lg" />
+          <div className="skeleton h-4 w-2/3 rounded-lg" />
         </div>
       )}
 
-      <ListaDeConquistas titulo="Desbloqueadas" conquistas={desbloqueadas} aberta={false} />
-      <ListaDeConquistas titulo="Faltam" conquistas={faltam} aberta />
-
-      <FieldError id="steam-jogo-atualizar-erro" message={erroAtualizar} />
-      <div className="flex flex-wrap gap-2.5">
-        <button
-          type="button"
-          onClick={() => void onAtualizar()}
-          disabled={atualizar.isPending}
-          className={BOTAO_CONTORNO}
-        >
-          {atualizar.isPending ? 'Atualizando…' : 'Atualizar'}
-        </button>
-        {steamUrl && (
-          <a href={steamUrl} target="_blank" rel="noopener noreferrer" className={BOTAO_CONTORNO}>
-            Abrir na Steam
-            <Icon name="open_in_new" size={18} />
-          </a>
-        )}
-        <button
-          type="button"
-          onClick={() => {
-            setErroDesvincular('');
-            setConfirmando(true);
-          }}
-          className={BOTAO_CONTORNO}
-        >
-          Desvincular
-        </button>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:items-start">
+        <ListaDeConquistas
+          titulo="Desbloqueadas"
+          icone="check_circle"
+          cor="text-status-zerado"
+          conquistas={desbloqueadas}
+          aberta={false}
+        />
+        <ListaDeConquistas
+          titulo="Faltam"
+          icone="lock"
+          cor="text-texto-suave"
+          conquistas={faltam}
+          aberta
+        />
       </div>
 
       <DesvincularJogoDialog

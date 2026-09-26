@@ -19,7 +19,7 @@ import { urlDaSteamSegura } from '../lib/steam-url';
 const PROVEDOR = 'STEAM' as const;
 
 const BOTAO =
-  'min-h-11 min-w-11 rounded-xl px-4 font-display text-[13px] uppercase tracking-[0.1em] disabled:cursor-wait disabled:opacity-60';
+  'min-h-11 min-w-11 rounded-full px-4 font-display text-[15px] disabled:cursor-wait disabled:opacity-60 font-bold';
 const BOTAO_CONTORNO = `${BOTAO} border border-borda-controle font-semibold hover:bg-acao-hover`;
 const BOTAO_PRIMARIO = `${BOTAO} bg-destaque font-extrabold text-fundo`;
 
@@ -58,9 +58,7 @@ function Cabecalho({ nome, avatarUrl }: { nome: string; avatarUrl?: string | nul
         <Icon name="account_circle" size={56} className="shrink-0 text-texto-suave" />
       )}
       <div className="flex min-w-0 flex-col">
-        <span className="font-display text-[13px] font-bold uppercase tracking-[0.18em] text-texto-suave">
-          Steam
-        </span>
+        <span className="font-display text-[15px] font-bold text-texto-suave">Steam</span>
         <span className="text-[19px] font-semibold [overflow-wrap:anywhere]">{nome}</span>
       </div>
     </div>
@@ -229,7 +227,7 @@ function DesvincularDialog({
       <div className="sheet-pad flex flex-col gap-5 px-7 pt-7">
         <h2
           id="desvincular-steam-titulo"
-          className="m-0 font-display text-xl font-extrabold uppercase tracking-[0.12em] text-destaque"
+          className="m-0 font-display text-xl font-extrabold tracking-[-0.01em] text-destaque"
         >
           Desvincular a Steam
         </h2>

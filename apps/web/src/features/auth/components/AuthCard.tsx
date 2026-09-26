@@ -9,9 +9,9 @@ interface AuthCardProps {
 /** Cartão central das telas de entrada: logo, título e o formulário, em até 420 px de largura. */
 export function AuthCard({ title, children }: AuthCardProps) {
   return (
-    <section className="relative flex w-full max-w-[420px] flex-col gap-5 rounded-md border border-borda bg-painel p-6 md:p-8">
+    <section className="relative flex w-full max-w-[420px] flex-col gap-5 rounded-2xl border border-borda bg-painel p-6 md:p-8">
       <BrandLogo />
-      <h1 className="m-0 text-center font-display text-[15px] font-extrabold uppercase tracking-[0.2em] text-texto-suave">
+      <h1 className="m-0 text-center font-display text-xl font-extrabold tracking-[-0.01em]">
         {title}
       </h1>
       {children}
@@ -21,8 +21,8 @@ export function AuthCard({ title, children }: AuthCardProps) {
 
 /** O botão principal do cartão: `destaque` com texto `fundo`, altura de 52 px. */
 export const PRIMARY_BUTTON =
-  'h-[52px] w-full rounded-[4px] bg-destaque px-6 font-display text-sm font-extrabold uppercase tracking-[0.1em] text-fundo disabled:cursor-wait disabled:opacity-60';
+  'h-[52px] w-full rounded-full bg-destaque px-6 font-display text-base font-extrabold text-fundo transition-transform hover:-translate-y-0.5 disabled:cursor-wait disabled:opacity-60';
 
 /** Link secundário do cartão ("Criar conta", "Já tenho conta"), com alvo de 44 px. */
 export const SECONDARY_LINK =
-  'flex min-h-11 items-center justify-center rounded-[4px] text-[16px] font-semibold text-ciano underline underline-offset-4';
+  'flex min-h-11 items-center justify-center rounded-full text-[16px] font-semibold text-destaque underline underline-offset-4';

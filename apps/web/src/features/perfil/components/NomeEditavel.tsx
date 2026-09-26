@@ -9,7 +9,7 @@ import { perfilApi } from '../api/perfil-api';
 const NO_ERROR: AuthFormError = { message: '', fields: {} };
 
 const BUTTON =
-  'min-h-11 rounded-xl px-4 font-display text-[13px] uppercase tracking-[0.1em] disabled:cursor-wait disabled:opacity-60';
+  'min-h-11 rounded-full px-4 font-display text-[15px] disabled:cursor-wait disabled:opacity-60 font-bold';
 
 /**
  * O nome de exibição, no cabeçalho do perfil, com o botão Editar ao lado (o nome aparece uma vez só
@@ -91,7 +91,7 @@ export function NomeEditavel() {
           type="button"
           aria-label="Editar nome"
           onClick={abrir}
-          className="grid size-11 shrink-0 place-items-center rounded-xl text-texto-suave transition-colors hover:bg-acao-hover hover:text-ciano"
+          className="grid size-11 shrink-0 place-items-center rounded-xl text-texto-suave transition-colors hover:bg-acao-hover hover:text-destaque"
         >
           <Icon name="edit" size={22} />
         </button>

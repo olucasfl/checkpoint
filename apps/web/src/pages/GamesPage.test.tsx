@@ -92,9 +92,12 @@ function renderPage(url = '/') {
   return userEvent.setup({ applyAccept: false });
 }
 
-const rows = () => screen.queryAllByRole('listitem');
-const titles = () =>
-  rows().map((row) => within(row).getByText(/./, { selector: '.game-title' }).textContent);
+const tiles = () => Array.from(document.querySelectorAll<HTMLElement>('[data-tile]'));
+const titles = () => tiles().map((t) => within(t).getByRole('link').textContent);
+const tile = (titulo: string) =>
+  tiles().find((t) => within(t).queryByRole('link', { name: titulo })) as HTMLElement;
+/** O jogo na estante (o link do tile): o destaque repete o título, por isso não se espera por texto. */
+const aparece = (titulo: string) => screen.findByRole('link', { name: titulo });
 const filterButton = (name: RegExp) =>
   within(screen.getByRole('group', { name: 'Filtrar por status' })).getByRole('button', { name });
 
@@ -105,60 +108,221 @@ beforeEach(() => {
   resetPrefsForTests();
 });
 
-describe('painéis de contagem (CA-79)', () => {
-  it('mostram Zerados 02, Jogando 01, Quero jogar 01, lidos como 2, 1 e 1', async () => {
+describe('estante e contagens (CA-13, CA-14, CA-27)', () => {
+  it('uma prateleira por status, na ordem da tela, cada uma com sua contagem e sua lista', async () => {
     renderPage();
-    await screen.findByText('Celeste');
+    await aparece('Celeste');
 
-    const panels = screen.getByRole('region', { name: 'Contagem por status' });
-    const panel = (status: string) =>
-      within(panels).getByText(
-        (_, el) =>
-          el?.closest('[data-panel]')?.getAttribute('data-panel') === status &&
-          el.getAttribute('role') === 'img',
-      );
-
-    expect(panel('ZERADO')).toHaveTextContent('02');
-    expect(panel('ZERADO')).toHaveAccessibleName('2');
-    expect(panel('JOGANDO')).toHaveTextContent('01');
-    expect(panel('JOGANDO')).toHaveAccessibleName('1');
-    expect(panel('QUERO_JOGAR')).toHaveTextContent('01');
-    expect(within(panels).getByText('Zerados')).toBeInTheDocument();
-    expect(within(panels).getByText('Quero jogar')).toBeInTheDocument();
+    const nomes = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent);
+    // O primeiro h2 é o título do destaque (Hollow Knight).
+    expect(nomes).toEqual(['Hollow Knight', 'Jogando agora', 'Quero jogar', 'Zerados']);
+    expect(titles()).toEqual(['Hollow Knight', 'Outer Wilds', 'Celeste', 'Hades']);
+    const zerados = screen.getByRole('list', { name: 'Zerados' });
+    expect(
+      within(zerados)
+        .getAllByRole('link')
+        .map((l) => l.textContent),
+    ).toEqual(['Celeste', 'Hades']);
+    expect(
+      within(screen.getByRole('region', { name: 'Zerados' })).getByText('2'),
+    ).toBeInTheDocument();
   });
 
-  it('depois de criar um jogo a lista é buscada de novo e as contagens acompanham', async () => {
+  it('não há mais os painéis de contagem', async () => {
+    renderPage();
+    await aparece('Celeste');
+
+    expect(screen.queryByRole('region', { name: 'Contagem por status' })).toBeNull();
+    expect(document.querySelector('[data-panel]')).toBeNull();
+    expect(screen.queryByText(/Última atualização primeiro/)).toBeNull();
+  });
+
+  it('depois de criar um jogo a lista é buscada de novo e a prateleira acompanha', async () => {
     const user = renderPage();
-    await screen.findByText('Celeste');
+    await aparece('Celeste');
     api.create.mockResolvedValue(game({ id: '5', titulo: 'Novo' }));
     api.list.mockResolvedValue([...CATALOG, game({ id: '5', titulo: 'Novo', status: 'JOGANDO' })]);
 
     await user.click(screen.getByRole('button', { name: 'Adicionar jogo' }));
     await user.type(await screen.findByLabelText('Título'), 'Novo');
     await user.click(screen.getByRole('button', { name: 'Jogando' }));
-    await user.click(screen.getByRole('button', { name: 'SALVAR' }));
+    await user.click(screen.getByRole('button', { name: 'Salvar' }));
 
-    await screen.findByText('Novo');
-    const jogando = document.querySelector('[data-panel="JOGANDO"] [role="img"]');
-    expect(jogando).toHaveTextContent('02');
-    expect(jogando).toHaveAccessibleName('2');
+    await aparece('Novo');
+    expect(
+      within(screen.getByRole('list', { name: 'Jogando agora' })).getAllByRole('link'),
+    ).toHaveLength(2);
     expect(api.list).toHaveBeenCalledTimes(2);
     expect(document.querySelector('dialog')).not.toHaveAttribute('open');
   });
 });
 
-describe('filtro na URL (CA-45, CA-47, CA-80)', () => {
-  it('sem parâmetro, "Todos" está ativo e a lista traz todos os jogos', async () => {
+describe('destaque "Continue de onde parou" (CA-22, CA-23)', () => {
+  it('Todos e Jogando mostram o jogo Jogando mais recente, que continua na prateleira', async () => {
     renderPage();
-    await screen.findByText('Celeste');
+    await aparece('Celeste');
+
+    const destaque = document.querySelector('[data-destaque-catalogo]') as HTMLElement;
+    expect(within(destaque).getByRole('heading', { name: 'Hollow Knight' })).toBeInTheDocument();
+    expect(within(destaque).getByRole('link', { name: 'Ver detalhes' })).toHaveAttribute(
+      'href',
+      '/jogos/1',
+    );
+    expect(titles()).toContain('Hollow Knight');
+  });
+
+  it.each(['QUERO_JOGAR', 'ZERADO'])('com o filtro %s não há destaque', async (status) => {
+    renderPage(`/?status=${status}`);
+    await aparece(status === 'ZERADO' ? 'Celeste' : 'Outer Wilds');
+
+    expect(document.querySelector('[data-destaque-catalogo]')).toBeNull();
+  });
+
+  it('sem nenhum jogo Jogando, não há destaque', async () => {
+    api.list.mockResolvedValue(CATALOG.filter((g) => g.status !== 'JOGANDO'));
+    renderPage();
+    await aparece('Celeste');
+
+    expect(document.querySelector('[data-destaque-catalogo]')).toBeNull();
+  });
+});
+
+describe('destaque e contagens acompanham a edição, sem recarregar (CA-19, CA-29)', () => {
+  const alfa = game({ id: '1', titulo: 'Alfa', atualizadoEm: '2026-09-25T10:00:00.000Z' });
+  const beta = game({ id: '2', titulo: 'Beta', atualizadoEm: '2026-09-24T10:00:00.000Z' });
+  const gama = game({
+    id: '3',
+    titulo: 'Gama',
+    status: 'ZERADO',
+    atualizadoEm: '2026-09-23T10:00:00.000Z',
+  });
+  const dois = [alfa, beta, gama];
+  const destaqueTitulo = () =>
+    within(document.querySelector('[data-destaque-catalogo]') as HTMLElement).getByRole('heading')
+      .textContent;
+
+  it('editar outro jogo Jogando promove ele a destaque', async () => {
+    api.list.mockResolvedValue(dois);
+    const user = renderPage();
+    await aparece('Gama');
+    expect(destaqueTitulo()).toBe('Alfa');
+
+    const editado = { ...beta, atualizadoEm: '2026-09-25T11:00:00.000Z' };
+    api.update.mockResolvedValue(editado);
+    api.list.mockResolvedValue([editado, alfa, gama]);
+    await user.click(screen.getByRole('button', { name: 'Editar Beta' }));
+    await user.click(await screen.findByRole('button', { name: 'Salvar' }));
+
+    await waitFor(() => expect(destaqueTitulo()).toBe('Beta'));
+  });
+
+  it('as pílulas e os contadores das prateleiras sobem, mudam e descem com criar, editar e remover', async () => {
+    api.list.mockResolvedValue(dois);
+    const user = renderPage();
+    await aparece('Gama');
+    const contador = (nome: string) =>
+      within(screen.getByRole('region', { name: nome })).getAllByText(/^\d+$/)[0]?.textContent;
+    expect(filterButton(/^Todos ?3$/)).toBeInTheDocument();
+    expect(filterButton(/^Jogando ?2$/)).toBeInTheDocument();
+    expect(filterButton(/^Quero jogar ?0$/)).toBeInTheDocument();
+    expect(filterButton(/^Zerado ?1$/)).toBeInTheDocument();
+    expect([contador('Jogando agora'), contador('Zerados')]).toEqual(['2', '1']);
+    expect(screen.queryByRole('region', { name: 'Quero jogar' })).toBeNull();
+
+    // criar um Jogando
+    const novo = game({ id: '4', titulo: 'Delta', atualizadoEm: '2026-09-25T12:00:00.000Z' });
+    api.create.mockResolvedValue(novo);
+    api.list.mockResolvedValue([novo, ...dois]);
+    await user.click(screen.getByRole('button', { name: 'Adicionar jogo' }));
+    await user.type(await screen.findByLabelText('Título'), 'Delta');
+    await user.click(screen.getByRole('button', { name: 'Salvar' }));
+    await waitFor(() => expect(filterButton(/^Todos ?4$/)).toBeInTheDocument());
+    expect(filterButton(/^Jogando ?3$/)).toBeInTheDocument();
+    expect(contador('Jogando agora')).toBe('3');
+
+    // remover um Zerado
+    api.remove.mockResolvedValue(undefined);
+    api.list.mockResolvedValue([novo, alfa, beta]);
+    await user.click(screen.getByRole('button', { name: 'Remover Gama' }));
+    await user.click(await screen.findByRole('button', { name: 'Remover' }));
+    await waitFor(() => expect(filterButton(/^Zerado ?0$/)).toBeInTheDocument());
+    expect(filterButton(/^Todos ?3$/)).toBeInTheDocument();
+  });
+
+  it('com o filtro Zerado só a prateleira "Zerados" aparece', async () => {
+    api.list.mockResolvedValue(dois);
+    renderPage('/?status=ZERADO');
+    await aparece('Gama');
+
+    expect(screen.getAllByRole('region').map((r) => r.getAttribute('data-prateleira'))).toEqual([
+      'ZERADO',
+    ]);
+  });
+});
+
+describe('"Adicionar" ao fim da prateleira (CA-14)', () => {
+  it('abre o formulário de novo jogo já no status da prateleira', async () => {
+    const user = renderPage();
+    await aparece('Celeste');
+
+    await user.click(screen.getByRole('button', { name: 'Adicionar em Zerados' }));
+
+    expect(await screen.findByRole('heading', { name: 'Novo jogo' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Zerado' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('o "Adicionar jogo" do topo mantém o status padrão', async () => {
+    const user = renderPage();
+    await aparece('Celeste');
+
+    await user.click(screen.getByRole('button', { name: 'Adicionar jogo' }));
+
+    await screen.findByRole('heading', { name: 'Novo jogo' });
+    expect(screen.getByRole('button', { name: 'Quero jogar' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+  });
+});
+
+describe('barra superior do catálogo (CA-12)', () => {
+  it('logo como link "/" da página atual e o Perfil como link redondo com nome acessível', async () => {
+    renderPage();
+    await aparece('Celeste');
+
+    expect(screen.getByRole('link', { name: 'checkpoint' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    expect(screen.getByRole('link', { name: 'Perfil' })).toHaveAttribute('href', '/perfil');
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Seus jogos');
+  });
+
+  it('o logo tem alvo de 44 px e, sem espaço, quem rola são os filtros (o Perfil não encolhe)', async () => {
+    renderPage();
+    await aparece('Celeste');
+
+    expect(screen.getByRole('link', { name: 'checkpoint' })).toHaveClass('min-h-11', 'shrink-0');
+    expect(screen.getByRole('link', { name: 'Perfil' }).parentElement).toHaveClass('shrink-0');
+    expect(screen.getByRole('group', { name: 'Filtrar por status' })).toHaveClass(
+      'overflow-x-auto',
+      'md:min-w-0',
+    );
+  });
+});
+
+describe('filtro na URL (CA-45, CA-47, CA-80)', () => {
+  it('sem parâmetro, "Todos" está ativo e a estante traz todos os jogos', async () => {
+    renderPage();
+    await aparece('Celeste');
 
     expect(filterButton(/^Todos/)).toHaveAttribute('aria-pressed', 'true');
-    expect(titles()).toEqual(['Hollow Knight', 'Celeste', 'Outer Wilds', 'Hades']);
+    expect(titles()).toEqual(['Hollow Knight', 'Outer Wilds', 'Celeste', 'Hades']);
   });
 
   it('cada filtro mostra ícone, rótulo e contagem, e só o ativo tem aria-pressed', async () => {
     renderPage();
-    await screen.findByText('Celeste');
+    await aparece('Celeste');
 
     expect(filterButton(/^Todos/)).toHaveTextContent('Todos4');
     expect(filterButton(/^Jogando/)).toHaveTextContent('Jogando1');
@@ -173,7 +337,7 @@ describe('filtro na URL (CA-45, CA-47, CA-80)', () => {
 
   it('clicar em "Zerado" põe ?status=ZERADO na URL e mostra só os zerados', async () => {
     const user = renderPage();
-    await screen.findByText('Celeste');
+    await aparece('Celeste');
 
     await user.click(filterButton(/^Zerado/));
 
@@ -186,7 +350,7 @@ describe('filtro na URL (CA-45, CA-47, CA-80)', () => {
 
   it('"Todos" volta a URL para sem parâmetro', async () => {
     const user = renderPage('/?status=ZERADO');
-    await screen.findByText('Celeste');
+    await aparece('Celeste');
 
     await user.click(filterButton(/^Todos/));
 
@@ -196,7 +360,7 @@ describe('filtro na URL (CA-45, CA-47, CA-80)', () => {
 
   it('carrega o filtro da URL ao abrir (sobrevive a reload)', async () => {
     renderPage('/?status=QUERO_JOGAR');
-    await screen.findByText('Outer Wilds');
+    await aparece('Outer Wilds');
 
     expect(filterButton(/^Quero jogar/)).toHaveAttribute('aria-pressed', 'true');
     expect(titles()).toEqual(['Outer Wilds']);
@@ -204,7 +368,7 @@ describe('filtro na URL (CA-45, CA-47, CA-80)', () => {
 
   it('status inválido na URL vira "Todos" e mostra tudo', async () => {
     renderPage('/?status=PAUSADO');
-    await screen.findByText('Celeste');
+    await aparece('Celeste');
 
     expect(filterButton(/^Todos/)).toHaveAttribute('aria-pressed', 'true');
     expect(titles()).toHaveLength(4);
@@ -244,173 +408,154 @@ describe('estados da lista (CA-41, CA-46, CA-50)', () => {
 
     expect(await screen.findByText('Não deu para carregar')).toBeInTheDocument();
     api.list.mockResolvedValue(CATALOG);
-    await user.click(screen.getByRole('button', { name: 'TENTAR DE NOVO' }));
+    await user.click(screen.getByRole('button', { name: 'Tentar de novo' }));
 
-    expect(await screen.findByText('Celeste')).toBeInTheDocument();
+    expect(await aparece('Celeste')).toBeInTheDocument();
     expect(api.list).toHaveBeenCalledTimes(2);
   });
 });
 
-describe('linha do jogo (CA-72, CA-73, CA-81)', () => {
-  it('sem capa: quadrado com as iniciais numa cor da paleta, sempre a mesma (CA-72)', async () => {
+describe('tile do jogo (CA-15 a CA-19)', () => {
+  it('sem capa: capa em pé gerada com as iniciais numa cor da paleta, sempre a mesma', async () => {
     renderPage();
-    await screen.findByText('Hollow Knight');
+    await aparece('Hollow Knight');
 
     const cover = (title: string) =>
-      within(rows().find((row) => within(row).queryByText(title)) as HTMLElement).getByText(
-        /^[A-Z?]{1,2}$/,
-        { selector: '[data-cover="generated"]' },
-      );
+      tile(title).querySelector('[data-cover="generated"]') as HTMLElement;
 
     expect(cover('Hollow Knight')).toHaveTextContent('HK');
     expect(cover('Celeste')).toHaveTextContent('C');
     expect(cover('Hollow Knight')).toHaveClass('bg-capa-2'); // índice 1 do hash
     expect(cover('Celeste')).toHaveClass('bg-capa-3'); // índice 2 do hash
+    expect(cover('Celeste')).toHaveClass('aspect-[3/4]');
   });
 
-  it('com capa: mostra a imagem, e se ela falhar volta para a gerada (CA-73)', async () => {
+  it('com capa: mostra a imagem, e se ela falhar volta para a gerada', async () => {
     api.list.mockResolvedValue([game({ capaUrl: 'https://s/capas/1/a.png' })]);
     renderPage();
-    await screen.findByText('Hollow Knight');
+    await aparece('Hollow Knight');
 
-    const image = document.querySelector('[data-cover="image"] img') as HTMLImageElement;
+    const image = document.querySelector(
+      '[data-tile] [data-cover="image"] img',
+    ) as HTMLImageElement;
     expect(image).toHaveAttribute('src', 'https://s/capas/1/a.png');
     expect(image).toHaveAttribute('alt', '');
 
     fireEvent.error(image);
 
     await waitFor(() => expect(document.querySelector('[data-cover="generated"]')).not.toBeNull());
-    expect(document.querySelector('[data-cover="image"]')).toBeNull();
+    expect(document.querySelector('[data-tile] [data-cover="image"]')).toBeNull();
   });
 
-  it('média como barra de 10 segmentos + número com vírgula; "—" sem média; 0 = nada preenchido (CA-23)', async () => {
+  it('a média vira o anel com o número com vírgula; sem média, sem anel; 0 é nota', async () => {
     renderPage();
-    await screen.findByText('Hollow Knight');
-    const row = (title: string) => rows().find((r) => within(r).queryByText(title)) as HTMLElement;
-    const filled = (title: string) => row(title).querySelectorAll('[data-segment="on"]').length;
+    await aparece('Hollow Knight');
 
     expect(
-      within(row('Hollow Knight')).getByRole('img', { name: 'Nota 8,0 de 10' }),
-    ).toBeInTheDocument();
-    expect(filled('Hollow Knight')).toBe(8);
-    expect(row('Hollow Knight').querySelectorAll('[data-segment]')).toHaveLength(10);
-
-    expect(within(row('Hades')).getByRole('img', { name: 'Nota 0,0 de 10' })).toBeInTheDocument();
-    expect(filled('Hades')).toBe(0);
-    expect(within(row('Hades')).getByText('0,0')).toBeInTheDocument();
-
-    expect(within(row('Outer Wilds')).getByRole('img', { name: 'Sem nota' })).toHaveTextContent(
-      '—',
+      within(tile('Hollow Knight')).getByRole('img', { name: 'Nota 8,0 de 10' }),
+    ).toHaveTextContent('8,0');
+    expect(within(tile('Hades')).getByRole('img', { name: 'Nota 0,0 de 10' })).toHaveTextContent(
+      '0,0',
     );
-    expect(within(row('Outer Wilds')).queryByText('SEM NOTA')).not.toBeInTheDocument();
-    expect(filled('Outer Wilds')).toBe(0);
+    expect(within(tile('Outer Wilds')).queryByRole('img')).toBeNull();
+    expect(within(tile('Outer Wilds')).queryByText('SEM NOTA')).not.toBeInTheDocument();
   });
 
-  it('a média decimal: 8,3 mostra "8,3" e 8 segmentos; 8,5 arredonda a barra para 9 (CA-23)', async () => {
+  it('a média decimal aparece como 8,3 e 8,5 e o arco acompanha (--pct)', async () => {
     api.list.mockResolvedValue([
       game({ id: '1', titulo: 'Oito e três', ...comMedia(8.3) }),
       game({ id: '2', titulo: 'Oito e meio', plataforma: 'PC', ...comMedia(8.5) }),
     ]);
     renderPage();
-    await screen.findByText('Oito e três');
-    const row = (title: string) => rows().find((r) => within(r).queryByText(title)) as HTMLElement;
-    const filled = (title: string) => row(title).querySelectorAll('[data-segment="on"]').length;
+    await aparece('Oito e três');
 
-    expect(
-      within(row('Oito e três')).getByRole('img', { name: 'Nota 8,3 de 10' }),
-    ).toBeInTheDocument();
-    expect(within(row('Oito e três')).getByText('8,3')).toBeInTheDocument();
-    expect(filled('Oito e três')).toBe(8);
-    expect(within(row('Oito e meio')).getByText('8,5')).toBeInTheDocument();
-    expect(filled('Oito e meio')).toBe(9);
+    const tres = within(tile('Oito e três')).getByRole('img', { name: 'Nota 8,3 de 10' });
+    const meio = within(tile('Oito e meio')).getByRole('img', { name: 'Nota 8,5 de 10' });
+    expect(tres).toHaveTextContent('8,3');
+    expect(tres.style.getPropertyValue('--pct')).toBe('83');
+    expect(meio.style.getPropertyValue('--pct')).toBe('85');
   });
 
-  it('a média tem legenda "NOTA", estrela e "/10", para não parecer outro número', async () => {
+  it('o tile mostra só a média, nunca os cinco critérios', async () => {
     renderPage();
-    await screen.findByText('Hollow Knight');
-    const row = rows().find((r) => within(r).queryByText('Hollow Knight')) as HTMLElement;
-
-    expect(within(row).getByText('Nota')).toBeInTheDocument();
-    expect(within(row).getByText('8,0')).toBeInTheDocument();
-    expect(within(row).getByText('/10')).toBeInTheDocument();
-    // O número é texto comum da fonte legível (Rajdhani), não da Orbitron dos painéis.
-    expect(within(row).getByText('8,0').closest('.font-corpo')).not.toBeNull();
-    expect(within(row).getByText('8,0').closest('.font-display')).toBeNull();
-  });
-
-  it('a lista mostra só a média, nunca os cinco critérios (CA-23)', async () => {
-    renderPage();
-    await screen.findByText('Hollow Knight');
+    await aparece('Hollow Knight');
 
     for (const rotulo of ['Gameplay', 'História', 'Gráficos', 'Trilha sonora', 'Performance']) {
       expect(screen.queryByText(new RegExp(rotulo))).not.toBeInTheDocument();
     }
   });
 
-  it('o título é um link real para /jogos/<id> (CA-24)', async () => {
+  it('o título é um link real para /jogos/<id>', async () => {
     renderPage();
-    await screen.findByText('Hollow Knight');
+    await aparece('Hollow Knight');
 
-    const link = screen.getByRole('link', { name: 'Hollow Knight' });
-
-    expect(link).toHaveAttribute('href', '/jogos/1');
+    expect(screen.getByRole('link', { name: 'Hollow Knight' })).toHaveAttribute('href', '/jogos/1');
     expect(screen.getByRole('link', { name: 'Celeste' })).toHaveAttribute('href', '/jogos/2');
   });
 
-  it('a linha inteira leva ao detalhe (o link é esticado sobre ela), e as ações ficam por cima (CA-24)', async () => {
+  it('o tile inteiro leva ao detalhe (link esticado) e as ações ficam por cima, fora do link', async () => {
     renderPage();
-    await screen.findByText('Hollow Knight');
-    const row = rows().find((r) => within(r).queryByText('Hollow Knight')) as HTMLElement;
+    await aparece('Hollow Knight');
+    const t = tile('Hollow Knight');
 
-    expect(row).toHaveClass('relative');
-    expect(within(row).getByRole('link', { name: 'Hollow Knight' })).toHaveClass('after:absolute');
-    expect(within(row).getByRole('link', { name: 'Hollow Knight' })).toHaveClass('after:inset-0');
-    const acoes = within(row).getByRole('button', { name: 'Editar Hollow Knight' }).parentElement;
-    expect(acoes).toHaveClass('z-10');
-    // Botões não ficam dentro do link (nada de <a> com <button> dentro).
-    expect(
-      within(row).getByRole('button', { name: 'Editar Hollow Knight' }).closest('a'),
-    ).toBeNull();
+    expect(t).toHaveClass('relative');
+    expect(within(t).getByRole('link', { name: 'Hollow Knight' })).toHaveClass(
+      'after:absolute',
+      'after:inset-0',
+    );
+    const editar = within(t).getByRole('button', { name: 'Editar Hollow Knight' });
+    expect(editar.parentElement).toHaveClass('z-10', 'tile-acoes');
+    expect(editar.closest('a')).toBeNull();
   });
 
-  it('Editar e Remover abrem seus diálogos SEM navegar para o detalhe (CA-24)', async () => {
+  it('Editar abre o diálogo SEM navegar para o detalhe', async () => {
     const user = userEvent.setup();
     renderPage();
-    await screen.findByText('Hollow Knight');
+    await aparece('Hollow Knight');
 
     await user.click(screen.getByRole('button', { name: 'Editar Hollow Knight' }));
 
-    expect(await screen.findByRole('heading', { name: 'EDITAR JOGO' })).toBeInTheDocument();
-    // Ainda na lista: as outras linhas continuam aqui (a rota do detalhe não existe neste teste).
-    expect(screen.getByText('Celeste')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Editar jogo' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Celeste' })).toBeInTheDocument();
   });
 
-  it('plataforma vazia é omitida; a preenchida aparece', async () => {
+  it('plataforma vazia é omitida; a preenchida vira o chip da capa; "Xbox Series X|S" aparece com "/"', async () => {
+    api.list.mockResolvedValue([
+      game({ id: '1', titulo: 'Com plataforma', plataforma: 'Switch' }),
+      game({ id: '2', titulo: 'Sem plataforma', plataforma: null }),
+      game({ id: '3', titulo: 'No Xbox', plataforma: 'Xbox Series X|S' }),
+    ]);
     renderPage();
-    await screen.findByText('Hollow Knight');
+    await aparece('Com plataforma');
 
-    expect(screen.getByText('Switch')).toBeInTheDocument();
-    expect(screen.queryByText('Sem plataforma')).not.toBeInTheDocument();
+    expect(within(tile('Com plataforma')).getByText('Switch')).toBeInTheDocument();
+    expect(tile('Sem plataforma').querySelector('[data-chip-plataforma]')).toBeNull();
+    expect(within(tile('No Xbox')).getByText('Xbox Series X/S')).toBeInTheDocument();
+    expect(document.body.textContent).not.toContain('X|S');
   });
 
-  it('cada linha tem Editar e Remover com aria-label, e o selo do status', async () => {
+  it('cada tile tem Editar e Remover com aria-label e mora na prateleira do seu status', async () => {
     renderPage();
-    await screen.findByText('Hollow Knight');
+    await aparece('Hollow Knight');
 
     expect(screen.getByRole('button', { name: 'Editar Hollow Knight' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Remover Hollow Knight' })).toBeInTheDocument();
-    expect(within(rows()[2] as HTMLElement).getByText('Quero jogar')).toBeInTheDocument();
+    expect(
+      within(screen.getByRole('list', { name: 'Quero jogar' })).getByRole('link', {
+        name: 'Outer Wilds',
+      }),
+    ).toBeInTheDocument();
   });
 });
 
 describe('diálogos (CA-42, CA-49)', () => {
   it('Adicionar jogo abre o diálogo com o formulário vazio', async () => {
     const user = renderPage();
-    await screen.findByText('Celeste');
+    await aparece('Celeste');
 
     await user.click(screen.getByRole('button', { name: 'Adicionar jogo' }));
 
-    expect(await screen.findByRole('heading', { name: 'NOVO JOGO' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Novo jogo' })).toBeInTheDocument();
     expect(screen.getByLabelText('Título')).toHaveValue('');
   });
 
@@ -418,7 +563,7 @@ describe('diálogos (CA-42, CA-49)', () => {
     // Achado na verificação real: o autoFocus do React roda com o <dialog> ainda fechado; o foco caía
     // no botão Fechar e o espaço de "Hollow Knight" o clicava.
     const user = renderPage();
-    await screen.findByText('Celeste');
+    await aparece('Celeste');
 
     await user.click(screen.getByRole('button', { name: 'Adicionar jogo' }));
     const titulo = await screen.findByLabelText('Título');
@@ -432,38 +577,40 @@ describe('diálogos (CA-42, CA-49)', () => {
 
   it('a confirmação de remover abre com o foco em "Cancelar" (o padrão seguro)', async () => {
     const user = renderPage();
-    await screen.findByText('Celeste');
+    await aparece('Celeste');
 
     await user.click(screen.getByRole('button', { name: 'Remover Celeste' }));
 
-    expect(await screen.findByRole('button', { name: 'CANCELAR' })).toHaveFocus();
+    expect(await screen.findByRole('button', { name: 'Cancelar' })).toHaveFocus();
   });
 
   it('Editar abre o MESMO formulário preenchido', async () => {
     const user = renderPage();
-    await screen.findByText('Celeste');
+    await aparece('Celeste');
 
     await user.click(screen.getByRole('button', { name: 'Editar Celeste' }));
 
-    expect(await screen.findByRole('heading', { name: 'EDITAR JOGO' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Editar jogo' })).toBeInTheDocument();
     expect(screen.getByLabelText('Título')).toHaveValue('Celeste');
   });
 
   it('Remover pede confirmação: cancelar mantém o jogo; confirmar remove e atualiza a lista', async () => {
     const user = renderPage();
-    await screen.findByText('Celeste');
+    await aparece('Celeste');
 
     await user.click(screen.getByRole('button', { name: 'Remover Celeste' }));
-    await user.click(await screen.findByRole('button', { name: 'CANCELAR' }));
+    await user.click(await screen.findByRole('button', { name: 'Cancelar' }));
     expect(api.remove).not.toHaveBeenCalled();
-    expect(screen.getByText('Celeste')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Celeste' })).toBeInTheDocument();
 
     api.remove.mockResolvedValue(undefined);
     api.list.mockResolvedValue(CATALOG.filter((g) => g.id !== '2'));
     await user.click(screen.getByRole('button', { name: 'Remover Celeste' }));
-    await user.click(await screen.findByRole('button', { name: 'REMOVER' }));
+    await user.click(await screen.findByRole('button', { name: 'Remover' }));
 
-    await waitFor(() => expect(screen.queryByText('Celeste')).not.toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.queryByRole('link', { name: 'Celeste' })).not.toBeInTheDocument(),
+    );
     expect(api.remove).toHaveBeenCalledWith('2');
   });
 });
@@ -472,7 +619,7 @@ describe('?novo=1 abre o formulário de novo jogo (pwa-e-mobile CA-04)', () => {
   it('abre o diálogo vazio e tira só o "novo" da URL, mantendo o filtro', async () => {
     renderPage('/?status=ZERADO&novo=1');
 
-    expect(await screen.findByRole('heading', { name: 'NOVO JOGO' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Novo jogo' })).toBeInTheDocument();
     expect(screen.getByLabelText('Título')).toHaveValue('');
     await waitFor(() => expect(screen.getByTestId('search')).toHaveTextContent('?status=ZERADO'));
     expect(screen.getByTestId('search').textContent).not.toContain('novo');
@@ -480,15 +627,17 @@ describe('?novo=1 abre o formulário de novo jogo (pwa-e-mobile CA-04)', () => {
 
   it('sem o parâmetro, o diálogo fica fechado', async () => {
     renderPage('/');
-    await screen.findByText('Celeste');
+    await aparece('Celeste');
 
-    expect(screen.queryByRole('heading', { name: 'NOVO JOGO' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Novo jogo' })).not.toBeInTheDocument();
   });
 });
 
 describe('sem conexão (pwa-e-mobile CA-23, CA-24)', () => {
   const networkError = () => new AxiosError('Network Error', 'ERR_NETWORK');
   const OFFLINE_LIST = 'Sem conexão. Seu catálogo aparece quando a conexão voltar.';
+  const celesteNaPrateleira = () =>
+    within(screen.getByRole('list', { name: 'Zerados' })).getByRole('link', { name: 'Celeste' });
 
   afterEach(() => {
     connectivity.reportReachable();
@@ -507,7 +656,7 @@ describe('sem conexão (pwa-e-mobile CA-23, CA-24)', () => {
 
       expect(await screen.findByText(OFFLINE_LIST)).toBeInTheDocument();
       expect(screen.queryByText('A API não respondeu.')).not.toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'TENTAR DE NOVO' })).toBeEnabled();
+      expect(screen.getByRole('button', { name: 'Tentar de novo' })).toBeEnabled();
       expect(screen.queryByRole('status', { name: 'Carregando jogos' })).not.toBeInTheDocument();
       onLine.mockRestore();
     },
@@ -520,26 +669,24 @@ describe('sem conexão (pwa-e-mobile CA-23, CA-24)', () => {
     await screen.findByText(OFFLINE_LIST);
 
     api.list.mockResolvedValue(CATALOG);
-    await user.click(screen.getByRole('button', { name: 'TENTAR DE NOVO' }));
+    await user.click(screen.getByRole('button', { name: 'Tentar de novo' }));
 
-    expect(await screen.findByText('Celeste')).toBeInTheDocument();
+    expect(await aparece('Celeste')).toBeInTheDocument();
   });
 
   it('lista já carregada continua visível quando o refetch seguinte falha sem conexão (CA-21)', async () => {
     api.remove.mockRejectedValue(networkError());
     const user = renderPage();
-    await screen.findByText('Celeste');
+    await aparece('Celeste');
 
     // A remoção falha e o onSettled refaz a busca, que também falha: a lista não some.
     connectivity.reportUnreachable();
     api.list.mockRejectedValue(networkError());
     await user.click(screen.getByRole('button', { name: 'Remover Celeste' }));
-    await user.click(await screen.findByRole('button', { name: 'REMOVER' }));
+    await user.click(await screen.findByRole('button', { name: 'Remover' }));
     await waitFor(() => expect(api.list).toHaveBeenCalledTimes(2));
 
-    expect(
-      within(screen.getByRole('list', { name: 'Jogos' })).getByText('Celeste'),
-    ).toBeInTheDocument();
+    expect(celesteNaPrateleira()).toBeInTheDocument();
     expect(screen.queryByText(OFFLINE_LIST)).not.toBeInTheDocument();
   });
 
@@ -547,31 +694,29 @@ describe('sem conexão (pwa-e-mobile CA-23, CA-24)', () => {
     connectivity.reportUnreachable();
     api.update.mockRejectedValue(networkError());
     const user = renderPage();
-    await screen.findByText('Celeste');
+    await aparece('Celeste');
 
     await user.click(screen.getByRole('button', { name: 'Editar Celeste' }));
-    await user.click(await screen.findByRole('button', { name: 'SALVAR' }));
+    await user.click(await screen.findByRole('button', { name: 'Salvar' }));
 
     expect(await screen.findByText(OFFLINE_NOT_SAVED)).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'EDITAR JOGO' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Editar jogo' })).toBeInTheDocument();
     expect(screen.getByLabelText('Título')).toHaveValue('Celeste');
-    expect(screen.getByRole('button', { name: 'SALVAR' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Salvar' })).toBeEnabled();
   });
 
   it('remover sem resposta: mesma mensagem, confirmação aberta e o jogo continua na lista', async () => {
     connectivity.reportUnreachable();
     api.remove.mockRejectedValue(networkError());
     const user = renderPage();
-    await screen.findByText('Celeste');
+    await aparece('Celeste');
 
     await user.click(screen.getByRole('button', { name: 'Remover Celeste' }));
-    await user.click(await screen.findByRole('button', { name: 'REMOVER' }));
+    await user.click(await screen.findByRole('button', { name: 'Remover' }));
 
     expect(await screen.findByText(OFFLINE_NOT_SAVED)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'REMOVER' })).toBeEnabled();
-    expect(
-      within(screen.getByRole('list', { name: 'Jogos' })).getByText('Celeste'),
-    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Remover' })).toBeEnabled();
+    expect(celesteNaPrateleira()).toBeInTheDocument();
   });
 });
 
@@ -586,54 +731,52 @@ describe('preferências do /perfil no catálogo (perfil CA-16, CA-17)', () => {
     renderPage('/');
 
     await waitFor(() => expect(screen.getByTestId('search')).toHaveTextContent('?status=JOGANDO'));
-    expect(await screen.findByText('Hollow Knight')).toBeInTheDocument();
+    expect(await aparece('Hollow Knight')).toBeInTheDocument();
     expect(titles()).toEqual(['Hollow Knight']);
   });
 
   it('com filtro inicial diferente de Todos, "Todos" grava ?status=TODOS e mostra todos', async () => {
     comPrefs({ filtroInicial: 'JOGANDO' });
     const user = renderPage('/');
-    await screen.findByText('Hollow Knight');
+    await aparece('Hollow Knight');
 
     await user.click(filterButton(/Todos/));
 
     await waitFor(() => expect(screen.getByTestId('search')).toHaveTextContent('?status=TODOS'));
-    expect(rows()).toHaveLength(4);
+    expect(tiles()).toHaveLength(4);
   });
 
   it('um link direto /?status=ZERADO é respeitado', async () => {
     comPrefs({ filtroInicial: 'JOGANDO' });
     renderPage('/?status=ZERADO');
 
-    await screen.findByText('Celeste');
+    await aparece('Celeste');
     expect(screen.getByTestId('search')).toHaveTextContent('?status=ZERADO');
     expect(titles()).toEqual(['Celeste', 'Hades']);
   });
 
-  it('densidade Compacta: capas 40x40 e ações ainda 44x44', async () => {
+  it('densidade Compacta: capas 120 (108 no celular) e ações ainda 44x44', async () => {
     comPrefs({ densidade: 'compacta' });
     renderPage('/');
 
-    await screen.findByText('Celeste');
-    for (const row of rows()) {
-      expect(row).toHaveAttribute('data-densidade', 'compacta');
-      expect(row.querySelector('[data-cover]')).toHaveClass('size-10');
-      for (const acao of within(row).getAllByRole('button')) {
+    await aparece('Celeste');
+    for (const t of tiles()) {
+      expect(t).toHaveClass('w-[108px]', 'md:w-[120px]');
+      for (const acao of within(t).getAllByRole('button')) {
         expect(acao).toHaveClass('size-11');
       }
     }
   });
 
-  it('densidade padrão (Confortável): capas 52x52', async () => {
+  it('densidade padrão (Confortável): capas 132 (150 no desktop)', async () => {
     renderPage('/');
 
-    await screen.findByText('Celeste');
-    expect(rows()[0]).toHaveAttribute('data-densidade', 'confortavel');
-    expect(rows()[0]?.querySelector('[data-cover]')).toHaveClass('size-[52px]');
+    await aparece('Celeste');
+    expect(tiles()[0]).toHaveClass('w-[132px]', 'md:w-[150px]');
   });
 });
 
-describe('linha do catálogo com a Steam (spec integracao-plataformas, CA-41)', () => {
+describe('tile do catálogo com a Steam (spec integracao-plataformas, CA-41)', () => {
   const dados = {
     provedor: 'STEAM' as const,
     idExterno: '504230',
@@ -660,7 +803,7 @@ describe('linha do catálogo com a Steam (spec integracao-plataformas, CA-41)', 
     expect(integracoesApi.detalheDoJogo).not.toHaveBeenCalled();
   });
 
-  it('a capa da linha é a oficial quando não há capa enviada, e a enviada quando há (CA-42)', async () => {
+  it('a capa do tile é a oficial quando não há capa enviada, e a enviada quando há (CA-42)', async () => {
     api.list.mockResolvedValue([
       game({ id: 'a', titulo: 'Sem capa enviada', dadosPlataforma: [dados] }),
       game({
@@ -672,9 +815,9 @@ describe('linha do catálogo com a Steam (spec integracao-plataformas, CA-41)', 
     ]);
     renderPage();
 
-    await screen.findByText('Sem capa enviada');
-    const srcs = Array.from(document.querySelectorAll('[data-cover="image"] img')).map((img) =>
-      img.getAttribute('src'),
+    await aparece('Sem capa enviada');
+    const srcs = Array.from(document.querySelectorAll('[data-tile] [data-cover="image"] img')).map(
+      (img) => img.getAttribute('src'),
     );
     expect(srcs).toEqual([dados.capaUrl, 'https://bucket/enviada.jpg']);
   });

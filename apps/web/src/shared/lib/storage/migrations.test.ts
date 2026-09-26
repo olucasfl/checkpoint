@@ -1,6 +1,17 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { FakeStorage, securityError } from './fake-storage';
-import { MIGRATIONS, runStorageMigrations, STORAGE_SCHEMA_VERSION } from './migrations';
+import {
+  isPrefs,
+  PREFS_PADRAO,
+  prefsDoUsuario,
+  type PrefsGuardadas,
+} from '@/shared/lib/prefs/prefs';
+import {
+  MIGRATIONS,
+  migrarDestaques,
+  runStorageMigrations,
+  STORAGE_SCHEMA_VERSION,
+} from './migrations';
 import { createStorage } from './storage';
 
 function setup(entries: Record<string, string> = {}) {
@@ -13,9 +24,9 @@ afterEach(() => {
 });
 
 describe('constantes', () => {
-  it('a versão do schema é 1 e não há migrações ainda', () => {
-    expect(STORAGE_SCHEMA_VERSION).toBe(1);
-    expect(MIGRATIONS).toEqual({});
+  it('a versão do schema é 2 e a única migração é a 1 → 2 (cores de destaque)', () => {
+    expect(STORAGE_SCHEMA_VERSION).toBe(2);
+    expect(Object.keys(MIGRATIONS)).toEqual(['1']);
   });
 });
 
@@ -143,8 +154,145 @@ describe('runStorageMigrations', () => {
 
     runStorageMigrations();
 
-    expect(window.localStorage.getItem('checkpoint:versao')).toBe('1');
+    expect(window.localStorage.getItem('checkpoint:versao')).toBe(String(STORAGE_SCHEMA_VERSION));
     expect(window.localStorage.getItem('checkpoint:qualquer')).toBeNull();
     expect(window.localStorage.getItem('outro-app:x')).toBe('"y"');
+  });
+});
+
+describe('migração 1 → 2: cores de destaque (troca de design, F1)', () => {
+  const entrada = (destaque: string) => ({
+    ...PREFS_PADRAO,
+    destaque,
+    densidade: 'compacta',
+    plataformasFavoritas: ['PS5', 'Nintendo Switch'],
+  });
+  const guardar = (porUsuario: Record<string, unknown>, ultimoUsuario: string | null = null) =>
+    JSON.stringify({ ultimoUsuario, porUsuario });
+  const lidas = (fake: FakeStorage) =>
+    JSON.parse(fake.snapshot()['checkpoint:prefs'] as string) as PrefsGuardadas;
+
+  it('entrada com magenta (o padrão de antes) vira azul, e o resto da entrada fica igual', () => {
+    const { fake, raw } = setup({
+      'checkpoint:prefs': guardar({ ana: entrada('magenta') }, 'ana'),
+    });
+
+    migrarDestaques(raw);
+
+    expect(lidas(fake)).toEqual({ ultimoUsuario: 'ana', porUsuario: { ana: entrada('azul') } });
+  });
+
+  it('entrada com o antigo azul (capa-1) cai em azul, sem tentar distinguir de quem ficou no padrão', () => {
+    const { fake, raw } = setup({ 'checkpoint:prefs': guardar({ ana: entrada('azul') }) });
+
+    migrarDestaques(raw);
+
+    expect(lidas(fake).porUsuario).toEqual({ ana: entrada('azul') });
+    expect(isPrefs(lidas(fake).porUsuario.ana)).toBe(true);
+  });
+
+  it('violeta e laranja ficam como estavam', () => {
+    const { fake, raw } = setup({
+      'checkpoint:prefs': guardar({ ana: entrada('violeta'), bia: entrada('laranja') }),
+    });
+
+    migrarDestaques(raw);
+
+    expect(lidas(fake).porUsuario).toEqual({ ana: entrada('violeta'), bia: entrada('laranja') });
+  });
+
+  it('várias entradas de uma vez: cada uma segue a sua regra, todas ficam válidas e o ultimoUsuario não muda', () => {
+    const { fake, raw } = setup({
+      'checkpoint:prefs': guardar(
+        { a: entrada('magenta'), b: entrada('azul'), c: entrada('violeta'), d: entrada('laranja') },
+        'c',
+      ),
+      'checkpoint:outra': '"intacta"',
+    });
+
+    migrarDestaques(raw);
+
+    const guardadas = lidas(fake);
+    expect(guardadas.ultimoUsuario).toBe('c');
+    expect(
+      Object.values(guardadas.porUsuario).map((e) => (e as { destaque: string }).destaque),
+    ).toEqual(['azul', 'azul', 'violeta', 'laranja']);
+    expect(Object.values(guardadas.porUsuario).every((e) => isPrefs(e))).toBe(true);
+    expect(fake.snapshot()['checkpoint:outra']).toBe('"intacta"');
+  });
+
+  it('JSON ilegível: não lança e não reescreve nada (ao ler, a chave devolve os padrões)', () => {
+    const { fake, raw } = setup({ 'checkpoint:prefs': '{ isto não é json' });
+
+    expect(() => migrarDestaques(raw)).not.toThrow();
+
+    expect(fake.snapshot()['checkpoint:prefs']).toBe('{ isto não é json');
+  });
+
+  it.each([
+    ['uma lista', '[1,2]'],
+    ['um número', '7'],
+    ['sem porUsuario', '{"ultimoUsuario":null}'],
+    ['porUsuario que é lista', '{"ultimoUsuario":null,"porUsuario":[]}'],
+  ])('formato inesperado (%s): fica como está', (_nome, texto) => {
+    const { fake, raw } = setup({ 'checkpoint:prefs': texto });
+
+    migrarDestaques(raw);
+
+    expect(fake.snapshot()['checkpoint:prefs']).toBe(texto);
+  });
+
+  it('usuário sem preferência gravada: a chave ausente não é criada, e quem não tem entrada abre com os padrões (azul)', () => {
+    const vazia = setup();
+    migrarDestaques(vazia.raw);
+    expect(vazia.fake.snapshot()).toEqual({});
+
+    const { fake, raw } = setup({
+      'checkpoint:prefs': guardar({ ana: entrada('magenta') }, 'novo'),
+    });
+    migrarDestaques(raw);
+    const guardadas = lidas(fake);
+    expect(guardadas.porUsuario).not.toHaveProperty('novo');
+    expect(prefsDoUsuario(guardadas, 'novo')).toEqual(PREFS_PADRAO);
+    expect(prefsDoUsuario(guardadas, 'novo').destaque).toBe('azul');
+    expect(prefsDoUsuario(guardadas, 'ana').destaque).toBe('azul');
+  });
+
+  it('valor de destaque desconhecido não é tocado: só aquela entrada volta aos padrões (as outras ficam)', () => {
+    const { fake, raw } = setup({
+      'checkpoint:prefs': guardar({ ana: entrada('roxo'), bia: entrada('magenta') }),
+    });
+
+    migrarDestaques(raw);
+
+    const guardadas = lidas(fake);
+    expect(isPrefs(guardadas.porUsuario.ana)).toBe(false);
+    expect(prefsDoUsuario(guardadas, 'ana')).toEqual(PREFS_PADRAO);
+    expect(prefsDoUsuario(guardadas, 'bia')).toEqual(entrada('azul'));
+  });
+
+  it('pelo runStorageMigrations: versão 1 → grava a 2 e migra; rodar de novo não muda nada', () => {
+    const { fake, raw } = setup({
+      'checkpoint:versao': '1',
+      'checkpoint:prefs': guardar({ ana: entrada('magenta') }, 'ana'),
+    });
+
+    runStorageMigrations({ raw });
+
+    expect(fake.snapshot()['checkpoint:versao']).toBe('2');
+    expect(lidas(fake).porUsuario).toEqual({ ana: entrada('azul') });
+    const depois = fake.snapshot();
+
+    runStorageMigrations({ raw });
+
+    expect(fake.snapshot()).toEqual(depois);
+  });
+
+  it('primeiro uso (sem versão): grava a 2 e não cria preferências', () => {
+    const { fake, raw } = setup();
+
+    runStorageMigrations({ raw });
+
+    expect(fake.snapshot()).toEqual({ 'checkpoint:versao': '2' });
   });
 });

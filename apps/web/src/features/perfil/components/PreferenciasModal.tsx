@@ -18,9 +18,9 @@ import { PreviaDensidade, PreviaEfeitos } from './PreviasAparencia';
 
 /** A amostra é o próprio token da cor (sem hex): o mesmo que o `html[data-destaque]` usa. */
 const DESTAQUE: readonly Opcao<Destaque>[] = [
-  { valor: 'magenta', rotulo: 'Magenta', cor: 'bg-magenta' },
+  { valor: 'azul', rotulo: 'Azul', cor: 'bg-acento' },
   { valor: 'violeta', rotulo: 'Violeta', cor: 'bg-capa-6' },
-  { valor: 'azul', rotulo: 'Azul', cor: 'bg-capa-1' },
+  { valor: 'rosa', rotulo: 'Rosa', cor: 'bg-capa-2' },
   { valor: 'laranja', rotulo: 'Laranja', cor: 'bg-capa-3' },
 ];
 
@@ -37,8 +37,8 @@ const DENSIDADE: readonly Opcao<Densidade>[] = [
 ];
 
 const EFEITOS: readonly Opcao<Efeitos>[] = [
-  { valor: 'completos', rotulo: 'Completos' },
-  { valor: 'reduzidos', rotulo: 'Reduzidos' },
+  { valor: 'completos', rotulo: 'Completas' },
+  { valor: 'reduzidos', rotulo: 'Reduzidas' },
 ];
 
 const ABAS = [
@@ -51,7 +51,7 @@ type AbaId = (typeof ABAS)[number]['id'];
 
 const BASE = 'prefs';
 
-/** O resumo da linha de Preferências no /perfil: a cor e a densidade em uso, ex.: "Magenta · Confortável". */
+/** O resumo da linha de Preferências no /perfil: a cor e a densidade em uso, ex.: "Azul · Confortável". */
 export function resumoDasPreferencias(prefs: Prefs): string {
   const cor = DESTAQUE.find((o) => o.valor === prefs.destaque)?.rotulo;
   const densidade = DENSIDADE.find((o) => o.valor === prefs.densidade)?.rotulo;
@@ -107,7 +107,7 @@ function Conteudo({ onConcluir }: { onConcluir: () => void }) {
       <div>
         <h2
           id="prefs-titulo"
-          className="m-0 font-display text-xl font-extrabold uppercase tracking-[0.12em]"
+          className="m-0 font-display text-xl font-extrabold tracking-[-0.01em]"
         >
           Preferências
         </h2>
@@ -152,7 +152,7 @@ function Conteudo({ onConcluir }: { onConcluir: () => void }) {
           <div className="flex flex-col gap-2.5">
             <GrupoOpcoes
               id="pref-efeitos"
-              titulo="Efeitos visuais"
+              titulo="Animações"
               opcoes={EFEITOS}
               valor={prefs.efeitos}
               onChange={(efeitos) => alterarPrefs({ efeitos })}
@@ -190,7 +190,7 @@ function Conteudo({ onConcluir }: { onConcluir: () => void }) {
         <button
           type="button"
           onClick={onConcluir}
-          className="min-h-12 rounded-xl bg-destaque px-6 font-display text-[13px] font-extrabold uppercase tracking-[0.1em] text-fundo"
+          className="min-h-12 rounded-full bg-destaque px-6 font-display text-[15px] font-extrabold text-fundo"
         >
           Concluído
         </button>

@@ -13,7 +13,7 @@ const PROVEDOR = 'STEAM' as const;
 const BUSCA_ATRASO_MS = 300;
 
 const BOTAO =
-  'min-h-11 min-w-11 rounded-xl px-4 font-display text-[13px] uppercase tracking-[0.1em] disabled:cursor-wait disabled:opacity-60';
+  'min-h-11 min-w-11 rounded-full px-4 font-display text-[15px] disabled:cursor-wait disabled:opacity-60 font-bold';
 const BOTAO_CONTORNO = `${BOTAO} border border-borda-controle font-semibold hover:bg-acao-hover`;
 const BOTAO_PRIMARIO = `${BOTAO} bg-destaque font-extrabold text-fundo`;
 
@@ -53,10 +53,10 @@ function Capa({ url }: { url: string | null }) {
       height={43}
       loading="lazy"
       referrerPolicy="no-referrer"
-      className="h-[43px] w-[92px] shrink-0 rounded-md bg-painel-2 object-cover"
+      className="h-[43px] w-[92px] shrink-0 rounded-xl bg-painel-2 object-cover"
     />
   ) : (
-    <div aria-hidden="true" className="h-[43px] w-[92px] shrink-0 rounded-md bg-painel-2" />
+    <div aria-hidden="true" className="h-[43px] w-[92px] shrink-0 rounded-xl bg-painel-2" />
   );
 }
 
@@ -364,7 +364,7 @@ function Conteudo({
         <div className="flex min-w-0 flex-col gap-1">
           <h2
             id="biblioteca-steam-titulo"
-            className="m-0 font-display text-xl font-extrabold uppercase tracking-[0.12em] text-destaque"
+            className="m-0 font-display text-xl font-extrabold tracking-[-0.01em] text-destaque"
           >
             {titulo}
           </h2>
@@ -374,7 +374,7 @@ function Conteudo({
               : `Escolha o jogo da Steam que é «${modo.jogo.titulo}».`}
           </p>
         </div>
-        <button type="button" onClick={onClose} className={BOTAO_CONTORNO}>
+        <button type="button" onClick={onClose} className={`${BOTAO_CONTORNO} shrink-0`}>
           Fechar
         </button>
       </div>

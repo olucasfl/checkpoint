@@ -3,13 +3,13 @@ import type { Densidade, Efeitos } from '@/shared/lib/prefs/prefs';
 
 /** Jogos de exemplo, sintéticos: a prévia não lê o catálogo da pessoa. */
 const EXEMPLOS = [
-  { titulo: 'Jogo de exemplo', detalhe: 'PS5 · Jogando' },
-  { titulo: 'Outro exemplo', detalhe: 'PC · Zerado' },
+  { titulo: 'Jogo de exemplo', detalhe: 'PS5' },
+  { titulo: 'Outro exemplo', detalhe: 'PC' },
 ] as const;
 
 /**
- * Duas linhas de jogo no formato da densidade escolhida (as mesmas medidas da `GameRow`: capa 52 ou
- * 40 e o espaço da linha), para ver a diferença sem sair do modal.
+ * Dois tiles de exemplo no tamanho da densidade escolhida (as mesmas capas em pé do catálogo: 132 × 176 ou 108 × 144
+ * no celular), para ver a diferença sem sair do modal.
  */
 export function PreviaDensidade({ densidade }: { densidade: Densidade }) {
   const compacta = densidade === 'compacta';
@@ -17,22 +17,20 @@ export function PreviaDensidade({ densidade }: { densidade: Densidade }) {
     <ul
       aria-label="Prévia da densidade"
       data-densidade={densidade}
-      className="m-0 flex list-none flex-col gap-1.5 rounded-2xl bg-painel-2 p-2"
+      className="m-0 flex list-none gap-3.5 rounded-2xl bg-painel-2 p-3"
     >
       {EXEMPLOS.map((exemplo) => (
         <li
           key={exemplo.titulo}
-          className={`flex items-center gap-3 rounded-xl bg-painel px-3 ${compacta ? 'py-1' : 'py-2.5'}`}
+          className={`flex flex-col gap-1.5 ${compacta ? 'w-[108px]' : 'w-[132px]'}`}
         >
           <GameCover
             titulo={exemplo.titulo}
             capaUrl={null}
-            variant={compacta ? 'compacta' : 'row'}
+            variant={compacta ? 'tileCompacto' : 'tile'}
           />
-          <div className="flex min-w-0 flex-col">
-            <span className="truncate text-[17px] font-bold">{exemplo.titulo}</span>
-            <span className="truncate text-[15px] text-texto-suave">{exemplo.detalhe}</span>
-          </div>
+          <span className="truncate font-display text-[15px] font-semibold">{exemplo.titulo}</span>
+          <span className="truncate text-[13px] text-texto-suave">{exemplo.detalhe}</span>
         </li>
       ))}
     </ul>
@@ -40,23 +38,21 @@ export function PreviaDensidade({ densidade }: { densidade: Densidade }) {
 }
 
 /**
- * Uma amostra do fundo: os mesmos `.orb` e `.scanlines` do app. A regra de `html[data-efeitos]` os
- * esconde aqui também, então o quadro mostra o que a escolha faz; o texto diz o estado sem depender
- * só da cor ou do movimento.
+ * Uma amostra de movimento: um tile de exemplo que sobe e desce em laço (`previa-elevar`). A regra de
+ * `html[data-efeitos]` (variante `movimento-reduzido`) o para aqui também, então o quadro mostra o que a escolha faz;
+ * o texto diz o estado sem depender só do movimento.
  */
 export function PreviaEfeitos({ efeitos }: { efeitos: Efeitos }) {
   return (
     <div
       data-efeitos-previa={efeitos}
-      className="relative flex h-20 items-end overflow-hidden rounded-2xl bg-fundo p-3"
+      className="flex items-center gap-4 overflow-hidden rounded-2xl bg-fundo p-3"
     >
-      <div aria-hidden="true" className="orb orb-magenta -right-6 -top-10 size-32" />
-      <div aria-hidden="true" className="orb orb-ciano -bottom-12 -left-6 size-32" />
-      <div aria-hidden="true" className="scanlines" />
-      <span className="relative text-[15px] font-semibold">
-        {efeitos === 'completos'
-          ? 'Orbes e scanlines ligados'
-          : 'Orbes e scanlines desligados, sem animação'}
+      <div data-previa-tile className="previa-elevar shrink-0">
+        <GameCover titulo="Jogo de exemplo" capaUrl={null} variant="preview" />
+      </div>
+      <span className="text-[15px] font-semibold">
+        {efeitos === 'completos' ? 'Animações ligadas' : 'Animações desligadas, sem movimento'}
       </span>
     </div>
   );

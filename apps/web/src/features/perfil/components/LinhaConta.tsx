@@ -59,7 +59,7 @@ export function LinhaBotao({
 export function ListaDeLinhas({ children, rotulo }: { children: React.ReactNode; rotulo: string }) {
   return (
     <section aria-label={rotulo} className="flex flex-col gap-2">
-      <h2 className="m-0 px-1 font-display text-sm font-bold uppercase tracking-[0.22em] text-texto-suave">
+      <h2 className="m-0 px-1 font-display text-sm font-bold uppercase tracking-[0.14em] text-texto-suave">
         {rotulo}
       </h2>
       <div className="flex flex-col divide-y divide-borda overflow-hidden rounded-2xl bg-painel">

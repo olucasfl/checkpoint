@@ -35,7 +35,7 @@ export function PerfilCabecalho() {
         <p className="m-0 text-[16px] [overflow-wrap:anywhere]">{usuario?.email}</p>
         <p className="m-0 text-[15px] text-texto-suave">(não verificado — usado só para entrar)</p>
         {desde && <p className="m-0 text-[15px] text-texto-suave">{desde}</p>}
-        <p data-resumo className="m-0 text-[15px] font-semibold text-ciano">
+        <p data-resumo className="m-0 text-[15px] font-semibold text-destaque">
           {resumoDoCatalogo(counts)}
         </p>
       </div>

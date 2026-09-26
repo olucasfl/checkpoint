@@ -89,15 +89,15 @@ describe('prefsDoUsuario (por usuário)', () => {
 });
 
 describe('store: mesmo navegador, usuários diferentes (CA-20)', () => {
-  it('Ana escolhe Violeta; Bia entra e vê Magenta; Ana volta e vê Violeta', () => {
+  it('Ana escolhe Violeta; Bia entra e vê Azul; Ana volta e vê Violeta', () => {
     definirUsuario('ana');
     alterarPrefs({ destaque: 'violeta' });
     expect(document.documentElement.dataset.destaque).toBe('violeta');
 
     definirUsuario(null); // Ana saiu
     definirUsuario('bia');
-    expect(getPrefs().destaque).toBe('magenta');
-    expect(document.documentElement.dataset.destaque).toBe('magenta');
+    expect(getPrefs().destaque).toBe('azul');
+    expect(document.documentElement.dataset.destaque).toBe('azul');
 
     definirUsuario(null);
     definirUsuario('ana');
@@ -107,7 +107,7 @@ describe('store: mesmo navegador, usuários diferentes (CA-20)', () => {
   });
 
   it('sem ninguém logado, alterar não grava nada', () => {
-    alterarPrefs({ destaque: 'azul' });
+    alterarPrefs({ destaque: 'rosa' });
 
     expect(storage.get(PREFS)).toEqual(PREFS.padrao);
     expect(getPrefs()).toEqual(PREFS_PADRAO);
@@ -154,10 +154,10 @@ describe('falhas do armazenamento', () => {
 });
 
 describe('exclusão de conta (perfil CA-28)', () => {
-  const AZUL: Prefs = { ...PREFS_PADRAO, destaque: 'azul' };
+  const ROSA: Prefs = { ...PREFS_PADRAO, destaque: 'rosa' };
 
   it('some só a entrada de quem excluiu; a da Bia fica, e a aparência volta ao padrão', () => {
-    storage.set(PREFS, { ultimoUsuario: 'bia', porUsuario: { bia: AZUL } });
+    storage.set(PREFS, { ultimoUsuario: 'bia', porUsuario: { bia: ROSA } });
     definirUsuario('ana');
     alterarPrefs({ destaque: 'violeta' });
     expect(document.documentElement.dataset.destaque).toBe('violeta');
@@ -165,11 +165,11 @@ describe('exclusão de conta (perfil CA-28)', () => {
     removerPrefsDoUsuario('ana');
 
     const guardadas = storage.get(PREFS);
-    expect(guardadas.porUsuario).toEqual({ bia: AZUL });
+    expect(guardadas.porUsuario).toEqual({ bia: ROSA });
     // A Ana era a última: ninguém fica apontado para uma conta que não existe mais.
     expect(guardadas.ultimoUsuario).toBeNull();
     expect(getPrefs()).toEqual(PREFS_PADRAO);
-    expect(document.documentElement.dataset.destaque).toBe('magenta');
+    expect(document.documentElement.dataset.destaque).toBe('azul');
   });
 
   it('o próximo carregamento abre com os padrões (nada da conta excluída sobra)', () => {
@@ -185,7 +185,7 @@ describe('exclusão de conta (perfil CA-28)', () => {
   });
 
   it('remover a entrada de outro usuário não mexe em quem está logado nem no ultimoUsuario', () => {
-    storage.set(PREFS, { ultimoUsuario: 'ana', porUsuario: { ana: VIOLETA, bia: AZUL } });
+    storage.set(PREFS, { ultimoUsuario: 'ana', porUsuario: { ana: VIOLETA, bia: ROSA } });
     definirUsuario('ana');
 
     removerPrefsDoUsuario('bia');

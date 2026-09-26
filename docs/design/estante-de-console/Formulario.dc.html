@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Novo jogo — Estante de console</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@600;700;800;900&amp;family=Manrope:wght@500;600;700&amp;family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,300..600,0..1,0&amp;display=block" rel="stylesheet">
+<style>
+body{margin:0;font-family:'Manrope',sans-serif;background:#05070d}
+.ms{font-family:'Material Symbols Rounded';font-weight:normal;font-style:normal;line-height:1;letter-spacing:normal;text-transform:none;display:inline-block;white-space:nowrap;-webkit-font-smoothing:antialiased;font-variation-settings:'FILL' 0,'wght' 400}
+.ms.f{font-variation-settings:'FILL' 1,'wght' 500}
+.field{transition:border-color .15s,box-shadow .15s}
+.field:focus{outline:none;border-color:#4f8cff !important;box-shadow:0 0 0 3px rgba(79,140,255,.35)}
+.btn{transition:background .15s,border-color .15s;cursor:pointer}
+.btn:hover{background:#1a2135 !important;border-color:#4f8cff !important}
+.cta{transition:transform .15s,box-shadow .15s;cursor:pointer}
+.cta:hover{transform:translateY(-2px);box-shadow:0 10px 30px rgba(79,140,255,.45)}
+@media (prefers-reduced-motion: reduce){*{animation:none !important;transition:none !important}}
+</style>
+</helmet>
+<div style="position: relative; width: 640px; height: 1800px; overflow: hidden; box-sizing: border-box; padding: 20px; background: #05070d; color: #eef2ff; font-family: Manrope, sans-serif">
+<div style="position: relative; height: 100%; box-sizing: border-box; border: 1px solid #2a3452; border-radius: 24px; background: #121829; display: flex; flex-direction: column; box-shadow: 0 30px 80px rgba(0,0,0,0.6)">
+
+<div style="padding: 24px 28px 8px; display: flex; align-items: center; justify-content: space-between">
+<h2 style="margin: 0; font-family: Outfit, sans-serif; font-weight: 800; font-size: 26px">Novo jogo</h2>
+<button class="btn" aria-label="Fechar" style="width: 44px; height: 44px; border: 1px solid #2a3452; border-radius: 50%; background: transparent; color: #eef2ff; display: flex; align-items: center; justify-content: center"><span class="ms" aria-hidden="true" style="font-size: 22px">close</span></button>
+</div>
+
+<div style="flex-grow: 1; min-height: 0; padding: 12px 28px 0; display: flex; flex-direction: column; gap: 20px">
+
+<button class="btn" style="height: 52px; border: 1px dashed #4f8cff; border-radius: 14px; background: rgba(79,140,255,0.08); color: #cfe0ff; font-family: Outfit, sans-serif; font-weight: 700; font-size: 16px; display: flex; align-items: center; justify-content: center; gap: 10px"><span class="ms" aria-hidden="true" style="font-size: 22px">search</span>Buscar na Steam</button>
+
+<div style="display: flex; align-items: center; gap: 14px; padding: 12px 14px; border-radius: 14px; background: #0f1524; border: 1px solid #1e2640">
+<div style="width: 44px; height: 58px; flex-shrink: 0; border-radius: 8px; background: #8ab4f8; display: flex; align-items: center; justify-content: center; font-family: Outfit, sans-serif; font-weight: 900; font-size: 16px; color: #0b0f1a">HK</div>
+<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px"><span style="display: flex; align-items: center; gap: 6px; font-size: 15px; font-weight: 700"><span class="ms f" aria-hidden="true" style="font-size: 18px; color: #7fb0ff">link</span>Ligado à Steam: «Hollow Knight»</span><span style="font-size: 13px; font-weight: 500; color: #a3abc7">42 h 30 min · 12/40 conquistas. A capa oficial é só prévia.</span></div>
+<button class="btn" style="height: 44px; padding: 0 14px; border: 1px solid #2a3452; border-radius: 999px; background: transparent; color: #eef2ff; font-family: Outfit, sans-serif; font-weight: 700; font-size: 13px">Trocar</button>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 8px">
+<label for="titulo" style="font-size: 13px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #a3abc7">Título</label>
+<input id="titulo" class="field" type="text" value="Hollow Knight" style="height: 52px; box-sizing: border-box; padding: 0 16px; border: 1px solid #3a4468; border-radius: 12px; background: #0b0f1a; color: #eef2ff; font-family: Manrope, sans-serif; font-size: 16px; font-weight: 600">
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 8px">
+<label for="plataforma" style="font-size: 13px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #a3abc7">Plataforma</label>
+<select id="plataforma" class="field" style="height: 52px; box-sizing: border-box; padding: 0 16px; border: 1px solid #3a4468; border-radius: 12px; background: #0b0f1a; color: #eef2ff; font-family: Manrope, sans-serif; font-size: 16px; font-weight: 600"><option>PC</option><option>PlayStation 5</option><option>Xbox Series</option><option>Nintendo Switch</option></select>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 8px">
+<div style="font-size: 13px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #a3abc7">Status</div>
+<div role="group" aria-label="Status" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px">
+<button aria-pressed="true" style="height: 52px; border: none; border-radius: 12px; background: #eef2ff; color: #0b0f1a; font-family: Outfit, sans-serif; font-weight: 700; font-size: 14px; display: flex; align-items: center; justify-content: center; gap: 6px"><span class="ms f" aria-hidden="true" style="font-size: 19px">sports_esports</span>Jogando</button>
+<button aria-pressed="false" style="height: 52px; border: 1px solid #3a4468; border-radius: 12px; background: transparent; color: #a3abc7; font-family: Outfit, sans-serif; font-weight: 600; font-size: 14px; display: flex; align-items: center; justify-content: center; gap: 6px"><span class="ms" aria-hidden="true" style="font-size: 19px">bookmark</span>Quero jogar</button>
+<button aria-pressed="false" style="height: 52px; border: 1px solid #3a4468; border-radius: 12px; background: transparent; color: #a3abc7; font-family: Outfit, sans-serif; font-weight: 600; font-size: 14px; display: flex; align-items: center; justify-content: center; gap: 6px"><span class="ms" aria-hidden="true" style="font-size: 19px">emoji_events</span>Zerado</button>
+</div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 14px; padding: 18px; border: 1px solid #1e2640; border-radius: 16px; background: #0f1524">
+<div style="display: flex; align-items: center; justify-content: space-between">
+<div style="font-family: Outfit, sans-serif; font-weight: 700; font-size: 18px">Avaliação</div>
+<div style="display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; color: #a3abc7">Média<span style="font-family: Outfit, sans-serif; font-weight: 800; font-size: 22px; color: #eef2ff">8,3</span></div>
+</div>
+<sc-for list="{{criterios}}" as="c" hint-placeholder-count="5">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px"><span style="font-size: 15px; font-weight: 700">{{c.label}}</span><span style="font-size: 12px; font-weight: 500; color: #a3abc7">{{c.desc}}</span></div>
+<div style="display: grid; grid-template-columns: minmax(0, 1fr) 76px 76px; align-items: center; gap: 12px">
+<input type="range" min="0" max="10" step="0.1" value="{{c.v}}" aria-label="{{c.label}}" style="width: 100%; height: 44px; accent-color: #4f8cff">
+<input class="field" type="text" inputmode="decimal" value="{{c.txt}}" aria-label="{{c.label}}, valor em texto" style="height: 44px; box-sizing: border-box; padding: 0 10px; border: 1px solid #3a4468; border-radius: 10px; background: #0b0f1a; color: #eef2ff; font-family: Outfit, sans-serif; font-size: 16px; font-weight: 700; text-align: center">
+<button class="btn" style="height: 44px; border: 1px solid #2a3452; border-radius: 10px; background: transparent; color: #a3abc7; font-family: Manrope, sans-serif; font-size: 13px; font-weight: 700">Limpar</button>
+</div>
+</div>
+</sc-for>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 8px">
+<div style="display: flex; align-items: center; justify-content: space-between"><label for="descricao" style="font-size: 13px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #a3abc7">Descrição</label><span style="font-size: 12px; font-weight: 700; color: #a3abc7">58/1000</span></div>
+<textarea id="descricao" class="field" rows="3" style="box-sizing: border-box; padding: 12px 16px; border: 1px solid #3a4468; border-radius: 12px; background: #0b0f1a; color: #eef2ff; font-family: Manrope, sans-serif; font-size: 16px; font-weight: 500; line-height: 1.5; resize: none; height: 110px">Explorei quase tudo em Hallownest.</textarea>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 8px">
+<div style="font-size: 13px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #a3abc7">Capa</div>
+<div style="display: flex; align-items: center; gap: 14px; padding: 12px 14px; border: 1px dashed #3a4468; border-radius: 14px">
+<div style="width: 56px; height: 74px; flex-shrink: 0; border-radius: 8px; background: #8ab4f8; display: flex; align-items: center; justify-content: center; font-family: Outfit, sans-serif; font-weight: 900; font-size: 18px; color: #0b0f1a">HK</div>
+<div style="flex-grow: 1; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 14px; font-weight: 700">Prévia da capa oficial da Steam</span><span style="font-size: 12px; font-weight: 500; color: #a3abc7">Envie um arquivo (JPEG, PNG ou WebP, até 2 MB) para usar a sua.</span></div>
+<button class="btn" style="height: 44px; padding: 0 16px; border: 1px solid #2a3452; border-radius: 999px; background: transparent; color: #eef2ff; font-family: Outfit, sans-serif; font-weight: 700; font-size: 13px; display: flex; align-items: center; gap: 6px"><span class="ms" aria-hidden="true" style="font-size: 18px">upload</span>Enviar</button>
+</div>
+</div>
+</div>
+
+<div style="flex-shrink: 0; padding: 16px 28px; display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #1e2640">
+<button class="btn" style="height: 52px; padding: 0 24px; border: 1px solid #3a4468; border-radius: 999px; background: transparent; color: #eef2ff; font-family: Outfit, sans-serif; font-weight: 700; font-size: 15px">Cancelar</button>
+<button class="cta" style="height: 52px; padding: 0 30px; border: none; border-radius: 999px; background: #4f8cff; color: #0b0f1a; font-family: Outfit, sans-serif; font-weight: 800; font-size: 15px">Salvar</button>
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":640,"height":1800}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const criterios = [
+      { label: 'Gameplay', desc: 'Como é jogar', v: 9, txt: '9,0' },
+      { label: 'História', desc: 'Enredo e personagens', v: 8, txt: '8,0' },
+      { label: 'Gráficos', desc: 'Arte e direção visual', v: 8.5, txt: '8,5' },
+      { label: 'Trilha sonora', desc: 'Música e sons', v: 9.5, txt: '9,5' },
+      { label: 'Performance', desc: 'Fluidez e estabilidade', v: 6.5, txt: '6,5' }
+    ];
+    return { criterios };
+  }
+}
+</script>
+</body>
+</html>

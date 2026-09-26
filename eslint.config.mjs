@@ -11,6 +11,8 @@ export default tseslint.config(
       '**/build/**',
       '**/coverage/**',
       '**/*.tsbuildinfo',
+      // Scripts de conferência no navegador (Playwright global, código que roda DENTRO da página): fora do lint.
+      'docs/verificacao-navegador/**',
     ],
   },
   js.configs.recommended,

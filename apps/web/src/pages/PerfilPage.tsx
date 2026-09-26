@@ -65,14 +65,14 @@ export function PerfilPage() {
   return (
     <div className="safe-x pb-12 pt-6 md:pb-16 md:pt-10">
       <main className="relative mx-auto flex max-w-[640px] flex-col gap-7">
-        <h1 className="glow-text-destaque m-0 font-display text-[22px] font-extrabold tracking-[0.14em] md:text-[30px]">
-          PERFIL
+        <h1 className="m-0 font-display text-[22px] font-extrabold tracking-[-0.01em] md:text-[30px]">
+          Perfil
         </h1>
 
         {avisoRecebido && (
           <p
             role="status"
-            className="m-0 rounded-2xl bg-painel px-4 py-3 text-[16px] font-semibold text-ciano"
+            className="m-0 rounded-2xl bg-painel px-4 py-3 text-[16px] font-semibold text-destaque"
           >
             {avisoRecebido}
           </p>
@@ -81,7 +81,7 @@ export function PerfilPage() {
         {avisoSteam?.tipo === 'sucesso' && (
           <p
             role="status"
-            className="m-0 rounded-2xl bg-painel px-4 py-3 text-[16px] font-semibold text-ciano"
+            className="m-0 rounded-2xl bg-painel px-4 py-3 text-[16px] font-semibold text-destaque"
           >
             {avisoSteam.texto}
           </p>

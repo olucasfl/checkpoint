@@ -33,7 +33,7 @@ export function subscribePrefs(listener: () => void): () => void {
   };
 }
 
-/** Antes do primeiro render: aplica as de `ultimoUsuario` para a cor não piscar em magenta. */
+/** Antes do primeiro render: aplica as de `ultimoUsuario` para a cor não piscar na cor padrão. */
 export function iniciarPrefs(): void {
   const guardadas = storage.get(PREFS);
   atuais = prefsDoUsuario(guardadas, guardadas.ultimoUsuario);

@@ -36,7 +36,7 @@ interface CriterioProps {
 }
 
 const CONTROLE =
-  'min-h-11 rounded-[4px] border bg-fundo px-2.5 font-corpo text-[19px] font-semibold';
+  'min-h-11 rounded-xl border bg-fundo px-2.5 font-display text-base font-bold focus:border-destaque';
 
 /**
  * Um critério, com o slider e o campo lendo o MESMO texto: assim não há dois estados para dessincronizar, e o
@@ -69,12 +69,12 @@ function Criterio({ chave, rotulo, descricao, texto, error, onChange }: Criterio
   const id = `f-nota-${chave}`;
 
   return (
-    <div className="flex flex-col gap-2 rounded-xl bg-painel-2 p-3" data-criterio={chave}>
+    <div className="flex flex-col gap-2" data-criterio={chave}>
       <div className="flex flex-col">
-        <label htmlFor={id} className="text-[17px] font-semibold">
+        <label htmlFor={id} className="text-[15px] font-bold">
           {rotulo}
         </label>
-        <span id={`${id}-desc`} className="text-[15px] text-texto-suave">
+        <span id={`${id}-desc`} className="text-xs font-medium text-texto-suave">
           {descricao}
         </span>
       </div>
@@ -103,14 +103,14 @@ function Criterio({ chave, rotulo, descricao, texto, error, onChange }: Criterio
           aria-invalid={shownError ? true : undefined}
           aria-describedby={shownError ? `${id}-err` : `${id}-desc`}
           onChange={(event) => onChange(event.target.value)}
-          className={`${CONTROLE} w-[72px] text-center ${shownError ? 'border-erro' : 'border-borda-controle'}`}
+          className={`${CONTROLE} w-[76px] text-center ${shownError ? 'border-erro' : 'border-borda-controle'}`}
         />
         <button
           type="button"
           aria-label={`Limpar ${rotulo}`}
           disabled={texto === ''}
           onClick={() => onChange('')}
-          className="min-h-11 min-w-11 rounded-[4px] px-2 text-[15px] font-semibold text-texto-suave underline underline-offset-4 hover:text-ciano disabled:cursor-default disabled:no-underline disabled:opacity-40"
+          className="min-h-11 w-[76px] min-w-11 rounded-xl border border-borda-controle px-2 text-sm font-semibold text-texto-suave transition-colors hover:text-destaque disabled:cursor-default disabled:opacity-40"
         >
           Limpar
         </button>
@@ -135,11 +135,17 @@ export function AvaliacaoField({
   onChange,
 }: AvaliacaoFieldProps) {
   return (
-    <fieldset className="m-0 flex min-w-0 flex-col gap-3 border-0 p-0">
-      <legend className="mb-1 p-0 font-display text-[13px] font-extrabold uppercase tracking-[0.16em]">
+    <fieldset className="m-0 flex min-w-0 flex-col gap-4 rounded-2xl border-0 bg-painel-2 p-4">
+      <legend className="float-left mb-0 w-full p-0 font-display text-lg font-bold">
         Avaliação
       </legend>
-      <p className="m-0 text-[15px] text-texto-suave">
+      <p aria-live="polite" data-media className="m-0 flex items-baseline gap-2">
+        <span className="text-sm font-semibold text-texto-suave">Média</span>
+        <span className="font-display text-[22px] font-extrabold tabular-nums">
+          {media === null ? '—' : formatRating(media)}
+        </span>
+      </p>
+      <p className="m-0 text-xs font-medium text-texto-suave">
         Todos os critérios são opcionais, de {GAME_RATING_MIN} a {GAME_RATING_MAX} (aceita casas
         decimais, ex.: 8,7).
       </p>
@@ -155,14 +161,6 @@ export function AvaliacaoField({
           onChange={(texto) => onChange(criterio.chave, texto)}
         />
       ))}
-
-      <p aria-live="polite" data-media className="m-0 flex items-baseline gap-2 text-[17px]">
-        <span className="font-semibold">Média</span>
-        <span className="font-corpo text-2xl font-bold tabular-nums">
-          {media === null ? '—' : formatRating(media)}
-        </span>
-        {media !== null && <span className="text-texto-suave">/{GAME_RATING_MAX}</span>}
-      </p>
 
       <FieldError id="f-notas-err" message={sectionError} />
     </fieldset>

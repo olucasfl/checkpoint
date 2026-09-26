@@ -142,14 +142,14 @@ describe('aparência: prévia ao vivo (CA-36, CA-37)', () => {
   it('abre com os padrões da spec', async () => {
     await abrir();
 
-    expect(selecionada('Cor de destaque')).toBe('Magenta');
+    expect(selecionada('Cor de destaque')).toBe('Azul');
     expect(selecionada('Densidade da lista')).toBe('Confortável');
-    expect(selecionada('Efeitos visuais')).toBe('Completos');
+    expect(selecionada('Animações')).toBe('Completas');
     expect(
       within(grupo('Cor de destaque'))
         .getAllByRole('radio')
         .map((r) => r.getAttribute('aria-label')),
-    ).toEqual(['Magenta', 'Violeta', 'Azul', 'Laranja']);
+    ).toEqual(['Azul', 'Violeta', 'Rosa', 'Laranja']);
   });
 
   it('escolher Violeta muda o <html> na hora, sem Salvar e sem nenhuma request', async () => {
@@ -171,7 +171,7 @@ describe('aparência: prévia ao vivo (CA-36, CA-37)', () => {
     const user = await abrir();
 
     await user.click(within(grupo('Cor de destaque')).getByRole('radio', { name: 'Violeta' }));
-    await user.click(within(grupo('Efeitos visuais')).getByRole('radio', { name: 'Reduzidos' }));
+    await user.click(within(grupo('Animações')).getByRole('radio', { name: 'Reduzidas' }));
 
     const guardadas = storage.get(PREFS);
     expect(guardadas.ultimoUsuario).toBe(ANA_ID);
@@ -182,7 +182,7 @@ describe('aparência: prévia ao vivo (CA-36, CA-37)', () => {
     expect(document.documentElement.dataset.efeitos).toBe('reduzidos');
 
     definirUsuario(BIA_ID);
-    expect(document.documentElement.dataset.destaque).toBe('magenta');
+    expect(document.documentElement.dataset.destaque).toBe('azul');
     definirUsuario(ANA_ID);
     expect(document.documentElement.dataset.destaque).toBe('violeta');
   });
@@ -190,35 +190,36 @@ describe('aparência: prévia ao vivo (CA-36, CA-37)', () => {
   it('as setas trocam a cor marcada, como num grupo de rádios', async () => {
     const user = await abrir();
 
-    within(grupo('Cor de destaque')).getByRole('radio', { name: 'Magenta' }).focus();
+    within(grupo('Cor de destaque')).getByRole('radio', { name: 'Azul' }).focus();
     await user.keyboard('{ArrowRight}');
 
     expect(within(grupo('Cor de destaque')).getByRole('radio', { name: 'Violeta' })).toHaveFocus();
     expect(document.documentElement.dataset.destaque).toBe('violeta');
   });
 
-  it('densidade: a mini-prévia (duas linhas sintéticas) acompanha a escolha', async () => {
+  it('densidade: a mini-prévia (dois tiles sintéticos) acompanha a escolha', async () => {
     const user = await abrir();
     const previa = () => within(modal()).getByRole('list', { name: 'Prévia da densidade' });
     expect(previa()).toHaveAttribute('data-densidade', 'confortavel');
+    expect(previa().querySelector('[data-cover]')?.className).toContain('w-[132px]');
     expect(within(previa()).getAllByRole('listitem')).toHaveLength(2);
 
     await user.click(within(grupo('Densidade da lista')).getByRole('radio', { name: 'Compacta' }));
 
     expect(previa()).toHaveAttribute('data-densidade', 'compacta');
-    expect(previa().querySelector('[data-cover]')?.className).toContain('size-10');
+    expect(previa().querySelector('[data-cover]')?.className).toContain('w-[108px]');
     expect(storage.get(PREFS).porUsuario[ANA_ID]).toMatchObject({ densidade: 'compacta' });
   });
 
-  it('efeitos: a amostra diz se orbes e scanlines estão ligados', async () => {
+  it('efeitos: a amostra diz se as animações estão ligadas', async () => {
     const user = await abrir();
-    expect(within(modal()).getByText('Orbes e scanlines ligados')).toBeInTheDocument();
+    expect(within(modal()).getByText('Animações ligadas')).toBeInTheDocument();
+    // A amostra é um tile que anima em laço (a regra global de movimento reduzido o para).
+    expect(modal().querySelector('[data-previa-tile]')).toHaveClass('previa-elevar');
 
-    await user.click(within(grupo('Efeitos visuais')).getByRole('radio', { name: 'Reduzidos' }));
+    await user.click(within(grupo('Animações')).getByRole('radio', { name: 'Reduzidas' }));
 
-    expect(
-      within(modal()).getByText('Orbes e scanlines desligados, sem animação'),
-    ).toBeInTheDocument();
+    expect(within(modal()).getByText('Animações desligadas, sem movimento')).toBeInTheDocument();
   });
 });
 
@@ -274,7 +275,7 @@ describe('Restaurar padrões por aba (CA-40)', () => {
 
     await user.click(screen.getByRole('button', { name: 'Restaurar padrões' }));
     expect(storage.get(PREFS).porUsuario[ANA_ID]).toMatchObject({
-      destaque: 'magenta',
+      destaque: 'azul',
       densidade: 'confortavel',
       efeitos: 'completos',
       filtroInicial: 'ZERADO',

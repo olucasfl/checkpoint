@@ -1,9 +1,9 @@
 import { Icon } from '@/shared/components/Icon';
 
 const STATE_BOX =
-  'flex min-h-[180px] flex-col items-center justify-center gap-2.5 rounded-md border border-dashed border-borda bg-painel p-6 text-center';
+  'flex min-h-[180px] flex-col items-center justify-center gap-2.5 rounded-2xl border border-dashed border-borda bg-painel p-6 text-center';
 
-const STATE_TITLE = 'font-display text-[15px] font-extrabold uppercase tracking-[0.12em]';
+const STATE_TITLE = 'font-display text-[15px] font-extrabold tracking-[-0.01em]';
 
 /** Carregando: três linhas de esqueleto (o brilho para com movimento reduzido). */
 export function ListLoading() {
@@ -15,7 +15,7 @@ export function ListLoading() {
       className="flex flex-col gap-2.5"
     >
       {[0, 1, 2].map((index) => (
-        <div key={index} className="skeleton h-[52px] w-full rounded-md" />
+        <div key={index} className="skeleton h-[52px] w-full rounded-xl" />
       ))}
     </div>
   );
@@ -62,9 +62,9 @@ export function ListError({
       <button
         type="button"
         onClick={onRetry}
-        className="min-h-11 rounded-[4px] border border-borda-controle px-[18px] font-display text-[13px] font-semibold tracking-[0.1em] hover:bg-acao-hover"
+        className="min-h-11 rounded-full border border-borda-controle px-[18px] font-display text-[15px] font-bold hover:bg-acao-hover"
       >
-        TENTAR DE NOVO
+        Tentar de novo
       </button>
     </div>
   );

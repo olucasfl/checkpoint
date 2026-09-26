@@ -4,7 +4,7 @@ import { VitePWA, type ManifestOptions, type VitePWAOptions } from 'vite-plugin-
  * O manifest não lê CSS: este hex e o do `<meta name="theme-color">` repetem o token `fundo` de
  * `src/styles/index.css`, e `pwa.config.test.ts` confere que os três são iguais.
  */
-const FUNDO = '#07040f';
+const FUNDO = '#0b0f1a';
 
 const ICONES = '/icons';
 

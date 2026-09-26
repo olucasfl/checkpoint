@@ -2,7 +2,8 @@ import { GAME_STATUS, type GameStatus } from '@checkpoint/shared';
 import { defineKey } from '@/shared/lib/storage/keys';
 
 /** As preferências deste aparelho (spec perfil, etapa 3). Nunca vão para a API. */
-export const DESTAQUES = ['magenta', 'violeta', 'azul', 'laranja'] as const;
+/** Azul (`acento`, o padrão), Violeta (`capa-6`), Rosa (`capa-2`) e Laranja (`capa-3`): só tokens que já existem. */
+export const DESTAQUES = ['azul', 'violeta', 'rosa', 'laranja'] as const;
 export type Destaque = (typeof DESTAQUES)[number];
 
 /** Na ordem dos botões de filtro do catálogo. */
@@ -27,7 +28,7 @@ export interface Prefs {
 }
 
 export const PREFS_PADRAO: Prefs = {
-  destaque: 'magenta',
+  destaque: 'azul',
   filtroInicial: 'TODOS',
   densidade: 'confortavel',
   efeitos: 'completos',

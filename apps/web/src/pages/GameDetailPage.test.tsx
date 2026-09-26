@@ -97,6 +97,8 @@ function renderAt(entries: string[] = ['/jogos/g1'], index = entries.length - 1)
   return userEvent.setup({ applyAccept: false });
 }
 
+/** O preenchimento da barra contínua de um critério (a largura é a nota em %). */
+const barra = (chave: string) => criterio(chave).querySelector('.bg-borda > div') as HTMLElement;
 const onde = () => screen.getByTestId('onde').textContent;
 const criterio = (chave: string) =>
   document.querySelector(`[data-criterio="${chave}"]`) as HTMLElement;
@@ -113,9 +115,10 @@ describe('conteúdo (CA-25)', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'Celeste' })).toBeInTheDocument();
     expect(screen.getByText('PC')).toBeInTheDocument();
     expect(screen.getByText('Zerado')).toBeInTheDocument();
-    const media = screen.getByRole('region', { name: 'Nota geral' });
-    expect(within(media).getByRole('img', { name: 'Nota 8,6 de 10' })).toBeInTheDocument();
-    expect(within(media).getByText('8,6')).toHaveClass('md:text-[56px]');
+    const anel = screen.getByRole('img', { name: 'Nota 8,6 de 10' });
+    expect(anel).toHaveAttribute('data-anel-nota', 'grande');
+    expect(within(anel).getByText('8,6')).toHaveClass('text-[28px]');
+    expect(within(anel).getByText('de 10')).toBeInTheDocument();
   });
 
   it('os cinco critérios, na ordem: nota e barra, ou "sem nota" quando vazio', async () => {
@@ -134,7 +137,7 @@ describe('conteúdo (CA-25)', () => {
       within(criterio('gameplay')).getByRole('img', { name: 'Gameplay 9,2 de 10' }),
     ).toBeInTheDocument();
     expect(within(criterio('gameplay')).getByText('9,2')).toBeInTheDocument();
-    expect(criterio('gameplay').querySelectorAll('[data-segment="on"]')).toHaveLength(9);
+    expect(barra('gameplay')).toHaveStyle({ width: '92%' });
     expect(
       within(criterio('historia')).getByRole('img', { name: 'História 8,0 de 10' }),
     ).toBeInTheDocument();
@@ -161,10 +164,14 @@ describe('conteúdo (CA-25)', () => {
     api.list.mockResolvedValue([game({ notas: SEM_NOTAS, notaMedia: null })]);
     renderAt();
 
-    const media = await screen.findByRole('region', { name: 'Nota geral' });
+    await screen.findByRole('heading', { level: 1, name: 'Celeste' });
 
-    expect(within(media).getByText(/sem nota/i)).toBeInTheDocument();
-    expect(within(media).getByText(/média dos critérios/i)).toBeInTheDocument();
+    expect(screen.queryByRole('img', { name: /^Nota / })).toBeNull();
+    expect(screen.getByText(/média dos critérios/i)).toBeInTheDocument();
+    for (const chave of ['gameplay', 'historia', 'graficos', 'trilhaSonora', 'performance']) {
+      expect(within(criterio(chave)).getByText(/sem nota/i)).toBeInTheDocument();
+      expect(barra(chave)).toHaveStyle({ width: '0%' });
+    }
   });
 
   it('uma nota 0 é uma nota: "0,0" e nenhum segmento, e não "sem nota"', async () => {
@@ -175,7 +182,7 @@ describe('conteúdo (CA-25)', () => {
     expect(
       within(criterio('performance')).getByRole('img', { name: 'Performance técnica 0,0 de 10' }),
     ).toBeInTheDocument();
-    expect(criterio('performance').querySelectorAll('[data-segment="on"]')).toHaveLength(0);
+    expect(barra('performance')).toHaveStyle({ width: '0%' });
     expect(within(criterio('performance')).queryByText(/sem nota/i)).not.toBeInTheDocument();
   });
 
@@ -185,8 +192,8 @@ describe('conteúdo (CA-25)', () => {
     const gerada = document.querySelector('[data-cover="generated"]') as HTMLElement;
 
     expect(gerada).toHaveTextContent('C');
-    expect(gerada).toHaveClass('max-w-[320px]');
-    expect(gerada).toHaveClass('aspect-square');
+    expect(gerada).toHaveClass('max-w-[300px]');
+    expect(gerada).toHaveClass('aspect-[3/4]');
   });
 
   it('com capa enviada mostra a imagem', async () => {
@@ -207,7 +214,7 @@ describe('descrição (CA-26)', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Adicionar descrição' }));
 
-    expect(await screen.findByRole('heading', { name: 'EDITAR JOGO' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Editar jogo' })).toBeInTheDocument();
     expect(screen.getByRole('textbox', { name: /Descrição/ })).toBeInTheDocument();
   });
 
@@ -249,12 +256,12 @@ describe('Editar, Excluir e Voltar (CA-27)', () => {
     const user = renderAt();
 
     await user.click(await screen.findByRole('button', { name: 'Editar' }));
-    const dialogo = await screen.findByRole('heading', { name: 'EDITAR JOGO' });
+    const dialogo = await screen.findByRole('heading', { name: 'Editar jogo' });
     expect(dialogo).toBeInTheDocument();
     expect(screen.getByLabelText('Gameplay')).toHaveValue('9,2');
     await user.clear(screen.getByLabelText('Gameplay'));
     await user.type(screen.getByLabelText('Gameplay'), '5');
-    await user.click(screen.getByRole('button', { name: 'SALVAR' }));
+    await user.click(screen.getByRole('button', { name: 'Salvar' }));
 
     expect(api.update).toHaveBeenCalledWith(
       'g1',
@@ -263,7 +270,7 @@ describe('Editar, Excluir e Voltar (CA-27)', () => {
     expect(await screen.findByRole('img', { name: 'Gameplay 5,0 de 10' })).toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'Nota 6,5 de 10' })).toBeInTheDocument();
     await waitFor(() =>
-      expect(screen.queryByRole('heading', { name: 'EDITAR JOGO' })).not.toBeInTheDocument(),
+      expect(screen.queryByRole('heading', { name: 'Editar jogo' })).not.toBeInTheDocument(),
     );
     expect(onde()).toBe('/jogos/g1');
   });
@@ -273,9 +280,9 @@ describe('Editar, Excluir e Voltar (CA-27)', () => {
     const user = renderAt();
 
     await user.click(await screen.findByRole('button', { name: 'Excluir' }));
-    expect(await screen.findByRole('heading', { name: 'REMOVER JOGO' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Remover jogo' })).toBeInTheDocument();
     expect(api.remove).not.toHaveBeenCalled();
-    await user.click(screen.getByRole('button', { name: 'REMOVER' }));
+    await user.click(screen.getByRole('button', { name: 'Remover' }));
 
     await waitFor(() => expect(api.remove).toHaveBeenCalledWith('g1'));
     await waitFor(() => expect(onde()).toBe('/'));
@@ -286,7 +293,7 @@ describe('Editar, Excluir e Voltar (CA-27)', () => {
     const user = renderAt();
 
     await user.click(await screen.findByRole('button', { name: 'Excluir' }));
-    await user.click(await screen.findByRole('button', { name: 'CANCELAR' }));
+    await user.click(await screen.findByRole('button', { name: 'Cancelar' }));
 
     expect(api.remove).not.toHaveBeenCalled();
     expect(onde()).toBe('/jogos/g1');
@@ -298,7 +305,7 @@ describe('Editar, Excluir e Voltar (CA-27)', () => {
     const user = renderAt();
 
     await user.click(await screen.findByRole('button', { name: 'Excluir' }));
-    await user.click(await screen.findByRole('button', { name: 'REMOVER' }));
+    await user.click(await screen.findByRole('button', { name: 'Remover' }));
 
     expect(await screen.findByText(/Sem conexão/)).toBeInTheDocument();
     expect(onde()).toBe('/jogos/g1');
@@ -374,26 +381,26 @@ describe('layout e acessibilidade (CA-30)', () => {
     renderAt();
     await screen.findByRole('heading', { level: 1, name: 'Celeste' });
 
-    for (const nome of ['Voltar', 'Editar', 'Excluir']) {
-      expect(screen.getByRole('button', { name: nome })).toHaveClass('min-h-11');
+    expect(screen.getByRole('button', { name: 'Voltar' })).toHaveClass('min-h-11');
+    for (const nome of ['Editar', 'Excluir']) {
+      expect(screen.getByRole('button', { name: nome })).toHaveClass('h-12');
     }
   });
 
-  it('coluna única no celular e a capa ao lado das notas a partir de 1024 px (lg:flex-row)', async () => {
+  it('coluna única no celular e a capa (300 px) ao lado das notas a partir de 1024 px (lg:grid)', async () => {
     renderAt();
     const article = (await screen.findByRole('article')) as HTMLElement;
 
     expect(article).toHaveClass('flex-col');
-    expect(article).toHaveClass('lg:flex-row');
+    expect(article).toHaveClass('lg:grid', 'lg:grid-cols-[300px_minmax(0,1fr)]');
   });
 
-  it('a página tem um único h1 (o título) e o "Nota geral", "Avaliação" e "Descrição" são h2', async () => {
+  it('a página tem um único h1 (o título) e "Avaliação" e "Descrição" são h2', async () => {
     renderAt();
     await screen.findByRole('heading', { level: 1, name: 'Celeste' });
 
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
     expect(screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)).toEqual([
-      'Nota geral',
       'Avaliação',
       'Descrição',
     ]);
@@ -534,5 +541,24 @@ describe('bloco Steam na página do jogo (spec integracao-plataformas, etapa 4)'
     expect(screen.getByRole('heading', { level: 1, name: 'Celeste' })).toBeInTheDocument();
     expect(screen.getByText('Zerado')).toBeInTheDocument();
     expect(await screen.findByRole('button', { name: 'Vincular à Steam' })).toBeInTheDocument();
+  });
+});
+
+describe('ações do jogo com a fonte mais larga (F1 da troca de design)', () => {
+  it('a fileira Vincular à Steam · Editar · Excluir quebra linha em vez de estourar a tela (o jsdom não mede; a classe é o contrato)', async () => {
+    vi.mocked(integracoesApi.listarContas).mockResolvedValue([
+      {
+        provedor: 'STEAM',
+        idExterno: 'STEAMID_SINTETICO',
+        nomeExibicao: 'Jogador Sintetico',
+        vinculadaEm: '2026-09-25T12:00:00.000Z',
+      },
+    ]);
+    renderAt();
+    await screen.findByRole('button', { name: 'Vincular à Steam' });
+
+    const fileira = document.querySelector('[data-acoes-do-jogo]');
+    expect(fileira).toHaveClass('flex-wrap');
+    expect(within(fileira as HTMLElement).getAllByRole('button')).toHaveLength(3);
   });
 });

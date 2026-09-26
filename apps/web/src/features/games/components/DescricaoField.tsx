@@ -25,7 +25,7 @@ export function DescricaoField({ value, error, onChange }: DescricaoFieldProps) 
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? 'f-descricao-err' : 'f-descricao-contador'}
         onChange={(event) => onChange(event.target.value)}
-        className={`${inputClass(Boolean(error))} h-auto! min-h-24 resize-y py-2.5 font-corpo`}
+        className={`${inputClass(Boolean(error))} h-auto! min-h-[110px] resize-y py-2.5 font-corpo`}
       />
       <div className="flex justify-between gap-3">
         <FieldError id="f-descricao-err" message={error} />

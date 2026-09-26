@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Catálogo — Estante de console</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@600;700;800;900&amp;family=Manrope:wght@500;600;700&amp;family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,300..600,0..1,0&amp;display=block" rel="stylesheet">
+<style>
+body{margin:0;font-family:'Manrope',sans-serif;background:#0b0f1a}
+.ms{font-family:'Material Symbols Rounded';font-weight:normal;font-style:normal;line-height:1;letter-spacing:normal;text-transform:none;display:inline-block;white-space:nowrap;-webkit-font-smoothing:antialiased;font-variation-settings:'FILL' 0,'wght' 400}
+.ms.f{font-variation-settings:'FILL' 1,'wght' 500}
+.tile{transition:transform .22s cubic-bezier(.2,.8,.2,1);cursor:pointer}
+.tile .cover{transition:box-shadow .22s}
+.tile:hover{transform:translateY(-6px)}
+.tile:hover .cover{box-shadow:0 0 0 3px #eef2ff,0 0 0 7px rgba(79,140,255,.55),0 22px 40px rgba(0,0,0,.55)}
+.acts{opacity:0;transform:translateY(6px);transition:opacity .2s,transform .2s}
+.tile:hover .acts,.tile:focus-within .acts{opacity:1;transform:translateY(0)}
+.tab{transition:color .15s,background .15s;cursor:pointer}
+.tab:hover{color:#ffffff !important}
+.cta{transition:transform .15s,box-shadow .15s;cursor:pointer}
+.cta:hover{transform:translateY(-2px);box-shadow:0 10px 30px rgba(79,140,255,.45)}
+.addtile{transition:border-color .15s,color .15s,background .15s;cursor:pointer}
+.addtile:hover{border-color:#4f8cff !important;color:#ffffff !important;background:rgba(79,140,255,.08) !important}
+.round{transition:background .15s;cursor:pointer}
+.round:hover{background:#4f8cff !important;color:#0b0f1a !important}
+@media (prefers-reduced-motion: reduce){*{animation:none !important;transition:none !important}}
+</style>
+</helmet>
+<div style="position: relative; width: 1280px; height: 1180px; overflow: hidden; box-sizing: border-box; padding: 32px 56px; display: flex; flex-direction: column; gap: 32px; background: #0b0f1a; color: #eef2ff; font-family: Manrope, sans-serif">
+<div style="position: absolute; left: 50%; top: -440px; width: 1400px; height: 800px; margin-left: -700px; border-radius: 50%; background: radial-gradient(closest-side, rgba(79,140,255,0.18), rgba(79,140,255,0))"></div>
+
+<div style="position: relative; display: flex; align-items: center; justify-content: space-between">
+<div style="display: flex; align-items: center; gap: 12px">
+<div style="width: 44px; height: 44px; border-radius: 50%; background: #4f8cff; display: flex; align-items: center; justify-content: center; color: #0b0f1a"><span class="ms f" aria-hidden="true" style="font-size: 24px">flag</span></div>
+<div style="font-family: Outfit, sans-serif; font-weight: 800; font-size: 26px; letter-spacing: -0.01em">checkpoint</div>
+</div>
+<div style="display: flex; gap: 4px; padding: 5px; border-radius: 999px; background: #121829; border: 1px solid #1e2640">
+<sc-for list="{{filters}}" as="x" hint-placeholder-count="4">
+<sc-if value="{{x.active}}" hint-placeholder-val="{{false}}"><button class="tab" onClick="{{x.pick}}" aria-pressed="true" style="height: 44px; padding: 0 20px; border: none; border-radius: 999px; background: #eef2ff; color: #0b0f1a; font-family: Outfit, sans-serif; font-weight: 700; font-size: 15px; display: flex; align-items: center; gap: 8px"><span class="ms f" aria-hidden="true" style="font-size: 19px">{{x.icon}}</span>{{x.label}}<span style="font-size: 12px; font-weight: 800; opacity: 0.7">{{x.count}}</span></button></sc-if>
+<sc-if value="{{x.inactive}}" hint-placeholder-val="{{true}}"><button class="tab" onClick="{{x.pick}}" aria-pressed="false" style="height: 44px; padding: 0 20px; border: none; border-radius: 999px; background: transparent; color: #8b93b0; font-family: Outfit, sans-serif; font-weight: 600; font-size: 15px; display: flex; align-items: center; gap: 8px"><span class="ms" aria-hidden="true" style="font-size: 19px">{{x.icon}}</span>{{x.label}}<span style="font-size: 12px; font-weight: 800; color: #6b7391">{{x.count}}</span></button></sc-if>
+</sc-for>
+</div>
+<div style="display: flex; align-items: center; gap: 10px">
+<button class="cta" style="height: 48px; padding: 0 22px; border: none; border-radius: 999px; background: #4f8cff; color: #0b0f1a; font-family: Outfit, sans-serif; font-weight: 700; font-size: 15px; display: flex; align-items: center; gap: 8px"><span class="ms" aria-hidden="true" style="font-size: 22px">add</span>Adicionar jogo</button>
+<button class="round" aria-label="Perfil" style="width: 48px; height: 48px; border: 1px solid #1e2640; border-radius: 50%; background: #121829; color: #eef2ff; display: flex; align-items: center; justify-content: center"><span class="ms" aria-hidden="true" style="font-size: 24px">person</span></button>
+</div>
+</div>
+
+<sc-if value="{{showHero}}" hint-placeholder-val="{{true}}">
+<div style="position: relative; height: 230px; flex-shrink: 0; border-radius: 24px; overflow: hidden; background: {{hero.hue}}">
+<div style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; background: linear-gradient(100deg, #0b0f1a 30%, rgba(11,15,26,0.55) 60%, rgba(11,15,26,0.05) 100%)"></div>
+<div style="position: absolute; right: 90px; top: -40px; width: 300px; height: 300px; border-radius: 50%; border: 44px solid rgba(255,255,255,0.16)"></div>
+<div style="position: absolute; right: 48px; bottom: -40px; font-family: Outfit, sans-serif; font-weight: 900; font-size: 230px; line-height: 1; color: rgba(11,15,26,0.28)">{{hero.ini}}</div>
+<div style="position: relative; height: 100%; box-sizing: border-box; padding: 32px 40px; display: flex; flex-direction: column; justify-content: center; gap: 12px">
+<div style="display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: #b6d0ff"><span class="ms f" aria-hidden="true" style="font-size: 20px">play_circle</span>Continue de onde parou</div>
+<div style="font-family: Outfit, sans-serif; font-weight: 800; font-size: 52px; line-height: 1; letter-spacing: -0.02em">{{hero.titulo}}</div>
+<div style="display: flex; align-items: center; gap: 8px">
+<span style="display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 14px; border-radius: 999px; background: rgba(255,255,255,0.12); font-size: 14px; font-weight: 600"><span class="ms" aria-hidden="true" style="font-size: 18px">{{hero.platIcon}}</span>{{hero.plat}}</span>
+<span style="display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 14px; border-radius: 999px; background: rgba(255,255,255,0.12); font-size: 14px; font-weight: 700"><span class="ms f" aria-hidden="true" style="font-size: 18px; color: #ffd166">star</span>{{hero.nota}}</span>
+<span style="display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 14px; border-radius: 999px; background: rgba(255,255,255,0.12); font-size: 14px; font-weight: 700"><span class="ms" aria-hidden="true" style="font-size: 18px">schedule</span>{{hero.horas}} na Steam</span>
+<span style="display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 14px; border-radius: 999px; background: rgba(255,255,255,0.12); font-size: 14px; font-weight: 700"><span class="ms f" aria-hidden="true" style="font-size: 18px; color: #ffd166">military_tech</span>{{hero.conq}} conquistas</span>
+<a href="Detalhe.dc.html" class="cta" style="margin-left: 8px; height: 44px; padding: 0 20px; border-radius: 999px; background: #eef2ff; color: #0b0f1a; font-family: Outfit, sans-serif; font-weight: 700; font-size: 15px; display: flex; align-items: center; gap: 8px; text-decoration: none"><span class="ms" aria-hidden="true" style="font-size: 20px">visibility</span>Ver detalhes</a>
+</div>
+</div>
+</div>
+</sc-if>
+
+<sc-for list="{{shelves}}" as="sh" hint-placeholder-count="3">
+<div style="position: relative; display: flex; flex-direction: column; gap: 16px">
+<div style="display: flex; align-items: center; gap: 10px">
+<span class="ms f" aria-hidden="true" style="font-size: 26px; color: {{sh.color}}">{{sh.icon}}</span>
+<h2 style="margin: 0; font-family: Outfit, sans-serif; font-weight: 700; font-size: 22px">{{sh.label}}</h2>
+<span style="height: 24px; padding: 0 10px; border-radius: 999px; background: #1a2135; color: #a3abc7; font-size: 13px; font-weight: 700; display: inline-flex; align-items: center">{{sh.count}}</span>
+</div>
+<div style="display: flex; gap: 22px">
+<sc-for list="{{sh.items}}" as="g" hint-placeholder-count="2">
+<div class="tile" style="width: 150px; display: flex; flex-direction: column; gap: 8px">
+<div class="cover" style="position: relative; width: 150px; height: 200px; border-radius: 14px; overflow: hidden; background: {{g.hue}}">
+<div style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; background: linear-gradient(160deg, rgba(255,255,255,0.28), rgba(255,255,255,0) 40%, rgba(0,0,0,0.45))"></div>
+<div style="position: absolute; left: -36px; bottom: -44px; width: 170px; height: 170px; border-radius: 50%; border: 26px solid rgba(255,255,255,0.16)"></div>
+<div style="position: absolute; left: 14px; top: 12px; font-family: Outfit, sans-serif; font-weight: 900; font-size: 50px; line-height: 1; color: rgba(11,15,26,0.78)">{{g.ini}}</div>
+<sc-if value="{{g.hasNota}}" hint-placeholder-val="{{true}}">
+<div style="position: absolute; right: 10px; top: 10px; width: 40px; height: 40px; border-radius: 50%; background: conic-gradient(#eef2ff {{g.pct}}%, rgba(255,255,255,0.25) 0); display: flex; align-items: center; justify-content: center"><div style="width: 32px; height: 32px; border-radius: 50%; background: #0b0f1a; display: flex; align-items: center; justify-content: center; font-family: Outfit, sans-serif; font-weight: 700; font-size: 13px">{{g.nota}}</div></div>
+</sc-if>
+<div style="position: absolute; left: 10px; bottom: 10px; display: flex; align-items: center; gap: 5px; height: 26px; padding: 0 10px; border-radius: 999px; background: rgba(11,15,26,0.78); font-size: 12px; font-weight: 700"><span class="ms" aria-hidden="true" style="font-size: 15px">{{g.platIcon}}</span>{{g.plat}}</div>
+<div class="acts" style="position: absolute; right: 8px; bottom: 8px; display: flex; flex-direction: column; gap: 6px">
+<button class="round" aria-label="Editar {{g.titulo}}" style="width: 44px; height: 44px; border: none; border-radius: 50%; background: rgba(11,15,26,0.88); color: #ffffff; display: flex; align-items: center; justify-content: center"><span class="ms" aria-hidden="true" style="font-size: 20px">edit</span></button>
+<button class="round" aria-label="Remover {{g.titulo}}" style="width: 44px; height: 44px; border: none; border-radius: 50%; background: rgba(11,15,26,0.88); color: #ffffff; display: flex; align-items: center; justify-content: center"><span class="ms" aria-hidden="true" style="font-size: 20px">delete</span></button>
+</div>
+</div>
+<a href="Detalhe.dc.html" style="font-family: Outfit, sans-serif; font-weight: 600; font-size: 16px; line-height: 1.2; color: #eef2ff; text-decoration: none">{{g.titulo}}</a>
+<sc-if value="{{g.hasSteam}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: #a3abc7"><span class="ms" aria-hidden="true" style="font-size: 16px">sports_esports</span>{{g.horas}} · {{g.conq}}</div>
+</sc-if>
+</div>
+</sc-for>
+<button class="addtile" style="width: 150px; height: 200px; border-radius: 14px; border: 2px dashed #2a3452; background: transparent; color: #a3abc7; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; font-family: Manrope, sans-serif; font-size: 14px; font-weight: 700"><span class="ms" aria-hidden="true" style="font-size: 34px">add</span>Adicionar</button>
+</div>
+</div>
+</sc-for>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":1180}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const all = [
+      { titulo: 'Hollow Knight', plat: 'PC', status: 'JOGANDO', nota: '8,3', pct: 83, hue: '#8ab4f8', horas: '42 h 30 min', conq: '12/40' },
+      { titulo: 'Palworld', plat: 'PC', status: 'JOGANDO', nota: null, hue: '#a78bfa', horas: '22 h', conq: '8/24' },
+      { titulo: 'Elden Ring', plat: 'PS5', status: 'JOGANDO', nota: null, hue: '#facc15' },
+      { titulo: 'Outer Wilds', plat: '', status: 'QUERO_JOGAR', nota: null, hue: '#fb923c' },
+      { titulo: 'Hi-Fi Rush', plat: 'Xbox', status: 'QUERO_JOGAR', nota: null, hue: '#f472b6' },
+      { titulo: 'Hades', plat: 'PC', status: 'ZERADO', nota: '9,5', pct: 95, hue: '#f87171', horas: '60 h', conq: '38/49' },
+      { titulo: 'Celeste', plat: 'Switch', status: 'ZERADO', nota: '9,0', pct: 90, hue: '#5ee6a8' }
+    ];
+    const icon = { PC: 'computer', Switch: 'videogame_asset', PS5: 'sports_esports', Xbox: 'sports_esports' };
+    const ini = (t) => t.split(/[\s-]+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase();
+    const f = (this.state && this.state.f) || 'TODOS';
+    const count = (s) => all.filter((g) => g.status === s).length;
+    const defs = [
+      { id: 'TODOS', label: 'Todos', icon: 'apps', count: all.length },
+      { id: 'JOGANDO', label: 'Jogando', icon: 'sports_esports', count: count('JOGANDO') },
+      { id: 'QUERO_JOGAR', label: 'Quero jogar', icon: 'bookmark', count: count('QUERO_JOGAR') },
+      { id: 'ZERADO', label: 'Zerado', icon: 'emoji_events', count: count('ZERADO') }
+    ];
+    const filters = defs.map((d) => ({ ...d, active: d.id === f, inactive: d.id !== f, pick: () => this.setState({ f: d.id }) }));
+    const dec = (g) => ({
+      ...g,
+      ini: ini(g.titulo),
+      platIcon: g.plat ? icon[g.plat] || 'devices' : 'block',
+      plat: g.plat || 'Sem plataforma',
+      hasNota: g.nota !== null,
+      pct: g.pct || 0,
+      hasSteam: !!g.horas,
+      horas: g.horas || '',
+      conq: g.conq || ''
+    });
+    const groups = [
+      { id: 'JOGANDO', label: 'Jogando agora', icon: 'sports_esports', color: '#7fb0ff' },
+      { id: 'QUERO_JOGAR', label: 'Quero jogar', icon: 'bookmark', color: '#ffd166' },
+      { id: 'ZERADO', label: 'Zerados', icon: 'emoji_events', color: '#5ee6a8' }
+    ];
+    const shelves = groups
+      .filter((s) => f === 'TODOS' || s.id === f)
+      .map((s) => {
+        const items = all.filter((g) => g.status === s.id).map(dec);
+        return { ...s, items, count: items.length };
+      });
+    const hero = dec(all[0]);
+    const showHero = f === 'TODOS' || f === 'JOGANDO';
+    return { filters, shelves, hero, showHero };
+  }
+}
+</script>
+</body>
+</html>

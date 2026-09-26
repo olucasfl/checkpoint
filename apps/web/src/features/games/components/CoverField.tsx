@@ -12,6 +12,8 @@ interface CoverFieldProps {
   file: File | null;
   /** A capa atual foi marcada para sair ao salvar. */
   removing: boolean;
+  /** Capa oficial do item da Steam escolhido: só PRÉVIA (não é salva com o jogo). */
+  oficialUrl?: string | null;
   error: string | undefined;
   onPick: (file: File) => void;
   onProblem: (message: string) => void;
@@ -19,7 +21,7 @@ interface CoverFieldProps {
 }
 
 const BTN =
-  'flex min-h-12 items-center gap-1.5 rounded-[4px] border border-borda-controle px-4 font-display text-[13px] font-semibold tracking-[0.1em] enabled:hover:bg-acao-hover disabled:border-apagado-2 disabled:opacity-60';
+  'flex min-h-11 items-center gap-1.5 rounded-full border border-borda-controle px-4 font-display text-sm font-bold transition-colors enabled:hover:bg-painel-3 disabled:border-apagado-2 disabled:opacity-60';
 
 /**
  * Capa do formulário: preview da imagem escolhida ANTES de salvar (nada é enviado até Salvar),
@@ -30,6 +32,7 @@ export function CoverField({
   currentUrl,
   file,
   removing,
+  oficialUrl = null,
   error,
   onPick,
   onProblem,
@@ -64,6 +67,7 @@ export function CoverField({
 
   const keptUrl = removing ? null : currentUrl;
   const canRemove = file !== null || keptUrl !== null;
+  const mostrandoOficial = file === null && keptUrl === null && oficialUrl !== null;
 
   return (
     <Field>
@@ -72,12 +76,15 @@ export function CoverField({
       </div>
 
       <div
-        className={`flex items-center gap-4 rounded-[4px] border border-dashed p-3 ${
+        className={`flex items-center gap-4 rounded-2xl border border-dashed p-3.5 ${
           error ? 'border-erro' : 'border-borda-controle'
         }`}
       >
         {previewUrl ? (
-          <div className="size-24 shrink-0 overflow-hidden rounded-[4px]" data-cover="preview">
+          <div
+            className="aspect-[3/4] w-14 shrink-0 overflow-hidden rounded-lg"
+            data-cover="preview"
+          >
             <img
               src={previewUrl}
               alt="Prévia da capa selecionada"
@@ -85,21 +92,29 @@ export function CoverField({
             />
           </div>
         ) : (
-          <GameCover titulo={titulo} capaUrl={keptUrl} variant="preview" />
+          <GameCover titulo={titulo} capaUrl={keptUrl ?? oficialUrl} variant="preview" />
         )}
 
         <div className="flex flex-col gap-2">
           <div className="flex flex-wrap gap-2">
             <button type="button" className={BTN} onClick={() => inputRef.current?.click()}>
               <Icon name="upload" size={18} />
-              ESCOLHER IMAGEM
+              Enviar
             </button>
             <button type="button" className={BTN} disabled={!canRemove} onClick={onRemove}>
               <Icon name="hide_image" size={18} />
-              REMOVER CAPA
+              Remover capa
             </button>
           </div>
-          <span className="text-[15px] text-texto-suave">JPEG, PNG ou WebP, até 2 MB</span>
+          {mostrandoOficial && (
+            <span className="text-sm font-semibold">Prévia da capa oficial da Steam</span>
+          )}
+          <span className="text-sm text-texto-suave">
+            Envie um arquivo (JPEG, PNG ou WebP, até 2 MB) para usar a sua.
+          </span>
+          <span className="text-sm text-texto-suave">
+            A capa aparece em pé (3:4); imagens de outra proporção são cortadas no centro.
+          </span>
         </div>
 
         <input

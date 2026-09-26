@@ -10,10 +10,10 @@ export function DetailLoading() {
       aria-busy="true"
       className="flex flex-col gap-6 lg:flex-row lg:gap-10"
     >
-      <div className="skeleton aspect-square w-full max-w-[320px] self-center rounded-[4px] lg:self-start" />
+      <div className="skeleton aspect-[3/4] w-full max-w-[300px] self-center rounded-[20px] lg:self-start" />
       <div className="flex flex-1 flex-col gap-4">
-        <div className="skeleton h-9 w-2/3 rounded-md" />
-        <div className="skeleton h-6 w-1/3 rounded-md" />
+        <div className="skeleton h-9 w-2/3 rounded-xl" />
+        <div className="skeleton h-6 w-1/3 rounded-xl" />
         <div className="skeleton h-28 w-full rounded-2xl" />
         <div className="skeleton h-44 w-full rounded-2xl" />
       </div>
@@ -33,7 +33,7 @@ export function GameNotFound() {
       className="flex min-h-[220px] flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-borda bg-painel p-6 text-center"
     >
       <Icon name="search_off" size={40} filled className="text-ouro" />
-      <h1 className="m-0 font-display text-[18px] font-extrabold uppercase tracking-[0.12em]">
+      <h1 className="m-0 font-display text-[18px] font-extrabold tracking-[-0.01em]">
         Jogo não encontrado
       </h1>
       <p className="m-0 text-[17px] text-texto-suave">
@@ -41,7 +41,7 @@ export function GameNotFound() {
       </p>
       <Link
         to="/"
-        className="flex min-h-11 items-center gap-2 rounded-xl border border-borda-controle px-5 text-[16px] font-semibold text-ciano no-underline hover:bg-acao-hover"
+        className="flex min-h-11 items-center gap-2 rounded-xl border border-borda-controle px-5 text-[16px] font-semibold text-destaque no-underline hover:bg-acao-hover"
       >
         <Icon name="arrow_back" size={20} />
         Voltar para os jogos

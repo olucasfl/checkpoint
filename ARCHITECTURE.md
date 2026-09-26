@@ -520,7 +520,10 @@ Registre o módulo novo em `app.module.ts` (`imports: [...]`).
 
 ### 5.1 Composição da aplicação
 
-- `src/main.tsx` monta `<AppProviders><AppRouter/></AppProviders>`.
+- `src/main.tsx` monta `<ErrorBoundary><AppProviders><AppRouter/></AppProviders></ErrorBoundary>`. O **`ErrorBoundary`** (`shared/components/`) é a rede
+  contra erro de RENDER: sem ele, uma exceção em qualquer componente desmonta o app inteiro (página em branco, nenhum clique responde). Ele
+  também envolve o conteúdo do `AppFrame` (§5.6) com `resetKey` = rota, então a tela quebrada mostra o erro de verdade (para colar num relato),
+  "Tentar de novo" e "Ir para o catálogo", a navegação continua viva e trocar de rota escapa do erro. Não pega erro de evento nem de requisição.
 - `src/app/providers.tsx` — ponto único para providers globais: `QueryClientProvider`
   (`shared/lib/query-client.ts`) e o `AuthProvider` (§5.10); tema etc. entram aqui quando existirem.
 - `src/app/routes.tsx` — a lista de rotas (à parte do roteador para os testes usarem um roteador em
@@ -562,7 +565,7 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
 ### 5.5 Catálogo de jogos (`features/games/`, spec `docs/specs/catalogo-jogos.md`, etapa 3)
 
 - **Dados:** o web busca a lista **completa** uma vez (`GET /api/games`, query `['games']`); o filtro
-  (`/?status=`, na URL) e as contagens dos painéis e botões saem dela, no cliente. Toda mutação invalida
+  (`/?status=`, na URL) e as contagens (pílulas de filtro e contadores das prateleiras) saem dela, no cliente. Toda mutação invalida
   essa query. Chamadas só pelo `apiClient`, tipos de `@checkpoint/shared`. O upload da capa manda
   `multipart/form-data` **explícito**: o `apiClient` tem `Content-Type: application/json` por padrão e,
   nesse caso, o axios converte o `FormData` em JSON (a API recebia o arquivo vazio: 400).
@@ -584,18 +587,30 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
   permite dar nota 0). O erro de digitação (fora de 0 a 10, ou casa demais) aparece **na hora** e bloqueia o
   envio; os da API vêm por `fields` (cada critério, `notas` na seção, `descricao`). Em "Quero jogar" a seção some,
   as notas digitadas ficam no estado (voltar para Jogando as recupera) e um aviso diz que serão apagadas ao salvar.
-  `DescricaoField`: textarea com `maxLength` 1000 e contador `n/1000`. A `GameRow` mostra só a **média**
-  (`RatingBar`: barra de 10 segmentos que preenche `round(média)`, número com vírgula e 1 casa, `aria-label`
-  "Nota 8,3 de 10"; "—" sem média) e o **título é um `<Link>` real** para `/jogos/:id`, esticado sobre a linha
-  por `after:absolute after:inset-0` (sem `<a>` aninhado nem `onClick` no `<li>`), com as ações em `z-10` por cima.
+  `DescricaoField`: textarea de 110 px com `maxLength` 1000 e contador `n/1000`. **Layout da F3:** diálogo de 640 px e raio 24 (folha inferior no celular); cabeçalho "Novo jogo"/"Editar jogo" com "Fechar" redondo; campos de 52 px e 16 px de fonte, foco com borda e anel em `destaque` (`form-parts.tsx`); `StatusPicker` na ordem Jogando, Quero jogar, Zerado (botões de 52 px, o ativo com fundo `texto`); a **Avaliação** é um cartão `painel-2` com a média ao vivo no topo ("Média 8,3", "—" sem nota) e, por critério, slider, campo de 76 px e "Limpar" de 76 × 44; a **capa** tem miniatura de 56 × 74 (a prévia da oficial da Steam quando há ligação e nenhuma capa) e "Enviar" e "Remover capa"; rodapé fixo com "Cancelar" e "Salvar" de 52 px; o cartão "Ligado à Steam" mostra a miniatura em pé (44 × 58), as horas e "Trocar" (reabre a busca) ao lado de "Remover ligação". O `GameTile` (F2; antes, `GameRow`) mostra só a **média**, como `AnelDeNota` (arco `conic-gradient` de `--pct` sobre trilho escuro, número com vírgula e 1 casa, `role="img"` "Nota 8,3 de 10"; **sem média, sem anel**; 0 é nota) e o **título é um `<Link>` real** para `/jogos/:id`, esticado sobre o tile por `after:absolute after:inset-0` (sem `<a>` aninhado nem `onClick` no `<li>`), com as ações em `z-10` por cima. A `RatingBar` (segmentos) só sobrevive no detalhe até a F3.
+- **Estante** (spec `troca-de-design-estante`, F2; substitui a lista em linhas, `GameRow` e `StatPanels`): a `GamesPage` busca a
+  lista completa e a divide no cliente com `lib/estante.ts` (puro, com teste): `agruparEmPrateleiras(games, filtro)` (Jogando agora,
+  Quero jogar, Zerados, nessa ordem, **só as que têm jogo**; a ordem interna é a da API, `atualizadoEm` desc), `destaqueDoCatalogo`
+  (o **primeiro Jogando da lista**, e **só com o filtro Todos ou Jogando**; toda edição o promove, questão 14), `chipsDoDestaque` (horas e
+  conquistas **só nos ligados à Steam**) e `nomeDaPlataforma` ("Xbox Series X|S" vira "X/S" **só na tela**: a barra parecia um "I" na
+  Manrope; o valor gravado não muda). Componentes: `DestaqueContinue` (cartão de 230 px no desktop e 176 no celular, fundo = capa enviada
+  ou oficial sob `.destaque-scrim`, senão a cor gerada; a coluna de texto tem no máximo 50%; o cartão **cresce** em vez de cortar o texto
+  se a fonte de reserva alargar os chips; no celular o `<Link>` cobre o cartão inteiro e o texto "Ver detalhes" vira `sr-only`),
+  `Prateleira` (`<section>` + `<ul aria-label>`; **grade de colunas do tamanho da capa no desktop e fileira que rola por dentro no
+  celular**, com `scroll-px-4` para o `snap` não comer o recuo; o botão-bloco "Adicionar em …" fecha a lista e abre o `GameForm` com
+  `statusInicial` = o status dela, enquanto o "Adicionar jogo" do topo mantém o padrão), `GameTile` e `AnelDeNota`. **Editar e Remover**
+  ficam em `.tile-acoes`: `display: none` por padrão (em toque nem existem na tela, e o caminho é abrir o jogo) e, **só dentro de
+  `@media (hover: hover)`**, aparecem em `:hover` e `:focus-within`, junto da elevação de −6 px e do anel; a variante `movimento-reduzido`
+  tira o `transform` e as transições (o anel continua). `StatusFilter` são pílulas de 44 px (a ativa com fundo `texto`); no desktop o grupo
+  é um contêiner em pílula que **rola por dentro quando não cabe** (em 768 a 1100 px só parte das pílulas fica à vista), no celular é uma
+  fileira que rola e traz a ativa à vista. **`GameCover`** é sempre em pé (3:4; `tile` 150 × 200 e 132 × 176, `tileCompacto` 120 × 160 e
+  108 × 144, `detalhe`, `preview`), cadeia **enviada → oficial → gerada** (o `header.jpg` saiu) com `object-fit: cover`. A **densidade
+  compacta** só troca as medidas (`compacta` em `Prateleira` e `GameTile`).
 - **Página de detalhes** (spec `avaliacao-de-jogos`, etapa 3): **`/jogos/:id`** (`pages/GameDetailPage.tsx`) acha o jogo
   na **mesma query `['games']`** do catálogo (`useGames`; **sem `GET /api/games/:id`**, um link direto carrega a lista
-  toda, como o catálogo já faz). `GameDetail` mostra a capa grande (`GameCover` `detalhe`, quadrada até 320 px, com o
-  fallback de cor + iniciais), título, plataforma e status; a **média em destaque** (`RatingBar` `grande`); os **5
-  critérios** de `GAME_RATING_CRITERIA` (rótulo, descrição curta e a nota com a barra, ou "sem nota"); e a
+  toda, como o catálogo já faz). `GameDetail` mostra a capa grande (`GameCover` `detalhe`, em pé 3:4 até 300 × 400, com o fallback de cor + iniciais), título, plataforma e status; chips de plataforma e de status e a **média no `AnelDeNota` `grande`** (92 px, arco `destaque`; sem média, o texto "A nota geral é a média dos critérios que você preencher."); **Editar** (pílula `destaque`) e **Excluir** ficam no próprio `GameDetail` (a página passa `onEdit`, `onRemove` e, com conta Steam e jogo sem vínculo, o "Vincular à Steam" em `acoesExtras`); o cartão **Avaliação** com os **5 critérios** de `GAME_RATING_CRITERIA` (`BarraDeCriterio`: barra contínua de 10 px, nota em Outfit, ou "sem nota" com a barra vazia); e a
   **descrição como texto** (`whitespace-pre-line`; nunca `dangerouslySetInnerHTML`) ou o convite "Adicionar
-  descrição", que abre o formulário. Coluna única no celular; a partir de `lg` (1024 px) a capa fica ao lado do
-  resto. **Editar** abre o mesmo `GameForm` no `ModalDialog` (a página se atualiza pela invalidação da query),
+  descrição", que abre o formulário. Coluna única no celular; a partir de `lg` (1024 px) a capa (grade `300px 1fr`) fica ao lado do resto, e o bloco Steam vem abaixo das duas colunas. O topo é só o **Voltar** (a navegação principal vem do `TopNav`/`BottomNav`). **Editar** abre o mesmo `GameForm` no `ModalDialog` (a página se atualiza pela invalidação da query),
   **Excluir** usa o `DeleteGameDialog` (com `onDeleted`, que leva ao catálogo) e **Voltar** desfaz a navegação
   quando ela veio do app (o catálogo volta com o filtro) ou vai a `/` num link direto (`location.key === 'default'`).
   Carregando: esqueleto (`DetailLoading`, `role="status"`); id inexistente **ou de outro usuário** (a lista só
@@ -605,26 +620,29 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
 - **Diálogos** são `<dialog>` nativo com `showModal()` (`shared/components/ModalDialog`): Esc fecha, o
   foco fica preso e volta ao botão que abriu. O `autoFocus` do React não funciona com o diálogo
   fechado; o foco inicial vai para o elemento com `data-autofocus`.
-- **Tema Neon arcade:** todos os tokens de cor (e os únicos hex do web) ficam no `@theme` de
-  `src/styles/index.css`; componentes usam só as classes (`bg-fundo`, `text-ouro`...) e os brilhos são
-  `color-mix()` dos tokens. Status: Zerado = `ouro`, Jogando = `ciano`, Quero jogar = `vermelho-neon`.
-  O acento primário (logo, "Adicionar", diálogos, botões principais) é o token **`destaque`** (§5.12).
-  `prefers-reduced-motion: reduce` desliga todas as animações e transições (variante
-  `movimento-reduzido`, §5.12). Fontes (Orbitron, Rajdhani)
-  e ícones (Material Symbols Rounded) vêm por `<link>` no `index.html`, sem pacote npm. O número da nota
-  usa Rajdhani (a Orbitron deixa o 0 e o 8 ambíguos).
+- **Tema "Estante de console"** (spec `troca-de-design-estante`, F1; antes, "Neon arcade"): todos os tokens de cor (e os
+  únicos hex do web) ficam no `@theme` de `src/styles/index.css`; componentes usam só as classes (`bg-fundo`,
+  `text-status-jogando`, `border-borda-controle`...) e sombras e sobreposições são `color-mix()` dos tokens. Superfícies:
+  `fundo`, `painel`, `painel-2` e `painel-3` (esta também é o hover de botão e o esqueleto, por alias `acao-hover` e
+  `esqueleto`). Status: Jogando = `status-jogando`, Quero jogar = `status-quero-jogar` (o mesmo `ouro` das conquistas, da estrela e dos
+  avisos) e Zerado = `status-zerado`; chips de status usam `tint-status-*` (18% da cor). Erro: `erro` (borda e preenchimento) e `erro-texto`
+  (texto de botão de perigo). O acento (logo, "Adicionar", botões principais, foco, barras) é o token **`destaque`** (§5.12).
+  **`borda-controle` é `#606a8e`** (3,32:1 sobre o painel; o desenho trazia um valor de 1,86:1 que reprova a WCAG 1.4.11) e o anel de foco
+  é o `destaque`. O token `apagado` e a `RatingBar` de segmentos **saíram na F3** (o detalhe era o último consumidor); sobra `apagado-2` (só controle desabilitado). `prefers-reduced-motion: reduce` desliga todas as animações e
+  transições (variante `movimento-reduzido`, §5.12). Fontes **Outfit** (`--font-display`) e **Manrope** (`--font-corpo`) e ícones
+  (Material Symbols Rounded) vêm por `<link>` no `index.html` (`display=swap`, `system-ui` de reserva), sem pacote npm; offline cai a fonte do
+  sistema, como antes. Sem orbes, _scanlines_, pulso nem brilhos neon: o `Backdrop` é só um halo estático (`.halo`). **Telas herdadas (F4):** `/perfil`, `/login`, `/registro`, `/perfil/senha`, `/status`, os diálogos de confirmação, o "Buscar na Steam" e os avisos (`ConnectionBanner`, `UpdatePrompt`, `InstallNudge`) não têm layout novo: só a linguagem (botões em pílula com Outfit e sem maiúsculas espaçadas, cartões de 16 a 22 px de raio, `BrandLogo` redondo). O rótulo de seção continua em maiúsculas de 13 a 14 px com `tracking-[0.14em]`. `tokens.test.ts` proíbe a volta do visual antigo (`rounded-[4px]`, cores padrão do Tailwind, maiúsculas espaçadas em botão), e a variante `movimento-reduzido` também desliga o `hover:-translate-y-*` (o Tailwind 4 usa a propriedade `translate`).
 - **Build de produção:** o `@checkpoint/shared/dist` é CommonJS e linkado; o `vite.config.ts` libera
   esse caminho em `build.commonjsOptions`, senão o Rollup não enxerga os valores exportados (o `dev`
   esconde o problema).
 - **Testes** (Vitest + Testing Library, `apiClient`/`gamesApi` mockados; o `jsdom` não tem
   `showModal()`, então `src/test/setup.ts` tem um polyfill mínimo): `lib/*.test.ts`,
-  `GameForm.test.tsx`, `GamesPage.test.tsx`, `api/games-api.test.ts` e `styles/tokens.test.ts` (sem hex
-  fora do `@theme`, regra de movimento reduzido no CSS, links de fontes).
+  `GameForm.test.tsx`, `GamesPage.test.tsx`, `components/estante.test.tsx` (tile, prateleira, destaque, filtros e a regra CSS do hover), `AnelDeNota.test.tsx`, `BarraDeCriterio.test.tsx`, `GameCover.test.tsx`, `lib/estante.test.ts`, `api/games-api.test.ts` e `styles/tokens.test.ts` (sem hex fora do `@theme`, regra de movimento reduzido no CSS, links de fontes, contraste das iniciais da capa).
 
 ### 5.6 Layout mobile-first (`app/layout/`, spec `docs/specs/pwa-e-mobile.md`, etapa 1)
 
 - **`AppLayout`** envolve toda tela do app (menos `/login` e `/registro`, que usam o `AuthLayout`): fundo
-  Neon (`Backdrop`: orbes + _scanlines_), `TopNav`, o `<Outlet/>` e a `BottomNav`. A moldura em si é o
+  (`Backdrop`: um halo estático na cor do destaque), `TopNav`, o `<Outlet/>` e a `BottomNav`. A moldura em si é o
   `AppFrame` (recebe `children`), para o `RequireAuth` poder mostrar a moldura com uma mensagem no lugar da
   rota. **Nenhuma página importa a navegação**
   (teste em `AppLayout.test.tsx`).
@@ -634,21 +652,19 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
   um jogo. `isNavActive(item, pathname)` decide (caminho exato ou o prefixo); a barra e o topo usam `Link` com
   `aria-current="page"` calculado por ela, e não o `NavLink`, que só marca o que casa com o próprio `to` (e com
   `end` `/jogos/:id` deixaria "Jogos" apagado).
-- **`BottomNav`** (< 768px, o `md`): fixa embaixo, renderizada por portal (`OverlayPortal`) no
+- **`BottomNav`** (< 768px, o `md`; F2: 68 px no total, sendo 67 da lista e 1 da borda de cima, fundo `painel-2`, itens de ≥ 88 × 44 com rótulo de 12 px e o ativo em `destaque` com ícone cheio): fixa embaixo, renderizada por portal (`OverlayPortal`) no
   `#overlay-root`, irmão do `#root` no `index.html`, para nenhum `transform` de ancestral prender o
   `position: fixed`. Some enquanto um campo **fora de diálogo** está focado
   (`use-typing-outside-dialog`), para não flutuar sobre o teclado virtual. "Adicionar" navega para
   `/?novo=1` (mantendo o `?status=` quando já está em `/`); a `GamesPage` abre o formulário e tira o
   `novo` da URL com `replace` (`features/games/lib/new-game.ts`).
-- **`TopNav`** (>= 768px) usa a mesma lista, mas só aparece com mais de um link; com um só, o desktop
-  fica como era (o "Adicionar" do desktop é o botão "Adicionar jogo" do catálogo).
+- **`TopNav`** (>= 768px, F2) é o logo (link para `/`) e a navegação em **pílulas** de 44 px (a ativa com fundo `texto` e `aria-current`), a mesma lista; só aparece com mais de um link e **não é renderizado em `/`**: o catálogo tem a barra própria, na `GamesPage` (logo com `aria-current="page"`, os filtros, "Adicionar jogo" e o link redondo "Perfil"). Logo e ações não encolhem e o grupo de filtros rola por dentro quando falta espaço (sem segundo ponto de quebra).
 - **Ponto de quebra único: 768px (`md`).** O catálogo usava `max-[900px]`; não usa mais.
 - **CSS** (`styles/index.css`, camada `components`): `.app-shell` (`100dvh` com `100vh` de reserva),
-  `.safe-x`, `.nav-clearance` e `.bottom-nav` (safe-area por `env()`), `.game-row` (grade no celular,
-  linha no desktop, áreas por `data-area`), `.game-title` (2 linhas no celular), `dialog.modal` (folha
+  `.safe-x`, `.nav-clearance` e `.bottom-nav` (safe-area por `env()`), `.tile-*` (título de 2 linhas, ações só com hover, elevação), `.destaque-scrim`, `.capa-*`, `dialog.modal` (folha
   inferior no celular com a animação `sheet-up`, centralizado em >= 768px), `.sheet-footer`/`.sheet-pad`.
   Globais: `touch-action: manipulation`, piso de 16px nos campos (camada `base`, evita o zoom do iOS),
-  hover da linha só com `@media (hover: hover)` e `overscroll-behavior-y: none` só no app instalado.
+  hover do tile só com `@media (hover: hover)` e `overscroll-behavior-y: none` só no app instalado.
   `env(safe-area-*)` fica em classe própria, não em classe arbitrária do Tailwind (que poderia
   espaçar o `-` dentro do `calc()`).
 - **Viewport** (`index.html`): `viewport-fit=cover` e `interactive-widget=resizes-content`, **sem**
@@ -665,11 +681,14 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
 - `storage.get/set/remove` **nunca lançam**: JSON inválido ou valor que o `validar` recusa devolve o
   padrão e apaga a chave; armazenamento bloqueado ou cheio cai num `Map` em memória (cota cheia avisa
   com **um** `console.warn` por sessão, sem o valor).
-- **Versão e migração** (`migrations.ts`): `STORAGE_SCHEMA_VERSION` (hoje 1) em `checkpoint:versao`;
+- **Versão e migração** (`migrations.ts`): `STORAGE_SCHEMA_VERSION` (hoje **2**) em `checkpoint:versao`;
   `runStorageMigrations()` roda em `main.tsx` **antes** do render. Ausente → grava a atual; menor →
   aplica `MIGRATIONS[n]` (n→n+1) em ordem; maior, ilegível ou migração que lança → apaga **todas** as
   chaves `checkpoint:*` (só elas; `outro-app:x` fica) e grava a atual. Mudar o formato de uma chave =
-  subir a versão + escrever a migração.
+  subir a versão + escrever a migração (`Migration` recebe o `raw` do armazenamento). A **1 → 2** (`migrarDestaques`) reescreve o
+  `destaque` de cada entrada de `checkpoint:prefs`: `magenta` e o antigo `azul` viram `azul`, sem distinguir quem escolheu de quem ficou no
+  padrão; `violeta` e `laranja` ficam; JSON ilegível, chave ausente e valor desconhecido não são tocados (a leitura devolve os padrões só para
+  aquela entrada).
 - **Conectividade** (`connectivity.ts`, hook `use-connectivity`): store externo lido por
   `useSyncExternalStore` com `online | offline | sem-servidor`. Entradas: eventos `online`/`offline` e
   `visibilitychange` (ligados por `connectivity.start()` em `main.tsx`) e o **interceptor de resposta
@@ -779,7 +798,7 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
   `BroadcastChannel` avisa as outras abas, que fazem o logout local na hora.
 - **Telas:** `LoginForm` e `RegistroForm` (validação local com as regras da API; "Confirmar senha" só no registro;
   `CampoSenha` com "mostrar senha" de 44 × 44 e `aria-pressed`) e o Sair do `/perfil` (a página está em §5.11). Reusam `shared/components/form-parts` (movido de `features/games`)
-  e o visual Neon.
+  e o tema do app.
 - **`/perfil/senha`** (etapa 5, `TrocarSenhaPage` + `TrocarSenhaForm`): Senha atual (`current-password`), Nova senha
   e Confirmar nova senha (`new-password`), cada uma com o "mostrar senha". Confirmação diferente → "As senhas não
   coincidem" **sem request**; erros pelo `code`/`fields`. `authApi.trocarSenha` é uma chamada protegida comum (Bearer
@@ -850,43 +869,39 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
   validada na leitura (`prefsDoUsuario`): a entrada inválida de um usuário volta aos padrões **só para ele**.
   JSON corrompido → padrões (a chave sai); armazenamento bloqueado → o módulo de storage guarda em memória e a
   escolha vale até recarregar.
-- **As cinco** (padrão primeiro): cor de destaque (magenta, violeta, azul, laranja), filtro inicial (Todos,
-  Jogando, Quero jogar, Zerado), densidade (confortável, compacta), efeitos (completos, reduzidos) e até
+- **As cinco** (padrão primeiro): cor de destaque (azul, violeta, rosa, laranja), filtro inicial (Todos,
+  Jogando, Quero jogar, Zerado), densidade (confortável, compacta), animações (completas, reduzidas; o valor gravado continua `completos`/`reduzidos`) e até
   **8** plataformas favoritas.
 - **Store** (`prefs-store.ts` + `shared/hooks/use-prefs.ts`, `useSyncExternalStore`): `iniciarPrefs()` roda no
   `main.tsx` **depois das migrações e antes do `createRoot`** e aplica as de `ultimoUsuario` no `<html>`
-  (sem piscar em magenta); o **`app/PrefsSync.tsx`** (nos providers) chama `definirUsuario` quando a sessão
+  (sem piscar na cor padrão); o **`app/PrefsSync.tsx`** (nos providers) chama `definirUsuario` quando a sessão
   resolve, e aí valem as de quem entrou (que vira o `ultimoUsuario`). Sair não troca a aparência.
 - **Exclusão da conta** (`removerPrefsDoUsuario`, etapa 4): some só a entrada desse usuário (as dos outros
   ficam); `ultimoUsuario` vira `null` se era ele; e, se as preferências em uso eram as dele, a aparência volta ao
   padrão (a tela de login não fica com as cores de uma conta que não existe mais).
   `alterarPrefs` só grava com alguém logado.
-- **Cor de destaque sem hex novo:** `@theme` tem `--color-destaque: var(--color-magenta)`, e
-  `html[data-destaque='violeta'|'azul'|'laranja']` o aponta para `capa-6`, `capa-1` e `capa-3`. Texto `fundo`
-  sobre o destaque: magenta 6,28:1, violeta 7,47:1, azul 9,64:1, laranja 8,98:1 (`tokens.test.ts` confere
-  ≥ 4,5:1). Usam `destaque`: logo (`glow-logo`, `glow-text-destaque`), "Adicionar" (barra e topo, pulso
-  `neon-pulse`), borda e brilho dos diálogos, botões principais (login/registro, Salvar). **Não** mudam: status,
-  o `ciano` do filtro ativo, a barra de nota e o orbe do fundo.
-- **Efeitos "Reduzidos":** as regras de movimento reduzido estão **uma vez só**, na variante do Tailwind
+- **Cor de destaque sem hex novo** (além do `acento`): `@theme` tem `--color-destaque: var(--color-acento)` (**Azul**, `#4f8cff`, o padrão), e
+  `html[data-destaque='violeta'|'rosa'|'laranja']` o aponta para `capa-6`, `capa-2` e `capa-3`. Texto `fundo` sobre o destaque: azul 5,95:1, violeta
+  7,03:1, rosa 7,22:1, laranja 8,45:1 (`tokens.test.ts` confere ≥ 4,5:1). Usam `destaque`: logo, "Adicionar" (barra e topo), borda dos diálogos, botões
+  principais (login/registro, Salvar), item ativo da navegação, filtro ativo (até a F2), segmentos da barra de nota (até a F2) e o anel de foco.
+  **Não** mudam: as cores de status e as conquistas (`ouro`).
+- **"Animações" reduzidas** (antes "Efeitos"): as regras de movimento reduzido estão **uma vez só**, na variante do Tailwind
   `@custom-variant movimento-reduzido` com dois ramos: `@media (prefers-reduced-motion: reduce)` e
-  `:root[data-efeitos='reduzidos'] &`. Além disso, `html[data-efeitos='reduzidos']` esconde `.orb` e
-  `.scanlines`. O ramo do atributo **não alcança `::before`/`::after`** (pseudo-elemento não entra no
+  `:root[data-efeitos='reduzidos'] &`. O ramo do atributo **não alcança `::before`/`::after`** (pseudo-elemento não entra no
   `:is()` gerado); nenhum pseudo-elemento do app anima, e o `tokens.test.ts` falha se algum passar a animar.
 - **Filtro inicial** (`features/games/lib/initial-filter.ts`): abrir `/` sem `?status=` (inclusive pelo item
   "Jogos") troca a URL por `/?status=<filtro>` com `replace`, no mesmo efeito da `GamesPage` que trata o
   `?novo=1` (dois `setSearchParams` seguidos se sobrescreveriam), e o 1º render já filtra. Com filtro inicial
   diferente de Todos, "Todos" grava `?status=TODOS` (lido como Todos). Parâmetro explícito é respeitado.
-- **Densidade compacta:** `GameRow` com `game-row-compacta` (capa `GameCover` `compacta` 40 × 40, menos espaço)
-  e a legenda "Nota" some em ≥ 768px (a barra fica numa linha); ações continuam 44 × 44.
+- **Densidade compacta** (F2): tiles menores (`GameCover` `tileCompacto`: 120 × 160, e 108 × 144 no celular; o bloco "Adicionar" da prateleira acompanha); as ações continuam 44 × 44.
 - **Favoritas:** `groupsWithFavorites` (`features/games/lib/platforms.ts`) põe o grupo "Favoritas" primeiro
   e as tira do grupo da família (sem opção repetida); o `PlatformField` recebe as favoritas do `GameForm`.
 - **Tela** (etapa 5: `features/perfil/components/PreferenciasModal.tsx`, aberto pela linha de Preferências do
   `/perfil`): o `ModalDialog` existente (Esc, foco preso, volta à linha que abriu; folha inferior no celular), com
   três abas em `Abas.tsx` (`tablist`/`tab`/`tabpanel`, ativação automática, setas com volta circular, Home/End, Tab só
   na ativa, foco inicial na aba ativa): **Aparência** (cor de destaque em bolinhas `role="radio"` com nome
-  acessível, pela variante `bolinha` do `GrupoOpcoes`; densidade e efeitos, cada um com sua prévia em
-  `PreviasAparencia.tsx`: duas linhas de jogo sintéticas nas medidas da `GameRow`, e um quadro com `.orb` e
-  `.scanlines` reais mais um texto do estado), **Catálogo** (filtro inicial) e **Plataformas** (`ChipsPlataformas`:
+  acessível, pela variante `bolinha` do `GrupoOpcoes`; densidade e animações, cada uma com sua prévia em
+  `PreviasAparencia.tsx`: dois tiles sintéticos nas medidas da densidade escolhida, e um esqueleto que anima (ou para) mais um texto do estado), **Catálogo** (filtro inicial) e **Plataformas** (`ChipsPlataformas`:
   chips `aria-pressed` por família; a 9ª mostra "Até 8 favoritas" e não marca). **Sem Salvar**: cada escolha chama
   `alterarPrefs`, que aplica no `<html>` e grava por usuário, e o próprio modal usa o token `destaque`, então a cor
   nova aparece nele também. "Restaurar padrões" volta só as preferências da aba ativa (`PADROES_DA_ABA`, a partir
@@ -936,12 +951,9 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
   reenvia sem 409); a confirmação de plataforma vem **antes** de criar qualquer coisa. A página do jogo tem **Vincular à
   Steam** (modo `vincular`). Ligar invalida `['games']` e o cartão do perfil.
 - **Horas e conquistas (etapa 4)**: a página `/jogos/:id` de um jogo ligado ganha o bloco **Steam** (`BlocoSteam`, dentro do
-  `GameDetail`): tempo jogado ("42 h 30 min"), "Último jogo em dd/mm/aaaa" ou "Nunca jogado", a barra `role="progressbar"`
-  ("12 de 40 conquistas"), **Atualizar**, **Desvincular** (confirmação; só a camada da Steam some: título, status, notas e capa
+  `GameDetail`): o cabeçalho com o ícone, "Steam" (`h2`) e **"Atualizado há 12 minutos"** (`lib/tempo-relativo.ts`, `Intl.RelativeTimeFormat` pt-BR, a partir do `atualizadoEm` do dado; "agora" abaixo de 1 min; nunca "Invalid Date"), três cartões de dados ("Tempo jogado na Steam" "42 h 30 min", "Último jogo em" dd/mm/aaaa ou "Nunca jogado", "Conquistas · 12 de 40" com a barra `role="progressbar"` em `ouro` e a porcentagem), **Atualizar**, **Desvincular** (confirmação; só a camada da Steam some: título, status, notas e capa
   ficam, e **Vincular à Steam** volta) e **Abrir na Steam** (`rel="noopener noreferrer"`). A lista tem dois `<details>`:
-  **Desbloqueadas** (fechada, por data decrescente) e **Faltam** (aberta, da mais comum à mais rara), com ícone (`width`/`height`/
-  `loading="lazy"`), nome, descrição ("Conquista oculta" se oculta e bloqueada), data e "12,4% dos jogadores" (ou "Raridade
-  indisponível"); uma coluna no celular e, a partir de 1024 px, data e raridade à direita. O detalhe **só é pedido nesta página**
+  **Desbloqueadas** (fechada, por data decrescente) e **Faltam** (aberta, da mais comum à mais rara), com contador, ícone de 52 px (`width`/`height`/`loading="lazy"`; cadeado ou `visibility_off` sem ícone), nome, descrição ("Conquista oculta" se oculta e bloqueada), data e "12,4% dos jogadores" (ou "Raridade indisponível"); uma coluna no celular e, a partir de 1024 px, as duas listas lado a lado. O detalhe **só é pedido nesta página**
   (`useDetalheJogo`, sem _retry_; abrir `/` não faz nenhuma request de conquistas) e os valores novos entram direto no cache do
   catálogo (`comDadosAtualizados`). Enquanto carrega, mostra o último valor gravado; os avisos são discretos: conquistas privadas
   (horas mantidas, sem barra), perfil privado e Steam indisponível (valor antigo mantido). Sem nenhuma animação nova.
@@ -956,6 +968,21 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
   mockada).
 
 ---
+
+### Contrato web ↔ API (testes)
+
+O `@checkpoint/shared` é o contrato; três testes impedem que a API, o web e os mocks divirjam **em silêncio**:
+
+- `apps/api/src/contract/contrato-web.http.spec.ts`: sobe os controllers de verdade (guard, pipe, serialização) e confere que o CORPO REAL de
+  `GET/POST /games`, `/integracoes` (contas, perfil, biblioteca), `/auth` (registro, login, refresh, me, sessões) e `/users/me` tem
+  **exatamente** a forma dos tipos do shared (`Record<keyof T, Tipo>`: uma chave nova no shared não compila até o mapa acompanhar; campo a mais,
+  a menos, `null` indevido, data fora de ISO e `id` que não é UUID falham). Não cobre o detalhe da plataforma (`DetalheJogoPlataforma`, com as
+  conquistas): não há spec HTTP dele, só o de service.
+- `apps/api/src/contract/payloads-do-web.spec.ts`: os corpos e queries que o web envia passam pelo MESMO `ValidationPipe` do `main.ts`
+  (`whitelist` + `forbidNonWhitelisted`), com um controle que prova que ele recusa campo a mais.
+- `apps/web/src/test/api-fixtures.test.ts`: os corpos sintéticos que os testes e o mock do navegador usam (`test/api-fixtures.ts`) têm a mesma
+  forma (mapas em espelho, `test/contrato/`). `test/dados-reais.test.tsx` renderiza o catálogo e o detalhe com dados "feios" e com os erros
+  reais da API (409, 502) e falha em qualquer `console.error`. O roteiro de cliques no navegador está em `docs/verificacao-navegador/`.
 
 ## 6. `packages/shared`
 

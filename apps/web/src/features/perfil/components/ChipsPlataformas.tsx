@@ -32,7 +32,7 @@ export function ChipsPlataformas({ favoritas, aviso, onAlternar }: ChipsPlatafor
           aria-label={grupo.label}
           className="flex flex-col gap-2"
         >
-          <div className="text-sm font-bold uppercase tracking-[0.22em] text-texto-suave">
+          <div className="text-sm font-bold uppercase tracking-[0.14em] text-texto-suave">
             {grupo.label}
           </div>
           <div className="flex flex-wrap gap-2">

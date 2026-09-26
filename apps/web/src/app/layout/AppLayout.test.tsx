@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -158,6 +159,62 @@ describe('barra inferior (CA-02)', () => {
   });
 });
 
+describe('barra do topo em pílulas (CA-12, CA-28)', () => {
+  const topo = () =>
+    screen
+      .getAllByRole('navigation', { name: 'Navegação principal' })
+      .find((nav) => !nav.classList.contains('bottom-nav')) as HTMLElement;
+
+  it('fora do catálogo: logo "checkpoint" para `/` e as três pílulas, a ativa com fundo `texto`', () => {
+    renderAt('/perfil');
+
+    expect(screen.getByRole('link', { name: 'checkpoint' })).toHaveAttribute('href', '/');
+    const perfil = within(topo()).getByRole('link', { name: 'Perfil' });
+    expect(perfil).toHaveAttribute('aria-current', 'page');
+    expect(perfil).toHaveClass('bg-texto', 'text-fundo', 'h-11', 'rounded-full');
+    expect(within(topo()).getByRole('link', { name: 'Jogos' })).not.toHaveClass('bg-texto');
+    expect(within(topo()).getByRole('button', { name: 'Adicionar' })).toBeInTheDocument();
+  });
+
+  it('no catálogo (`/`) o topo é da página: sem a barra do AppLayout, só a inferior', async () => {
+    renderAt('/');
+    await screen.findByText(/nenhum jogo cadastrado/i);
+
+    expect(screen.getAllByRole('navigation', { name: 'Navegação principal' })).toHaveLength(1);
+    expect(screen.getAllByRole('link', { name: 'checkpoint' })).toHaveLength(1);
+  });
+
+  it('"Adicionar" do topo, fora do catálogo, leva a `/` com o formulário aberto', async () => {
+    const user = renderAt('/perfil');
+
+    await user.click(within(topo()).getByRole('button', { name: 'Adicionar' }));
+
+    expect(await screen.findByRole('heading', { name: 'Novo jogo' })).toBeInTheDocument();
+  });
+});
+
+describe('barra inferior de 68 px (CA-28)', () => {
+  it('fundo painel-2, altura 68 (67 da lista + 1 da borda), itens de 44 de altura e o ativo com ícone cheio', () => {
+    renderAt('/perfil');
+
+    const nav = mainNav();
+    expect(nav).toHaveClass('bg-painel-2');
+    expect(nav.querySelector('ul')).toHaveClass('h-[67px]');
+    const ativo = within(nav).getByRole('link', { name: 'Perfil' });
+    expect(ativo).toHaveClass('h-11', 'min-w-[88px]', 'text-destaque');
+    expect(ativo.querySelector('.icon-fill')).not.toBeNull();
+    expect(within(nav).getByRole('link', { name: 'Jogos' }).querySelector('.icon-fill')).toBeNull();
+  });
+
+  it('o espaço reservado e o aviso de versão acompanham os 68 px', () => {
+    const css = readFileSync('src/styles/index.css', 'utf-8');
+
+    expect(css).toMatch(/\.nav-clearance\s*\{[^}]*calc\(68px/);
+    expect(css).toMatch(/\.update-prompt,\s*\.install-nudge\s*\{[^}]*calc\(68px/);
+    expect(css).not.toContain('64px');
+  });
+});
+
 describe('"Adicionar" na barra (CA-03, CA-04)', () => {
   it('em `/` abre o formulário de novo jogo e mantém o filtro da URL', async () => {
     const user = renderAt('/?status=ZERADO');
@@ -165,7 +222,7 @@ describe('"Adicionar" na barra (CA-03, CA-04)', () => {
 
     await user.click(within(mainNav()).getByRole('button', { name: 'Adicionar' }));
 
-    expect(await screen.findByRole('heading', { name: 'NOVO JOGO' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Novo jogo' })).toBeInTheDocument();
     expect(screen.getByLabelText('Título')).toHaveFocus();
     await waitFor(() =>
       expect(screen.getByTestId('location')).toHaveTextContent('/?status=ZERADO'),
@@ -177,7 +234,7 @@ describe('"Adicionar" na barra (CA-03, CA-04)', () => {
 
     await user.click(within(mainNav()).getByRole('button', { name: 'Adicionar' }));
 
-    expect(await screen.findByRole('heading', { name: 'NOVO JOGO' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Novo jogo' })).toBeInTheDocument();
     await waitFor(() => expect(screen.getByTestId('location').textContent).toBe('/'));
   });
 });

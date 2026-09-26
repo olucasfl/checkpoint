@@ -1,0 +1,16 @@
+{
+  "v": 3,
+  "createdOnFiles": { "v": 1, "at": "2026-09-25T22:00:00Z" },
+  "title": "checkpoint — Estante de console",
+  "launch": { "view": "canvas" },
+  "pages": [],
+  "designSystems": [],
+  "notes": {},
+  "boards": {
+    "Main.dc.html": { "x": 0, "y": 0, "w": 1280, "h": 1180, "title": "Catálogo · desktop", "is_interactive": true },
+    "CatalogoMobile.dc.html": { "x": 1360, "y": 0, "w": 390, "h": 844, "title": "Catálogo · celular", "is_interactive": true },
+    "Detalhe.dc.html": { "x": 0, "y": 1300, "w": 1280, "h": 1500, "title": "Detalhe do jogo · Steam", "is_interactive": true },
+    "Formulario.dc.html": { "x": 1360, "y": 1300, "w": 640, "h": 1800, "title": "Novo jogo · formulário", "is_interactive": true }
+  },
+  "order": ["Main.dc.html", "CatalogoMobile.dc.html", "Detalhe.dc.html", "Formulario.dc.html"]
+}
