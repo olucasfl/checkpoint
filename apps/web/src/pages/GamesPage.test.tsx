@@ -290,7 +290,7 @@ describe('barra superior do catálogo (CA-12)', () => {
     renderPage();
     await aparece('Celeste');
 
-    expect(screen.getByRole('link', { name: 'checkpoint' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Checkpoint' })).toHaveAttribute(
       'aria-current',
       'page',
     );
@@ -298,15 +298,16 @@ describe('barra superior do catálogo (CA-12)', () => {
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Seus jogos');
   });
 
-  it('o logo tem alvo de 44 px e, sem espaço, quem rola são os filtros (o Perfil não encolhe)', async () => {
+  it('o logo tem alvo de 44 px e os filtros ficam em grade 2 × 2 no celular, sem rolar de lado', async () => {
     renderPage();
     await aparece('Celeste');
 
-    expect(screen.getByRole('link', { name: 'checkpoint' })).toHaveClass('min-h-11', 'shrink-0');
+    expect(screen.getByRole('link', { name: 'Checkpoint' })).toHaveClass('min-h-11', 'shrink-0');
     expect(screen.getByRole('link', { name: 'Perfil' }).parentElement).toHaveClass('shrink-0');
     expect(screen.getByRole('group', { name: 'Filtrar por status' })).toHaveClass(
-      'overflow-x-auto',
-      'md:min-w-0',
+      'grid',
+      'grid-cols-2',
+      'md:flex',
     );
   });
 });
