@@ -331,6 +331,87 @@ button:disabled {
     color: color-mix(in srgb, var(--color-fundo) 78%, transparent);
   }
 
+  /* ---- Estante (spec troca-de-design-estante, F2) ---- */
+
+  /* Título do tile: até 2 linhas, quebrando até palavra de 120 letras. */
+  .tile-titulo {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+    overflow-wrap: anywhere;
+  }
+
+  /* Chip da plataforma na capa (fundo a 78%: >= 8,71:1 do texto até sobre uma imagem branca) e chips do destaque (72%). */
+  .capa-chip {
+    background: color-mix(in srgb, var(--color-fundo) 78%, transparent);
+  }
+
+  .chip-escuro {
+    background: color-mix(in srgb, var(--color-fundo) 72%, transparent);
+  }
+
+  /*
+   * Editar e Remover do tile: SEM hover (toque) os botões não existem na tela (display: none: sem espaço, sem toque e
+   * fora da árvore de acessibilidade), e o caminho é abrir o jogo (o detalhe tem Editar e Excluir). Com hover, aparecem
+   * no :hover e no :focus-within (foco por teclado), junto da elevação e do anel do tile.
+   */
+  .tile-acoes {
+    display: none;
+  }
+
+  @media (hover: hover) {
+    .tile {
+      transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+
+    .tile-capa {
+      transition: box-shadow 0.22s;
+    }
+
+    .tile:hover {
+      transform: translateY(-6px);
+    }
+
+    .tile:hover .tile-capa {
+      box-shadow:
+        0 0 0 3px var(--color-texto),
+        0 0 0 7px color-mix(in srgb, var(--color-destaque) 55%, transparent),
+        0 22px 40px color-mix(in srgb, var(--color-fundo) 55%, transparent);
+    }
+
+    .tile-acoes {
+      display: flex;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(6px);
+      transition:
+        opacity 0.2s,
+        transform 0.2s;
+    }
+
+    .tile:hover .tile-acoes,
+    .tile:focus-within .tile-acoes {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateY(0);
+    }
+  }
+
+  /* Destaque "Continue de onde parou": degradê escuro à esquerda (o texto fica onde o escurecimento é >= 67%). */
+  .destaque-scrim {
+    background: linear-gradient(
+      100deg,
+      var(--color-fundo) 34%,
+      color-mix(in srgb, var(--color-fundo) 60%, transparent) 66%,
+      color-mix(in srgb, var(--color-fundo) 10%, transparent) 100%
+    );
+  }
+
+  .destaque-rotulo {
+    color: color-mix(in srgb, var(--color-destaque) 40%, var(--color-texto));
+  }
+
   /* Halo estático atrás do topo (direção "Estante de console"): um degradê radial na cor do destaque. Nada anima. */
   .halo {
     position: absolute;
@@ -349,6 +430,15 @@ button:disabled {
   }
 
   @media (min-width: 48rem) {
+    .destaque-scrim {
+      background: linear-gradient(
+        100deg,
+        var(--color-fundo) 30%,
+        color-mix(in srgb, var(--color-fundo) 55%, transparent) 60%,
+        color-mix(in srgb, var(--color-fundo) 5%, transparent) 100%
+      );
+    }
+
     .halo {
       top: -440px;
       width: 1400px;
@@ -479,5 +569,13 @@ button:disabled {
   @variant movimento-reduzido {
     animation: none !important;
     transition: none !important;
+  }
+}
+
+/* Movimento reduzido: o tile não se eleva no hover e as ações aparecem sem deslizar (o anel do hover continua). */
+.tile,
+.tile-acoes {
+  @variant movimento-reduzido {
+    transform: none !important;
   }
 }
