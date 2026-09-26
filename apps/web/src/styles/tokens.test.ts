@@ -352,6 +352,29 @@ describe('contrastes da spec troca-de-design-estante (CA-03)', () => {
 });
 
 describe('estante: anel da nota e capa gerada (F2)', () => {
+  it('as iniciais (fundo a 78%) têm >= 4,5:1 sobre cada cor da capa com o brilho de 28% (CA-41)', () => {
+    const rgb = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+    const misturar = (topo: string, base: string, alfa: number) =>
+      '#' +
+      rgb(topo)
+        .map((c, i) => Math.round(c * alfa + (rgb(base)[i] as number) * (1 - alfa)))
+        .map((c) => c.toString(16).padStart(2, '0'))
+        .join('');
+    const medidos: number[] = [];
+
+    for (const n of [1, 2, 3, 4, 5, 6]) {
+      const capa = hexDoToken(`capa-${n}`);
+      const comBrilho = misturar(hexDoToken('texto'), capa, 0.28);
+      const iniciais = misturar(hexDoToken('fundo'), comBrilho, 0.78);
+      medidos.push(contraste(iniciais, comBrilho));
+    }
+
+    expect(medidos).toHaveLength(6);
+    for (const [i, valor] of medidos.entries()) {
+      expect(valor, `capa-${i + 1}`).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
   it('o anel da média é um conic-gradient com o arco em `texto` e o trilho em color-mix do fundo (sem hex)', () => {
     const regra = css.match(/\.anel-nota\s*\{[^}]*\}/)?.[0] ?? '';
 

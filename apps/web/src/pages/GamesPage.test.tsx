@@ -134,6 +134,7 @@ describe('estante e contagens (CA-13, CA-14, CA-27)', () => {
 
     expect(screen.queryByRole('region', { name: 'Contagem por status' })).toBeNull();
     expect(document.querySelector('[data-panel]')).toBeNull();
+    expect(screen.queryByText(/Última atualização primeiro/)).toBeNull();
   });
 
   it('depois de criar um jogo a lista é buscada de novo e a prateleira acompanha', async () => {

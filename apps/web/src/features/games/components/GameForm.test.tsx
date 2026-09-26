@@ -640,6 +640,16 @@ describe('erros da API no campo certo (CA-44)', () => {
 });
 
 describe('capa: preview, salvar o jogo e depois a capa (CA-74 a CA-78)', () => {
+  it('avisa que a capa aparece em pé (3:4) e que outra proporção é cortada no centro (CA-40)', () => {
+    renderForm();
+
+    expect(
+      screen.getByText(
+        'A capa aparece em pé (3:4); imagens de outra proporção são cortadas no centro.',
+      ),
+    ).toBeInTheDocument();
+  });
+
   it('escolher um arquivo mostra o preview e NÃO envia nada antes de Salvar (CA-74)', async () => {
     const { user } = renderForm();
 
