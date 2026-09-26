@@ -584,7 +584,7 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
   permite dar nota 0). O erro de digitação (fora de 0 a 10, ou casa demais) aparece **na hora** e bloqueia o
   envio; os da API vêm por `fields` (cada critério, `notas` na seção, `descricao`). Em "Quero jogar" a seção some,
   as notas digitadas ficam no estado (voltar para Jogando as recupera) e um aviso diz que serão apagadas ao salvar.
-  `DescricaoField`: textarea com `maxLength` 1000 e contador `n/1000`. O `GameTile` (F2; antes, `GameRow`) mostra só a **média**, como `AnelDeNota` (arco `conic-gradient` de `--pct` sobre trilho escuro, número com vírgula e 1 casa, `role="img"` "Nota 8,3 de 10"; **sem média, sem anel**; 0 é nota) e o **título é um `<Link>` real** para `/jogos/:id`, esticado sobre o tile por `after:absolute after:inset-0` (sem `<a>` aninhado nem `onClick` no `<li>`), com as ações em `z-10` por cima. A `RatingBar` (segmentos) só sobrevive no detalhe até a F3.
+  `DescricaoField`: textarea de 110 px com `maxLength` 1000 e contador `n/1000`. **Layout da F3:** diálogo de 640 px e raio 24 (folha inferior no celular); cabeçalho "Novo jogo"/"Editar jogo" com "Fechar" redondo; campos de 52 px e 16 px de fonte, foco com borda e anel em `destaque` (`form-parts.tsx`); `StatusPicker` na ordem Jogando, Quero jogar, Zerado (botões de 52 px, o ativo com fundo `texto`); a **Avaliação** é um cartão `painel-2` com a média ao vivo no topo ("Média 8,3", "—" sem nota) e, por critério, slider, campo de 76 px e "Limpar" de 76 × 44; a **capa** tem miniatura de 56 × 74 (a prévia da oficial da Steam quando há ligação e nenhuma capa) e "Enviar" e "Remover capa"; rodapé fixo com "Cancelar" e "Salvar" de 52 px; o cartão "Ligado à Steam" mostra a miniatura em pé (44 × 58), as horas e "Trocar" (reabre a busca) ao lado de "Remover ligação". O `GameTile` (F2; antes, `GameRow`) mostra só a **média**, como `AnelDeNota` (arco `conic-gradient` de `--pct` sobre trilho escuro, número com vírgula e 1 casa, `role="img"` "Nota 8,3 de 10"; **sem média, sem anel**; 0 é nota) e o **título é um `<Link>` real** para `/jogos/:id`, esticado sobre o tile por `after:absolute after:inset-0` (sem `<a>` aninhado nem `onClick` no `<li>`), com as ações em `z-10` por cima. A `RatingBar` (segmentos) só sobrevive no detalhe até a F3.
 - **Estante** (spec `troca-de-design-estante`, F2; substitui a lista em linhas, `GameRow` e `StatPanels`): a `GamesPage` busca a
   lista completa e a divide no cliente com `lib/estante.ts` (puro, com teste): `agruparEmPrateleiras(games, filtro)` (Jogando agora,
   Quero jogar, Zerados, nessa ordem, **só as que têm jogo**; a ordem interna é a da API, `atualizadoEm` desc), `destaqueDoCatalogo`
@@ -605,11 +605,9 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
   compacta** só troca as medidas (`compacta` em `Prateleira` e `GameTile`).
 - **Página de detalhes** (spec `avaliacao-de-jogos`, etapa 3): **`/jogos/:id`** (`pages/GameDetailPage.tsx`) acha o jogo
   na **mesma query `['games']`** do catálogo (`useGames`; **sem `GET /api/games/:id`**, um link direto carrega a lista
-  toda, como o catálogo já faz). `GameDetail` mostra a capa grande (`GameCover` `detalhe`, em pé 3:4 até 300 × 400, com o fallback de cor + iniciais), título, plataforma e status; a **média em destaque** (`RatingBar` `grande`); os **5
-  critérios** de `GAME_RATING_CRITERIA` (rótulo, descrição curta e a nota com a barra, ou "sem nota"); e a
+  toda, como o catálogo já faz). `GameDetail` mostra a capa grande (`GameCover` `detalhe`, em pé 3:4 até 300 × 400, com o fallback de cor + iniciais), título, plataforma e status; chips de plataforma e de status e a **média no `AnelDeNota` `grande`** (92 px, arco `destaque`; sem média, o texto "A nota geral é a média dos critérios que você preencher."); **Editar** (pílula `destaque`) e **Excluir** ficam no próprio `GameDetail` (a página passa `onEdit`, `onRemove` e, com conta Steam e jogo sem vínculo, o "Vincular à Steam" em `acoesExtras`); o cartão **Avaliação** com os **5 critérios** de `GAME_RATING_CRITERIA` (`BarraDeCriterio`: barra contínua de 10 px, nota em Outfit, ou "sem nota" com a barra vazia); e a
   **descrição como texto** (`whitespace-pre-line`; nunca `dangerouslySetInnerHTML`) ou o convite "Adicionar
-  descrição", que abre o formulário. Coluna única no celular; a partir de `lg` (1024 px) a capa fica ao lado do
-  resto. **Editar** abre o mesmo `GameForm` no `ModalDialog` (a página se atualiza pela invalidação da query),
+  descrição", que abre o formulário. Coluna única no celular; a partir de `lg` (1024 px) a capa (grade `300px 1fr`) fica ao lado do resto, e o bloco Steam vem abaixo das duas colunas. O topo é só o **Voltar** (a navegação principal vem do `TopNav`/`BottomNav`). **Editar** abre o mesmo `GameForm` no `ModalDialog` (a página se atualiza pela invalidação da query),
   **Excluir** usa o `DeleteGameDialog` (com `onDeleted`, que leva ao catálogo) e **Voltar** desfaz a navegação
   quando ela veio do app (o catálogo volta com o filtro) ou vai a `/` num link direto (`location.key === 'default'`).
   Carregando: esqueleto (`DetailLoading`, `role="status"`); id inexistente **ou de outro usuário** (a lista só
@@ -627,7 +625,7 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
   avisos) e Zerado = `status-zerado`; chips de status usam `tint-status-*` (18% da cor). Erro: `erro` (borda e preenchimento) e `erro-texto`
   (texto de botão de perigo). O acento (logo, "Adicionar", botões principais, foco, barras) é o token **`destaque`** (§5.12).
   **`borda-controle` é `#606a8e`** (3,32:1 sobre o painel; o desenho trazia um valor de 1,86:1 que reprova a WCAG 1.4.11) e o anel de foco
-  é o `destaque`. `apagado` (segmentos da `RatingBar` do detalhe) é temporário até a F3. `prefers-reduced-motion: reduce` desliga todas as animações e
+  é o `destaque`. O token `apagado` e a `RatingBar` de segmentos **saíram na F3** (o detalhe era o último consumidor); sobra `apagado-2` (só controle desabilitado). `prefers-reduced-motion: reduce` desliga todas as animações e
   transições (variante `movimento-reduzido`, §5.12). Fontes **Outfit** (`--font-display`) e **Manrope** (`--font-corpo`) e ícones
   (Material Symbols Rounded) vêm por `<link>` no `index.html` (`display=swap`, `system-ui` de reserva), sem pacote npm; offline cai a fonte do
   sistema, como antes. Sem orbes, _scanlines_, pulso nem brilhos neon: o `Backdrop` é só um halo estático (`.halo`).
@@ -636,7 +634,7 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
   esconde o problema).
 - **Testes** (Vitest + Testing Library, `apiClient`/`gamesApi` mockados; o `jsdom` não tem
   `showModal()`, então `src/test/setup.ts` tem um polyfill mínimo): `lib/*.test.ts`,
-  `GameForm.test.tsx`, `GamesPage.test.tsx`, `components/estante.test.tsx` (tile, prateleira, destaque, filtros e a regra CSS do hover), `AnelDeNota.test.tsx`, `GameCover.test.tsx`, `lib/estante.test.ts`, `api/games-api.test.ts` e `styles/tokens.test.ts` (sem hex fora do `@theme`, regra de movimento reduzido no CSS, links de fontes, contraste das iniciais da capa).
+  `GameForm.test.tsx`, `GamesPage.test.tsx`, `components/estante.test.tsx` (tile, prateleira, destaque, filtros e a regra CSS do hover), `AnelDeNota.test.tsx`, `BarraDeCriterio.test.tsx`, `GameCover.test.tsx`, `lib/estante.test.ts`, `api/games-api.test.ts` e `styles/tokens.test.ts` (sem hex fora do `@theme`, regra de movimento reduzido no CSS, links de fontes, contraste das iniciais da capa).
 
 ### 5.6 Layout mobile-first (`app/layout/`, spec `docs/specs/pwa-e-mobile.md`, etapa 1)
 
@@ -950,12 +948,9 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
   reenvia sem 409); a confirmação de plataforma vem **antes** de criar qualquer coisa. A página do jogo tem **Vincular à
   Steam** (modo `vincular`). Ligar invalida `['games']` e o cartão do perfil.
 - **Horas e conquistas (etapa 4)**: a página `/jogos/:id` de um jogo ligado ganha o bloco **Steam** (`BlocoSteam`, dentro do
-  `GameDetail`): tempo jogado ("42 h 30 min"), "Último jogo em dd/mm/aaaa" ou "Nunca jogado", a barra `role="progressbar"`
-  ("12 de 40 conquistas"), **Atualizar**, **Desvincular** (confirmação; só a camada da Steam some: título, status, notas e capa
+  `GameDetail`): o cabeçalho com o ícone, "Steam" (`h2`) e **"Atualizado há 12 minutos"** (`lib/tempo-relativo.ts`, `Intl.RelativeTimeFormat` pt-BR, a partir do `atualizadoEm` do dado; "agora" abaixo de 1 min; nunca "Invalid Date"), três cartões de dados ("Tempo jogado na Steam" "42 h 30 min", "Último jogo em" dd/mm/aaaa ou "Nunca jogado", "Conquistas · 12 de 40" com a barra `role="progressbar"` em `ouro` e a porcentagem), **Atualizar**, **Desvincular** (confirmação; só a camada da Steam some: título, status, notas e capa
   ficam, e **Vincular à Steam** volta) e **Abrir na Steam** (`rel="noopener noreferrer"`). A lista tem dois `<details>`:
-  **Desbloqueadas** (fechada, por data decrescente) e **Faltam** (aberta, da mais comum à mais rara), com ícone (`width`/`height`/
-  `loading="lazy"`), nome, descrição ("Conquista oculta" se oculta e bloqueada), data e "12,4% dos jogadores" (ou "Raridade
-  indisponível"); uma coluna no celular e, a partir de 1024 px, data e raridade à direita. O detalhe **só é pedido nesta página**
+  **Desbloqueadas** (fechada, por data decrescente) e **Faltam** (aberta, da mais comum à mais rara), com contador, ícone de 52 px (`width`/`height`/`loading="lazy"`; cadeado ou `visibility_off` sem ícone), nome, descrição ("Conquista oculta" se oculta e bloqueada), data e "12,4% dos jogadores" (ou "Raridade indisponível"); uma coluna no celular e, a partir de 1024 px, as duas listas lado a lado. O detalhe **só é pedido nesta página**
   (`useDetalheJogo`, sem _retry_; abrir `/` não faz nenhuma request de conquistas) e os valores novos entram direto no cache do
   catálogo (`comDadosAtualizados`). Enquanto carrega, mostra o último valor gravado; os avisos são discretos: conquistas privadas
   (horas mantidas, sem barra), perfil privado e Steam indisponível (valor antigo mantido). Sem nenhuma animação nova.

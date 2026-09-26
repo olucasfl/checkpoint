@@ -1,6 +1,6 @@
 # Spec: troca de design — "Estante de console"
 
-> Status: 🚧 em andamento (aprovada em 2026-09-25). **F1 e F2 implementadas** (branches `feat/design-estante-f1` e `feat/design-estante-f2`); F3 e F4 não começaram. As
+> Status: 🚧 em andamento (aprovada em 2026-09-25). **F1, F2 e F3 implementadas** (branches `feat/design-estante-f1`, `-f2` e `-f3`); a F4 vem a seguir. As
 > decisões 1 a 3 e as questões 4 a 14 foram respondidas com "aceito todas as recomendações" (registro em "Decisões tomadas").
 
 ## Objetivo
@@ -73,7 +73,7 @@ commit que muda o comportamento descrito.
 | **F3** detalhe e formulários | `/jogos/:id` (anel, barras, bloco Steam, lista de conquistas), formulário "Novo jogo/Editar", diálogos de confirmação                                                                                                                                                                                                       | telas herdadas (perfil, login…)                                                                             | as quatro telas desenhadas prontas                                                                         | CA-40 a CA-54                       |
 | **F4** herdado e fechamento  | conferência visual de tudo que herda (lista abaixo), ajuste de formas nas telas herdadas, `/qa-verify` no app rodando, `ARCHITECTURE.md` e status da spec                                                                                                                                                                   | nada novo                                                                                                   | direção completa                                                                                           | CA-61 a CA-70                       |
 
-**Estado (2026-09-25):** **F1 implementada** em `feat/design-estante-f1` (7 commits, do `feat(web): tokens do tema estante e fontes outfit e manrope` ao de docs) e **F2 implementada** em `feat/design-estante-f2` (do `feat(web): capa em pe 3:4` ao de docs, mais os `fix` e `test` da conferência); F3 e F4 não começaram. Nada foi mesclado na `main`.
+**Estado (2026-09-25):** **F1 implementada** em `feat/design-estante-f1` (7 commits, do `feat(web): tokens do tema estante e fontes outfit e manrope` ao de docs) e **F2 implementada** em `feat/design-estante-f2` (do `feat(web): capa em pe 3:4` ao de docs, mais os `fix` e `test` da conferência); **F3 implementada** em `feat/design-estante-f3` (detalhe, bloco Steam e formulário); a F4 é a seguinte. Nada foi mesclado na `main`.
 
 **Riscos, para quem implementar.** (1) O rename de tokens toca ~39 arquivos (mecânico; o `tsc` e os testes são a rede de
 segurança). (2) `hover: translateY` e a sombra do anel são cortados por contêineres com `overflow` (as prateleiras do
@@ -583,40 +583,53 @@ Jogando), com e sem vínculo Steam, com e sem média (inclusive 0), título de 1
 
 ### F3 — detalhe e formulário
 
-- [ ] **CA-42** [T] — **Dado** um jogo Zerado com `gameplay 9,2`, `historia 8` e os outros vazios, **quando** abro `/jogos/<id>` em ≥ 1024
+- [x] **CA-42** [T] — **Dado** um jogo Zerado com `gameplay 9,2`, `historia 8` e os outros vazios, **quando** abro `/jogos/<id>` em ≥ 1024
       px, **então** vejo a capa em pé (300 × 400, 3:4), o título, o chip de plataforma e o de status, o anel da média com "8,6" e "de 10", e
       o cartão Avaliação com cinco linhas: Gameplay "9,2" e História "8,0" com barra, e os outros três com "sem nota". (Substitui o
       CA-25 da `avaliacao-de-jogos` na parte visual.)
-- [ ] **CA-43** [T] — **Dado** um jogo sem média, **então** não há anel e vejo "A nota geral é a média dos critérios que você preencher."
-- [ ] **CA-44** [T] — **Dado** uma descrição `"<b>oi</b>\nlinha 2"`, **então** ela aparece como **texto** (`<b>oi</b>` literal) com a
+- [x] **CA-43** [T] — **Dado** um jogo sem média, **então** não há anel e vejo "A nota geral é a média dos critérios que você preencher."
+- [x] **CA-44** [T] — **Dado** uma descrição `"<b>oi</b>\nlinha 2"`, **então** ela aparece como **texto** (`<b>oi</b>` literal) com a
       quebra; sem descrição, o convite "Adicionar descrição" abre o formulário.
-- [ ] **CA-45** [T] — **Dado** um jogo ligado com `atualizadoEm` de 12 minutos atrás, **então** o bloco Steam mostra "Atualizado há 12
+- [x] **CA-45** [T] — **Dado** um jogo ligado com `atualizadoEm` de 12 minutos atrás, **então** o bloco Steam mostra "Atualizado há 12
       minutos"; com 30 s, "Atualizado agora"; com 3 h, "Atualizado há 3 horas"; e o formatador nunca mostra "Invalid Date".
-- [ ] **CA-46** [T] — **Dado** o bloco Steam, **então** mostra "Tempo jogado na Steam" ("42 h 30 min"), "Último jogo em"
+- [x] **CA-46** [T] — **Dado** o bloco Steam, **então** mostra "Tempo jogado na Steam" ("42 h 30 min"), "Último jogo em"
       (dd/mm/aaaa) ou "Nunca jogado", a barra `role="progressbar"` com "12 de 40", **Atualizar**, **Abrir na Steam** e **Desvincular**;
       **e** todos os comportamentos dos CA-43 a CA-54 da `integracao-plataformas` (1 h, 30 s, avisos, sem 502 no detalhe, Desvincular) passam
       sem alteração de regra.
-- [ ] **CA-47** [T] — **Dado** as conquistas, **então** as listas "Desbloqueadas" e "Faltam" têm contador; cada item mostra o ícone real
+- [x] **CA-47** [T] — **Dado** as conquistas, **então** as listas "Desbloqueadas" e "Faltam" têm contador; cada item mostra o ícone real
       (52 × 52, `loading="lazy"`, com `width` e `height`), o nome, a descrição (ou "Conquista oculta"), "Desbloqueada em dd/mm/aaaa" quando
       houver, e "62,1% dos jogadores" ou "Raridade indisponível"; em ≥ 1024 px as duas listas ficam lado a lado e abaixo disso em uma
       coluna.
-- [ ] **CA-48** [T] — **Dado** o formulário aberto, **então** o cabeçalho tem "Novo jogo" (ou "Editar jogo") e o botão redondo "Fechar"
+- [x] **CA-48** [T] — **Dado** o formulário aberto, **então** o cabeçalho tem "Novo jogo" (ou "Editar jogo") e o botão redondo "Fechar"
       (≥ 44 px); o rodapé fixo tem "Cancelar" e "Salvar" (52 px); Esc fecha e o foco volta ao botão que abriu.
-- [ ] **CA-49** [T] — **Dado** uma conta Steam vinculada, **quando** escolho um item em "Buscar na Steam", **então** vejo "Ligado à
+- [x] **CA-49** [T] — **Dado** uma conta Steam vinculada, **quando** escolho um item em "Buscar na Steam", **então** vejo "Ligado à
       Steam: «título»" com a miniatura em pé, as horas e "A capa oficial é só prévia.", e os botões "Trocar" e "Remover ligação"; **quando**
       clico em "Trocar", a busca reabre; **quando** clico em "Remover ligação", o cartão some; **e** sem conta vinculada vejo o link "Vincule
       sua Steam no perfil".
-- [ ] **CA-50** [T] — **Dado** um campo com erro (ex.: título duplicado), **então** ele tem borda `erro`, a mensagem junto e o tremor;
+- [x] **CA-50** [T] — **Dado** um campo com erro (ex.: título duplicado), **então** ele tem borda `erro`, a mensagem junto e o tremor;
       com movimento reduzido, só a borda e a mensagem. **Dado** o foco num campo, **então** ele tem a borda `destaque` e o anel de 3 px.
-- [ ] **CA-51** [T] — **Dado** o formulário, **então** o Status tem três botões na ordem Jogando, Quero jogar, Zerado com `aria-pressed`
+- [x] **CA-51** [T] — **Dado** o formulário, **então** o Status tem três botões na ordem Jogando, Quero jogar, Zerado com `aria-pressed`
       (exatamente um); com Quero jogar a seção Avaliação some e o aviso "As notas preenchidas serão apagadas ao salvar como Quero jogar"
       continua (CA-16 e CA-21 da `avaliacao-de-jogos`).
-- [ ] **CA-52** [T] — **Dado** critérios `9`, `8,5` e dois vazios, **então** "Média" mostra `8,8` ao vivo, e `—` sem nenhum; o slider, o campo
+- [x] **CA-52** [T] — **Dado** critérios `9`, `8,5` e dois vazios, **então** "Média" mostra `8,8` ao vivo, e `—` sem nenhum; o slider, o campo
       e o "Limpar" de cada critério têm ≥ 44 px de altura e o mesmo comportamento de hoje (CA-17 a CA-20 da `avaliacao-de-jogos`).
-- [ ] **CA-53** [T] — **Dado** a descrição, **então** o contador mostra `n/1000` e não passa de 1000.
-- [ ] **CA-54** [T] — **Dado** o formulário de novo jogo ligado à Steam com plataforma "PlayStation 5", **quando** salvo, **então** vejo a
+- [x] **CA-53** [T] — **Dado** a descrição, **então** o contador mostra `n/1000` e não passa de 1000.
+- [x] **CA-54** [T] — **Dado** o formulário de novo jogo ligado à Steam com plataforma "PlayStation 5", **quando** salvo, **então** vejo a
       confirmação **antes** de qualquer request (CA-37 da `integracao-plataformas`, inalterado); e o formulário aninhado com "Buscar na Steam"
       não fecha ao fechar o diálogo interno.
+
+#### Evidência da F3 (2026-09-25)
+
+Legenda: **T** = teste automatizado; **N** = conferência no navegador (registrada na conferência final, abaixo do CA-75).
+
+| CA            | Evidência                                                                                                                                                                                                                                                                                                                 |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| CA-42, CA-43  | T `GameDetailPage.test.tsx` (título, chips, anel "Nota 8,6 de 10" com "de 10", cinco linhas: Gameplay 9,2 e História 8,0 com barra em 92% e as outras três "sem nota" com barra vazia; sem média não há anel e vale o texto de sempre), `AnelDeNota.test.tsx` e `BarraDeCriterio.test.tsx` (0 é nota, vazio não é 0)      |
+| CA-44         | T `GameDetailPage.test.tsx` (a descrição entra como texto, com a quebra; "Adicionar descrição" abre o formulário)                                                                                                                                                                                                         |
+| CA-45         | T `tempo-relativo.test.ts` ("agora", 1 minuto, 12 minutos, 1 e 3 horas, 2 dias, futuro, ilegível) e `BlocoSteam.test.tsx` ("Atualizado há 12 minutos")                                                                                                                                                                    |
+| CA-46, CA-47  | T `BlocoSteam.test.tsx` (três cartões, `progressbar` "12 de 40 conquistas", Atualizar, Abrir na Steam com `noopener noreferrer`, Desvincular, avisos, listas com contador, ícones de 52 px com `loading="lazy"`); os comportamentos da `integracao-plataformas` (1 h, 30 s, avisos, Desvincular) seguem nos mesmos testes |
+| CA-48 a CA-53 | T `GameForm.test.tsx` (cabeçalho "Novo jogo", "Fechar", rodapé de 52 px, status na ordem Jogando, Quero jogar, Zerado, média ao vivo, controles de 44 px, contador `n/1000`, erro no campo) e `GameForm.steam.test.tsx` ("Ligado à Steam", horas, miniatura 44 × 58, "Trocar", "Remover ligação")                         |
+| CA-54         | T `GameForm.steam.test.tsx` (a confirmação vem antes de qualquer request) e `ModalDialog.test.tsx` (o `close` aninhado)                                                                                                                                                                                                   |
 
 ### Preferências (F1 e F2)
 

@@ -244,12 +244,12 @@ campos, o `schema.prisma` descrito, o `CHECK` da decisão A, o campo Nota do for
 
 ### Etapa 3 — página de detalhes
 
-- [x] **CA-25** — **Dado** um jogo Zerado com `gameplay 9,2`, `historia 8` e os outros vazios, **quando** abro `/jogos/<id>`, **então** vejo capa grande, título, plataforma, status, a média (`8,6`) em destaque e os cinco critérios: Gameplay `9,2` e História `8,0` com barra, e os outros três com "sem nota"; cada barra tem `aria-label` "<Rótulo> <nota> de 10".
+- [x] **CA-25** — _(atualizado por `troca-de-design-estante`, F3: a parte visual do detalhe (capa em pé, anel, barras); ver CA-42)_ **Dado** um jogo Zerado com `gameplay 9,2`, `historia 8` e os outros vazios, **quando** abro `/jogos/<id>`, **então** vejo capa grande, título, plataforma, status, a média (`8,6`) em destaque e os cinco critérios: Gameplay `9,2` e História `8,0` com barra, e os outros três com "sem nota"; cada barra tem `aria-label` "<Rótulo> <nota> de 10".
 - [x] **CA-26** — **Dado** um jogo sem descrição, **então** vejo o convite "Adicionar descrição", que abre o formulário; **dado** uma descrição `"<b>oi</b>\nlinha 2"`, **então** ela aparece como **texto** (`<b>oi</b>` literal, sem negrito) com a quebra de linha.
 - [x] **CA-27** — **Dado** a página aberta, **quando** clico **Editar**, mudo uma nota e salvo, **então** o modal fecha e a página mostra a nota nova sem recarregar; **quando** clico **Excluir** e confirmo, **então** o jogo some e vou para `/`; **quando** clico **Voltar**, **então** volto ao catálogo.
 - [x] **CA-28** — **Dado** um link direto, **quando** a lista ainda carrega, **então** vejo um esqueleto; **dado** um id inexistente ou de outro usuário, **então** vejo "Jogo não encontrado" com um link para `/` (sem revelar qual dos dois é). _(Prova do "de outro usuário": Vitest, `GameDetailPage.test.tsx`, "id inexistente (ou de outro usuário)"; ao vivo foram vistos o esqueleto e o id inexistente.)_
 - [x] **CA-29** — **Dado** `/jogos/<id>` (inclusive após recarregar), **então** o item "Jogos" da navegação (barra inferior e topo) está marcado como ativo.
-- [x] **CA-30** — **Dado** 375 px, **então** não há rolagem horizontal, a coluna é única e todo botão, link e campo tem ≥ 44 px de alto; **dado** ≥ 1024 px, **então** a capa fica ao lado das notas.
+- [x] **CA-30** — _(atualizado por `troca-de-design-estante`, F3: o layout do detalhe mudou (grade de 300 px e coluna única); ver CA-42 e CA-64)_ **Dado** 375 px, **então** não há rolagem horizontal, a coluna é única e todo botão, link e campo tem ≥ 44 px de alto; **dado** ≥ 1024 px, **então** a capa fica ao lado das notas.
 - [x] **CA-31** — **Dado** o app, **então** nenhuma cor nova fora do `@theme` (`tokens.test.ts` verde), nenhuma animação nova sem a variante `movimento-reduzido`, e `package.json` não mudou.
 
 ## Critérios provados só por teste

@@ -68,11 +68,11 @@ describe('LoginForm — campos (CA-37)', () => {
     expect(senha()).toHaveAttribute('autocomplete', 'current-password');
   });
 
-  it('fonte dos campos de 19px (piso de 16px: o iOS não dá zoom ao focar)', () => {
+  it('fonte dos campos de 16px (piso de 16px: o iOS não dá zoom ao focar)', () => {
     renderForm();
 
-    expect(email().className).toContain('text-[19px]');
-    expect(senha().className).toContain('text-[19px]');
+    expect(email().className).toContain('text-base');
+    expect(senha().className).toContain('text-base');
   });
 
   it('"mostrar senha": botão de 44 × 44 com aria-pressed, que alterna o tipo do campo', async () => {
