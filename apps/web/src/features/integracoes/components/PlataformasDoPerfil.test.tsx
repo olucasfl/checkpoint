@@ -391,7 +391,7 @@ describe('perfil privado, falha da Steam e sem conexão (CA-20, CA-21)', () => {
   });
 
   it('privado: "Seu perfil Steam está privado", o passo a passo e "Tentar de novo" que refaz a consulta', async () => {
-    api.resumo.mockRejectedValueOnce(erroHttp(409, 'PLATAFORMA_PERFIL_PRIVADO'));
+    api.resumo.mockRejectedValue(erroHttp(409, 'PLATAFORMA_PERFIL_PRIVADO'));
     const user = await renderVinculado();
 
     expect(
@@ -415,7 +415,8 @@ describe('perfil privado, falha da Steam e sem conexão (CA-20, CA-21)', () => {
 
     expect(await screen.findByText('Jogador Sintetico')).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Seu perfil Steam está privado' })).toBeNull();
-    expect(api.resumo).toHaveBeenCalledTimes(2);
+    // A linha do perfil, o popup ao abrir e o "Tentar de novo".
+    expect(api.resumo).toHaveBeenCalledTimes(3);
   });
 
   it.each([
@@ -458,17 +459,17 @@ describe('a seção "Plataformas"', () => {
 });
 
 describe('a aba Plataformas (spec plataformas-e-pagina-do-jogo, F3)', () => {
-  it('vinculada: linha minimizada com a plataforma, o nome da conta e "Vinculada em" (sem consultar a Steam para desenhar)', async () => {
+  it('vinculada: linha minimizada com a logo oficial, o nome da conta e a foto (uma consulta ao resumo)', async () => {
     api.listarContas.mockResolvedValue([CONTA]);
     api.resumo.mockResolvedValue(PERFIL);
     renderCartao();
 
     const linha = await screen.findByRole('button', { name: /Jogador Gravado/ });
     expect(linha).toHaveTextContent('Steam');
-    expect(linha).toHaveTextContent('Vinculada em 25/09/2026');
+    expect(linha.querySelector('[data-plataforma-logo="STEAM"]')).not.toBeNull();
     expect(linha).toHaveAttribute('aria-haspopup', 'dialog');
     expect(linha).toHaveClass('min-h-14');
-    expect(api.resumo).not.toHaveBeenCalled();
+    await waitFor(() => expect(api.resumo).toHaveBeenCalledTimes(1));
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 

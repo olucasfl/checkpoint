@@ -29,6 +29,8 @@ export function useResumoPlataforma(provedor: Provedor, enabled: boolean) {
     queryFn: () => integracoesApi.resumo(provedor),
     enabled,
     retry: false,
+    // A linha do perfil e o popup leem o mesmo resumo: sem isto abrir o popup consultaria de novo logo em seguida.
+    staleTime: 30_000,
   });
 }
 

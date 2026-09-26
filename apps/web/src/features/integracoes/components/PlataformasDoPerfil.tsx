@@ -13,7 +13,7 @@ import { atualizadoHaTexto } from '../lib/tempo-relativo';
 import { PlataformaDialog } from './PlataformaDialog';
 import { Esqueleto, Falha } from './ResumoSteam';
 
-const LINHA = 'flex min-w-0 items-center gap-3 px-4 py-3 text-left';
+const LINHA = 'flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 text-left';
 
 /**
  * Uma plataforma que a pessoa já vinculou: linha minimizada com o marcador, o nome da conta e "atualizado há X". A linha
@@ -30,9 +30,11 @@ function LinhaVinculada({
   onAbrir: () => void;
 }) {
   const provedor = plataforma.id as Provedor;
-  const cache = useResumoPlataforma(provedor, false);
+  // O resumo entra no mesmo cache do popup (10 min no servidor): a linha mostra a foto e o "atualizado há X".
+  const cache = useResumoPlataforma(provedor, true);
   const atualizado = cache.data ? atualizadoHaTexto(cache.data.consultadoEm) : null;
   const detalhe = atualizado ?? `Vinculada em ${dataCurta(conta.vinculadaEm) ?? '—'}`;
+  const avatarUrl = cache.data?.avatarUrl ?? null;
 
   return (
     <button
@@ -42,15 +44,25 @@ function LinhaVinculada({
       data-plataforma-linha={provedor}
       className={`${LINHA} min-h-14 w-full transition-colors hover:bg-acao-hover`}
     >
-      <PlataformaMarca provedor={provedor} variante="marcador" tamanho="g" decorativa />
-      <span className="flex min-w-0 flex-1 flex-col">
-        <span className="font-display text-[15px] font-bold text-texto-suave">
-          {plataforma.nome}
+      {/* A logo oficial fica sozinha; o nome da plataforma vai só para leitor de tela. */}
+      <PlataformaMarca provedor={provedor} variante="logo" decorativa />
+      <span className="sr-only">{plataforma.nome}</span>
+      <span className="flex min-w-[10rem] flex-1 items-center gap-3">
+        {avatarUrl ? (
+          <img
+            src={avatarUrl}
+            alt=""
+            width={44}
+            height={44}
+            className="size-11 shrink-0 rounded-full border border-borda object-cover"
+          />
+        ) : null}
+        <span className="flex min-w-0 flex-col">
+          <span className="text-[17px] font-semibold [overflow-wrap:anywhere]">
+            {conta.nomeExibicao}
+          </span>
+          <span className="text-[13px] font-medium text-texto-suave">{detalhe}</span>
         </span>
-        <span className="text-[17px] font-semibold [overflow-wrap:anywhere]">
-          {conta.nomeExibicao}
-        </span>
-        <span className="text-[13px] font-medium text-texto-suave">{detalhe}</span>
       </span>
       <Icon name="chevron_right" size={24} className="shrink-0 text-texto-suave" />
     </button>
