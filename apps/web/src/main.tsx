@@ -3,6 +3,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { AppProviders } from '@/app/providers';
 import { AppRouter } from '@/app/router';
+import { ErrorBoundary } from '@/shared/components/ErrorBoundary';
 import { connectivity } from '@/shared/lib/connectivity';
 import { iniciarPrefs } from '@/shared/lib/prefs/prefs-store';
 import { registrarDiaDeUso } from '@/shared/lib/pwa/usage-days';
@@ -26,8 +27,11 @@ connectivity.start();
 
 createRoot(container).render(
   <StrictMode>
-    <AppProviders>
-      <AppRouter />
-    </AppProviders>
+    {/* Última rede: erro nos provedores, no roteador ou nas telas de entrada (que não usam o AppFrame). */}
+    <ErrorBoundary>
+      <AppProviders>
+        <AppRouter />
+      </AppProviders>
+    </ErrorBoundary>
   </StrictMode>,
 );
