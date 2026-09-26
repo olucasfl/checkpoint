@@ -5,18 +5,28 @@ const STATE_BOX =
 
 const STATE_TITLE = 'font-display text-[15px] font-extrabold tracking-[-0.01em]';
 
-/** Carregando: três linhas de esqueleto (o brilho para com movimento reduzido). */
+/**
+ * Carregando: o esqueleto de UMA prateleira (cartão, título e quatro capas em pé com duas linhas de texto), nas mesmas
+ * medidas da `Prateleira`, para o conteúdo entrar sem mudar o layout. O pulso para com movimento reduzido.
+ */
 export function ListLoading() {
   return (
     <div
       role="status"
       aria-label="Carregando jogos"
       aria-busy="true"
-      className="flex flex-col gap-2.5"
+      className="flex min-w-0 flex-col gap-4 rounded-2xl border border-borda bg-painel p-4 md:border-0 md:bg-transparent md:p-0"
     >
-      {[0, 1, 2].map((index) => (
-        <div key={index} className="skeleton h-[52px] w-full rounded-xl" />
-      ))}
+      <div className="skeleton h-7 w-40 rounded-full" />
+      <div className="grid grid-cols-[repeat(auto-fill,132px)] justify-start gap-x-3.5 gap-y-5 md:grid-cols-[repeat(auto-fill,150px)] md:gap-x-[22px] md:gap-y-6">
+        {[0, 1, 2, 3].map((index) => (
+          <div key={index} className="flex w-[132px] flex-col gap-2 md:w-[150px]">
+            <div className="skeleton aspect-[3/4] w-full rounded-xl md:rounded-[14px]" />
+            <div className="skeleton h-4 w-4/5 rounded-full" />
+            <div className="skeleton h-3 w-1/2 rounded-full" />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

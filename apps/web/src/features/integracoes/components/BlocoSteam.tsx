@@ -1,3 +1,4 @@
+import { RotuloPendente } from '@/shared/components/RotuloPendente';
 import { useState } from 'react';
 import {
   type AvisoPlataforma,
@@ -308,8 +309,13 @@ export function BlocoSteam({ game }: { game: Game }) {
             disabled={atualizar.isPending}
             className={BOTAO_CONTORNO}
           >
-            <Icon name="refresh" size={20} />
-            {atualizar.isPending ? 'Atualizando…' : 'Atualizar'}
+            <Icon name="refresh" size={20} className={atualizar.isPending ? 'gira' : undefined} />
+            <RotuloPendente
+              pendente={atualizar.isPending}
+              normal="Atualizar"
+              ocupado="Atualizando…"
+              indicador={false}
+            />
           </button>
           {steamUrl && (
             <a href={steamUrl} target="_blank" rel="noopener noreferrer" className={BOTAO_CONTORNO}>

@@ -415,9 +415,16 @@ function Conteudo({
           <FieldError id="biblioteca-steam-erro" message={erro} />
 
           {biblioteca.isPending && (
-            <p role="status" className="m-0 text-[16px] text-texto-suave">
-              Carregando sua biblioteca…
-            </p>
+            <div role="status" aria-busy="true" className="flex flex-col gap-2.5">
+              <p className="sr-only">Carregando sua biblioteca…</p>
+              {[0, 1, 2].map((indice) => (
+                <div
+                  key={indice}
+                  aria-hidden="true"
+                  className="skeleton h-[72px] w-full rounded-2xl"
+                />
+              ))}
+            </div>
           )}
           {falha === 'privado' && (
             <p role="alert" className="m-0 text-[16px] font-semibold text-ouro">

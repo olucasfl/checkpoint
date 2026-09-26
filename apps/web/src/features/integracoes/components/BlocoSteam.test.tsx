@@ -310,10 +310,14 @@ describe('BlocoSteam — Atualizar e Desvincular', () => {
     await screen.findByText('Faltam');
 
     await user.click(screen.getByRole('button', { name: 'Atualizar' }));
-    expect(await screen.findByRole('button', { name: 'Atualizando…' })).toBeDisabled();
+    const pendente = await screen.findByRole('button', { name: 'Atualizando…' });
+    expect(pendente).toBeDisabled();
+    // O ícone gira só enquanto o pedido existe (CA-31).
+    expect(pendente.querySelector('.gira')).not.toBeNull();
     resolver(detalhe({ dados: dados({ minutosJogados: 3000 }) }));
 
     expect(await screen.findByText('50 h')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Atualizar' }).querySelector('.gira')).toBeNull();
     expect(api.atualizarJogo).toHaveBeenCalledWith('STEAM', 'g1');
   });
 

@@ -453,6 +453,47 @@ button:disabled {
   }
 
   /* ---- Animações (só CSS) ---- */
+  /* Bandeira do Chek do carregamento: balança em torno do pé do mastro (`rotate`, não `transform`). Só existe com `animado`. */
+  .chek-bandeira {
+    transform-origin: 256px 156px;
+    animation: chek-balanco var(--mov-laco-lento) ease-in-out infinite alternate;
+  }
+
+  /* Indicador de pedido em andamento (botão pendente e ícone de "Atualizar"): gira só enquanto o pedido existe. */
+  .gira {
+    animation: gira var(--mov-laco) linear infinite;
+  }
+
+  /* Reserva de largura do botão pendente: os dois textos (repouso e ocupado, este com o espaço do indicador) ocupam a
+     mesma célula, invisíveis, então a largura é a do maior e o botão não pula. Não anima. */
+  .reserva {
+    display: inline-grid;
+    justify-items: center;
+  }
+
+  .reserva > *,
+  .reserva::before,
+  .reserva::after {
+    grid-area: 1 / 1;
+  }
+
+  .reserva::before,
+  .reserva::after {
+    visibility: hidden;
+    height: 0;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+
+  .reserva::before {
+    content: attr(data-normal);
+  }
+
+  .reserva::after {
+    content: attr(data-ocupado);
+    padding-inline-start: 24px;
+  }
+
   /* Um ciclo só (antes eram 3): nada pisca mais de 3 vezes por segundo e o erro não repete em laço. */
   .shake-error {
     animation: shake var(--mov-padrao) var(--ease-entrada) 1;
@@ -521,6 +562,21 @@ button:disabled {
   }
   to {
     transform: translateY(-6px);
+  }
+}
+
+@keyframes chek-balanco {
+  from {
+    rotate: -6deg;
+  }
+  to {
+    rotate: 6deg;
+  }
+}
+
+@keyframes gira {
+  to {
+    rotate: 360deg;
   }
 }
 

@@ -989,6 +989,12 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
   **Movimento reduzido** (sistema ou "Animações: reduzidas") continua uma regra só (a variante `movimento-reduzido`): sem animação, sem transição e sem `scale`.
   Hooks: `useMovimentoReduzido` (para o que se decide em JS), `useAtraso(ativo, ms)` (só vira `true` depois de `ms` contínuos) e `useAbaVisivel`
   (marca `data-aba-oculta` no `<html>`, e o CSS pausa os laços).
+- **Carregamento** (F3): a `LoadingScreen` mostra o Chek parado e só depois de 300 ms (`ATRASO_DO_CHEK_MS`, `useAtraso`) a bandeira balança em laço lento
+  (`.chek-bandeira`, propriedade `rotate`; um boot rápido nunca anima). `ListLoading` é o esqueleto de **uma prateleira** (cartão, título e 4 capas em pé, nas
+  medidas da `Prateleira`), e a biblioteca da Steam também tem esqueleto (o texto "Carregando sua biblioteca…" fica `sr-only`). **Botões pendentes** usam
+  `RotuloPendente` (`shared/components/`): um anel de 16 px que gira (`.gira`, sem ícone de fonte, que na 1ª vez alargava o botão) e a **largura dos dois textos
+  reservada** por pseudo-elemento (`.reserva`, sem duplicar texto no DOM), então "Salvar" e "Salvando…" têm a mesma largura. O ícone de "Atualizar" da Steam
+  gira só enquanto o pedido existe.
 
 ---
 

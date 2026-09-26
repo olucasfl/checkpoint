@@ -1,3 +1,4 @@
+import { RotuloPendente } from '@/shared/components/RotuloPendente';
 import { useState } from 'react';
 import { type PerfilPlataforma } from '@checkpoint/shared';
 import { FieldError } from '@/shared/components/form-parts';
@@ -323,7 +324,11 @@ function ContaVinculadaCartao({ nomeGravado }: { nomeGravado: string }) {
           disabled={atualizar.isPending}
           className={BOTAO_CONTORNO}
         >
-          {atualizar.isPending ? 'Atualizando…' : 'Atualizar'}
+          <RotuloPendente
+            pendente={atualizar.isPending}
+            normal="Atualizar"
+            ocupado="Atualizando…"
+          />
         </button>
         <button
           type="button"

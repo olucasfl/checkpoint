@@ -1,3 +1,4 @@
+import { RotuloPendente } from '@/shared/components/RotuloPendente';
 import { useState, type FormEvent } from 'react';
 import { Link, useInRouterContext } from 'react-router-dom';
 import {
@@ -443,7 +444,7 @@ export function GameForm({
           disabled={mutation.isPending}
           className="h-[52px] rounded-full bg-destaque px-8 font-display text-base font-extrabold text-fundo transition-transform hover:-translate-y-0.5 disabled:opacity-70"
         >
-          {mutation.isPending ? 'Salvando…' : 'Salvar'}
+          <RotuloPendente pendente={mutation.isPending} normal="Salvar" ocupado="Salvando…" />
         </button>
       </div>
     </form>
