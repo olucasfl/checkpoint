@@ -56,7 +56,8 @@ Definições em `.claude/commands/`; agentes em `.claude/agents/`; skills em `.c
 
 **Existe:** autenticação (e-mail e senha, access token + refresh em cookie), catálogo de jogos com avaliação por
 critérios e capas (Supabase Storage), perfil e preferências, PWA, integração com a Steam (vínculo por OpenID,
-biblioteca, horas e conquistas) e deploy em produção (web na Vercel, API no Render, banco e bucket no Supabase). As
+biblioteca, horas e conquistas, com o cadastro global de plataformas e o popup da conta), o mascote Chek com o
+sistema de movimento (spec `personalizacao-chek-e-animacoes`) e deploy em produção (web na Vercel, API no Render, banco e bucket no Supabase). As
 entidades são as de `apps/api/prisma/schema.prisma` (`User`, `RefreshSession`, `Game`, `ContaVinculada`,
 `JogoPlataforma`). O estado detalhado está em `ARCHITECTURE.md` §1 e em `docs/specs/INDEX.md`.
 
