@@ -308,7 +308,7 @@ export interface ResumoContaPlataforma {
 ### F2 — página do jogo em seções
 
 - [ ] **CA-10** — **Dado** `/jogos/:id` de um jogo ligado, **então** há uma seção "Avaliação e descrição" (com o anel da média, os 5 critérios e a descrição) e uma seção da Steam com a logo e "Steam" no título.
-- [ ] **CA-11** — **Dado** a seção da Steam **fechada** para um jogo com 42 h 30 min e 12 de 40 conquistas, **então** a linha mostra "Steam · 42 h 30 min · 12/40 conquistas".
+- [ ] **CA-11** — **Dado** a seção da Steam **fechada** para um jogo com 42 h 30 min e 12 de 40 conquistas, **então** a linha mostra a logo da Steam (nome acessível "Steam") e o texto "42 h 30 min · 12/40 conquistas" (o "Steam ·" do exemplo é a própria logo, que fica sozinha).
 - [ ] **CA-12** — **Dado** a seção da Steam de um jogo com conquistas, **quando** a abro pela primeira vez, **então** "Desbloqueadas (N)" e "Faltam (N)" estão **fechadas**, cada uma com seta e o texto "Toque para ver".
 - [ ] **CA-13** — **Dado** "Faltam (N)" aberta, **então** a conquista oculta e bloqueada mostra "Conquista oculta" e cada conquista mostra "% dos jogadores" ou "Raridade indisponível".
 - [ ] **CA-14** — **Dado** que abri "Faltam" e recarreguei a página, **então** ela abre como deixei; **dado** o armazenamento bloqueado, **então** abre no padrão e não há erro.
