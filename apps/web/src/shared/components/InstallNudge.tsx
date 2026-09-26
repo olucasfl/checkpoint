@@ -19,8 +19,7 @@ const MIN_DAYS_OF_USE = 2;
 /** Telas de entrada: convidar a instalar ali atrapalha o que a pessoa veio fazer. */
 const AUTH_ROUTES = /^\/(login|registro)(\/|$)/;
 
-const BUTTON =
-  'min-h-11 shrink-0 rounded-[4px] px-3.5 font-display text-[13px] uppercase tracking-[0.1em]';
+const BUTTON = 'min-h-11 shrink-0 rounded-full px-[18px] font-display text-[15px] font-bold';
 
 /**
  * Convite para instalar o app, no `#overlay-root`. Não modal e só aparece quando TODAS as condições da
@@ -81,7 +80,7 @@ export function InstallNudge() {
         className="install-nudge pointer-events-none fixed z-40"
       >
         {mostrar && (
-          <div className="update-in pointer-events-auto flex items-center gap-3 rounded-md border border-destaque bg-painel px-3.5 py-2.5 text-[16px] text-texto">
+          <div className="update-in pointer-events-auto flex items-center gap-3 rounded-2xl border border-destaque bg-painel px-3.5 py-2.5 text-[16px] text-texto">
             <Icon
               name={ios ? 'add_to_home_screen' : 'install_mobile'}
               size={22}

@@ -47,7 +47,7 @@ export function CampoSenha({
         aria-pressed={visivel}
         aria-label="Mostrar senha"
         onClick={() => setVisivel((atual) => !atual)}
-        className="absolute right-0.5 top-0.5 grid size-11 place-items-center rounded-[4px] text-texto-suave hover:text-texto"
+        className="absolute right-0.5 top-0.5 grid size-11 place-items-center rounded-full text-texto-suave hover:text-texto"
       >
         <Icon name={visivel ? 'visibility_off' : 'visibility'} size={22} />
       </button>

@@ -179,7 +179,7 @@ describe('RequireAuth — carregando e desconectado', () => {
     const { user } = renderAt('/');
     api.refresh.mockResolvedValue(auth);
 
-    await user.click(await screen.findByRole('button', { name: 'TENTAR DE NOVO' }));
+    await user.click(await screen.findByRole('button', { name: 'Tentar de novo' }));
 
     expect(await screen.findByText('Nenhum jogo cadastrado')).toBeInTheDocument();
     expect(getSession().status).toBe('autenticado');

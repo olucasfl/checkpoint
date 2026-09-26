@@ -8,7 +8,7 @@ import { connectivity, type ConnectionState } from '@/shared/lib/connectivity';
 export const RESTORED_VISIBLE_MS = 3_000;
 
 const BOX =
-  'banner-in pointer-events-auto mx-auto flex max-w-[640px] items-center gap-3 rounded-md border bg-painel px-3.5 py-2.5 text-[16px] text-texto';
+  'banner-in pointer-events-auto mx-auto flex max-w-[640px] items-center gap-3 rounded-2xl border bg-painel px-3.5 py-2.5 text-[16px] text-texto';
 
 /**
  * Aviso de conexão no topo, no `#overlay-root`. O contêiner `role="status"` existe SEMPRE (vazio
@@ -59,7 +59,7 @@ export function ConnectionBanner() {
             <button
               type="button"
               onClick={() => connectivity.retryNow()}
-              className="min-h-11 shrink-0 rounded-[4px] border border-borda-controle px-3.5 font-display text-[13px] font-semibold tracking-[0.1em] uppercase hover:bg-acao-hover"
+              className="min-h-11 shrink-0 rounded-full border border-borda-controle px-[18px] font-display text-[15px] font-bold hover:bg-acao-hover"
             >
               Tentar agora
             </button>

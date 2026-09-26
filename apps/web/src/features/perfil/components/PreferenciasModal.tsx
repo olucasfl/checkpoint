@@ -107,7 +107,7 @@ function Conteudo({ onConcluir }: { onConcluir: () => void }) {
       <div>
         <h2
           id="prefs-titulo"
-          className="m-0 font-display text-xl font-extrabold uppercase tracking-[0.12em]"
+          className="m-0 font-display text-xl font-extrabold tracking-[-0.01em]"
         >
           Preferências
         </h2>
@@ -190,7 +190,7 @@ function Conteudo({ onConcluir }: { onConcluir: () => void }) {
         <button
           type="button"
           onClick={onConcluir}
-          className="min-h-12 rounded-xl bg-destaque px-6 font-display text-[13px] font-extrabold uppercase tracking-[0.1em] text-fundo"
+          className="min-h-12 rounded-full bg-destaque px-6 font-display text-[15px] font-extrabold text-fundo"
         >
           Concluído
         </button>

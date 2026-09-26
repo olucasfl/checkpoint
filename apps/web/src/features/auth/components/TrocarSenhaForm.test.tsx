@@ -142,7 +142,7 @@ describe('TrocarSenhaForm (CA-56)', () => {
     expect(await screen.findByRole('status')).toHaveTextContent(
       'Senha alterada. As outras sessões foram encerradas.',
     );
-    expect(screen.getByRole('heading', { name: 'PERFIL' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Perfil' })).toBeInTheDocument();
   });
 
   it('AUTH_SENHA_ATUAL_INCORRETA → mensagem sob o campo Senha atual (pelo fields)', async () => {

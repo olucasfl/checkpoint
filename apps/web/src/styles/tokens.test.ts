@@ -65,6 +65,16 @@ describe('tokens de cor (CA-87)', () => {
     expect(usos).toEqual([]);
   });
 
+  it('nenhum arquivo do web volta ao visual antigo: cantos de 4 px, cores padrão do Tailwind ou maiúsculas espaçadas em botão (F4)', () => {
+    const ANTIGO =
+      /rounded-\[[34]px\]|\b(?:text|bg|border)-(?:slate|gray|zinc|neutral|red|blue)-\d{2,3}\b|font-display[^"'`]*\buppercase\b[^"'`]*tracking-\[0\.1em\]/g;
+    const usos = Object.entries(sources).flatMap(([file, source]) =>
+      (source.match(ANTIGO) ?? []).map((achado) => `${file}: ${achado}`),
+    );
+
+    expect(usos).toEqual([]);
+  });
+
   it('o @theme existe e declara os tokens da spec', () => {
     const theme = css.match(/@theme\s*\{[\s\S]*?\n\}/)?.[0] ?? '';
 

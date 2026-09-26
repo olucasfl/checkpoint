@@ -24,7 +24,7 @@ export function textoDaExclusao(totalDeJogos: number | undefined): string {
 }
 
 const BOTAO_BASE =
-  'min-h-12 rounded-xl px-5 font-display text-[13px] tracking-[0.1em] disabled:opacity-60';
+  'min-h-12 rounded-full px-5 font-display text-[15px] disabled:opacity-60 font-bold';
 
 /**
  * Confirma a exclusão com a senha. "Cancelar" tem o foco inicial (o padrão seguro) e "Excluir conta"
@@ -77,7 +77,7 @@ export function ExcluirContaDialog({ open, onClose }: { open: boolean; onClose: 
       >
         <h2
           id="excluir-conta-titulo"
-          className="m-0 font-display text-xl font-extrabold uppercase tracking-[0.12em] text-erro"
+          className="m-0 font-display text-xl font-extrabold tracking-[-0.01em] text-erro"
         >
           Excluir conta
         </h2>
@@ -124,7 +124,7 @@ export function ZonaDePerigo() {
     >
       <h2
         id="perfil-perigo"
-        className="m-0 px-1 font-display text-sm font-bold uppercase tracking-[0.22em] text-erro"
+        className="m-0 px-1 font-display text-sm font-bold uppercase tracking-[0.14em] text-erro"
       >
         Zona de perigo
       </h2>
@@ -134,7 +134,7 @@ export function ZonaDePerigo() {
       <button
         type="button"
         onClick={() => setAberto(true)}
-        className="min-h-11 min-w-11 self-start rounded-xl border border-erro px-5 font-display text-[13px] font-semibold uppercase tracking-[0.1em] text-erro hover:bg-acao-hover"
+        className="min-h-11 min-w-11 self-start rounded-full border border-erro px-5 font-display text-[15px] font-bold text-erro hover:bg-acao-hover"
       >
         Excluir conta
       </button>

@@ -30,20 +30,20 @@ export function UpdatePrompt() {
         className="update-prompt pointer-events-none fixed z-40"
       >
         {visivel && (
-          <div className="update-in pointer-events-auto flex items-center gap-3 rounded-md border border-destaque bg-painel px-3.5 py-2.5 text-[16px] text-texto">
+          <div className="update-in pointer-events-auto flex items-center gap-3 rounded-2xl border border-destaque bg-painel px-3.5 py-2.5 text-[16px] text-texto">
             <Icon name="system_update" size={22} filled className="text-destaque" />
             <span className="flex-1">Nova versão disponível</span>
             <button
               type="button"
               onClick={atualizar}
-              className="min-h-11 shrink-0 rounded-[4px] bg-destaque px-3.5 font-display text-[13px] font-extrabold uppercase tracking-[0.1em] text-fundo"
+              className="min-h-11 shrink-0 rounded-full bg-destaque px-[18px] font-display text-[15px] font-extrabold text-fundo"
             >
               Atualizar
             </button>
             <button
               type="button"
               onClick={adiar}
-              className="min-h-11 shrink-0 rounded-[4px] border border-borda-controle px-3.5 font-display text-[13px] font-semibold uppercase tracking-[0.1em] hover:bg-acao-hover"
+              className="min-h-11 shrink-0 rounded-full border border-borda-controle px-[18px] font-display text-[15px] font-bold hover:bg-acao-hover"
             >
               Depois
             </button>

@@ -244,7 +244,7 @@ describe('destaque e contagens acompanham a edição, sem recarregar (CA-19, CA-
     api.remove.mockResolvedValue(undefined);
     api.list.mockResolvedValue([novo, alfa, beta]);
     await user.click(screen.getByRole('button', { name: 'Remover Gama' }));
-    await user.click(await screen.findByRole('button', { name: 'REMOVER' }));
+    await user.click(await screen.findByRole('button', { name: 'Remover' }));
     await waitFor(() => expect(filterButton(/^Zerado ?0$/)).toBeInTheDocument());
     expect(filterButton(/^Todos ?3$/)).toBeInTheDocument();
   });
@@ -408,7 +408,7 @@ describe('estados da lista (CA-41, CA-46, CA-50)', () => {
 
     expect(await screen.findByText('Não deu para carregar')).toBeInTheDocument();
     api.list.mockResolvedValue(CATALOG);
-    await user.click(screen.getByRole('button', { name: 'TENTAR DE NOVO' }));
+    await user.click(screen.getByRole('button', { name: 'Tentar de novo' }));
 
     expect(await aparece('Celeste')).toBeInTheDocument();
     expect(api.list).toHaveBeenCalledTimes(2);
@@ -581,7 +581,7 @@ describe('diálogos (CA-42, CA-49)', () => {
 
     await user.click(screen.getByRole('button', { name: 'Remover Celeste' }));
 
-    expect(await screen.findByRole('button', { name: 'CANCELAR' })).toHaveFocus();
+    expect(await screen.findByRole('button', { name: 'Cancelar' })).toHaveFocus();
   });
 
   it('Editar abre o MESMO formulário preenchido', async () => {
@@ -599,14 +599,14 @@ describe('diálogos (CA-42, CA-49)', () => {
     await aparece('Celeste');
 
     await user.click(screen.getByRole('button', { name: 'Remover Celeste' }));
-    await user.click(await screen.findByRole('button', { name: 'CANCELAR' }));
+    await user.click(await screen.findByRole('button', { name: 'Cancelar' }));
     expect(api.remove).not.toHaveBeenCalled();
     expect(screen.getByRole('link', { name: 'Celeste' })).toBeInTheDocument();
 
     api.remove.mockResolvedValue(undefined);
     api.list.mockResolvedValue(CATALOG.filter((g) => g.id !== '2'));
     await user.click(screen.getByRole('button', { name: 'Remover Celeste' }));
-    await user.click(await screen.findByRole('button', { name: 'REMOVER' }));
+    await user.click(await screen.findByRole('button', { name: 'Remover' }));
 
     await waitFor(() =>
       expect(screen.queryByRole('link', { name: 'Celeste' })).not.toBeInTheDocument(),
@@ -656,7 +656,7 @@ describe('sem conexão (pwa-e-mobile CA-23, CA-24)', () => {
 
       expect(await screen.findByText(OFFLINE_LIST)).toBeInTheDocument();
       expect(screen.queryByText('A API não respondeu.')).not.toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'TENTAR DE NOVO' })).toBeEnabled();
+      expect(screen.getByRole('button', { name: 'Tentar de novo' })).toBeEnabled();
       expect(screen.queryByRole('status', { name: 'Carregando jogos' })).not.toBeInTheDocument();
       onLine.mockRestore();
     },
@@ -669,7 +669,7 @@ describe('sem conexão (pwa-e-mobile CA-23, CA-24)', () => {
     await screen.findByText(OFFLINE_LIST);
 
     api.list.mockResolvedValue(CATALOG);
-    await user.click(screen.getByRole('button', { name: 'TENTAR DE NOVO' }));
+    await user.click(screen.getByRole('button', { name: 'Tentar de novo' }));
 
     expect(await aparece('Celeste')).toBeInTheDocument();
   });
@@ -683,7 +683,7 @@ describe('sem conexão (pwa-e-mobile CA-23, CA-24)', () => {
     connectivity.reportUnreachable();
     api.list.mockRejectedValue(networkError());
     await user.click(screen.getByRole('button', { name: 'Remover Celeste' }));
-    await user.click(await screen.findByRole('button', { name: 'REMOVER' }));
+    await user.click(await screen.findByRole('button', { name: 'Remover' }));
     await waitFor(() => expect(api.list).toHaveBeenCalledTimes(2));
 
     expect(celesteNaPrateleira()).toBeInTheDocument();
@@ -712,10 +712,10 @@ describe('sem conexão (pwa-e-mobile CA-23, CA-24)', () => {
     await aparece('Celeste');
 
     await user.click(screen.getByRole('button', { name: 'Remover Celeste' }));
-    await user.click(await screen.findByRole('button', { name: 'REMOVER' }));
+    await user.click(await screen.findByRole('button', { name: 'Remover' }));
 
     expect(await screen.findByText(OFFLINE_NOT_SAVED)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'REMOVER' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Remover' })).toBeEnabled();
     expect(celesteNaPrateleira()).toBeInTheDocument();
   });
 });

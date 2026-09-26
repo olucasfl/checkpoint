@@ -8,7 +8,7 @@ import { useEncerrarOutrasSessoes, useEncerrarSessao, useSessoes } from '../api/
 import { confirmacaoEncerrarOutras, iconeDoDispositivo, ultimoUso } from '../lib/sessoes';
 
 const BUTTON =
-  'min-h-11 min-w-11 shrink-0 rounded-xl px-3 font-display text-[13px] uppercase tracking-[0.1em] disabled:cursor-wait disabled:opacity-60';
+  'min-h-11 min-w-11 shrink-0 rounded-full px-3 font-display text-[15px] disabled:cursor-wait disabled:opacity-60 font-bold';
 
 function LinhaSessao({
   sessao,
@@ -148,9 +148,9 @@ export function SessoesAtivas() {
         <div className="sheet-pad flex flex-col gap-5 px-7 pt-7">
           <h2
             id="encerrar-outras-titulo"
-            className="m-0 font-display text-xl font-extrabold tracking-[0.12em]"
+            className="m-0 font-display text-xl font-extrabold tracking-[-0.01em]"
           >
-            ENCERRAR SESSÕES
+            Encerrar sessões
           </h2>
           <p className="m-0 text-[19px]">{confirmacaoEncerrarOutras(outras.length)}</p>
           <FieldError id="encerrar-outras-erro" message={erroConfirmacao} />
@@ -159,17 +159,17 @@ export function SessoesAtivas() {
               type="button"
               data-autofocus
               onClick={() => setConfirmando(false)}
-              className="min-h-12 rounded-xl border border-borda-controle px-5 font-display text-[13px] font-semibold tracking-[0.1em] hover:bg-acao-hover"
+              className="min-h-12 rounded-full border border-borda-controle px-5 font-display text-[15px] font-bold hover:bg-acao-hover"
             >
-              CANCELAR
+              Cancelar
             </button>
             <button
               type="button"
               onClick={() => void onConfirmarOutras()}
               disabled={encerrarOutras.isPending}
-              className="min-h-12 rounded-xl bg-erro px-[22px] font-display text-[13px] font-extrabold tracking-[0.1em] text-fundo disabled:opacity-70"
+              className="min-h-12 rounded-full bg-erro px-[22px] font-display text-[15px] font-extrabold text-fundo disabled:opacity-70"
             >
-              {encerrarOutras.isPending ? 'ENCERRANDO…' : 'ENCERRAR'}
+              {encerrarOutras.isPending ? 'Encerrando…' : 'Encerrar'}
             </button>
           </div>
         </div>

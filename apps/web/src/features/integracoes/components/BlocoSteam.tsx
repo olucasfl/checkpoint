@@ -101,7 +101,7 @@ function ItemDeConquista({ conquista }: { conquista: Conquista }) {
   return (
     <li
       data-conquista={conquista.id}
-      className="flex min-w-0 items-center gap-3.5 rounded-2xl bg-painel-2 px-3.5 py-3"
+      className="flex min-w-0 flex-wrap items-center gap-x-3.5 gap-y-1.5 rounded-2xl bg-painel-2 px-3.5 py-3"
     >
       {conquista.iconeUrl ? (
         // Decorativo (o nome está ao lado), sem `Referer` e com tamanho fixo: a lista pode ter centenas de ícones.
@@ -122,14 +122,14 @@ function ItemDeConquista({ conquista }: { conquista: Conquista }) {
           <Icon name={iconeVazio} size={26} />
         </div>
       )}
-      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+      <div className="flex min-w-0 flex-1 basis-40 flex-col gap-0.5">
         <span className="text-[15px] font-bold [overflow-wrap:anywhere]">{conquista.nome}</span>
         <span className="text-[13px] font-medium text-texto-suave [overflow-wrap:anywhere]">
           {escondida ? 'Conquista oculta' : (conquista.descricao ?? '')}
         </span>
         {data && <span className="text-xs font-semibold text-status-zerado">{data}</span>}
       </div>
-      <span className="shrink-0 text-right text-xs font-bold text-texto-suave">
+      <span className="shrink-0 text-xs font-bold text-texto-suave max-sm:basis-full max-sm:pl-[66px] sm:text-right">
         {raridadeTexto(conquista.raridadePercentual)}
       </span>
     </li>

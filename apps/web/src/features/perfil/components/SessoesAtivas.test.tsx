@@ -145,8 +145,8 @@ describe('"Encerrar todas as outras" (perfil CA-13)', () => {
     expect(dialogo).toHaveTextContent(
       'Encerrar 2 sessões? Esses aparelhos vão precisar entrar de novo.',
     );
-    expect(within(dialogo).getByRole('button', { name: 'CANCELAR' })).toHaveFocus();
-    await user.click(within(dialogo).getByRole('button', { name: 'ENCERRAR' }));
+    expect(within(dialogo).getByRole('button', { name: 'Cancelar' })).toHaveFocus();
+    await user.click(within(dialogo).getByRole('button', { name: 'Encerrar' }));
 
     expect(api.encerrarOutrasSessoes).toHaveBeenCalledTimes(1);
     await waitFor(() => expect(document.querySelector('dialog[open]')).toBeNull());
@@ -161,7 +161,7 @@ describe('"Encerrar todas as outras" (perfil CA-13)', () => {
     await screen.findByText('Chrome · Android');
 
     await user.click(screen.getByRole('button', { name: 'Encerrar todas as outras' }));
-    await user.click(screen.getByRole('button', { name: 'CANCELAR' }));
+    await user.click(screen.getByRole('button', { name: 'Cancelar' }));
 
     expect(api.encerrarOutrasSessoes).not.toHaveBeenCalled();
     expect(document.querySelector('dialog[open]')).toBeNull();
@@ -185,7 +185,7 @@ describe('"Encerrar todas as outras" (perfil CA-13)', () => {
 
     await user.click(screen.getByRole('button', { name: 'Encerrar todas as outras' }));
     const dialogo = document.querySelector('dialog[open]') as HTMLElement;
-    await user.click(within(dialogo).getByRole('button', { name: 'ENCERRAR' }));
+    await user.click(within(dialogo).getByRole('button', { name: 'Encerrar' }));
 
     expect(
       await within(dialogo).findByText('Sem conexão. Tente de novo quando a conexão voltar.'),

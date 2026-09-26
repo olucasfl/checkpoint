@@ -280,9 +280,9 @@ describe('Editar, Excluir e Voltar (CA-27)', () => {
     const user = renderAt();
 
     await user.click(await screen.findByRole('button', { name: 'Excluir' }));
-    expect(await screen.findByRole('heading', { name: 'REMOVER JOGO' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Remover jogo' })).toBeInTheDocument();
     expect(api.remove).not.toHaveBeenCalled();
-    await user.click(screen.getByRole('button', { name: 'REMOVER' }));
+    await user.click(screen.getByRole('button', { name: 'Remover' }));
 
     await waitFor(() => expect(api.remove).toHaveBeenCalledWith('g1'));
     await waitFor(() => expect(onde()).toBe('/'));
@@ -293,7 +293,7 @@ describe('Editar, Excluir e Voltar (CA-27)', () => {
     const user = renderAt();
 
     await user.click(await screen.findByRole('button', { name: 'Excluir' }));
-    await user.click(await screen.findByRole('button', { name: 'CANCELAR' }));
+    await user.click(await screen.findByRole('button', { name: 'Cancelar' }));
 
     expect(api.remove).not.toHaveBeenCalled();
     expect(onde()).toBe('/jogos/g1');
@@ -305,7 +305,7 @@ describe('Editar, Excluir e Voltar (CA-27)', () => {
     const user = renderAt();
 
     await user.click(await screen.findByRole('button', { name: 'Excluir' }));
-    await user.click(await screen.findByRole('button', { name: 'REMOVER' }));
+    await user.click(await screen.findByRole('button', { name: 'Remover' }));
 
     expect(await screen.findByText(/Sem conexão/)).toBeInTheDocument();
     expect(onde()).toBe('/jogos/g1');
