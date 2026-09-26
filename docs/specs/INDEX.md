@@ -15,6 +15,7 @@ commit — `/docs-sync` confere se ela bate com a realidade.
 | Troca de design: Estante de console   | [troca-de-design-estante.md](troca-de-design-estante.md)                 | 🚧 em andamento |
 | Plataformas e página do jogo          | [plataformas-e-pagina-do-jogo.md](plataformas-e-pagina-do-jogo.md)       | 🚧 em andamento |
 | Personalização com o Chek e animações | [personalizacao-chek-e-animacoes.md](personalizacao-chek-e-animacoes.md) | 🚧 em andamento |
+| Integração com a PlayStation (PSN)    | [integracao-playstation.md](integracao-playstation.md)                   | 📝 rascunho     |
 
 ## Legenda de status
 
