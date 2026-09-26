@@ -6,6 +6,7 @@ import { describeAuthError, type AuthFormError } from '@/features/auth/lib/auth-
 import { nomeError } from '@/features/auth/lib/field-rules';
 import { useAuth } from '@/features/auth/session/use-auth';
 import { perfilApi } from '../api/perfil-api';
+import { avisar } from '@/shared/lib/avisos';
 
 const NO_ERROR: AuthFormError = { message: '', fields: {} };
 
@@ -74,6 +75,7 @@ export function NomeEditavel() {
       const atualizado = await perfilApi.atualizar({ nome: valor.trim() });
       atualizarUsuario(atualizado);
       fechar();
+      avisar({ texto: 'Nome atualizado.' });
     } catch (failure) {
       setErro(describeAuthError(failure));
     } finally {

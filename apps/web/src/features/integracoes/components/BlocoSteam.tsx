@@ -20,6 +20,7 @@ import {
   separarConquistas,
 } from '../lib/conquistas';
 import { atualizadoHaTexto } from '../lib/tempo-relativo';
+import { avisar } from '@/shared/lib/avisos';
 
 const PROVEDOR = 'STEAM' as const;
 
@@ -262,6 +263,7 @@ export function BlocoSteam({ game }: { game: Game }) {
     setErroAtualizar('');
     try {
       await atualizar.mutateAsync();
+      avisar({ texto: 'Dados da Steam atualizados.' });
     } catch (failure) {
       setErroAtualizar(describeAuthError(failure).message);
     }
@@ -272,6 +274,7 @@ export function BlocoSteam({ game }: { game: Game }) {
     try {
       await desvincular.mutateAsync(game.id);
       setConfirmando(false);
+      avisar({ texto: 'Jogo desvinculado da Steam.' });
     } catch (failure) {
       setErroDesvincular(describeAuthError(failure).message);
     }

@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
+import { Chek } from '@/shared/components/Chek/Chek';
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -50,6 +51,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
         data-state="render-error"
         className="safe-x mx-auto flex max-w-[640px] flex-col gap-4 py-10"
       >
+        <Chek expressao="confuso" altura={96} />
         <h1 className="m-0 font-display text-[26px] font-extrabold tracking-[-0.01em]">
           Algo deu errado nesta tela
         </h1>

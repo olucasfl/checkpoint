@@ -1,4 +1,4 @@
-import { Icon } from '@/shared/components/Icon';
+import { Chek } from '@/shared/components/Chek/Chek';
 
 const STATE_BOX =
   'flex min-h-[180px] flex-col items-center justify-center gap-2.5 rounded-2xl border border-dashed border-borda bg-painel p-6 text-center';
@@ -35,7 +35,7 @@ export function ListLoading() {
 export function ListEmpty({ filtered }: { filtered: boolean }) {
   return (
     <div className={STATE_BOX} data-state={filtered ? 'empty-filter' : 'empty'}>
-      <Icon name="stadia_controller" size={40} filled className="text-ouro" />
+      <Chek expressao="dormindo" altura={72} />
       <div className={STATE_TITLE}>
         {filtered ? 'Nenhum jogo neste status' : 'Nenhum jogo cadastrado'}
       </div>
@@ -62,7 +62,7 @@ export function ListError({
 }) {
   return (
     <div role="alert" className={STATE_BOX} data-state="error">
-      <Icon name="wifi_off" size={40} filled className="text-erro" />
+      <Chek expressao="confuso" altura={72} />
       <div className={STATE_TITLE}>Não deu para carregar</div>
       <p className="m-0 text-[17px] text-texto-suave">
         {offline

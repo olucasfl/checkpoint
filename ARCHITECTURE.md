@@ -995,6 +995,15 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
   `RotuloPendente` (`shared/components/`): um anel de 16 px que gira (`.gira`, sem ícone de fonte, que na 1ª vez alargava o botão) e a **largura dos dois textos
   reservada** por pseudo-elemento (`.reserva`, sem duplicar texto no DOM), então "Salvar" e "Salvando…" têm a mesma largura. O ícone de "Atualizar" da Steam
   gira só enquanto o pedido existe.
+- **Erro, vazio e sucesso** (F4): `Avisos` (`shared/components/`, montado ao lado do `ConnectionBanner` no `AppFrame` e no `AuthLayout`) mostra um aviso de sucesso
+  por vez, na região `role="status"` que existe sempre; `avisar({ texto, chek?, acao? })` (`shared/lib/avisos.ts`, fila fora do React, com `useFilaDeAvisos`)
+  enfileira. Fica ≥ 4 s (1 s a mais por 20 caracteres acima de 60), pausa com o mouse ou o foco, tem **Fechar**, sai com `aviso-out` e nunca rouba o foco; no
+  celular fica acima da barra inferior e, com `UpdatePrompt` ou `InstallNudge` na tela, acima deles (`body:has(...)`). **Erros continuam no lugar, em
+  `role="alert"`**: nada de erro vira aviso. Usam `avisar`: salvar/editar/remover jogo, vincular, atualizar e desvincular na Steam, salvar nome e sair (trocar
+  senha e o retorno da Steam já tinham o seu aviso). O `ConnectionBanner` também **sai** com animação (`useComSaida`: segura o visual por 200 ms). Os estados
+  levam o Chek (sempre `aria-hidden`; o texto vale sem ele): catálogo vazio e filtro sem resultado `dormindo`, erro da lista e `ErrorBoundary` `confuso`,
+  perfil Steam privado `cadeado`. **Rota `*`** (`NaoEncontradaPage`, dentro do `RequireAuth` e do `AppLayout`): quem não tem sessão vai ao login antes, então
+  o 404 não revela rotas.
 
 ---
 

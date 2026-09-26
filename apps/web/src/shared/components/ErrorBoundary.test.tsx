@@ -34,6 +34,21 @@ describe('ErrorBoundary', () => {
     expect(screen.getByRole('link', { name: 'Ir para o catálogo' })).toHaveAttribute('href', '/');
   });
 
+  it('mostra o Chek confuso, decorativo, e o texto vale sem ele (CA-36, CA-39)', () => {
+    render(
+      <ErrorBoundary>
+        <Quebra />
+      </ErrorBoundary>,
+    );
+
+    expect(document.querySelector('svg[data-chek="confuso"]')).toHaveAttribute(
+      'aria-hidden',
+      'true',
+    );
+    expect(screen.getByRole('alert')).toHaveAttribute('data-state', 'render-error');
+    expect(screen.getByRole('button', { name: 'Tentar de novo' })).toBeInTheDocument();
+  });
+
   it('sem erro, os filhos passam intactos', () => {
     render(
       <ErrorBoundary>

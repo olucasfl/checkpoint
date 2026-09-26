@@ -18,6 +18,7 @@ import { agruparEmPrateleiras, destaqueDoCatalogo } from '@/features/games/lib/e
 import { comFiltroInicial, paramsDoFiltro } from '@/features/games/lib/initial-filter';
 import { wantsNewGame, withoutNewGameParam } from '@/features/games/lib/new-game';
 import { parseStatusFilter, type StatusFilter as Filter } from '@/features/games/lib/status-filter';
+import { avisar } from '@/shared/lib/avisos';
 
 /** Estado do diálogo: fechado, novo jogo (com o status da prateleira que o abriu, se veio de uma) ou edição. */
 type FormDialog = { open: false } | { open: true; game?: Game; status?: GameStatus };
@@ -142,7 +143,10 @@ export function GamesPage() {
           <GameForm
             game={form.game}
             statusInicial={form.status}
-            onDone={() => setForm({ open: false })}
+            onDone={() => {
+              setForm({ open: false });
+              avisar({ texto: form.game ? 'Jogo atualizado.' : 'Jogo adicionado.' });
+            }}
             onCancel={() => setForm({ open: false })}
             onLinkedExisting={(jogoId) => {
               setForm({ open: false });

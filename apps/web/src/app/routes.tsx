@@ -5,6 +5,7 @@ import { RequireAuth } from '@/app/layout/RequireAuth';
 import { GameDetailPage } from '@/pages/GameDetailPage';
 import { GamesPage } from '@/pages/GamesPage';
 import { LoginPage } from '@/pages/LoginPage';
+import { NaoEncontradaPage } from '@/pages/NaoEncontradaPage';
 import { PerfilPage } from '@/pages/PerfilPage';
 import { RegistroPage } from '@/pages/RegistroPage';
 import { StatusPage } from '@/pages/StatusPage';
@@ -27,6 +28,7 @@ export const routes: RouteObject[] = [
           { path: '/jogos/:id', element: <GameDetailPage /> },
           { path: '/perfil', element: <PerfilPage /> },
           { path: '/perfil/senha', element: <TrocarSenhaPage /> },
+          { path: '*', element: <NaoEncontradaPage /> },
         ],
       },
     ],

@@ -73,6 +73,10 @@ describe('sistema de movimento (CA-13 a CA-17)', () => {
     expect(laco).toContain('esqueleto-pulso');
   });
 
+  it('o tremor do campo com erro é UM ciclo, dentro de --mov-padrao (CA-33)', () => {
+    expect(css).toMatch(/\.shake-error\s*\{[^}]*animation:\s*shake var\(--mov-padrao\)[^;]*\s1;/);
+  });
+
   it('o brilho antigo do esqueleto (background-position) saiu', () => {
     expect(css).not.toContain('@keyframes shimmer');
     expect(css).not.toMatch(/background-position/);

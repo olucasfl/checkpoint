@@ -1,3 +1,4 @@
+import { Chek } from '@/shared/components/Chek/Chek';
 import { RotuloPendente } from '@/shared/components/RotuloPendente';
 import { useState } from 'react';
 import { type PerfilPlataforma } from '@checkpoint/shared';
@@ -16,6 +17,7 @@ import { classificarFalhaDoCartao } from '../lib/estado-do-cartao';
 import { horasCurtas, textoDasConquistas } from '../lib/format';
 import { irPara } from '../lib/navegar';
 import { urlDaSteamSegura } from '../lib/steam-url';
+import { avisar } from '@/shared/lib/avisos';
 
 const PROVEDOR = 'STEAM' as const;
 
@@ -142,6 +144,7 @@ function PerfilPrivado({
 }) {
   return (
     <div className="flex flex-col gap-3">
+      <Chek expressao="cadeado" altura={72} />
       <h3 className="m-0 text-[19px] font-bold text-ouro">Seu perfil Steam está privado</h3>
       <p className="m-0 text-[16px] text-texto-suave">
         A Steam só entrega horas e conquistas de perfis públicos. Para mudar:
@@ -272,6 +275,7 @@ function ContaVinculadaCartao({ nomeGravado }: { nomeGravado: string }) {
     setErroAtualizar('');
     try {
       await atualizar.mutateAsync();
+      avisar({ texto: 'Perfil Steam atualizado.' });
     } catch (failure) {
       setErroAtualizar(describeAuthError(failure).message);
     }
@@ -282,6 +286,7 @@ function ContaVinculadaCartao({ nomeGravado }: { nomeGravado: string }) {
     try {
       await desvincular.mutateAsync();
       setConfirmando(false);
+      avisar({ texto: 'Conta Steam desvinculada.' });
     } catch (failure) {
       setErroDesvincular(describeAuthError(failure).message);
     }

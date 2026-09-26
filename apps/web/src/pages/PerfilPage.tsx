@@ -20,6 +20,7 @@ import {
 } from '@/features/perfil/components/PreferenciasModal';
 import { SessoesAtivas } from '@/features/perfil/components/SessoesAtivas';
 import { ZonaDePerigo } from '@/features/perfil/components/ZonaDePerigo';
+import { avisar } from '@/shared/lib/avisos';
 
 const SEM_CONEXAO_PARA_SAIR = 'Sem conexão. Para sair, conecte-se.';
 
@@ -59,6 +60,8 @@ export function PerfilPage() {
       setAviso(SEM_CONEXAO_PARA_SAIR);
     } else if (resultado === 'erro') {
       setAviso(UNEXPECTED_MESSAGE);
+    } else {
+      avisar({ texto: 'Você saiu da conta.' });
     }
   }
 

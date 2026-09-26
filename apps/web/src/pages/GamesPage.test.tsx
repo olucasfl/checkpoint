@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { gamesApi } from '@/features/games/api/games-api';
 import { integracoesApi } from '@/features/integracoes/api/integracoes-api';
 import { OFFLINE_NOT_SAVED } from '@/features/games/lib/api-error';
+import { avisosNaFila } from '@/shared/lib/avisos';
 import { connectivity } from '@/shared/lib/connectivity';
 import { alterarPrefs, definirUsuario, resetPrefsForTests } from '@/shared/lib/prefs/prefs-store';
 import { storage } from '@/shared/lib/storage/storage';
@@ -154,6 +155,7 @@ describe('estante e contagens (CA-13, CA-14, CA-27)', () => {
     ).toHaveLength(2);
     expect(api.list).toHaveBeenCalledTimes(2);
     expect(document.querySelector('dialog')).not.toHaveAttribute('open');
+    expect(avisosNaFila().map((a) => a.texto)).toContain('Jogo adicionado.');
   });
 });
 
@@ -613,6 +615,7 @@ describe('diálogos (CA-42, CA-49)', () => {
       expect(screen.queryByRole('link', { name: 'Celeste' })).not.toBeInTheDocument(),
     );
     expect(api.remove).toHaveBeenCalledWith('2');
+    expect(avisosNaFila().map((a) => a.texto)).toContain('Jogo removido.');
   });
 });
 

@@ -8,6 +8,7 @@ import { useBiblioteca, useVincularJogo } from '../api/use-integracoes';
 import { jogoAtualDoErro, precisaConfirmarPlataforma } from '../lib/biblioteca';
 import { classificarFalhaDoCartao } from '../lib/estado-do-cartao';
 import { horasCurtas } from '../lib/format';
+import { avisar } from '@/shared/lib/avisos';
 
 const PROVEDOR = 'STEAM' as const;
 const BUSCA_ATRASO_MS = 300;
@@ -332,6 +333,7 @@ function Conteudo({
     setErro('');
     try {
       await vincular.mutateAsync({ jogoId: alvo.id, idExterno: item.idExterno, mover });
+      avisar({ texto: 'Jogo vinculado à Steam.' });
       onVinculado(alvo.id);
     } catch (failure) {
       const jogoAtual = jogoAtualDoErro(failure);
