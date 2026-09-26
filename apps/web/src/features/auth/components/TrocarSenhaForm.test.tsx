@@ -29,7 +29,7 @@ vi.mock('@/features/games/api/games-api', () => ({ gamesApi: { list: vi.fn() } }
 vi.mock('@/features/perfil/api/perfil-api', () => ({
   perfilApi: { atualizar: vi.fn(), listarSessoes: vi.fn() },
 }));
-// E a seção "Contas vinculadas" (nenhuma conta vinculada aqui).
+// E a seção "Plataformas" (nenhuma conta vinculada aqui).
 vi.mock('@/features/integracoes/api/integracoes-api', () => ({
   integracoesApi: { listarContas: vi.fn() },
 }));
@@ -229,9 +229,9 @@ describe('/perfil e a troca de senha', () => {
         </MemoryRouter>,
       ),
     );
-    // A seção "Contas vinculadas" carrega de forma assíncrona e o esqueleto dela também é um `status`:
+    // A seção "Plataformas" carrega de forma assíncrona e o esqueleto dela também é um `status`:
     // espera terminar para afirmar que nenhum `status` (mensagem de sucesso) sobrou.
-    await screen.findByRole('button', { name: 'Vincular conta' });
+    await screen.findByRole('button', { name: 'Vincular conta Steam' });
 
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
     expect(within(document.body).queryByText('qualquer texto')).not.toBeInTheDocument();

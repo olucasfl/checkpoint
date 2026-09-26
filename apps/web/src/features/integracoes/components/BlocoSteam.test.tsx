@@ -10,6 +10,7 @@ import {
 } from '@checkpoint/shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { avisosNaFila } from '@/shared/lib/avisos';
+import { storage } from '@/shared/lib/storage/storage';
 import { integracoesApi } from '../api/integracoes-api';
 import { BlocoSteam } from './BlocoSteam';
 
@@ -166,7 +167,7 @@ describe('BlocoSteam — dados (CA-51)', () => {
 });
 
 describe('BlocoSteam — lista de conquistas (CA-52, CA-53)', () => {
-  it('Desbloqueadas (fechada, mais recente primeiro) e Faltam (aberta, da mais comum à mais rara), com contagem', async () => {
+  it('Desbloqueadas e Faltam (as duas FECHADAS, com "Toque para ver"), na ordem certa e com contagem', async () => {
     api.detalheDoJogo.mockResolvedValue(detalhe());
     const { container } = abrir();
     await screen.findByText('42 h 30 min');
@@ -179,7 +180,9 @@ describe('BlocoSteam — lista de conquistas (CA-52, CA-53)', () => {
     const faltam = container.querySelector('details[data-lista="Faltam"]') as HTMLDetailsElement;
 
     expect(desbloqueadas.open).toBe(false);
-    expect(faltam.open).toBe(true);
+    expect(faltam.open).toBe(false);
+    expect(within(desbloqueadas).getByText('Toque para ver')).toBeInTheDocument();
+    expect(within(faltam).getByText('Toque para ver')).toBeInTheDocument();
     expect(within(desbloqueadas).getByText('Desbloqueadas')).toBeInTheDocument();
     expect(within(desbloqueadas).getByText('2')).toBeInTheDocument();
     expect(within(faltam).getByText('Faltam')).toBeInTheDocument();
@@ -262,7 +265,7 @@ describe('BlocoSteam — avisos (CA-47 a CA-50)', () => {
     abrir();
 
     expect(await screen.findByText(/conquistas deste jogo estão privadas/)).toBeInTheDocument();
-    expect(screen.getByText('42 h 30 min')).toBeInTheDocument();
+    expect(screen.getAllByText('42 h 30 min').length).toBeGreaterThan(0);
     expect(screen.queryByRole('progressbar')).toBeNull();
     expect(screen.queryByText(/Seu perfil Steam está privado/)).toBeNull();
     expect(screen.getByRole('button', { name: 'Atualizar' })).toBeInTheDocument();
@@ -273,7 +276,7 @@ describe('BlocoSteam — avisos (CA-47 a CA-50)', () => {
     abrir();
 
     expect(await screen.findByText(/Seu perfil Steam está privado agora/)).toBeInTheDocument();
-    expect(screen.getByText('42 h 30 min')).toBeInTheDocument();
+    expect(screen.getAllByText(/42 h 30 min/).length).toBeGreaterThan(0);
     expect(screen.getByText('Conquistas · 12 de 40')).toBeInTheDocument();
   });
 
@@ -282,7 +285,7 @@ describe('BlocoSteam — avisos (CA-47 a CA-50)', () => {
     abrir();
 
     expect(await screen.findByText(/Não foi possível atualizar agora/)).toBeInTheDocument();
-    expect(screen.getByText('42 h 30 min')).toBeInTheDocument();
+    expect(screen.getAllByText(/42 h 30 min/).length).toBeGreaterThan(0);
     expect(screen.getByText('Conquistas · 12 de 40')).toBeInTheDocument();
   });
 
@@ -395,5 +398,83 @@ describe('BlocoSteam — Atualizar e Desvincular', () => {
 
     expect(container).toBeEmptyDOMElement();
     expect(api.detalheDoJogo).not.toHaveBeenCalled();
+  });
+});
+
+describe('BlocoSteam — seção recolhível (spec plataformas-e-pagina-do-jogo, F2)', () => {
+  beforeEach(() => storage.raw.removeAllWithPrefix('checkpoint:'));
+
+  it('o título é a logo oficial sozinha (nome acessível "Steam", >= 50 px) e a linha fechada resume horas e conquistas', async () => {
+    api.detalheDoJogo.mockResolvedValue(detalhe());
+    const { container } = abrir();
+
+    const titulo = await screen.findByRole('heading', { level: 2, name: 'Steam' });
+    const logo = within(titulo).getByRole('img', { name: 'Steam' });
+    expect(Number(logo.getAttribute('height'))).toBeGreaterThanOrEqual(50);
+    expect(titulo).toHaveTextContent('');
+    expect(
+      within(container.querySelector('summary') as HTMLElement).getByText(
+        '42 h 30 min · 12/40 conquistas',
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('sem número certo de conquistas (privadas), a linha traz só as horas', async () => {
+    api.detalheDoJogo.mockResolvedValue(detalhe({ conquistas: [], aviso: 'CONQUISTAS_PRIVADAS' }));
+    const { container } = abrir();
+    await screen.findByText(/conquistas deste jogo estão privadas/);
+    expect(container.querySelector('summary')).toHaveTextContent('42 h 30 min');
+    expect(container.querySelector('summary')).not.toHaveTextContent('conquistas');
+  });
+
+  it('a seção da plataforma abre por padrão; fechar fica guardado neste aparelho', async () => {
+    api.detalheDoJogo.mockResolvedValue(detalhe());
+    const { container, user, unmount } = abrir();
+    const secao = container.querySelector('details[data-secao="steam"]') as HTMLDetailsElement;
+    expect(secao.open).toBe(true);
+
+    await user.click(
+      within(secao)
+        .getAllByText(/42 h 30 min/)[0]!
+        .closest('summary')!,
+    );
+    expect(secao.open).toBe(false);
+    unmount();
+
+    api.detalheDoJogo.mockResolvedValue(detalhe());
+    const outra = abrir();
+    expect(
+      (outra.container.querySelector('details[data-secao="steam"]') as HTMLDetailsElement).open,
+    ).toBe(false);
+  });
+
+  it('abrir "Faltam" troca o texto para "Toque para fechar" e fica guardado (e "Desbloqueadas" continua fechada)', async () => {
+    api.detalheDoJogo.mockResolvedValue(detalhe());
+    const { container, user, unmount } = abrir();
+    await screen.findByText('Faltam');
+    const faltam = container.querySelector('details[data-lista="Faltam"]') as HTMLDetailsElement;
+
+    await user.click(faltam.querySelector('summary') as HTMLElement);
+    expect(faltam.open).toBe(true);
+    expect(within(faltam).getByText('Toque para fechar')).toBeInTheDocument();
+    unmount();
+
+    api.detalheDoJogo.mockResolvedValue(detalhe());
+    const outra = abrir();
+    await screen.findAllByText('Faltam');
+    const de = (nome: string) =>
+      outra.container.querySelector(`details[data-lista="${nome}"]`) as HTMLDetailsElement;
+    expect(de('Faltam').open).toBe(true);
+    expect(de('Desbloqueadas').open).toBe(false);
+  });
+
+  it('a conquista oculta e a raridade continuam nas listas (mesmo fechadas, o conteúdo existe)', async () => {
+    api.detalheDoJogo.mockResolvedValue(detalhe());
+    const { container } = abrir();
+    await screen.findByText('Faltam');
+    const segredo = container.querySelector('li[data-conquista="segredo"]') as HTMLElement;
+    expect(within(segredo).getByText('Conquista oculta')).toBeInTheDocument();
+    expect(within(segredo).getByText('Raridade indisponível')).toBeInTheDocument();
+    expect(screen.getByText('1,5% dos jogadores')).toBeInTheDocument();
   });
 });

@@ -44,6 +44,33 @@ export class PerfilPlataformaDto {
   consultadoEm!: string;
 }
 
+class NoCheckpointDto {
+  @ApiProperty() ligados!: number;
+  @ApiProperty() naBiblioteca!: number;
+}
+
+export class ResumoContaPlataformaDto {
+  @ApiProperty({ enum: PROVEDORES }) provedor!: Provedor;
+  @ApiProperty() nomeExibicao!: string;
+  @ApiPropertyOptional({ nullable: true, type: String }) avatarUrl!: string | null;
+  @ApiPropertyOptional({ nullable: true, type: String }) perfilUrl!: string | null;
+  @ApiPropertyOptional({ nullable: true, type: Number, description: 'O ano de criação da conta' })
+  membroDesde!: number | null;
+  @ApiPropertyOptional({ nullable: true, enum: ['online', 'offline', 'jogando'] })
+  status!: 'online' | 'offline' | 'jogando' | null;
+  @ApiPropertyOptional({ nullable: true, type: String }) jogandoAgora!: string | null;
+  @ApiProperty() totalJogos!: number;
+  @ApiProperty() minutosTotais!: number;
+  @ApiProperty({ description: 'Jogos com mais de 0 minutos' }) jogosJogados!: number;
+  @ApiProperty({ description: 'O backlog: jogos com 0 minutos' }) nuncaJogados!: number;
+  @ApiProperty({ type: [JogoMaisJogadoDto], description: 'Até 5' })
+  maisJogados!: JogoMaisJogadoDto[];
+  @ApiProperty({ type: NoCheckpointDto }) noCheckpoint!: NoCheckpointDto;
+  @ApiProperty({ type: ConquistasDoPerfilDto }) conquistas!: ConquistasDoPerfilDto;
+  @ApiProperty({ description: 'Quando a biblioteca foi consultada na plataforma (ISO 8601)' })
+  consultadoEm!: string;
+}
+
 class JogoParecidoDto {
   @ApiProperty() id!: string;
   @ApiProperty() titulo!: string;

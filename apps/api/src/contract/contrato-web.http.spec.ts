@@ -18,6 +18,7 @@ import {
   type ItemBiblioteca,
   type JogoParecido,
   type PerfilPlataforma,
+  type ResumoContaPlataforma,
   type SessaoAtiva,
   type Usuario,
 } from '@checkpoint/shared';
@@ -114,6 +115,28 @@ const PERFIL: Record<keyof PerfilPlataforma, Tipo> = {
   maisJogados: {
     lista: { idExterno: 'string', titulo: 'string', capaUrl: 'string?', minutosJogados: 'number' },
   },
+  conquistas: {
+    objeto: { desbloqueadas: 'number', total: 'number', jogosVinculados: 'number' },
+  },
+  consultadoEm: 'iso',
+};
+
+const RESUMO: Record<keyof ResumoContaPlataforma, Tipo> = {
+  provedor: 'string',
+  nomeExibicao: 'string',
+  avatarUrl: 'string?',
+  perfilUrl: 'string?',
+  membroDesde: 'number?',
+  status: 'string?',
+  jogandoAgora: 'string?',
+  totalJogos: 'number',
+  minutosTotais: 'number',
+  jogosJogados: 'number',
+  nuncaJogados: 'number',
+  maisJogados: {
+    lista: { idExterno: 'string', titulo: 'string', capaUrl: 'string?', minutosJogados: 'number' },
+  },
+  noCheckpoint: { objeto: { ligados: 'number', naBiblioteca: 'number' } },
   conquistas: {
     objeto: { desbloqueadas: 'number', total: 'number', jogosVinculados: 'number' },
   },
@@ -322,6 +345,10 @@ describe('contrato: /integracoes (ContaVinculada, PerfilPlataforma, ItemBibliote
       const perfil = await pedir('/integracoes/steam/perfil');
       expect(perfil.status).toBe(200);
       expect(conforme(perfil.corpo, PERFIL)).toEqual([]);
+
+      const resumo = await pedir('/integracoes/steam/resumo');
+      expect(resumo.status).toBe(200);
+      expect(conforme(resumo.corpo, RESUMO)).toEqual([]);
 
       const biblioteca = await pedir('/integracoes/steam/biblioteca');
       expect(biblioteca.status).toBe(200);

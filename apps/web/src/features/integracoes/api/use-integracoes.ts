@@ -2,52 +2,58 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   type DetalheJogoPlataforma,
   type Game,
-  type PerfilPlataforma,
+  type ResumoContaPlataforma,
   type Provedor,
   type VincularJogoRequest,
 } from '@checkpoint/shared';
 import { GAMES_QUERY_KEY } from '@/features/games/api/use-games';
 import { comDadosAtualizados } from '../lib/conquistas';
+import { PROVEDOR_STEAM } from '../lib/provedores';
 import { integracoesApi } from './integracoes-api';
 
 /** As contas vinculadas. O logout local limpa o `queryClient` inteiro, estas chaves junto. */
 export const CONTAS_QUERY_KEY = ['integracoes', 'contas'] as const;
-export const perfilQueryKey = (provedor: Provedor) => ['integracoes', 'perfil', provedor] as const;
+export const resumoQueryKey = (provedor: Provedor) => ['integracoes', 'resumo', provedor] as const;
 
 export function useContas() {
   return useQuery({ queryKey: CONTAS_QUERY_KEY, queryFn: () => integracoesApi.listarContas() });
 }
 
 /**
- * O cartão do perfil, só depois de saber que há conta vinculada (`enabled`). Sem _retry_: 409 (privado) e 502
+ * O resumo da conta (o popup da plataforma), só depois de saber que há conta vinculada (`enabled`). Sem _retry_: 409 (privado) e 502
  * são respostas que a pessoa resolve com "Tentar de novo", não falhas passageiras para repetir sozinho.
  */
-export function usePerfilPlataforma(provedor: Provedor, enabled: boolean) {
+export function useResumoPlataforma(provedor: Provedor, enabled: boolean) {
   return useQuery({
-    queryKey: perfilQueryKey(provedor),
-    queryFn: () => integracoesApi.perfil(provedor),
+    queryKey: resumoQueryKey(provedor),
+    queryFn: () => integracoesApi.resumo(provedor),
     enabled,
     retry: false,
   });
 }
 
 /** Há conta Steam vinculada? `undefined` enquanto carrega ou se a consulta falhou (a tela some com o atalho). */
-export function useTemContaSteam(): boolean | undefined {
+export function useTemConta(provedor: Provedor): boolean | undefined {
   const contas = useContas();
-  return contas.data?.some((conta) => conta.provedor === 'STEAM');
+  return contas.data?.some((conta) => conta.provedor === provedor);
+}
+
+/** O atalho das telas que só falam com a Steam (ver `lib/provedores.ts`). */
+export function useTemContaSteam(): boolean | undefined {
+  return useTemConta(PROVEDOR_STEAM);
 }
 
 export function useIniciarVinculo(provedor: Provedor) {
   return useMutation({ mutationFn: () => integracoesApi.iniciarVinculo(provedor) });
 }
 
-/** O "Atualizar" do cartão: o resultado entra direto no cache do perfil. */
-export function useAtualizarPerfil(provedor: Provedor) {
+/** O "Atualizar" do popup: o resultado entra direto no cache do resumo. */
+export function useAtualizarResumo(provedor: Provedor) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () => integracoesApi.atualizarPerfil(provedor),
-    onSuccess: (perfil: PerfilPlataforma) => {
-      queryClient.setQueryData(perfilQueryKey(provedor), perfil);
+    mutationFn: () => integracoesApi.atualizarResumo(provedor),
+    onSuccess: (resumo: ResumoContaPlataforma) => {
+      queryClient.setQueryData(resumoQueryKey(provedor), resumo);
     },
   });
 }
@@ -58,23 +64,33 @@ export function useDesvincular(provedor: Provedor) {
   return useMutation({
     mutationFn: () => integracoesApi.desvincular(provedor),
     onSuccess: () => {
-      queryClient.removeQueries({ queryKey: perfilQueryKey(provedor) });
+      queryClient.removeQueries({ queryKey: resumoQueryKey(provedor) });
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: CONTAS_QUERY_KEY }),
   });
 }
 
-export const bibliotecaQueryKey = (provedor: Provedor, busca: string) =>
-  ['integracoes', 'biblioteca', provedor, busca] as const;
+export const bibliotecaQueryKey = (provedor: Provedor, busca: string, soNuncaJogados = false) =>
+  soNuncaJogados
+    ? (['integracoes', 'biblioteca', provedor, busca, 'nunca-jogados'] as const)
+    : (['integracoes', 'biblioteca', provedor, busca] as const);
 
 /**
  * A biblioteca para escolher o jogo a ligar. Sem _retry_ (409 privado e 502 têm o "Tentar de novo" da tela) e sem
  * dado antigo: o servidor guarda 10 min de cache, então buscar de novo ao abrir é barato e mostra os vínculos atuais.
  */
-export function useBiblioteca(provedor: Provedor, busca: string, enabled: boolean) {
+export function useBiblioteca(
+  provedor: Provedor,
+  busca: string,
+  enabled: boolean,
+  soNuncaJogados = false,
+) {
   return useQuery({
-    queryKey: bibliotecaQueryKey(provedor, busca),
-    queryFn: () => integracoesApi.biblioteca(provedor, busca),
+    queryKey: bibliotecaQueryKey(provedor, busca, soNuncaJogados),
+    queryFn: () =>
+      soNuncaJogados
+        ? integracoesApi.biblioteca(provedor, busca, { nuncaJogados: true })
+        : integracoesApi.biblioteca(provedor, busca),
     enabled,
     retry: false,
     gcTime: 0,
@@ -92,7 +108,7 @@ export function useVincularJogo(provedor: Provedor) {
       }),
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: GAMES_QUERY_KEY });
-      void queryClient.invalidateQueries({ queryKey: perfilQueryKey(provedor) });
+      void queryClient.invalidateQueries({ queryKey: resumoQueryKey(provedor) });
     },
   });
 }
@@ -145,7 +161,7 @@ export function useDesvincularJogo(provedor: Provedor) {
     },
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: GAMES_QUERY_KEY });
-      void queryClient.invalidateQueries({ queryKey: perfilQueryKey(provedor) });
+      void queryClient.invalidateQueries({ queryKey: resumoQueryKey(provedor) });
     },
   });
 }

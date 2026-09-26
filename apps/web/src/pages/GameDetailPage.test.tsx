@@ -395,12 +395,15 @@ describe('layout e acessibilidade (CA-30)', () => {
     expect(article).toHaveClass('lg:grid', 'lg:grid-cols-[300px_minmax(0,1fr)]');
   });
 
-  it('a página tem um único h1 (o título) e "Avaliação" e "Descrição" são h2', async () => {
+  it('a página tem um único h1 (o título), a seção "Avaliação e descrição" é h2 e "Avaliação" e "Descrição" são h3', async () => {
     renderAt();
     await screen.findByRole('heading', { level: 1, name: 'Celeste' });
 
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
     expect(screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)).toEqual([
+      'Avaliação e descrição',
+    ]);
+    expect(screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual([
       'Avaliação',
       'Descrição',
     ]);
@@ -486,10 +489,10 @@ describe('bloco Steam na página do jogo (spec integracao-plataformas, etapa 4)'
     renderAt();
 
     const bloco = (await screen.findByRole('heading', { level: 2, name: 'Steam' })).closest(
-      'section',
+      'details',
     );
     expect(bloco).not.toBeNull();
-    expect(within(bloco as HTMLElement).getByText('42 h 30 min')).toBeInTheDocument();
+    expect(within(bloco as HTMLElement).getAllByText(/42 h 30 min/).length).toBeGreaterThan(0);
     expect(integracoesApi.detalheDoJogo).toHaveBeenCalledWith('STEAM', 'g1');
   });
 

@@ -5,7 +5,7 @@ import { usePrefs } from '@/shared/hooks/use-prefs';
 import { UNEXPECTED_MESSAGE } from '@/features/auth/lib/auth-errors';
 import { avisoDoPerfil } from '@/features/auth/lib/perfil-avisos';
 import { useAuth } from '@/features/auth/session/use-auth';
-import { ContasVinculadas } from '@/features/integracoes/components/ContasVinculadas';
+import { PlataformasDoPerfil } from '@/features/integracoes/components/PlataformasDoPerfil';
 import {
   avisoDoRetorno,
   semParametrosDoRetorno,
@@ -121,7 +121,7 @@ export function PerfilPage() {
         </ListaDeLinhas>
         {aviso && <FieldError id="perfil-aviso" message={aviso} />}
 
-        <ContasVinculadas />
+        <PlataformasDoPerfil />
 
         <ListaDeLinhas rotulo="Preferências">
           <LinhaBotao

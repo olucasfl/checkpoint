@@ -24,6 +24,12 @@ export interface SteamPerfil {
   nome: string;
   avatarUrl: string | null;
   perfilUrl: string | null;
+  /** `timecreated` (segundos desde 1970). Só vem com o perfil público; SEM fixture real (CA-63). */
+  criadoEmUnix?: number | null;
+  /** `personastate`: 0 offline, 1 online, 2 a 6 (ocupado, ausente, soneca, quer trocar, quer jogar). */
+  estado?: number | null;
+  /** `gameextrainfo`: o jogo em andamento (só aparece quando a pessoa está jogando). */
+  jogandoAgora?: string | null;
 }
 
 export interface SteamJogoDaBiblioteca {
@@ -134,6 +140,12 @@ export class SteamClient {
       nome: textOrNull(player.personaname) ?? '',
       avatarUrl: textOrNull(player.avatarfull),
       perfilUrl: textOrNull(player.profileurl),
+      criadoEmUnix:
+        typeof player.timecreated === 'number' && player.timecreated > 0
+          ? player.timecreated
+          : null,
+      estado: typeof player.personastate === 'number' ? player.personastate : null,
+      jogandoAgora: textOrNull(player.gameextrainfo),
     };
   }
 

@@ -4,13 +4,15 @@ import { FieldError, LABEL, inputClass } from '@/shared/components/form-parts';
 import { ModalDialog } from '@/shared/components/ModalDialog';
 import { describeAuthError } from '@/features/auth/lib/auth-errors';
 import { useGames } from '@/features/games/api/use-games';
+import { PlataformaMarca } from '@/shared/components/PlataformaMarca';
+import { PROVEDOR_STEAM } from '../lib/provedores';
 import { useBiblioteca, useVincularJogo } from '../api/use-integracoes';
 import { jogoAtualDoErro, precisaConfirmarPlataforma } from '../lib/biblioteca';
 import { classificarFalhaDoCartao } from '../lib/estado-do-cartao';
 import { horasCurtas } from '../lib/format';
 import { avisar } from '@/shared/lib/avisos';
 
-const PROVEDOR = 'STEAM' as const;
+const PROVEDOR = PROVEDOR_STEAM;
 const BUSCA_ATRASO_MS = 300;
 
 const BOTAO =
@@ -29,6 +31,8 @@ interface AlvoDoVinculo {
 }
 
 interface BibliotecaSteamDialogProps {
+  /** O backlog: só os itens nunca abertos (0 minutos). */
+  soNuncaJogados?: boolean;
   open: boolean;
   modo: ModoBiblioteca;
   onClose: () => void;
@@ -312,6 +316,7 @@ function Conteudo({
   onClose,
   onCriar,
   onVinculado,
+  soNuncaJogados = false,
 }: Omit<BibliotecaSteamDialogProps, 'open'>) {
   const [busca, setBusca] = useState('');
   const [buscaAplicada, setBuscaAplicada] = useState('');
@@ -320,7 +325,7 @@ function Conteudo({
   );
   const [conflito, setConflito] = useState<Conflito | null>(null);
   const [erro, setErro] = useState('');
-  const biblioteca = useBiblioteca(PROVEDOR, buscaAplicada, true);
+  const biblioteca = useBiblioteca(PROVEDOR, buscaAplicada, true, soNuncaJogados);
   const vincular = useVincularJogo(PROVEDOR);
 
   // O debounce evita uma consulta por tecla: a busca só vai à API 300 ms depois de a pessoa parar de digitar.
@@ -366,14 +371,17 @@ function Conteudo({
         <div className="flex min-w-0 flex-col gap-1">
           <h2
             id="biblioteca-steam-titulo"
-            className="m-0 font-display text-xl font-extrabold tracking-[-0.01em] text-destaque"
+            className="m-0 flex items-center gap-2 font-display text-xl font-extrabold tracking-[-0.01em] text-destaque"
           >
+            <PlataformaMarca provedor={PROVEDOR} variante="marcador" tamanho="g" decorativa />
             {titulo}
           </h2>
           <p className="m-0 text-[16px] text-texto-suave">
-            {modo.tipo === 'novo'
-              ? 'Escolha um jogo da sua biblioteca para criar ou ligar a um jogo seu.'
-              : `Escolha o jogo da Steam que é «${modo.jogo.titulo}».`}
+            {soNuncaJogados
+              ? 'Só os jogos que você nunca abriu. Escolha um para criar ou ligar a um jogo seu.'
+              : modo.tipo === 'novo'
+                ? 'Escolha um jogo da sua biblioteca para criar ou ligar a um jogo seu.'
+                : `Escolha o jogo da Steam que é «${modo.jogo.titulo}».`}
           </p>
         </div>
         <button type="button" onClick={onClose} className={`${BOTAO_CONTORNO} shrink-0`}>
@@ -458,7 +466,9 @@ function Conteudo({
             <p className="m-0 text-[16px] text-texto-suave">
               {buscaAplicada
                 ? `Nenhum jogo encontrado para «${buscaAplicada}».`
-                : 'Sua biblioteca da Steam está vazia.'}
+                : soNuncaJogados
+                  ? 'Você não tem jogos nunca abertos na Steam.'
+                  : 'Sua biblioteca da Steam está vazia.'}
             </p>
           )}
           {itens.length > 0 && (

@@ -261,3 +261,39 @@ describe('GameForm — buscar na Steam (jogo novo)', () => {
     expect(onDone).not.toHaveBeenCalled();
   });
 });
+
+describe('GameForm — jogo novo já ligado a um item (itemInicial, "Ver e importar" do popup)', () => {
+  function renderComItem(over: Partial<ItemBiblioteca> = {}) {
+    const onDone = vi.fn();
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+    render(
+      <QueryClientProvider client={client}>
+        <GameForm onDone={onDone} onCancel={vi.fn()} itemInicial={item(over)} />
+      </QueryClientProvider>,
+    );
+    return { onDone, user: userEvent.setup({ applyAccept: false }) };
+  }
+
+  it('já nasce com título, PC e status pelas horas, e o cartão "Ligado à Steam"', async () => {
+    renderComItem();
+
+    expect(await screen.findByText(/Ligado à Steam: «Jogo Sintetico»/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Título/)).toHaveValue('Jogo Sintetico');
+  });
+
+  it('Salvar cria o jogo e SÓ DEPOIS liga o item; nunca sugere "Zerado" (0 minutos = Quero jogar)', async () => {
+    games.create.mockResolvedValue(criado());
+    const { user, onDone } = renderComItem({ minutosJogados: 0 });
+    await screen.findByText(/Ligado à Steam/);
+
+    await user.click(salvar());
+
+    await waitFor(() => expect(onDone).toHaveBeenCalled());
+    expect(games.create).toHaveBeenCalledWith(
+      expect.objectContaining({ plataforma: 'PC', status: 'QUERO_JOGAR' }),
+    );
+    expect(integ.vincularJogo).toHaveBeenCalledWith('STEAM', 'novo1', { idExterno: '100' });
+  });
+});

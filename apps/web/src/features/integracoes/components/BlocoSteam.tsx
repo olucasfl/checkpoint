@@ -5,9 +5,13 @@ import {
   type Conquista,
   type DadosJogoPlataforma,
   type Game,
+  PROVEDOR_SLUG,
 } from '@checkpoint/shared';
 import { FieldError } from '@/shared/components/form-parts';
 import { Icon } from '@/shared/components/Icon';
+import { PlataformaMarca } from '@/shared/components/PlataformaMarca';
+import { SecaoRecolhivel } from '@/shared/components/SecaoRecolhivel';
+import { useSecaoAberta } from '@/shared/hooks/use-secao-aberta';
 import { ModalDialog } from '@/shared/components/ModalDialog';
 import { describeAuthError } from '@/features/auth/lib/auth-errors';
 import { useAtualizarJogo, useDesvincularJogo, useDetalheJogo } from '../api/use-integracoes';
@@ -23,7 +27,8 @@ import { atualizadoHaTexto } from '../lib/tempo-relativo';
 import { avisar } from '@/shared/lib/avisos';
 import { chegouAos100, textoDoMarco } from '@/features/games/lib/marcos';
 
-const PROVEDOR = 'STEAM' as const;
+import { PROVEDOR_STEAM } from '../lib/provedores';
+const PROVEDOR = PROVEDOR_STEAM;
 
 const BOTAO =
   'min-h-11 min-w-11 rounded-full px-[18px] font-display text-[15px] disabled:cursor-wait disabled:opacity-60';
@@ -139,29 +144,56 @@ function ItemDeConquista({ conquista }: { conquista: Conquista }) {
   );
 }
 
+/** A linha da seção fechada: "42 h 30 min · 12/40 conquistas" (a conquista só com o número certo). */
+export function resumoDaLinha(dados: DadosJogoPlataforma, comConquistas: boolean): string {
+  const horas = horasEMinutos(dados.minutosJogados);
+  const { conquistasTotal: total, conquistasDesbloqueadas: ganhas } = dados;
+  if (!comConquistas || total === null || total <= 0 || ganhas === null) {
+    return horas;
+  }
+  return `${horas} · ${ganhas}/${total} conquistas`;
+}
+
 function ListaDeConquistas({
   titulo,
+  chave,
   icone,
   cor,
   conquistas,
-  aberta,
 }: {
   titulo: string;
+  /** A chave do estado guardado neste aparelho (por tipo de lista). */
+  chave: string;
   icone: string;
   cor: string;
   conquistas: Conquista[];
-  aberta: boolean;
 }) {
+  // As duas listas começam FECHADAS: a seta e o "Toque para ver" mostram que dá para abrir.
+  const [aberta, definir] = useSecaoAberta(chave, false);
   if (conquistas.length === 0) {
     return null;
   }
   return (
-    <details open={aberta} data-lista={titulo} className="flex min-w-0 flex-col gap-3">
-      <summary className="flex min-h-11 cursor-pointer items-center gap-2.5 font-display text-lg font-bold">
+    <details
+      open={aberta}
+      data-lista={titulo}
+      onToggle={(evento) => {
+        const agora = evento.currentTarget.open;
+        if (agora !== aberta) {
+          definir(agora);
+        }
+      }}
+      className="group/lista flex min-w-0 flex-col gap-3"
+    >
+      <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 font-display text-base font-bold sm:gap-2.5 sm:text-lg [&::-webkit-details-marker]:hidden">
         <Icon name={icone} size={22} filled className={cor} />
         {titulo}
         <span className="inline-flex h-[22px] items-center rounded-full bg-painel-3 px-2.5 text-[13px] font-bold text-texto-suave">
           {conquistas.length}
+        </span>
+        <span className="ml-auto flex shrink-0 items-center gap-0.5 font-corpo text-xs sm:gap-1 sm:text-[13px] font-semibold text-texto-suave">
+          {aberta ? 'Toque para fechar' : 'Toque para ver'}
+          <Icon name="expand_more" size={22} className="group-open/lista:rotate-180" />
         </span>
       </summary>
       <ul className="m-0 flex list-none flex-col gap-2.5 p-0">
@@ -286,30 +318,26 @@ export function BlocoSteam({ game }: { game: Game }) {
   }
 
   const atualizadoEm = atualizadoHaTexto(dados.atualizadoEm);
+  const slug = PROVEDOR_SLUG[PROVEDOR];
+  const resumo = resumoDaLinha(dados, mostrarBarra);
 
   return (
-    <section
-      aria-labelledby="detalhe-steam"
-      data-secao="steam"
-      className="flex min-w-0 flex-col gap-5 rounded-[22px] border border-borda bg-painel p-4 md:gap-[22px] md:px-7 md:py-6"
+    <SecaoRecolhivel
+      chave={`plataforma:${slug}`}
+      abertaPorPadrao
+      dataSecao="steam"
+      titulo={
+        // A logo oficial fica SOZINHA no título (regra da Valve): o resumo vai ao lado, em texto separado.
+        <h2 id="detalhe-steam" className="m-0">
+          <PlataformaMarca provedor={PROVEDOR} variante="logo" />
+        </h2>
+      }
+      resumo={resumo}
     >
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div
-            aria-hidden="true"
-            className="grid size-11 place-items-center rounded-xl bg-painel-3 text-status-jogando"
-          >
-            <Icon name="sports_esports" size={26} filled />
-          </div>
-          <div className="flex flex-col">
-            <h2 id="detalhe-steam" className="m-0 font-display text-xl font-extrabold">
-              Steam
-            </h2>
-            {atualizadoEm && (
-              <span className="text-[13px] font-medium text-texto-suave">{atualizadoEm}</span>
-            )}
-          </div>
-        </div>
+        {atualizadoEm && (
+          <span className="text-[13px] font-medium text-texto-suave">{atualizadoEm}</span>
+        )}
         <div className="flex flex-wrap gap-2.5">
           <button
             type="button"
@@ -381,15 +409,15 @@ export function BlocoSteam({ game }: { game: Game }) {
           titulo="Desbloqueadas"
           icone="check_circle"
           cor="text-status-zerado"
+          chave={`conquistas:${slug}:desbloqueadas`}
           conquistas={desbloqueadas}
-          aberta={false}
         />
         <ListaDeConquistas
           titulo="Faltam"
           icone="lock"
           cor="text-texto-suave"
+          chave={`conquistas:${slug}:faltam`}
           conquistas={faltam}
-          aberta
         />
       </div>
 
@@ -401,6 +429,6 @@ export function BlocoSteam({ game }: { game: Game }) {
         desvinculando={desvincular.isPending}
         erro={erroDesvincular}
       />
-    </section>
+    </SecaoRecolhivel>
   );
 }

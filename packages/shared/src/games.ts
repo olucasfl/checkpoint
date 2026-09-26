@@ -143,6 +143,7 @@ export type ApiErrorField =
   // Query da biblioteca de uma plataforma (spec integracao-plataformas): sem formulário, mas o erro aponta o campo.
   | 'busca'
   | 'limite'
+  | 'nuncaJogados'
   // Corpo do vínculo de jogo (spec integracao-plataformas).
   | 'idExterno'
   | 'mover';

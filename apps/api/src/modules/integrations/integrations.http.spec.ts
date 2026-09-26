@@ -123,6 +123,8 @@ describe('autenticação das rotas (CA-57)', () => {
     ['POST', '/integracoes/steam/vinculo'],
     ['DELETE', '/integracoes/steam'],
     ['GET', '/integracoes/steam/perfil'],
+    ['GET', '/integracoes/steam/resumo'],
+    ['POST', '/integracoes/steam/resumo/atualizacao'],
     ['GET', '/integracoes/steam/biblioteca'],
     ['PUT', '/integracoes/steam/jogos/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'],
     ['DELETE', '/integracoes/steam/jogos/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'],
@@ -1675,6 +1677,8 @@ describe('todas as rotas exigem token, menos o retorno (CA-57)', () => {
         'DELETE /integracoes/:provedor',
         'GET /integracoes/:provedor/perfil',
         'POST /integracoes/:provedor/perfil/atualizacao',
+        'GET /integracoes/:provedor/resumo',
+        'POST /integracoes/:provedor/resumo/atualizacao',
         'GET /integracoes/:provedor/biblioteca',
         'PUT /integracoes/:provedor/jogos/:jogoId',
         'GET /integracoes/:provedor/jogos/:jogoId',
@@ -1682,7 +1686,7 @@ describe('todas as rotas exigem token, menos o retorno (CA-57)', () => {
         'DELETE /integracoes/:provedor/jogos/:jogoId',
       ]),
     );
-    expect(moldes).toHaveLength(11);
+    expect(moldes).toHaveLength(13);
   });
 
   it('cada rota sem Authorization dá 401 AUTH_NAO_AUTENTICADO; só o retorno responde 302', async () => {
@@ -1794,5 +1798,129 @@ describe('nenhum log com segredo numa execução completa, com sucesso e com tod
     expect(logs).not.toContain('checkpoint_vinculo');
     expect(logs).not.toMatch(/key=|state=|openid\./i);
     expect(logs).not.toMatch(/https?:\/\/(steamcommunity|api\.steampowered|store\.steampowered)/i);
+  });
+});
+
+describe('GET /integracoes/:provedor/resumo e o backlog (spec plataformas-e-pagina-do-jogo, F4a)', () => {
+  async function vincular(userId: string): Promise<string> {
+    const token = await ctx.tokenFor(userId);
+    const ida = await iniciar(token);
+    await retornar(ida.state, ida.nonce);
+    return token;
+  }
+
+  it('sem token → 401; provedor desconhecido → 400 VALIDACAO; sem vínculo → 409 PLATAFORMA_NAO_VINCULADA', async () => {
+    expect((await pedir('GET', '/integracoes/steam/resumo')).status).toBe(401);
+    expect((await pedir('POST', '/integracoes/steam/resumo/atualizacao')).status).toBe(401);
+
+    const token = await ctx.tokenFor(ANA_ID);
+    const xbox = await pedir('GET', '/integracoes/xbox/resumo', token);
+    expect(xbox.status).toBe(400);
+    expect(await json(xbox)).toMatchObject({ code: 'VALIDACAO' });
+
+    const semVinculo = await pedir('GET', '/integracoes/steam/resumo', token);
+    expect(semVinculo.status).toBe(409);
+    expect(await json(semVinculo)).toMatchObject({ code: 'PLATAFORMA_NAO_VINCULADA' });
+  });
+
+  it('o resumo: totais, jogados, backlog, top, ligação com o catálogo e conquistas; sem userId; sem chamada nova à Steam', async () => {
+    const token = await vincular(ANA_ID);
+    ctx.db.jogos.push({
+      id: 'j1',
+      userId: ANA_ID,
+      provedor: 'STEAM',
+      idExterno: '1',
+      conquistasTotal: 40,
+      conquistasDesbloqueadas: 12,
+    });
+    const perfilAntes = ctx.client.obterPerfil.mock.calls.length;
+    const jogosAntes = ctx.client.listarJogos.mock.calls.length;
+
+    const response = await pedir('GET', '/integracoes/steam/resumo', token);
+    const corpo = await json(response);
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(corpo).toMatchObject({
+      provedor: 'STEAM',
+      nomeExibicao: 'Jogador Sintetico',
+      totalJogos: 3,
+      minutosTotais: 1800,
+      noCheckpoint: { ligados: 1, naBiblioteca: 3 },
+      conquistas: { desbloqueadas: 12, total: 40, jogosVinculados: 1 },
+    });
+    expect(Object.keys(corpo ?? {}).sort()).toEqual(
+      [
+        'avatarUrl',
+        'conquistas',
+        'consultadoEm',
+        'jogandoAgora',
+        'jogosJogados',
+        'maisJogados',
+        'membroDesde',
+        'minutosTotais',
+        'noCheckpoint',
+        'nomeExibicao',
+        'nuncaJogados',
+        'perfilUrl',
+        'provedor',
+        'status',
+        'totalJogos',
+      ].sort(),
+    );
+    expect((corpo?.jogosJogados as number) + (corpo?.nuncaJogados as number)).toBe(3);
+    expect(JSON.stringify(corpo)).not.toContain(ANA_ID);
+    // A frio: as mesmas duas chamadas (perfil e biblioteca) que o cartão já fazia; nenhuma a mais.
+    expect(ctx.client.obterPerfil.mock.calls.length - perfilAntes).toBeLessThanOrEqual(1);
+    expect(ctx.client.listarJogos.mock.calls.length - jogosAntes).toBeLessThanOrEqual(1);
+
+    // A quente: zero.
+    const perfilDepois = ctx.client.obterPerfil.mock.calls.length;
+    const jogosDepois = ctx.client.listarJogos.mock.calls.length;
+    await pedir('GET', '/integracoes/steam/resumo', token);
+    await pedir('GET', '/integracoes/steam/perfil', token);
+    expect(ctx.client.obterPerfil.mock.calls.length).toBe(perfilDepois);
+    expect(ctx.client.listarJogos.mock.calls.length).toBe(jogosDepois);
+  });
+
+  it('atualizar duas vezes em menos de 30 s: a 2ª devolve o que já tem, sem chamar a Steam', async () => {
+    const token = await vincular(ANA_ID);
+    const a = await json(await pedir('POST', '/integracoes/steam/resumo/atualizacao', token));
+    const chamadas = ctx.client.listarJogos.mock.calls.length;
+
+    const respostaB = await pedir('POST', '/integracoes/steam/resumo/atualizacao', token);
+
+    expect(respostaB.status).toBe(200);
+    expect((await json(respostaB))?.consultadoEm).toBe(a?.consultadoEm);
+    expect(ctx.client.listarJogos.mock.calls.length).toBe(chamadas);
+  });
+
+  it('perfil privado → 409 PLATAFORMA_PERFIL_PRIVADO; Steam fora do ar → 502 PLATAFORMA_INDISPONIVEL sem SteamID no corpo', async () => {
+    const token = await vincular(ANA_ID);
+    ctx.client.obterPerfil.mockResolvedValue({ ...perfilPublico, visibilidade: 1 });
+    const privado = await pedir('POST', '/integracoes/steam/resumo/atualizacao', token);
+    expect(privado.status).toBe(409);
+    expect(await json(privado)).toMatchObject({ code: 'PLATAFORMA_PERFIL_PRIVADO' });
+  });
+
+  it('GET biblioteca?nuncaJogados=true: só os itens com 0 minutos; valor que não é true nem false → 400', async () => {
+    const token = await vincular(ANA_ID);
+    ctx.client.listarJogos.mockResolvedValue({
+      privada: false,
+      total: 2,
+      jogos: [
+        { appid: '1', nome: 'Jogado', minutosJogados: 90, ultimaVezJogadoEm: null },
+        { appid: '2', nome: 'Nunca aberto', minutosJogados: 0, ultimaVezJogadoEm: null },
+      ],
+    });
+
+    const backlog = await pedir('GET', '/integracoes/steam/biblioteca?nuncaJogados=true', token);
+    expect(backlog.status).toBe(200);
+    const itens = (await backlog.json()) as { titulo: string }[];
+    expect(itens.map((i) => i.titulo)).toEqual(['Nunca aberto']);
+
+    const ruim = await pedir('GET', '/integracoes/steam/biblioteca?nuncaJogados=talvez', token);
+    expect(ruim.status).toBe(400);
+    expect(await json(ruim)).toMatchObject({ code: 'VALIDACAO' });
   });
 });

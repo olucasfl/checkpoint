@@ -13,6 +13,8 @@ import { Icon } from '@/shared/components/Icon';
 import { usePrefs } from '@/shared/hooks/use-prefs';
 import { describeAuthError } from '@/features/auth/lib/auth-errors';
 import { useTemContaSteam, useVincularJogo } from '@/features/integracoes/api/use-integracoes';
+import { PROVEDOR_STEAM } from '@/features/integracoes/lib/provedores';
+import { PlataformaMarca } from '@/shared/components/PlataformaMarca';
 import { BibliotecaSteamDialog } from '@/features/integracoes/components/BibliotecaSteamDialog';
 import { horasEMinutos } from '@/features/integracoes/lib/conquistas';
 import {
@@ -56,6 +58,8 @@ interface GameFormProps {
   onLinkedExisting?: (jogoId: string) => void;
   /** Jogo novo aberto pelo "Adicionar" de uma prateleira: começa com o status dela. Sem isso, o padrão. */
   statusInicial?: GameStatus;
+  /** Jogo NOVO que já nasce ligado a um item da Steam ("Ver e importar" do popup): título, plataforma e status vêm dele. */
+  itemInicial?: ItemBiblioteca;
 }
 
 const NO_ERROR: FormError = { message: '', fields: {} };
@@ -74,23 +78,33 @@ export function GameForm({
   onCancel,
   onLinkedExisting,
   statusInicial,
+  itemInicial,
 }: GameFormProps) {
   const [saved, setSaved] = useState<Game | undefined>(game);
   const [values, setValues] = useState<GameFormValues>(
     game
       ? valuesFromGame(game)
-      : { ...EMPTY_FORM_VALUES, status: statusInicial ?? EMPTY_FORM_VALUES.status },
+      : itemInicial
+        ? {
+            ...EMPTY_FORM_VALUES,
+            titulo: tituloDoItem(itemInicial.titulo),
+            plataforma: PLATAFORMA_PADRAO,
+            status: statusSugerido(itemInicial.minutosJogados),
+          }
+        : { ...EMPTY_FORM_VALUES, status: statusInicial ?? EMPTY_FORM_VALUES.status },
   );
   const [file, setFile] = useState<File | null>(null);
   const [removing, setRemoving] = useState(false);
   const [error, setError] = useState<FormError>(NO_ERROR);
   const mutation = useSaveGame();
-  const vincular = useVincularJogo('STEAM');
+  const vincular = useVincularJogo(PROVEDOR_STEAM);
   const temContaSteam = useTemContaSteam();
   const noRouter = useInRouterContext();
   // O item da Steam escolhido em "Buscar na Steam" (só jogo novo). O vínculo só é gravado DEPOIS de o jogo ser
   // criado; a capa oficial dele é só prévia (o arquivo de capa continua sendo escolha da pessoa).
-  const [ligacao, setLigacao] = useState<ItemBiblioteca | null>(null);
+  const [ligacao, setLigacao] = useState<ItemBiblioteca | null>(
+    game ? null : (itemInicial ?? null),
+  );
   const [ligado, setLigado] = useState(false);
   const [erroLigacao, setErroLigacao] = useState('');
   const [buscando, setBuscando] = useState(false);
@@ -271,7 +285,13 @@ export function GameForm({
               )}
               <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <span className="flex items-start gap-1.5 text-[15px] font-bold [overflow-wrap:anywhere]">
-                  <Icon name="link" size={18} className="mt-0.5 shrink-0 text-status-jogando" />
+                  <PlataformaMarca
+                    provedor={PROVEDOR_STEAM}
+                    variante="marcador"
+                    tamanho="m"
+                    decorativa
+                    className="mt-0.5 shrink-0"
+                  />
                   Ligado à Steam: «{ligacao.titulo}»
                 </span>
                 <span className="text-[13px] font-medium text-texto-suave">
@@ -300,7 +320,12 @@ export function GameForm({
               onClick={() => setBuscando(true)}
               className="flex h-[52px] items-center justify-center gap-2 rounded-xl border-2 border-dashed border-destaque bg-destaque/10 px-4 font-display text-[15px] font-bold text-destaque transition-colors hover:bg-destaque/20"
             >
-              <Icon name="search" size={22} />
+              <PlataformaMarca
+                provedor={PROVEDOR_STEAM}
+                variante="marcador"
+                tamanho="m"
+                decorativa
+              />
               Buscar na Steam
             </button>
           )}

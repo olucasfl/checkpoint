@@ -1,9 +1,11 @@
 import { type ReactNode } from 'react';
 import { GAME_RATING_CRITERIA, type Game } from '@checkpoint/shared';
 import { Icon } from '@/shared/components/Icon';
-import { BlocoSteam } from '@/features/integracoes/components/BlocoSteam';
+import { SecaoRecolhivel } from '@/shared/components/SecaoRecolhivel';
+import { SecoesDasPlataformas } from '@/features/integracoes/components/SecoesDasPlataformas';
 import { capasDoJogo } from '@/features/integracoes/lib/capa';
 import { nomeDaPlataforma } from '../lib/estante';
+import { resumoDaAvaliacao } from '../lib/resumo-avaliacao';
 import { platformIcon } from '../lib/status-meta';
 import { AnelDeNota } from './AnelDeNota';
 import { BarraDeCriterio } from './BarraDeCriterio';
@@ -23,7 +25,7 @@ const TITULO_SECAO = 'm-0 font-display text-lg font-bold';
 
 /**
  * O corpo da página `/jogos/:id`, separado da página para ela cuidar só de carregar, editar e excluir. Em >= 1024 px a
- * capa em pé (300 × 400) fica ao lado do resto; abaixo disso a coluna é única. O bloco Steam (só com vínculo) vem por último.
+ * capa em pé (300 × 400) fica ao lado do resto; abaixo disso a coluna é única. As seções das plataformas ligadas vêm por último.
  *
  * A descrição é texto digitado por quem usa o app, então entra como TEXTO: o React a escapa (um `<b>` ou
  * `<script>` aparece literal) e `whitespace-pre-line` preserva as quebras de linha, que é tudo o que a
@@ -101,60 +103,75 @@ export function GameDetail({ game, onEdit, onRemove, acoesExtras }: GameDetailPr
             </button>
           </div>
 
-          <section
-            aria-labelledby="detalhe-criterios"
-            data-secao="criterios"
-            className="flex flex-col gap-3.5 rounded-[18px] border border-borda bg-painel px-4 py-5 md:px-6"
+          <SecaoRecolhivel
+            chave="avaliacao"
+            abertaPorPadrao
+            dataSecao="avaliacao"
+            titulo={
+              <h2 id="detalhe-avaliacao" className={TITULO_SECAO}>
+                Avaliação e descrição
+              </h2>
+            }
+            resumo={resumoDaAvaliacao(game)}
           >
-            <h2 id="detalhe-criterios" className={TITULO_SECAO}>
-              Avaliação
-            </h2>
-            <ul aria-label="Notas por critério" className="m-0 flex list-none flex-col gap-3.5 p-0">
-              {GAME_RATING_CRITERIA.map((criterio) => (
-                <li
-                  key={criterio.chave}
-                  data-criterio={criterio.chave}
-                  className="grid grid-cols-[minmax(0,1fr)_52px] items-center gap-x-4 gap-y-1.5 sm:grid-cols-[170px_minmax(0,1fr)_52px]"
-                >
-                  <div className="flex min-w-0 flex-col max-sm:col-span-2">
-                    <span className="text-[15px] font-bold">{criterio.rotulo}</span>
-                    <span className="text-xs font-medium text-texto-suave">
-                      {criterio.descricao}
-                    </span>
-                  </div>
-                  <BarraDeCriterio nota={game.notas[criterio.chave]} rotulo={criterio.rotulo} />
-                </li>
-              ))}
-            </ul>
-          </section>
-
-          <section
-            aria-labelledby="detalhe-descricao"
-            data-secao="descricao"
-            className="flex flex-col gap-1.5"
-          >
-            <h2 id="detalhe-descricao" className={TITULO_SECAO}>
-              Descrição
-            </h2>
-            {game.descricao !== null ? (
-              <p className="m-0 whitespace-pre-line text-base font-medium leading-normal [overflow-wrap:anywhere]">
-                {game.descricao}
-              </p>
-            ) : (
-              <button
-                type="button"
-                onClick={onEdit}
-                className="flex min-h-11 items-center gap-2 self-start rounded-xl px-1 text-base font-semibold text-texto-suave underline underline-offset-4 hover:text-destaque"
+            <section
+              aria-labelledby="detalhe-criterios"
+              data-secao="criterios"
+              className="flex flex-col gap-3.5"
+            >
+              <h3 id="detalhe-criterios" className={TITULO_SECAO}>
+                Avaliação
+              </h3>
+              <ul
+                aria-label="Notas por critério"
+                className="m-0 flex list-none flex-col gap-3.5 p-0"
               >
-                <Icon name="add" size={20} />
-                Adicionar descrição
-              </button>
-            )}
-          </section>
+                {GAME_RATING_CRITERIA.map((criterio) => (
+                  <li
+                    key={criterio.chave}
+                    data-criterio={criterio.chave}
+                    className="grid grid-cols-[minmax(0,1fr)_52px] items-center gap-x-4 gap-y-1.5 sm:grid-cols-[170px_minmax(0,1fr)_52px]"
+                  >
+                    <div className="flex min-w-0 flex-col max-sm:col-span-2">
+                      <span className="text-[15px] font-bold">{criterio.rotulo}</span>
+                      <span className="text-xs font-medium text-texto-suave">
+                        {criterio.descricao}
+                      </span>
+                    </div>
+                    <BarraDeCriterio nota={game.notas[criterio.chave]} rotulo={criterio.rotulo} />
+                  </li>
+                ))}
+              </ul>
+            </section>
+
+            <section
+              aria-labelledby="detalhe-descricao"
+              data-secao="descricao"
+              className="flex flex-col gap-1.5"
+            >
+              <h3 id="detalhe-descricao" className={TITULO_SECAO}>
+                Descrição
+              </h3>
+              {game.descricao !== null ? (
+                <p className="m-0 whitespace-pre-line text-base font-medium leading-normal [overflow-wrap:anywhere]">
+                  {game.descricao}
+                </p>
+              ) : (
+                <button
+                  type="button"
+                  onClick={onEdit}
+                  className="flex min-h-11 items-center gap-2 self-start rounded-xl px-1 text-base font-semibold text-texto-suave underline underline-offset-4 hover:text-destaque"
+                >
+                  <Icon name="add" size={20} />
+                  Adicionar descrição
+                </button>
+              )}
+            </section>
+          </SecaoRecolhivel>
         </div>
       </article>
 
-      {game.dadosPlataforma.length > 0 && <BlocoSteam game={game} />}
+      <SecoesDasPlataformas game={game} />
     </div>
   );
 }
