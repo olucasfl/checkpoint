@@ -6,3 +6,5 @@ package-lock.json
 apps/api/prisma/migrations
 # Referência visual versionada byte a byte (spec troca-de-design-estante): o hook não a reformata.
 docs/design
+# Scripts de conferência no navegador (não fazem parte do build nem dos testes).
+docs/verificacao-navegador/*.js

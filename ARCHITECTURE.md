@@ -520,7 +520,10 @@ Registre o módulo novo em `app.module.ts` (`imports: [...]`).
 
 ### 5.1 Composição da aplicação
 
-- `src/main.tsx` monta `<AppProviders><AppRouter/></AppProviders>`.
+- `src/main.tsx` monta `<ErrorBoundary><AppProviders><AppRouter/></AppProviders></ErrorBoundary>`. O **`ErrorBoundary`** (`shared/components/`) é a rede
+  contra erro de RENDER: sem ele, uma exceção em qualquer componente desmonta o app inteiro (página em branco, nenhum clique responde). Ele
+  também envolve o conteúdo do `AppFrame` (§5.6) com `resetKey` = rota, então a tela quebrada mostra o erro de verdade (para colar num relato),
+  "Tentar de novo" e "Ir para o catálogo", a navegação continua viva e trocar de rota escapa do erro. Não pega erro de evento nem de requisição.
 - `src/app/providers.tsx` — ponto único para providers globais: `QueryClientProvider`
   (`shared/lib/query-client.ts`) e o `AuthProvider` (§5.10); tema etc. entram aqui quando existirem.
 - `src/app/routes.tsx` — a lista de rotas (à parte do roteador para os testes usarem um roteador em
@@ -965,6 +968,21 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
   mockada).
 
 ---
+
+### Contrato web ↔ API (testes)
+
+O `@checkpoint/shared` é o contrato; três testes impedem que a API, o web e os mocks divirjam **em silêncio**:
+
+- `apps/api/src/contract/contrato-web.http.spec.ts`: sobe os controllers de verdade (guard, pipe, serialização) e confere que o CORPO REAL de
+  `GET/POST /games`, `/integracoes` (contas, perfil, biblioteca), `/auth` (registro, login, refresh, me, sessões) e `/users/me` tem
+  **exatamente** a forma dos tipos do shared (`Record<keyof T, Tipo>`: uma chave nova no shared não compila até o mapa acompanhar; campo a mais,
+  a menos, `null` indevido, data fora de ISO e `id` que não é UUID falham). Não cobre o detalhe da plataforma (`DetalheJogoPlataforma`, com as
+  conquistas): não há spec HTTP dele, só o de service.
+- `apps/api/src/contract/payloads-do-web.spec.ts`: os corpos e queries que o web envia passam pelo MESMO `ValidationPipe` do `main.ts`
+  (`whitelist` + `forbidNonWhitelisted`), com um controle que prova que ele recusa campo a mais.
+- `apps/web/src/test/api-fixtures.test.ts`: os corpos sintéticos que os testes e o mock do navegador usam (`test/api-fixtures.ts`) têm a mesma
+  forma (mapas em espelho, `test/contrato/`). `test/dados-reais.test.tsx` renderiza o catálogo e o detalhe com dados "feios" e com os erros
+  reais da API (409, 502) e falha em qualquer `console.error`. O roteiro de cliques no navegador está em `docs/verificacao-navegador/`.
 
 ## 6. `packages/shared`
 
