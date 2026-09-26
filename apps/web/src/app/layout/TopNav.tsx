@@ -24,7 +24,7 @@ export function TopNav() {
       <div className="mx-auto flex max-w-[1168px] items-center justify-between gap-4">
         <Link
           to="/"
-          className="flex items-center gap-2.5 font-display text-[22px] font-extrabold tracking-[-0.01em] text-texto no-underline"
+          className="flex min-h-11 shrink-0 items-center gap-2.5 font-display text-[22px] font-extrabold tracking-[-0.01em] text-texto no-underline"
         >
           <span
             aria-hidden="true"

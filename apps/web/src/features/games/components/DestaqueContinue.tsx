@@ -89,13 +89,13 @@ export function DestaqueContinue({ game }: { game: Game }) {
         {/* Um só link: cobre o cartão no celular (texto invisível, o nome acessível continua) e vira o botão no desktop. */}
         <Link
           to={`/jogos/${game.id}`}
-          className="absolute inset-0 z-10 text-[0px] md:static md:z-auto md:mt-1 md:inline-flex md:h-11 md:items-center md:gap-2 md:self-start md:rounded-full md:bg-texto md:px-5 md:font-display md:text-[15px] md:font-bold md:text-fundo"
+          className="absolute inset-0 z-10 md:static md:z-auto md:mt-1 md:inline-flex md:h-11 md:items-center md:gap-2 md:self-start md:rounded-full md:bg-texto md:px-5 md:font-display md:text-[15px] md:font-bold md:text-fundo"
         >
           {/* `.icon` tem display próprio: o `hidden` direto no ícone não valeria no celular. */}
           <span aria-hidden="true" className="hidden md:inline-flex">
             <Icon name="visibility" size={20} />
           </span>
-          Ver detalhes
+          <span className="max-md:sr-only">Ver detalhes</span>
         </Link>
       </div>
     </section>

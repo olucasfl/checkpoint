@@ -297,6 +297,18 @@ describe('barra superior do catálogo (CA-12)', () => {
     expect(screen.getByRole('link', { name: 'Perfil' })).toHaveAttribute('href', '/perfil');
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Seus jogos');
   });
+
+  it('o logo tem alvo de 44 px e, sem espaço, quem rola são os filtros (o Perfil não encolhe)', async () => {
+    renderPage();
+    await aparece('Celeste');
+
+    expect(screen.getByRole('link', { name: 'checkpoint' })).toHaveClass('min-h-11', 'shrink-0');
+    expect(screen.getByRole('link', { name: 'Perfil' }).parentElement).toHaveClass('shrink-0');
+    expect(screen.getByRole('group', { name: 'Filtrar por status' })).toHaveClass(
+      'overflow-x-auto',
+      'md:min-w-0',
+    );
+  });
 });
 
 describe('filtro na URL (CA-45, CA-47, CA-80)', () => {

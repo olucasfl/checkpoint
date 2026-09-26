@@ -46,7 +46,7 @@ export function StatusFilter({ filter, counts, onChange }: StatusFilterProps) {
       ref={rowRef}
       role="group"
       aria-label="Filtrar por status"
-      className="scroll-row flex w-full snap-x gap-2 overflow-x-auto md:w-auto md:gap-1 md:overflow-visible md:rounded-full md:border md:border-borda md:bg-painel md:p-[5px]"
+      className="scroll-row flex w-full snap-x gap-2 overflow-x-auto md:w-auto md:min-w-0 md:gap-1 md:rounded-full md:border md:border-borda md:bg-painel md:p-[5px]"
     >
       {FILTER_ORDER.map((option) => {
         const active = option === filter;

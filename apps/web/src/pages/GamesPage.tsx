@@ -73,7 +73,7 @@ export function GamesPage() {
             <Link
               to="/"
               aria-current="page"
-              className="flex items-center gap-2.5 font-display text-xl font-extrabold tracking-[-0.01em] text-texto no-underline md:text-[22px]"
+              className="flex min-h-11 shrink-0 items-center gap-2.5 font-display text-xl font-extrabold tracking-[-0.01em] text-texto no-underline md:text-[22px]"
             >
               <span
                 aria-hidden="true"
@@ -88,7 +88,7 @@ export function GamesPage() {
           <StatusFilter filter={filter} counts={counts} onChange={changeFilter} />
 
           {/* No celular, "Adicionar" e "Perfil" ficam na barra inferior. */}
-          <div className="hidden items-center gap-2 md:flex">
+          <div className="hidden shrink-0 items-center gap-2 md:flex">
             <button
               type="button"
               onClick={() => setForm({ open: true })}
