@@ -197,22 +197,25 @@ describe('aparência: prévia ao vivo (CA-36, CA-37)', () => {
     expect(document.documentElement.dataset.destaque).toBe('violeta');
   });
 
-  it('densidade: a mini-prévia (duas linhas sintéticas) acompanha a escolha', async () => {
+  it('densidade: a mini-prévia (dois tiles sintéticos) acompanha a escolha', async () => {
     const user = await abrir();
     const previa = () => within(modal()).getByRole('list', { name: 'Prévia da densidade' });
     expect(previa()).toHaveAttribute('data-densidade', 'confortavel');
+    expect(previa().querySelector('[data-cover]')?.className).toContain('w-[132px]');
     expect(within(previa()).getAllByRole('listitem')).toHaveLength(2);
 
     await user.click(within(grupo('Densidade da lista')).getByRole('radio', { name: 'Compacta' }));
 
     expect(previa()).toHaveAttribute('data-densidade', 'compacta');
-    expect(previa().querySelector('[data-cover]')?.className).toContain('size-10');
+    expect(previa().querySelector('[data-cover]')?.className).toContain('w-[108px]');
     expect(storage.get(PREFS).porUsuario[ANA_ID]).toMatchObject({ densidade: 'compacta' });
   });
 
   it('efeitos: a amostra diz se as animações estão ligadas', async () => {
     const user = await abrir();
     expect(within(modal()).getByText('Animações ligadas')).toBeInTheDocument();
+    // A amostra é um tile que anima em laço (a regra global de movimento reduzido o para).
+    expect(modal().querySelector('[data-previa-tile]')).toHaveClass('previa-elevar');
 
     await user.click(within(grupo('Animações')).getByRole('radio', { name: 'Reduzidas' }));
 

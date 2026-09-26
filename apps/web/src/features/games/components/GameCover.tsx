@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { coverBackground, coverInitials } from '@/shared/lib/game-cover';
 
-type Variante = 'tile' | 'tileCompacto' | 'detalhe' | 'preview' | 'row' | 'compacta';
+type Variante = 'tile' | 'tileCompacto' | 'detalhe' | 'preview';
 
 interface GameCoverProps {
   titulo: string;
@@ -15,17 +15,14 @@ interface GameCoverProps {
   /**
    * Em pé (3:4), como as capas da estante: `tile` = 150 × 200 (132 × 176 no celular); `tileCompacto` = 120 × 160
    * (108 × 144); `detalhe` = a capa grande da página do jogo (até 300 × 400); `preview` = a miniatura do formulário.
-   * `row` e `compacta` (quadradas, 52 e 40 px) são da linha antiga e saem com ela.
    */
   variant?: Variante;
 }
 
 interface Forma {
   caixa: string;
-  /** Sem `iniciais`, o texto fica centrado (as variantes quadradas antigas). */
-  iniciais?: string;
+  iniciais: string;
   anel?: string;
-  centrado?: string;
 }
 
 const FORMA: Record<Variante, Forma> = {
@@ -48,8 +45,6 @@ const FORMA: Record<Variante, Forma> = {
     caixa: 'w-[72px] aspect-[3/4] rounded-lg',
     iniciais: 'left-2 top-1.5 text-[24px]',
   },
-  row: { caixa: 'size-[52px] rounded-[4px]', centrado: 'text-[17px]' },
-  compacta: { caixa: 'size-10 rounded-[4px]', centrado: 'text-[14px]' },
 };
 
 /**
@@ -80,18 +75,6 @@ export function GameCover({
           className="block size-full object-cover object-center"
           onError={() => setFailedUrls((atuais) => [...atuais, shownUrl])}
         />
-      </div>
-    );
-  }
-
-  if (forma.centrado) {
-    return (
-      <div
-        aria-hidden="true"
-        data-cover="generated"
-        className={`${base} grid place-items-center font-display font-extrabold text-fundo ${forma.centrado} ${coverBackground(titulo)}`}
-      >
-        {coverInitials(titulo)}
       </div>
     );
   }

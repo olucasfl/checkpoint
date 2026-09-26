@@ -412,6 +412,11 @@ button:disabled {
     animation: shimmer 1.4s linear infinite;
   }
 
+  /* Amostra do /perfil > Animações: o tile de exemplo sobe e desce em laço (para com "Reduzidas", pela regra global). */
+  .previa-elevar {
+    animation: previa-elevar 1.4s ease-in-out infinite alternate;
+  }
+
   .update-in {
     animation: update-in 0.2s ease-out;
   }
@@ -463,6 +468,15 @@ button:disabled {
   }
   75% {
     transform: translateX(4px);
+  }
+}
+
+@keyframes previa-elevar {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-6px);
   }
 }
 
