@@ -1,6 +1,7 @@
 import { Navigate, Outlet, useLocation, useSearchParams } from 'react-router-dom';
 import { safeRedirect } from '@/features/auth/lib/safe-redirect';
 import { useAuth } from '@/features/auth/session/use-auth';
+import { Avisos } from '@/shared/components/Avisos';
 import { ConnectionBanner } from '@/shared/components/ConnectionBanner';
 import { UpdatePrompt } from '@/shared/components/UpdatePrompt';
 import { Backdrop } from './Backdrop';
@@ -32,6 +33,7 @@ export function AuthLayout() {
         <Outlet />
       </main>
       <ConnectionBanner />
+      <Avisos />
       <UpdatePrompt />
     </div>
   );

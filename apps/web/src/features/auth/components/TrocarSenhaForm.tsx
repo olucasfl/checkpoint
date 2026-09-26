@@ -1,3 +1,4 @@
+import { RotuloPendente } from '@/shared/components/RotuloPendente';
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { FieldError } from '@/shared/components/form-parts';
@@ -97,7 +98,7 @@ export function TrocarSenhaForm() {
       {error?.message && <FieldError id="trocar-senha-error" message={error.message} />}
 
       <button type="submit" disabled={pending} className={PRIMARY_BUTTON}>
-        {pending ? 'Trocando…' : 'Trocar senha'}
+        <RotuloPendente pendente={pending} normal="Trocar senha" ocupado="Trocando…" />
       </button>
       <Link to="/perfil" className={SECONDARY_LINK}>
         Voltar ao perfil

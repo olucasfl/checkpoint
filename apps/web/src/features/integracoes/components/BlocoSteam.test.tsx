@@ -9,6 +9,7 @@ import {
   type Game,
 } from '@checkpoint/shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { avisosNaFila } from '@/shared/lib/avisos';
 import { integracoesApi } from '../api/integracoes-api';
 import { BlocoSteam } from './BlocoSteam';
 
@@ -297,6 +298,38 @@ describe('BlocoSteam — avisos (CA-47 a CA-50)', () => {
   });
 });
 
+describe('BlocoSteam — 100% das conquistas (CA-56)', () => {
+  it('Atualizar que leva as conquistas a 100% comemora com o Chek', async () => {
+    api.detalheDoJogo.mockResolvedValue(detalhe());
+    api.atualizarJogo.mockResolvedValue(
+      detalhe({ dados: dados({ conquistasTotal: 40, conquistasDesbloqueadas: 40 }) }),
+    );
+    const { user } = abrir();
+    await screen.findByText('Faltam');
+
+    await user.click(screen.getByRole('button', { name: 'Atualizar' }));
+
+    await waitFor(() =>
+      expect(avisosNaFila().some((aviso) => aviso.chek === 'comemorando')).toBe(true),
+    );
+    expect(avisosNaFila().find((aviso) => aviso.chek)?.texto).toContain('100%');
+  });
+
+  it('Atualizar sem chegar a 100% só avisa que atualizou', async () => {
+    api.detalheDoJogo.mockResolvedValue(detalhe());
+    api.atualizarJogo.mockResolvedValue(
+      detalhe({ dados: dados({ conquistasTotal: 40, conquistasDesbloqueadas: 20 }) }),
+    );
+    const { user } = abrir();
+    await screen.findByText('Faltam');
+
+    await user.click(screen.getByRole('button', { name: 'Atualizar' }));
+
+    await waitFor(() => expect(avisosNaFila()).toHaveLength(1));
+    expect(avisosNaFila()[0]?.chek).toBeUndefined();
+  });
+});
+
 describe('BlocoSteam — Atualizar e Desvincular', () => {
   it('Atualizar chama o POST, mostra "Atualizando…" e troca os dados', async () => {
     api.detalheDoJogo.mockResolvedValue(detalhe());
@@ -310,10 +343,14 @@ describe('BlocoSteam — Atualizar e Desvincular', () => {
     await screen.findByText('Faltam');
 
     await user.click(screen.getByRole('button', { name: 'Atualizar' }));
-    expect(await screen.findByRole('button', { name: 'Atualizando…' })).toBeDisabled();
+    const pendente = await screen.findByRole('button', { name: 'Atualizando…' });
+    expect(pendente).toBeDisabled();
+    // O ícone gira só enquanto o pedido existe (CA-31).
+    expect(pendente.querySelector('.gira')).not.toBeNull();
     resolver(detalhe({ dados: dados({ minutosJogados: 3000 }) }));
 
     expect(await screen.findByText('50 h')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Atualizar' }).querySelector('.gira')).toBeNull();
     expect(api.atualizarJogo).toHaveBeenCalledWith('STEAM', 'g1');
   });
 

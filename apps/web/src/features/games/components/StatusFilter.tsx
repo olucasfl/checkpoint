@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { Contador } from '@/shared/components/Contador';
 import { Icon } from '@/shared/components/Icon';
 import { type StatusCounts } from '../lib/count-by-status';
 import { FILTER_ORDER, type StatusFilter as Filter } from '../lib/status-filter';
@@ -65,11 +66,10 @@ export function StatusFilter({ filter, counts, onChange }: StatusFilterProps) {
           >
             <Icon name={iconOf(option)} size={19} filled={active} />
             {labelOf(option)}
-            <span
+            <Contador
+              valor={countOf(option, counts)}
               className={`text-xs font-extrabold ${active ? 'text-fundo/70' : 'text-texto-suave'}`}
-            >
-              {countOf(option, counts)}
-            </span>
+            />
           </button>
         );
       })}

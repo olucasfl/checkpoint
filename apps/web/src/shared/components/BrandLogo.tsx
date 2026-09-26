@@ -1,15 +1,17 @@
-import { Icon } from '@/shared/components/Icon';
+import { Chek } from '@/shared/components/Chek/Chek';
 
-/** O logo "Checkpoint" (círculo `destaque` com a bandeira em `fundo` e o nome), das telas fora do catálogo. */
-export function BrandLogo() {
+interface BrandLogoProps {
+  /** O Chek acima do nome já está na tela (ex.: o cartão de entrada): mostra só o nome. */
+  mostrarChek?: boolean;
+  animado?: boolean;
+  altura?: number;
+}
+
+/** O logo "Checkpoint" (o mascote Chek e o nome), das telas fora do catálogo. */
+export function BrandLogo({ mostrarChek = true, animado = false, altura = 44 }: BrandLogoProps) {
   return (
     <div className="flex items-center justify-center gap-2.5">
-      <div
-        aria-hidden="true"
-        className="grid size-10 place-items-center rounded-full bg-destaque text-fundo"
-      >
-        <Icon name="flag" size={22} filled />
-      </div>
+      {mostrarChek && <Chek altura={altura} animado={animado} />}
       <span className="font-display text-2xl font-extrabold tracking-[-0.01em]">Checkpoint</span>
     </div>
   );

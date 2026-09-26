@@ -1,21 +1,25 @@
 import { type ReactNode } from 'react';
 import { BrandLogo } from '@/shared/components/BrandLogo';
+import { Chek } from '@/shared/components/Chek/Chek';
 
 interface AuthCardProps {
   title: string;
   children: ReactNode;
 }
 
-/** Cartão central das telas de entrada: logo, título e o formulário, em até 420 px de largura. */
+/** Telas de entrada: o Chek (96 px) acima do cartão com o nome, o título e o formulário, em até 420 px de largura. */
 export function AuthCard({ title, children }: AuthCardProps) {
   return (
-    <section className="relative flex w-full max-w-[420px] flex-col gap-5 rounded-2xl border border-borda bg-painel p-6 md:p-8">
-      <BrandLogo />
-      <h1 className="m-0 text-center font-display text-xl font-extrabold tracking-[-0.01em]">
-        {title}
-      </h1>
-      {children}
-    </section>
+    <div className="relative flex w-full max-w-[420px] flex-col items-center gap-4">
+      <Chek altura={96} />
+      <section className="flex w-full flex-col gap-5 rounded-2xl border border-borda bg-painel p-6 md:p-8">
+        <BrandLogo mostrarChek={false} />
+        <h1 className="m-0 text-center font-display text-xl font-extrabold tracking-[-0.01em]">
+          {title}
+        </h1>
+        {children}
+      </section>
+    </div>
   );
 }
 

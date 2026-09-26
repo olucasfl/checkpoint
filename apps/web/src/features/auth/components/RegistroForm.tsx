@@ -1,3 +1,4 @@
+import { RotuloPendente } from '@/shared/components/RotuloPendente';
 import { useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { FieldError } from '@/shared/components/form-parts';
@@ -109,7 +110,7 @@ export function RegistroForm() {
       {error?.message && <FieldError id="registro-error" message={error.message} />}
 
       <button type="submit" disabled={pending} className={PRIMARY_BUTTON}>
-        {pending ? 'Criando…' : 'Criar conta'}
+        <RotuloPendente pendente={pending} normal="Criar conta" ocupado="Criando…" />
       </button>
       <Link to="/login" className={SECONDARY_LINK}>
         Já tenho conta

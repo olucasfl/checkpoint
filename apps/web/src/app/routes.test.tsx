@@ -343,3 +343,37 @@ describe('/perfil (CA-33, CA-34, CA-36)', () => {
     await waitFor(() => expect(where()).toBe('/perfil'));
   });
 });
+
+describe('rota inexistente (CA-37)', () => {
+  it('logado: um caminho sem rota mostra "Página não encontrada" dentro da moldura, com link para "/"', async () => {
+    entrar(auth);
+
+    renderAt('/qualquer-coisa');
+
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Página não encontrada' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getAllByRole('navigation', { name: 'Navegação principal' }).length,
+    ).toBeGreaterThan(0);
+    expect(screen.getByRole('link', { name: 'Ir para o catálogo' })).toHaveAttribute('href', '/');
+  });
+
+  it('visitante: o login vem ANTES do 404 (a tela não revela quais rotas existem)', async () => {
+    await asVisitor();
+
+    const { where } = renderAt('/qualquer-coisa');
+
+    await waitFor(() => expect(where()).toContain('/login'));
+    expect(screen.queryByText('Página não encontrada')).not.toBeInTheDocument();
+  });
+
+  it('/login e /registro seguem sendo rotas próprias (não caem no 404)', async () => {
+    await asVisitor();
+
+    renderAt('/registro');
+
+    expect(await screen.findByRole('button', { name: 'Criar conta' })).toBeInTheDocument();
+    expect(screen.queryByText('Página não encontrada')).not.toBeInTheDocument();
+  });
+});

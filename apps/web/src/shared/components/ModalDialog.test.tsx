@@ -2,7 +2,7 @@ import { act, render, screen } from '@testing-library/react';
 import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
-import { ModalDialog } from './ModalDialog';
+import { ModalDialog, SAIDA_MS } from './ModalDialog';
 
 /**
  * Regressão: "Buscar na Steam" é um diálogo dentro do "Novo jogo". O `close` do interno chegava ao `onClose` do
@@ -49,5 +49,47 @@ describe('ModalDialog', () => {
     });
 
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('ModalDialog: saída suave (CA-20)', () => {
+  it('o diálogo fecha no mesmo tick; o conteúdo fica inerte SAIDA_MS e some', () => {
+    vi.useFakeTimers();
+    try {
+      const { container, rerender } = render(
+        <ModalDialog open onClose={() => undefined} labelledBy="t">
+          <h2 id="t">Conteúdo</h2>
+        </ModalDialog>,
+      );
+      const dialog = container.querySelector('dialog') as HTMLDialogElement;
+      expect(dialog.open).toBe(true);
+
+      rerender(
+        <ModalDialog open={false} onClose={() => undefined} labelledBy="t">
+          <h2 id="t">Conteúdo</h2>
+        </ModalDialog>,
+      );
+
+      expect(dialog.open).toBe(false);
+      expect(dialog.querySelector('[inert]')).toHaveTextContent('Conteúdo');
+
+      act(() => {
+        vi.advanceTimersByTime(SAIDA_MS);
+      });
+
+      expect(dialog).toBeEmptyDOMElement();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('um diálogo que nunca abriu não monta conteúdo nenhum', () => {
+    const { container } = render(
+      <ModalDialog open={false} onClose={() => undefined} labelledBy="t">
+        <h2 id="t">Não deve existir</h2>
+      </ModalDialog>,
+    );
+
+    expect(container.querySelector('dialog')).toBeEmptyDOMElement();
   });
 });

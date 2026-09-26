@@ -6,6 +6,7 @@ import { type DadosJogoPlataforma, type Game, type GameStatus } from '@checkpoin
 import { describe, expect, it, vi } from 'vitest';
 import { DestaqueContinue } from './DestaqueContinue';
 import { GameTile } from './GameTile';
+import { ListLoading } from './ListStates';
 import { Prateleira } from './Prateleira';
 import { StatusFilter } from './StatusFilter';
 
@@ -200,5 +201,18 @@ describe('StatusFilter em pílulas (CA-12)', () => {
 
     await userEvent.click(screen.getByRole('button', { name: /Zerado/ }));
     expect(onChange).toHaveBeenCalledWith('ZERADO');
+  });
+});
+
+describe('ListLoading (CA-28)', () => {
+  it('é o esqueleto de uma prateleira: status ocupado com quatro capas em pé, sem spinner', () => {
+    const { container } = render(<ListLoading />);
+
+    expect(screen.getByRole('status', { name: 'Carregando jogos' })).toHaveAttribute(
+      'aria-busy',
+      'true',
+    );
+    expect(container.querySelectorAll('[class*="aspect-"]')).toHaveLength(4);
+    expect(container.querySelector('.gira')).toBeNull();
   });
 });

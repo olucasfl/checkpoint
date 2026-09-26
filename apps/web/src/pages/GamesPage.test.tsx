@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { gamesApi } from '@/features/games/api/games-api';
 import { integracoesApi } from '@/features/integracoes/api/integracoes-api';
 import { OFFLINE_NOT_SAVED } from '@/features/games/lib/api-error';
+import { avisosNaFila } from '@/shared/lib/avisos';
 import { connectivity } from '@/shared/lib/connectivity';
 import { alterarPrefs, definirUsuario, resetPrefsForTests } from '@/shared/lib/prefs/prefs-store';
 import { storage } from '@/shared/lib/storage/storage';
@@ -154,6 +155,7 @@ describe('estante e contagens (CA-13, CA-14, CA-27)', () => {
     ).toHaveLength(2);
     expect(api.list).toHaveBeenCalledTimes(2);
     expect(document.querySelector('dialog')).not.toHaveAttribute('open');
+    expect(avisosNaFila().map((a) => a.texto)).toContain('Jogo adicionado.');
   });
 });
 
@@ -613,6 +615,7 @@ describe('diálogos (CA-42, CA-49)', () => {
       expect(screen.queryByRole('link', { name: 'Celeste' })).not.toBeInTheDocument(),
     );
     expect(api.remove).toHaveBeenCalledWith('2');
+    expect(avisosNaFila().map((a) => a.texto)).toContain('Jogo removido.');
   });
 });
 
@@ -821,5 +824,118 @@ describe('tile do catálogo com a Steam (spec integracao-plataformas, CA-41)', (
       (img) => img.getAttribute('src'),
     );
     expect(srcs).toEqual([dados.capaUrl, 'https://bucket/enviada.jpg']);
+  });
+});
+
+describe('criar e remover com animação (F5: CA-48 a CA-58)', () => {
+  const criar = async (
+    user: ReturnType<typeof renderPage>,
+    titulo: string,
+    status?: 'Jogando' | 'Quero jogar' | 'Zerado',
+  ) => {
+    await user.click(screen.getByRole('button', { name: 'Adicionar jogo' }));
+    await user.type(await screen.findByLabelText('Título'), titulo);
+    if (status) {
+      await user.click(screen.getByRole('button', { name: status }));
+    }
+    await user.click(screen.getByRole('button', { name: 'Salvar' }));
+  };
+  const textos = () => avisosNaFila().map((aviso) => aviso.texto);
+
+  it('criar: o diálogo fecha na hora, o tile novo aparece na prateleira certa com data-novo e o contador sobe (CA-48, CA-49)', async () => {
+    const user = renderPage();
+    await aparece('Celeste');
+    api.create.mockResolvedValue(game({ id: '5', titulo: 'Novo', status: 'JOGANDO' }));
+    api.list.mockResolvedValue([...CATALOG, game({ id: '5', titulo: 'Novo', status: 'JOGANDO' })]);
+
+    await criar(user, 'Novo', 'Jogando');
+    await aparece('Novo');
+
+    expect(document.querySelector('dialog')).not.toHaveAttribute('open');
+    const jogando = screen.getByRole('list', { name: 'Jogando agora' });
+    expect(
+      within(jogando).getByRole('link', { name: 'Novo' }).closest('[data-tile]'),
+    ).toHaveAttribute('data-novo', 'true');
+    expect(filterButton(/^Jogando/)).toHaveTextContent('2');
+    expect(textos()).toContain('Jogo adicionado.');
+  });
+
+  it('o filtro esconde o jogo criado: o aviso diz onde ele foi parar e "Ver" troca o filtro (CA-51)', async () => {
+    const user = renderPage('/?status=ZERADO');
+    await aparece('Celeste');
+    api.create.mockResolvedValue(game({ id: '5', titulo: 'Novo', status: 'JOGANDO' }));
+    api.list.mockResolvedValue([...CATALOG, game({ id: '5', titulo: 'Novo', status: 'JOGANDO' })]);
+
+    await criar(user, 'Novo', 'Jogando');
+
+    await waitFor(() => expect(textos()).toContain('Adicionado em Jogando.'));
+    expect(document.querySelector('[data-novo="true"]')).toBeNull();
+    avisosNaFila()
+      .find((aviso) => aviso.acao)
+      ?.acao?.aoClicar();
+    await waitFor(() => expect(screen.getByTestId('search')).toHaveTextContent('?status=JOGANDO'));
+  });
+
+  it('primeiro jogo (lista vazia): um marco com o Chek comemorando, e o segundo jogo não repete (CA-54)', async () => {
+    api.list.mockResolvedValue([]);
+    const user = renderPage();
+    await screen.findByText('Nenhum jogo cadastrado');
+    const primeiro = game({ id: '7', titulo: 'Primeiro', status: 'JOGANDO' });
+    api.create.mockResolvedValue(primeiro);
+    api.list.mockResolvedValue([primeiro]);
+
+    await criar(user, 'Primeiro');
+    await aparece('Primeiro');
+
+    const marcos = avisosNaFila().filter((aviso) => aviso.chek === 'comemorando');
+    expect(marcos).toHaveLength(1);
+    expect(marcos[0]?.texto).toContain('primeiro jogo');
+
+    const segundo = game({ id: '8', titulo: 'Segundo', status: 'JOGANDO' });
+    api.create.mockResolvedValue(segundo);
+    api.list.mockResolvedValue([primeiro, segundo]);
+    await criar(user, 'Segundo');
+    await aparece('Segundo');
+
+    expect(avisosNaFila().filter((aviso) => aviso.chek === 'comemorando')).toHaveLength(1);
+    expect(textos()).toContain('Jogo adicionado.');
+  });
+
+  it('um jogo que passa a Zerado comemora; abrir a lista com jogos Zerados não (CA-55)', async () => {
+    const user = renderPage();
+    await aparece('Celeste');
+    expect(avisosNaFila()).toHaveLength(0);
+    const zerado = game({ id: '9', titulo: 'Zerei', status: 'ZERADO', ...comMedia(7) });
+    api.create.mockResolvedValue(zerado);
+    api.list.mockResolvedValue([...CATALOG, zerado]);
+
+    await criar(user, 'Zerei', 'Zerado');
+    await aparece('Zerei');
+
+    const marco = avisosNaFila().find((aviso) => aviso.chek === 'comemorando');
+    expect(marco?.texto).toContain('Zerei');
+    expect(marco?.texto).toContain('Zerado');
+  });
+
+  it('remover: o item some da lista e da contagem já, e só uma cópia visual inerte fica ≤ 200 ms (CA-52)', async () => {
+    const user = renderPage();
+    await aparece('Celeste');
+    api.remove.mockResolvedValue(undefined);
+    api.list.mockResolvedValue(CATALOG.filter((g) => g.id !== '2'));
+
+    await user.click(screen.getByRole('button', { name: 'Remover Celeste' }));
+    await user.click(await screen.findByRole('button', { name: 'Remover' }));
+
+    await waitFor(() =>
+      expect(screen.queryByRole('link', { name: 'Celeste' })).not.toBeInTheDocument(),
+    );
+    expect(filterButton(/^Zerado/)).toHaveTextContent('1');
+    const copia = document.querySelector('.tile-sai');
+    expect(copia).not.toBeNull();
+    expect(copia).toHaveAttribute('aria-hidden', 'true');
+    expect(copia).toHaveAttribute('inert');
+    await waitFor(() => expect(document.querySelector('.tile-sai')).toBeNull(), {
+      timeout: 1_000,
+    });
   });
 });

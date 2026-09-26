@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1540 340" width="1540" height="340"><g transform="scale(.6640625)"><defs>
+<linearGradient id="gBg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1a2440"/><stop offset="1" stop-color="#0b0f1a"/></linearGradient>
+<radialGradient id="gGlow" cx="50%" cy="0%" r="85%"><stop offset="0" stop-color="#4f8cff" stop-opacity=".34"/><stop offset="1" stop-color="#4f8cff" stop-opacity="0"/></radialGradient>
+<linearGradient id="gBlue" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8fbaff"/><stop offset="1" stop-color="#3f79f0"/></linearGradient>
+<linearGradient id="gGold" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffe08a"/><stop offset="1" stop-color="#ffbf47"/></linearGradient>
+</defs><clipPath id="cp"><rect width="512" height="512" rx="115"/></clipPath><g clip-path="url(#cp)"><rect width="512" height="512" fill="url(#gBg)"/><rect width="512" height="512" fill="url(#gGlow)"/></g><ellipse cx="256" cy="440" rx="112" ry="12" fill="#000" fill-opacity="0.38"/>
+<rect x="252" y="82" width="8" height="74" rx="4" fill="#dfe8ff"/>
+<path d="M260 84 L326 104 L260 126 Z" fill="url(#gGold)"/>
+<rect x="136" y="148" width="240" height="262" rx="46" fill="url(#gBlue)"/>
+<rect x="176" y="392" width="160" height="34" rx="9" fill="#2a4fa3"/><rect x="192" y="402" width="9" height="24" rx="2" fill="#ffd166"/><rect x="214" y="402" width="9" height="24" rx="2" fill="#ffd166"/><rect x="236" y="402" width="9" height="24" rx="2" fill="#ffd166"/><rect x="258" y="402" width="9" height="24" rx="2" fill="#ffd166"/><rect x="280" y="402" width="9" height="24" rx="2" fill="#ffd166"/><rect x="302" y="402" width="9" height="24" rx="2" fill="#ffd166"/>
+<rect x="164" y="182" width="184" height="158" rx="34" fill="#0b0f1a"/>
+<ellipse cx="220" cy="248" rx="21" ry="28" fill="#eef2ff"/><ellipse cx="292" cy="248" rx="21" ry="28" fill="#eef2ff"/>
+<ellipse cx="226" cy="254" rx="11" ry="15" fill="#0b0f1a"/><ellipse cx="298" cy="254" rx="11" ry="15" fill="#0b0f1a"/>
+<circle cx="230" cy="247" r="4.5" fill="#eef2ff"/><circle cx="302" cy="247" r="4.5" fill="#eef2ff"/>
+<circle cx="188" cy="296" r="11" fill="#ffd166" fill-opacity=".5"/><circle cx="324" cy="296" r="11" fill="#ffd166" fill-opacity=".5"/>
+<path d="M238 298 Q256 318 274 298" fill="none" stroke="#eef2ff" stroke-width="8" stroke-linecap="round"/>
+<rect x="152" y="352" width="208" height="8" rx="4" fill="#0b0f1a" fill-opacity=".22"/></g><text x="396" y="252" font-family="Outfit, 'Segoe UI', Arial, sans-serif" font-weight="800" font-size="190" letter-spacing="-3.8" fill="#eef2ff">Checkpoint</text></svg>

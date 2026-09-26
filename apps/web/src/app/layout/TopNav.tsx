@@ -1,4 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Chek } from '@/shared/components/Chek/Chek';
 import { Icon } from '@/shared/components/Icon';
 import { newGameHref } from '@/features/games/lib/new-game';
 import { isNavActive, NAV_ITEMS } from './nav-items';
@@ -26,12 +27,7 @@ export function TopNav() {
           to="/"
           className="flex min-h-11 shrink-0 items-center gap-2.5 font-display text-[22px] font-extrabold tracking-[-0.01em] text-texto no-underline"
         >
-          <span
-            aria-hidden="true"
-            className="grid size-9 place-items-center rounded-full bg-destaque text-fundo"
-          >
-            <Icon name="flag" size={20} filled />
-          </span>
+          <Chek altura={44} />
           Checkpoint
         </Link>
 

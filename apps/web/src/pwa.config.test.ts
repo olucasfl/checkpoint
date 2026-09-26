@@ -96,6 +96,11 @@ describe('service worker (workbox)', () => {
     expect(denylist.some((pattern) => pattern.test('/'))).toBe(false);
   });
 
+  it('a imagem de compartilhamento fica fora do precache (CA-09)', () => {
+    expect(pwaOptions.workbox?.globIgnores).toContain('og-image-*.png');
+    expect(pwaOptions.includeAssets).toContain('favicon.ico');
+  });
+
   it('limpa caches antigos e NÃO ativa a versão nova sozinha', () => {
     const workbox = pwaOptions.workbox;
 

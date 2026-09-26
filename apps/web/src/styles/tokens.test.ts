@@ -104,6 +104,12 @@ describe('tokens de cor (CA-87)', () => {
       'capa-4',
       'capa-5',
       'capa-6',
+      'chek-corpo-1',
+      'chek-corpo-2',
+      'chek-base',
+      'chek-mastro',
+      'ouro-1',
+      'ouro-2',
     ]) {
       expect(theme, `token --color-${token}`).toContain(`--color-${token}:`);
     }
@@ -125,6 +131,13 @@ describe('tokens de cor (CA-87)', () => {
     expect(hexDoToken('status-quero-jogar')).toBe('#ffd166');
     expect(hexDoToken('status-zerado')).toBe('#5ee6a8');
     expect(hexDoToken('ouro')).toBe('#ffd166');
+    // O mascote Chek (CA-03): os seis tokens que o mestre em docs/design/marca usa e o tema ainda não tinha.
+    expect(hexDoToken('chek-corpo-1')).toBe('#8fbaff');
+    expect(hexDoToken('chek-corpo-2')).toBe('#3f79f0');
+    expect(hexDoToken('chek-base')).toBe('#2a4fa3');
+    expect(hexDoToken('chek-mastro')).toBe('#dfe8ff');
+    expect(hexDoToken('ouro-1')).toBe('#ffe08a');
+    expect(hexDoToken('ouro-2')).toBe('#ffbf47');
     expect(hexDoToken('erro')).toBe('#ff4d6d');
     expect(hexDoToken('erro-texto')).toBe('#ff8fa3');
   });
@@ -207,9 +220,11 @@ describe('mobile-first (pwa-e-mobile, etapa 1)', () => {
     expect(css).toMatch(/dialog\.modal\s*\{[^}]*env\(safe-area-inset-top\)/);
   });
 
-  it('a subida da folha é uma animação, desligada pela regra global de movimento reduzido (CA-13)', () => {
-    expect(css).toMatch(/dialog\.modal\s*\{[^}]*animation:\s*sheet-up/);
-    expect(css).toContain('@keyframes sheet-up');
+  it('a entrada e a saída da folha são transições CSS, desligadas pela regra global de movimento reduzido (CA-13)', () => {
+    expect(css).toMatch(
+      /dialog\.modal\s*\{[^}]*transition:[^;]*display var\(--mov-padrao\) allow-discrete/,
+    );
+    expect(css).toMatch(/@starting-style\s*\{\s*dialog\.modal\[open\]/);
     const reduced = css.match(/@media \(prefers-reduced-motion: reduce\)\s*\{[\s\S]*$/)?.[0] ?? '';
     expect(reduced).toMatch(
       /\*,\s*\*::before,\s*\*::after\s*\{[^}]*animation:\s*none\s*!important/,

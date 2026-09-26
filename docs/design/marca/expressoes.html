@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Chek: expressões (mock)</title>
+    <!--
+      Mock estático da spec personalizacao-chek-e-animacoes (F1). NÃO é código do app: serve só para aprovar o
+      desenho das 5 expressões antes de aplicá-las nas telas. O corpo é o do mestre (docs/design/marca/fonte-svg),
+      sem o fundo do ícone; só o rosto muda. As cores repetem os tokens do tema (e os 6 tokens novos do Chek).
+    -->
+    <style>
+      :root {
+        --fundo: #0b0f1a;
+        --painel: #121829;
+        --painel-2: #0f1524;
+        --borda: #1e2640;
+        --texto: #eef2ff;
+        --texto-suave: #a3abc7;
+        --ouro: #ffd166;
+        --chek-corpo-1: #8fbaff;
+        --chek-corpo-2: #3f79f0;
+        --chek-base: #2a4fa3;
+        --chek-mastro: #dfe8ff;
+        --ouro-1: #ffe08a;
+        --ouro-2: #ffbf47;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 24px 16px 48px;
+        background: var(--fundo);
+        color: var(--texto);
+        font-family: 'Manrope', system-ui, sans-serif;
+      }
+      h1 {
+        margin: 0 0 4px;
+        font: 800 26px 'Outfit', system-ui, sans-serif;
+      }
+      p.nota {
+        margin: 0 0 20px;
+        max-width: 720px;
+        color: var(--texto-suave);
+      }
+      .grade {
+        display: grid;
+        gap: 16px;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        max-width: 1280px;
+      }
+      .cartao {
+        border: 1px solid var(--borda);
+        border-radius: 20px;
+        overflow: hidden;
+        background: var(--painel);
+      }
+      .cartao h2 {
+        margin: 0;
+        padding: 14px 16px 0;
+        font: 700 18px 'Outfit', system-ui, sans-serif;
+      }
+      .cartao p {
+        margin: 2px 16px 12px;
+        font-size: 14px;
+        color: var(--texto-suave);
+      }
+      .faixa {
+        display: flex;
+        align-items: flex-end;
+        gap: 20px;
+        padding: 16px;
+      }
+      .faixa.fundo {
+        background: var(--fundo);
+      }
+      .faixa.painel {
+        background: var(--painel);
+      }
+      .faixa figure {
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+      }
+      .faixa figcaption {
+        font-size: 12px;
+        color: var(--texto-suave);
+      }
+      .faixa figcaption {
+        white-space: nowrap;
+      }
+      .grande {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px 24px;
+        max-width: 1280px;
+        margin: 0 0 20px;
+        padding: 20px;
+        border: 1px solid var(--borda);
+        border-radius: 20px;
+        background: var(--fundo);
+      }
+      .grande figure {
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+      }
+      .grande figcaption {
+        font: 700 15px 'Outfit', system-ui, sans-serif;
+      }
+      svg.chek {
+        display: block;
+        width: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Chek: expressões</h1>
+    <p class="nota">
+      Cinco expressões sobre o mesmo corpo (só olhos, boca e adereços mudam), em 24, 44 e 96 px, sobre
+      <code>fundo</code> e <code>painel</code>. Abaixo de 24 px de altura o Chek com rosto não é usado (vale o favicon).
+    </p>
+
+    <!-- Gradientes compartilhados (ids únicos no documento). -->
+    <svg width="0" height="0" style="position: absolute" aria-hidden="true">
+      <defs>
+        <linearGradient id="gAzul" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" style="stop-color: var(--chek-corpo-1)" />
+          <stop offset="1" style="stop-color: var(--chek-corpo-2)" />
+        </linearGradient>
+        <linearGradient id="gOuro" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" style="stop-color: var(--ouro-1)" />
+          <stop offset="1" style="stop-color: var(--ouro-2)" />
+        </linearGradient>
+
+        <!-- Corpo comum: sombra, mastro, bandeira, cartucho, base com pinos e o painel do rosto. -->
+        <g id="corpo">
+          <ellipse cx="256" cy="440" rx="112" ry="12" fill="#000" fill-opacity="0.38" />
+          <rect x="252" y="82" width="8" height="74" rx="4" style="fill: var(--chek-mastro)" />
+          <path d="M260 84 L326 104 L260 126 Z" fill="url(#gOuro)" />
+          <rect x="136" y="148" width="240" height="262" rx="46" fill="url(#gAzul)" />
+          <rect x="176" y="392" width="160" height="34" rx="9" style="fill: var(--chek-base)" />
+          <g style="fill: var(--ouro)">
+            <rect x="192" y="402" width="9" height="24" rx="2" />
+            <rect x="214" y="402" width="9" height="24" rx="2" />
+            <rect x="236" y="402" width="9" height="24" rx="2" />
+            <rect x="258" y="402" width="9" height="24" rx="2" />
+            <rect x="280" y="402" width="9" height="24" rx="2" />
+            <rect x="302" y="402" width="9" height="24" rx="2" />
+          </g>
+          <rect x="164" y="182" width="184" height="158" rx="34" style="fill: var(--fundo)" />
+          <rect x="152" y="352" width="208" height="8" rx="4" style="fill: var(--fundo)" fill-opacity="0.22" />
+        </g>
+
+        <!-- Rostos. -->
+        <g id="rosto-feliz">
+          <ellipse cx="220" cy="248" rx="21" ry="28" style="fill: var(--texto)" />
+          <ellipse cx="292" cy="248" rx="21" ry="28" style="fill: var(--texto)" />
+          <ellipse cx="226" cy="254" rx="11" ry="15" style="fill: var(--fundo)" />
+          <ellipse cx="298" cy="254" rx="11" ry="15" style="fill: var(--fundo)" />
+          <circle cx="230" cy="247" r="4.5" style="fill: var(--texto)" />
+          <circle cx="302" cy="247" r="4.5" style="fill: var(--texto)" />
+          <circle cx="188" cy="296" r="11" style="fill: var(--ouro)" fill-opacity="0.5" />
+          <circle cx="324" cy="296" r="11" style="fill: var(--ouro)" fill-opacity="0.5" />
+          <path d="M238 298 Q256 318 274 298" fill="none" style="stroke: var(--texto)" stroke-width="8" stroke-linecap="round" />
+        </g>
+
+        <g id="rosto-dormindo">
+          <path d="M199 250 Q220 272 241 250" fill="none" style="stroke: var(--texto)" stroke-width="9" stroke-linecap="round" />
+          <path d="M271 250 Q292 272 313 250" fill="none" style="stroke: var(--texto)" stroke-width="9" stroke-linecap="round" />
+          <circle cx="188" cy="296" r="11" style="fill: var(--ouro)" fill-opacity="0.5" />
+          <circle cx="324" cy="296" r="11" style="fill: var(--ouro)" fill-opacity="0.5" />
+          <ellipse cx="256" cy="304" rx="9" ry="7" fill="none" style="stroke: var(--texto)" stroke-width="7" />
+          <path d="M304 200 h24 l-24 28 h24" fill="none" style="stroke: var(--ouro)" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" />
+          <path d="M328 186 h14 l-14 17 h14" fill="none" style="stroke: var(--ouro)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" />
+        </g>
+
+        <g id="rosto-confuso">
+          <ellipse cx="216" cy="250" rx="24" ry="31" style="fill: var(--texto)" />
+          <ellipse cx="292" cy="256" rx="16" ry="22" style="fill: var(--texto)" />
+          <ellipse cx="222" cy="256" rx="12" ry="17" style="fill: var(--fundo)" />
+          <ellipse cx="296" cy="260" rx="8" ry="12" style="fill: var(--fundo)" />
+          <circle cx="227" cy="248" r="5" style="fill: var(--texto)" />
+          <circle cx="299" cy="254" r="3.5" style="fill: var(--texto)" />
+          <path d="M268 220 L316 204" fill="none" style="stroke: var(--texto)" stroke-width="7" stroke-linecap="round" />
+          <circle cx="188" cy="298" r="11" style="fill: var(--ouro)" fill-opacity="0.5" />
+          <circle cx="324" cy="298" r="11" style="fill: var(--ouro)" fill-opacity="0.5" />
+          <path d="M228 308 q14 -14 28 0 t28 0" fill="none" style="stroke: var(--texto)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" />
+          <path d="M388 128 Q388 104 410 104 Q432 104 432 124 Q432 138 416 146 Q410 150 410 160" fill="none" style="stroke: var(--ouro)" stroke-width="10" stroke-linecap="round" />
+          <circle cx="410" cy="182" r="6.5" style="fill: var(--ouro)" />
+        </g>
+
+        <g id="rosto-comemorando">
+          <path d="M196 262 Q220 224 244 262" fill="none" style="stroke: var(--texto)" stroke-width="10" stroke-linecap="round" />
+          <path d="M268 262 Q292 224 316 262" fill="none" style="stroke: var(--texto)" stroke-width="10" stroke-linecap="round" />
+          <circle cx="188" cy="298" r="11" style="fill: var(--ouro)" fill-opacity="0.5" />
+          <circle cx="324" cy="298" r="11" style="fill: var(--ouro)" fill-opacity="0.5" />
+          <path d="M232 290 Q256 338 280 290 Z" style="fill: var(--texto)" stroke-linejoin="round" stroke="var(--texto)" stroke-width="6" />
+          <path d="M96 150 Q96 172 74 172 Q96 172 96 194 Q96 172 118 172 Q96 172 96 150 Z" fill="url(#gOuro)" stroke="url(#gOuro)" stroke-width="6" stroke-linejoin="round" />
+          <path d="M424 116 Q424 144 396 144 Q424 144 424 172 Q424 144 452 144 Q424 144 424 116 Z" fill="url(#gOuro)" stroke="url(#gOuro)" stroke-width="6" stroke-linejoin="round" />
+          <path d="M432 236 Q432 250 418 250 Q432 250 432 264 Q432 250 446 250 Q432 250 432 236 Z" fill="url(#gOuro)" stroke="url(#gOuro)" stroke-width="5" stroke-linejoin="round" />
+        </g>
+
+        <g id="rosto-cadeado">
+          <ellipse cx="220" cy="248" rx="21" ry="28" style="fill: var(--texto)" />
+          <ellipse cx="292" cy="248" rx="21" ry="28" style="fill: var(--texto)" />
+          <ellipse cx="226" cy="254" rx="11" ry="15" style="fill: var(--fundo)" />
+          <ellipse cx="298" cy="254" rx="11" ry="15" style="fill: var(--fundo)" />
+          <circle cx="230" cy="247" r="4.5" style="fill: var(--texto)" />
+          <circle cx="302" cy="247" r="4.5" style="fill: var(--texto)" />
+          <circle cx="188" cy="296" r="11" style="fill: var(--ouro)" fill-opacity="0.5" />
+          <circle cx="324" cy="296" r="11" style="fill: var(--ouro)" fill-opacity="0.5" />
+          <path d="M243 296 v-9 a13 13 0 0 1 26 0 v9" fill="none" stroke="url(#gOuro)" stroke-width="7" stroke-linecap="round" />
+          <rect x="234" y="294" width="44" height="34" rx="8" fill="url(#gOuro)" />
+          <circle cx="256" cy="308" r="5" style="fill: var(--fundo)" />
+          <rect x="254" y="309" width="4" height="10" rx="2" style="fill: var(--fundo)" />
+        </g>
+      </defs>
+    </svg>
+
+    <div class="grande" id="grande"></div>
+    <div class="grade" id="grade"></div>
+
+    <script>
+      const EXPRESSOES = [
+        ['feliz', 'feliz', 'Marca, telas de entrada, sucesso e carregamento.'],
+        ['dormindo', 'dormindo', 'Catálogo vazio, prateleira sem jogos e filtro sem resultado.'],
+        ['confuso', 'confuso', 'Erro de tela, falha de rede, sem conexão e página 404.'],
+        ['comemorando', 'comemorando', 'Marcos: primeiro jogo, Zerado e 100% das conquistas.'],
+        ['cadeado', 'cadeado', 'Perfil Steam privado.'],
+      ];
+      // Recorte do desenho: o corpo mais as estrelas e o "?", que passam do cartucho.
+      const VIEWBOX = '64 64 400 384';
+      const chek = (id, altura) =>
+        `<svg class="chek" viewBox="${VIEWBOX}" height="${altura}" width="${(altura * 400) / 384}" aria-hidden="true" focusable="false">` +
+        `<use href="#corpo"/><use href="#rosto-${id}"/></svg>`;
+      const faixa = (id, fundo) =>
+        `<div class="faixa ${fundo}">` +
+        [24, 44, 96].map((h) => `<figure>${chek(id, h)}<figcaption>${h} px</figcaption></figure>`).join('') +
+        '</div>';
+
+      document.getElementById('grande').innerHTML = EXPRESSOES.map(
+        ([id, nome]) => `<figure>${chek(id, 200)}<figcaption>${nome}</figcaption></figure>`,
+      ).join('');
+
+      document.getElementById('grade').innerHTML = EXPRESSOES.map(
+        ([id, nome, uso]) =>
+          `<section class="cartao"><h2>${nome}</h2><p>${uso}</p>${faixa(id, 'fundo')}${faixa(id, 'painel')}</section>`,
+      ).join('');
+    </script>
+  </body>
+</html>

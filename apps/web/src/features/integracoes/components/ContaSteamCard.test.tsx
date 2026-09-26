@@ -380,6 +380,11 @@ describe('perfil privado, falha da Steam e sem conexão (CA-20, CA-21)', () => {
     expect(
       await screen.findByRole('heading', { name: 'Seu perfil Steam está privado' }),
     ).toBeInTheDocument();
+    // O Chek com o cadeado é decorativo (CA-38); o texto acima já diz tudo.
+    expect(document.querySelector('svg[data-chek="cadeado"]')).toHaveAttribute(
+      'aria-hidden',
+      'true',
+    );
     const passos = screen.getAllByRole('listitem').map((li) => li.textContent);
     expect(passos).toEqual([...PASSOS_DE_PRIVACIDADE]);
     expect(PASSOS_DE_PRIVACIDADE.join(' ')).toContain('"Meu perfil" como Público');

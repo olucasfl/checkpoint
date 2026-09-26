@@ -1,5 +1,9 @@
+import { useRef } from 'react';
 import { type Game, type GameStatus } from '@checkpoint/shared';
+import { Contador } from '@/shared/components/Contador';
+import { useFlip } from '@/shared/hooks/use-flip';
 import { Icon } from '@/shared/components/Icon';
+import { useJogosComSaida } from '../lib/use-jogos-com-saida';
 import { STATUS_META } from '../lib/status-meta';
 import { GameTile } from './GameTile';
 
@@ -15,6 +19,8 @@ interface PrateleiraProps {
   compacta?: boolean;
   /** No celular, em "Todos": mostra só os primeiros jogos e o botão leva ao filtro desta prateleira. */
   onVerMais?: (status: GameStatus) => void;
+  /** O jogo recém-criado (assenta e ganha um anel que some). */
+  novoId?: string | null;
 }
 
 /**
@@ -32,7 +38,11 @@ export function Prateleira({
   onAdicionar,
   compacta = false,
   onVerMais,
+  novoId = null,
 }: PrateleiraProps) {
+  const itens = useJogosComSaida(jogos, 200);
+  const lista = useRef<HTMLUListElement>(null);
+  useFlip(lista, itens.map((item) => `${item.game.id}${item.saindo ? '-' : ''}`).join(','));
   const tituloId = `prateleira-${status.toLowerCase()}`;
   const bloco = compacta
     ? 'h-[144px] w-[108px] md:h-[160px] md:w-[120px]'
@@ -52,11 +62,12 @@ export function Prateleira({
           {titulo}
         </h2>
         <span className="inline-flex h-[22px] items-center rounded-full bg-painel-3 px-2.5 text-xs font-bold text-texto-suave md:h-6 md:text-[13px]">
-          {jogos.length}
+          <Contador valor={jogos.length} />
         </span>
       </div>
 
       <ul
+        ref={lista}
         aria-label={titulo}
         className={`m-0 grid list-none justify-start gap-x-3.5 gap-y-5 p-0 ${
           compacta ? 'grid-cols-[repeat(auto-fill,108px)]' : 'grid-cols-[repeat(auto-fill,132px)]'
@@ -66,13 +77,15 @@ export function Prateleira({
             : 'md:grid-cols-[repeat(auto-fill,150px)] md:gap-x-[22px] md:gap-y-6'
         }`}
       >
-        {jogos.map((game) => (
+        {itens.map(({ game, saindo }) => (
           <GameTile
             key={game.id}
             game={game}
             onEdit={onEdit}
             onRemove={onRemove}
             compacta={compacta}
+            novo={!saindo && game.id === novoId}
+            saindo={saindo}
           />
         ))}
         <li data-adicionar className="shrink-0 snap-start">

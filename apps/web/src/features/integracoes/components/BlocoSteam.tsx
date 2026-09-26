@@ -1,3 +1,4 @@
+import { RotuloPendente } from '@/shared/components/RotuloPendente';
 import { useState } from 'react';
 import {
   type AvisoPlataforma,
@@ -19,6 +20,8 @@ import {
   separarConquistas,
 } from '../lib/conquistas';
 import { atualizadoHaTexto } from '../lib/tempo-relativo';
+import { avisar } from '@/shared/lib/avisos';
+import { chegouAos100, textoDoMarco } from '@/features/games/lib/marcos';
 
 const PROVEDOR = 'STEAM' as const;
 
@@ -260,7 +263,12 @@ export function BlocoSteam({ game }: { game: Game }) {
   async function onAtualizar() {
     setErroAtualizar('');
     try {
-      await atualizar.mutateAsync();
+      const novo = await atualizar.mutateAsync();
+      if (chegouAos100(dados, novo.dados)) {
+        avisar({ texto: textoDoMarco('conquistas-100', game.titulo), chek: 'comemorando' });
+      } else {
+        avisar({ texto: 'Dados da Steam atualizados.' });
+      }
     } catch (failure) {
       setErroAtualizar(describeAuthError(failure).message);
     }
@@ -271,6 +279,7 @@ export function BlocoSteam({ game }: { game: Game }) {
     try {
       await desvincular.mutateAsync(game.id);
       setConfirmando(false);
+      avisar({ texto: 'Jogo desvinculado da Steam.' });
     } catch (failure) {
       setErroDesvincular(describeAuthError(failure).message);
     }
@@ -308,8 +317,13 @@ export function BlocoSteam({ game }: { game: Game }) {
             disabled={atualizar.isPending}
             className={BOTAO_CONTORNO}
           >
-            <Icon name="refresh" size={20} />
-            {atualizar.isPending ? 'Atualizando…' : 'Atualizar'}
+            <Icon name="refresh" size={20} className={atualizar.isPending ? 'gira' : undefined} />
+            <RotuloPendente
+              pendente={atualizar.isPending}
+              normal="Atualizar"
+              ocupado="Atualizando…"
+              indicador={false}
+            />
           </button>
           {steamUrl && (
             <a href={steamUrl} target="_blank" rel="noopener noreferrer" className={BOTAO_CONTORNO}>

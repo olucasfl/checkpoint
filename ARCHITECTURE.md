@@ -661,7 +661,7 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
 - **Ponto de quebra único: 768px (`md`).** O catálogo usava `max-[900px]`; não usa mais.
 - **CSS** (`styles/index.css`, camada `components`): `.app-shell` (`100dvh` com `100vh` de reserva),
   `.safe-x`, `.nav-clearance` e `.bottom-nav` (safe-area por `env()`), `.tile-*` (título de 2 linhas, ações só com hover, elevação), `.destaque-scrim`, `.capa-*`, `dialog.modal` (folha
-  inferior no celular com a animação `sheet-up`, centralizado em >= 768px), `.sheet-footer`/`.sheet-pad`.
+  inferior no celular, com entrada e saída por transição CSS (§5.14), centralizado em >= 768px), `.sheet-footer`/`.sheet-pad`.
   Globais: `touch-action: manipulation`, piso de 16px nos campos (camada `base`, evita o zoom do iOS),
   hover do tile só com `@media (hover: hover)` e `overscroll-behavior-y: none` só no app instalado.
   `env(safe-area-*)` fica em classe própria, não em classe arbitrária do Tailwind (que poderia
@@ -965,6 +965,54 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
   diálogo, Atualizar, privacidade), `lib/lib.test.ts` (URL da Steam, avisos, horas, classificação),
   `pages/PerfilPage.test.tsx` (a seção entre Conta e Preferências e os avisos do retorno; a API de integrações é
   mockada).
+
+### 5.14 O Chek e o movimento (`shared/components/Chek/`, spec `docs/specs/personalizacao-chek-e-animacoes.md`)
+
+- **`Chek`** é o mascote (um cartucho com carinha e uma bandeira de checkpoint como antena) em **SVG inline**, com as cores por
+  tokens (`var(--color-*)`; os seis do mascote que o tema não tinha entram no `@theme`: `chek-corpo-1`, `chek-corpo-2`, `chek-base`,
+  `chek-mastro`, `ouro-1`, `ouro-2`). É a marca: **não segue** o `destaque` do /perfil. O corpo é o do mestre em `docs/design/marca/`; só o
+  rosto muda em cinco expressões (`feliz`, `dormindo`, `confuso`, `comemorando`, `cadeado`; `Rostos.tsx`). Decorativo (`aria-hidden`) por padrão;
+  com `titulo` vira `role="img"`. Gradientes com id por instância (`useId`). `altura` em px ou a altura vem do `className`.
+- **Marca:** o logo do topo (`TopNav` e cabeçalho do catálogo) é o Chek (44 px no desktop, 36 no celular) + "Checkpoint"; `BrandLogo` (Chek + nome)
+  serve às telas fora do catálogo; `AuthCard` põe o Chek de 96 px acima do cartão. O nome da marca é **"Checkpoint"** (C maiúsculo).
+- **`index.html`** ganha `description`, Open Graph (`og:image` etc.), `twitter:card` e `favicon.ico`. O domínio de produção mora só em
+  `apps/web/site.config.ts` (`SITE_URL`): o `index.html` escreve `%SITE_URL%` e o plugin `sitePlugin` (no `vite.config.ts`) o troca. O
+  `og-image-1200x630.png` (355 KB) fica **fora do precache** (`globIgnores` em `pwa.config.ts`).
+- **Sistema de movimento** (`styles/index.css`, F2): tokens em `:root` (`--mov-rapida` 120 ms, `--mov-padrao` 200, `--mov-enfase` 320, `--mov-max` 600,
+  `--mov-laco`/`--mov-laco-lento` para os laços da espera, e as curvas `--ease-entrada`, `--ease-saida`, `--ease-elastica`); **toda** duração e curva de
+  `animation`/`transition` passa por eles e todo `@keyframes` só anima `transform`, `opacity`, `scale`, `translate` e `rotate` (`styles/motion.test.ts`
+  vigia; laços só os da espera: esqueleto, Chek, ícone girando e a amostra do /perfil). O esqueleto pulsa em `opacity` (o `shimmer` saiu) e o tremor do campo
+  é 1 ciclo. **Pressão:** `:active` aplica `scale: 0.97` em botão, `[role=button]`, tile e link da navegação, com retorno elástico. **Diálogos:** entrada e
+  saída em CSS puro (`@starting-style` + `transition-behavior: allow-discrete`); o `ModalDialog` fecha o `<dialog>` na hora (Esc e foco) e mantém o conteúdo
+  da última abertura por `SAIDA_MS` (200 ms), inerte, só para o painel não encolher no desvanecer. **Troca de tela:** os links do catálogo ao detalhe
+  levam `viewTransition` (React Router; só onde o navegador tem a View Transitions API) **desligado** em movimento reduzido; o Voltar por histórico não anima.
+  **Movimento reduzido** (sistema ou "Animações: reduzidas") continua uma regra só (a variante `movimento-reduzido`): sem animação, sem transição e sem `scale`.
+  Hooks: `useMovimentoReduzido` (para o que se decide em JS), `useAtraso(ativo, ms)` (só vira `true` depois de `ms` contínuos) e `useAbaVisivel`
+  (marca `data-aba-oculta` no `<html>`, e o CSS pausa os laços).
+- **Carregamento** (F3): a `LoadingScreen` mostra o Chek parado e só depois de 300 ms (`ATRASO_DO_CHEK_MS`, `useAtraso`) a bandeira balança em laço lento
+  (`.chek-bandeira`, propriedade `rotate`; um boot rápido nunca anima). `ListLoading` é o esqueleto de **uma prateleira** (cartão, título e 4 capas em pé, nas
+  medidas da `Prateleira`), e a biblioteca da Steam também tem esqueleto (o texto "Carregando sua biblioteca…" fica `sr-only`). **Botões pendentes** usam
+  `RotuloPendente` (`shared/components/`): um anel de 16 px que gira (`.gira`, sem ícone de fonte, que na 1ª vez alargava o botão) e a **largura dos dois textos
+  reservada** por pseudo-elemento (`.reserva`, sem duplicar texto no DOM), então "Salvar" e "Salvando…" têm a mesma largura. O ícone de "Atualizar" da Steam
+  gira só enquanto o pedido existe.
+- **Erro, vazio e sucesso** (F4): `Avisos` (`shared/components/`, montado ao lado do `ConnectionBanner` no `AppFrame` e no `AuthLayout`) mostra um aviso de sucesso
+  por vez, na região `role="status"` que existe sempre; `avisar({ texto, chek?, acao? })` (`shared/lib/avisos.ts`, fila fora do React, com `useFilaDeAvisos`)
+  enfileira. Fica ≥ 4 s (1 s a mais por 20 caracteres acima de 60), pausa com o mouse ou o foco, tem **Fechar**, sai com `aviso-out` e nunca rouba o foco; no
+  celular fica acima da barra inferior e, com `UpdatePrompt` ou `InstallNudge` na tela, acima deles (`body:has(...)`). **Erros continuam no lugar, em
+  `role="alert"`**: nada de erro vira aviso. Usam `avisar`: salvar/editar/remover jogo, vincular, atualizar e desvincular na Steam, salvar nome e sair (trocar
+  senha e o retorno da Steam já tinham o seu aviso). O `ConnectionBanner` também **sai** com animação (`useComSaida`: segura o visual por 200 ms). Os estados
+  levam o Chek (sempre `aria-hidden`; o texto vale sem ele): catálogo vazio e filtro sem resultado `dormindo`, erro da lista e `ErrorBoundary` `confuso`,
+  perfil Steam privado `cadeado`. **Rota `*`** (`NaoEncontradaPage`, dentro do `RequireAuth` e do `AppLayout`): quem não tem sessão vai ao login antes, então
+  o 404 não revela rotas.
+- **Criar, remover e marcos** (F5): `GameForm.onDone` devolve `{ jogo, criado }` (`ResultadoDoSalvar`) e a `GamesPage` o usa para: (1) o **jogo novo** (`novoId`, 2 s):
+  o tile "assenta" (`.tile-novo`: `translate`, `scale`, `opacity`) e ganha um anel `destaque` que some por `opacity` (`.tile-anel-novo`, `--mov-realce`), e a página rola até
+  ele (`scrollIntoView` centralizado, `auto` em movimento reduzido, sem mover o foco) se ele estiver fora da vista; se o filtro ativo **esconde** o jogo, o aviso
+  diz "Adicionado em <status>" com **Ver**, que troca o filtro; (2) os **marcos** (`lib/marcos.ts`, puro): primeiro jogo (criar com a lista vazia de ANTES de
+  abrir o formulário), jogo que **passa** a Zerado (nunca ao carregar a lista) e 100% das conquistas (o **Atualizar** do `BlocoSteam` que leva o total ao
+  máximo). Um marco é um `avisar({ chek: 'comemorando' })`, por ocorrência e **sem gravar nada** (sem confete, sem som). **Remover**: a lista e a contagem já
+  não têm o jogo; `useJogosComSaida` devolve uma cópia visual `saindo` (`.tile-sai`, inerte e `aria-hidden`) por 200 ms na mesma posição, e `useFlip` (Web Animations
+  API, duração e curva lidas dos tokens) desliza os vizinhos ao novo lugar. Sem movimento (reduzido) nada é retido e nada desliza. `Contador` troca o número
+  das pílulas e das prateleiras com um fade curto (o valor novo já está no DOM).
 
 ---
 
