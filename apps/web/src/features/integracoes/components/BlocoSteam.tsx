@@ -20,7 +20,8 @@ import {
 } from '../lib/conquistas';
 import { atualizadoHaTexto } from '../lib/tempo-relativo';
 
-const PROVEDOR = 'STEAM' as const;
+import { PROVEDOR_STEAM } from '../lib/provedores';
+const PROVEDOR = PROVEDOR_STEAM;
 
 const BOTAO =
   'min-h-11 min-w-11 rounded-full px-[18px] font-display text-[15px] disabled:cursor-wait disabled:opacity-60';

@@ -8,6 +8,7 @@ import {
 } from '@checkpoint/shared';
 import { GAMES_QUERY_KEY } from '@/features/games/api/use-games';
 import { comDadosAtualizados } from '../lib/conquistas';
+import { PROVEDOR_STEAM } from '../lib/provedores';
 import { integracoesApi } from './integracoes-api';
 
 /** As contas vinculadas. O logout local limpa o `queryClient` inteiro, estas chaves junto. */
@@ -32,9 +33,14 @@ export function usePerfilPlataforma(provedor: Provedor, enabled: boolean) {
 }
 
 /** Há conta Steam vinculada? `undefined` enquanto carrega ou se a consulta falhou (a tela some com o atalho). */
-export function useTemContaSteam(): boolean | undefined {
+export function useTemConta(provedor: Provedor): boolean | undefined {
   const contas = useContas();
-  return contas.data?.some((conta) => conta.provedor === 'STEAM');
+  return contas.data?.some((conta) => conta.provedor === provedor);
+}
+
+/** O atalho das telas que só falam com a Steam (ver `lib/provedores.ts`). */
+export function useTemContaSteam(): boolean | undefined {
+  return useTemConta(PROVEDOR_STEAM);
 }
 
 export function useIniciarVinculo(provedor: Provedor) {

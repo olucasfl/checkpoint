@@ -7,6 +7,7 @@ import { nomeDaPlataforma } from '../lib/estante';
 import { platformIcon } from '../lib/status-meta';
 import { AnelDeNota } from './AnelDeNota';
 import { GameCover } from './GameCover';
+import { SeloDePlataformas } from './SeloDePlataformas';
 
 interface GameTileProps {
   game: Game;
@@ -21,7 +22,7 @@ const ACAO =
 
 /**
  * Um jogo na prateleira. A capa em pé leva o **anel da média** (só com média) no canto superior direito, o **chip da
- * plataforma** (só com plataforma) no inferior esquerdo e, em aparelho com hover, **Editar** e **Remover** no inferior
+ * plataforma** (só com plataforma) no inferior esquerdo, o **selo das plataformas ligadas** no superior esquerdo e, em aparelho com hover, **Editar** e **Remover** no inferior
  * direito. Abaixo: o título (o `<Link>` real do detalhe, esticado sobre o tile inteiro; as ações ficam por cima) e, só
  * nos jogos ligados à Steam, "42 h · 12/40". Em toque as ações não existem na tela: o caminho é abrir o jogo.
  */
@@ -45,6 +46,7 @@ export function GameTile({ game, onEdit, onRemove, compacta = false }: GameTileP
           alternativas={capas.slice(1)}
           variant={compacta ? 'tileCompacto' : 'tile'}
         />
+        <SeloDePlataformas dados={game.dadosPlataforma} />
         <div className="absolute right-2 top-2 md:right-2.5 md:top-2.5">
           <AnelDeNota nota={game.notaMedia} />
         </div>

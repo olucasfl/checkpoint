@@ -65,6 +65,27 @@ describe('GameTile (CA-15 a CA-19)', () => {
     expect(screen.getByText('42 h · 12/40')).toBeInTheDocument();
   });
 
+  it('com vínculo: um selo "Ligado à Steam" no canto livre, sem tocar no anel nem no chip; sem vínculo: nenhum', () => {
+    const { container, rerender } = noRouter(
+      <GameTile
+        game={jogo('a', { notaMedia: 8.3, plataforma: 'PC', dadosPlataforma: [steam] })}
+        {...acoes}
+      />,
+    );
+
+    const selo = screen.getByRole('img', { name: 'Ligado à Steam' });
+    expect(selo).toHaveAttribute('data-selo-plataformas');
+    expect(selo).toHaveClass('left-2', 'top-2'); // o anel é top/right; o chip, bottom/left; as ações, bottom/right
+    expect(container.querySelectorAll('[data-selo-plataformas]')).toHaveLength(1);
+
+    rerender(
+      <MemoryRouter>
+        <GameTile game={jogo('b')} {...acoes} />
+      </MemoryRouter>,
+    );
+    expect(container.querySelector('[data-selo-plataformas]')).toBeNull();
+  });
+
   it('Editar e Remover têm nome acessível com o título e chamam o jogo certo', async () => {
     const onEdit = vi.fn();
     const onRemove = vi.fn();

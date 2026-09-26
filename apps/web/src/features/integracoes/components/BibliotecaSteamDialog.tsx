@@ -4,12 +4,14 @@ import { FieldError, LABEL, inputClass } from '@/shared/components/form-parts';
 import { ModalDialog } from '@/shared/components/ModalDialog';
 import { describeAuthError } from '@/features/auth/lib/auth-errors';
 import { useGames } from '@/features/games/api/use-games';
+import { PlataformaMarca } from '@/shared/components/PlataformaMarca';
+import { PROVEDOR_STEAM } from '../lib/provedores';
 import { useBiblioteca, useVincularJogo } from '../api/use-integracoes';
 import { jogoAtualDoErro, precisaConfirmarPlataforma } from '../lib/biblioteca';
 import { classificarFalhaDoCartao } from '../lib/estado-do-cartao';
 import { horasCurtas } from '../lib/format';
 
-const PROVEDOR = 'STEAM' as const;
+const PROVEDOR = PROVEDOR_STEAM;
 const BUSCA_ATRASO_MS = 300;
 
 const BOTAO =
@@ -364,8 +366,9 @@ function Conteudo({
         <div className="flex min-w-0 flex-col gap-1">
           <h2
             id="biblioteca-steam-titulo"
-            className="m-0 font-display text-xl font-extrabold tracking-[-0.01em] text-destaque"
+            className="m-0 flex items-center gap-2 font-display text-xl font-extrabold tracking-[-0.01em] text-destaque"
           >
+            <PlataformaMarca provedor={PROVEDOR} variante="marcador" tamanho="g" decorativa />
             {titulo}
           </h2>
           <p className="m-0 text-[16px] text-texto-suave">

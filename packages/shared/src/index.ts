@@ -10,6 +10,7 @@
 export * from './auth';
 export * from './games';
 export * from './integracoes';
+export * from './plataformas';
 
 /** Exemplo de contrato compartilhado — substitua quando as entidades existirem. */
 export interface HealthCheckResponse {

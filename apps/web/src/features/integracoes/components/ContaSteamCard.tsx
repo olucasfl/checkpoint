@@ -16,7 +16,8 @@ import { horasCurtas, textoDasConquistas } from '../lib/format';
 import { irPara } from '../lib/navegar';
 import { urlDaSteamSegura } from '../lib/steam-url';
 
-const PROVEDOR = 'STEAM' as const;
+import { PROVEDOR_STEAM } from '../lib/provedores';
+const PROVEDOR = PROVEDOR_STEAM;
 
 const BOTAO =
   'min-h-11 min-w-11 rounded-full px-4 font-display text-[15px] disabled:cursor-wait disabled:opacity-60 font-bold';

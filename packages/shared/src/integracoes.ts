@@ -1,17 +1,11 @@
 import type { ApiErrorResponse } from './games';
+import type { Provedor } from './plataformas';
 
 /**
  * Contrato das integrações com plataformas de jogos (spec `integracao-plataformas`). Só tipos,
  * constantes e funções puras: nada de Node, `window` nem Prisma. A primeira plataforma é a Steam; as
  * outras entram acrescentando um valor a `PROVEDORES` e implementando `GameProvider` na API.
  */
-
-/** Códigos do enum `Provedor` do banco. Sem rótulo de tela (isso vive no web). */
-export const PROVEDORES = ['STEAM'] as const;
-export type Provedor = (typeof PROVEDORES)[number];
-
-/** O segmento `:provedor` das rotas, em minúsculas. */
-export const PROVEDOR_SLUG: Record<Provedor, string> = { STEAM: 'steam' };
 
 /**
  * Idade a partir da qual abrir o detalhe de um jogo refaz a consulta à plataforma. Constante nomeada
