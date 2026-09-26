@@ -291,6 +291,15 @@ describe('cor de destaque e efeitos reduzidos (perfil, etapa 3)', () => {
   });
 });
 
+describe('movimento reduzido nos botões que se elevam (CA-09)', () => {
+  it('o hover:-translate-y de todo botão é desligado na mesma variante, pela propriedade `translate`', () => {
+    const regra = css.match(/\[class\*='hover:-translate-y'\][^}]*\}\s*\}/)?.[0] ?? '';
+
+    expect(regra).toContain('@variant movimento-reduzido');
+    expect(regra).toContain('translate: none !important');
+  });
+});
+
 describe('contrastes da spec troca-de-design-estante (CA-03)', () => {
   const t = (nome: string) => hexDoToken(nome);
   const SUPERFICIES = ['fundo', 'painel', 'painel-2', 'painel-3'];

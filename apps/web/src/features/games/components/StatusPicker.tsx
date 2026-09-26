@@ -29,7 +29,7 @@ export function StatusPicker({ value, onChange }: StatusPickerProps) {
               type="button"
               aria-pressed={pressed}
               onClick={() => onChange(status)}
-              className={`flex h-[52px] items-center justify-center gap-1.5 rounded-xl border px-1 font-display text-[13px] font-bold transition-colors sm:gap-2 sm:text-[15px] ${
+              className={`flex h-[52px] items-center justify-center gap-1.5 whitespace-nowrap rounded-xl border px-1 font-display text-xs font-bold transition-colors max-sm:flex-col max-sm:gap-0.5 sm:gap-2 sm:text-[15px] ${
                 pressed
                   ? 'border-transparent bg-texto text-fundo'
                   : 'border-borda-controle bg-fundo text-texto-suave hover:text-texto'

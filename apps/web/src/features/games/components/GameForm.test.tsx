@@ -110,7 +110,7 @@ describe('cabeçalho, status e rodapé do formulário novo (CA-48, CA-51)', () =
       expect(botoes[i]).toHaveAccessibleName(nome),
     );
     for (const botao of botoes) {
-      expect(botao).toHaveClass('h-[52px]');
+      expect(botao).toHaveClass('h-[52px]', 'whitespace-nowrap', 'max-sm:flex-col');
     }
     expect(botoes.filter((b) => b.getAttribute('aria-pressed') === 'true')).toHaveLength(1);
   });

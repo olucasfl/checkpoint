@@ -517,10 +517,15 @@ button:disabled {
   }
 }
 
-/* Movimento reduzido: o tile não se eleva no hover e as ações aparecem sem deslizar (o anel do hover continua). */
+/*
+ * Movimento reduzido: o tile e todo botão com `hover:-translate-y-*` não se elevam no hover, e as ações do tile
+ * aparecem sem deslizar (o anel do hover continua). O Tailwind 4 usa a propriedade `translate`, não `transform`.
+ */
 .tile,
-.tile-acoes {
+.tile-acoes,
+[class*='hover:-translate-y'] {
   @variant movimento-reduzido {
     transform: none !important;
+    translate: none !important;
   }
 }
