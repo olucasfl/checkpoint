@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { useMovimentoReduzido } from '@/shared/hooks/use-movimento-reduzido';
 import { type Game } from '@checkpoint/shared';
 import { Icon } from '@/shared/components/Icon';
 import { capasDoJogo } from '@/features/integracoes/lib/capa';
@@ -26,6 +27,7 @@ const ACAO =
  * nos jogos ligados à Steam, "42 h · 12/40". Em toque as ações não existem na tela: o caminho é abrir o jogo.
  */
 export function GameTile({ game, onEdit, onRemove, compacta = false }: GameTileProps) {
+  const reduzido = useMovimentoReduzido();
   const capas = capasDoJogo(game);
   const resumo = resumoDoCatalogo(game.dadosPlataforma);
   const plataforma = game.plataforma?.trim() ? nomeDaPlataforma(game.plataforma.trim()) : null;
@@ -79,6 +81,7 @@ export function GameTile({ game, onEdit, onRemove, compacta = false }: GameTileP
 
       <Link
         to={`/jogos/${game.id}`}
+        viewTransition={!reduzido}
         title={game.titulo}
         className="tile-titulo font-display text-[15px] font-semibold leading-tight text-texto after:absolute after:inset-0 after:content-[''] md:text-base"
       >

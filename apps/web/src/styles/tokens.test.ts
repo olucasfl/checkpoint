@@ -220,9 +220,11 @@ describe('mobile-first (pwa-e-mobile, etapa 1)', () => {
     expect(css).toMatch(/dialog\.modal\s*\{[^}]*env\(safe-area-inset-top\)/);
   });
 
-  it('a subida da folha é uma animação, desligada pela regra global de movimento reduzido (CA-13)', () => {
-    expect(css).toMatch(/dialog\.modal\s*\{[^}]*animation:\s*sheet-up/);
-    expect(css).toContain('@keyframes sheet-up');
+  it('a entrada e a saída da folha são transições CSS, desligadas pela regra global de movimento reduzido (CA-13)', () => {
+    expect(css).toMatch(
+      /dialog\.modal\s*\{[^}]*transition:[^;]*display var\(--mov-padrao\) allow-discrete/,
+    );
+    expect(css).toMatch(/@starting-style\s*\{\s*dialog\.modal\[open\]/);
     const reduced = css.match(/@media \(prefers-reduced-motion: reduce\)\s*\{[\s\S]*$/)?.[0] ?? '';
     expect(reduced).toMatch(
       /\*,\s*\*::before,\s*\*::after\s*\{[^}]*animation:\s*none\s*!important/,

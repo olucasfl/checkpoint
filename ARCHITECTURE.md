@@ -661,7 +661,7 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
 - **Ponto de quebra único: 768px (`md`).** O catálogo usava `max-[900px]`; não usa mais.
 - **CSS** (`styles/index.css`, camada `components`): `.app-shell` (`100dvh` com `100vh` de reserva),
   `.safe-x`, `.nav-clearance` e `.bottom-nav` (safe-area por `env()`), `.tile-*` (título de 2 linhas, ações só com hover, elevação), `.destaque-scrim`, `.capa-*`, `dialog.modal` (folha
-  inferior no celular com a animação `sheet-up`, centralizado em >= 768px), `.sheet-footer`/`.sheet-pad`.
+  inferior no celular, com entrada e saída por transição CSS (§5.14), centralizado em >= 768px), `.sheet-footer`/`.sheet-pad`.
   Globais: `touch-action: manipulation`, piso de 16px nos campos (camada `base`, evita o zoom do iOS),
   hover do tile só com `@media (hover: hover)` e `overscroll-behavior-y: none` só no app instalado.
   `env(safe-area-*)` fica em classe própria, não em classe arbitrária do Tailwind (que poderia
@@ -978,6 +978,17 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
 - **`index.html`** ganha `description`, Open Graph (`og:image` etc.), `twitter:card` e `favicon.ico`. O domínio de produção mora só em
   `apps/web/site.config.ts` (`SITE_URL`): o `index.html` escreve `%SITE_URL%` e o plugin `sitePlugin` (no `vite.config.ts`) o troca. O
   `og-image-1200x630.png` (355 KB) fica **fora do precache** (`globIgnores` em `pwa.config.ts`).
+- **Sistema de movimento** (`styles/index.css`, F2): tokens em `:root` (`--mov-rapida` 120 ms, `--mov-padrao` 200, `--mov-enfase` 320, `--mov-max` 600,
+  `--mov-laco`/`--mov-laco-lento` para os laços da espera, e as curvas `--ease-entrada`, `--ease-saida`, `--ease-elastica`); **toda** duração e curva de
+  `animation`/`transition` passa por eles e todo `@keyframes` só anima `transform`, `opacity`, `scale`, `translate` e `rotate` (`styles/motion.test.ts`
+  vigia; laços só os da espera: esqueleto, Chek, ícone girando e a amostra do /perfil). O esqueleto pulsa em `opacity` (o `shimmer` saiu) e o tremor do campo
+  é 1 ciclo. **Pressão:** `:active` aplica `scale: 0.97` em botão, `[role=button]`, tile e link da navegação, com retorno elástico. **Diálogos:** entrada e
+  saída em CSS puro (`@starting-style` + `transition-behavior: allow-discrete`); o `ModalDialog` fecha o `<dialog>` na hora (Esc e foco) e mantém o conteúdo
+  da última abertura por `SAIDA_MS` (200 ms), inerte, só para o painel não encolher no desvanecer. **Troca de tela:** os links do catálogo ao detalhe
+  levam `viewTransition` (React Router; só onde o navegador tem a View Transitions API) **desligado** em movimento reduzido; o Voltar por histórico não anima.
+  **Movimento reduzido** (sistema ou "Animações: reduzidas") continua uma regra só (a variante `movimento-reduzido`): sem animação, sem transição e sem `scale`.
+  Hooks: `useMovimentoReduzido` (para o que se decide em JS), `useAtraso(ativo, ms)` (só vira `true` depois de `ms` contínuos) e `useAbaVisivel`
+  (marca `data-aba-oculta` no `<html>`, e o CSS pausa os laços).
 
 ---
 
