@@ -1,20 +1,12 @@
 import { useState } from 'react';
-import { type PerfilPlataforma } from '@checkpoint/shared';
+import { type ContaVinculada, type PerfilPlataforma } from '@checkpoint/shared';
 import { FieldError } from '@/shared/components/form-parts';
 import { Icon } from '@/shared/components/Icon';
 import { ModalDialog } from '@/shared/components/ModalDialog';
 import { describeAuthError } from '@/features/auth/lib/auth-errors';
-import {
-  useAtualizarPerfil,
-  useContas,
-  useDesvincular,
-  useIniciarVinculo,
-  usePerfilPlataforma,
-} from '../api/use-integracoes';
+import { useAtualizarPerfil, useDesvincular, usePerfilPlataforma } from '../api/use-integracoes';
 import { classificarFalhaDoCartao } from '../lib/estado-do-cartao';
 import { horasCurtas, textoDasConquistas } from '../lib/format';
-import { irPara } from '../lib/navegar';
-import { urlDaSteamSegura } from '../lib/steam-url';
 
 import { PROVEDOR_STEAM } from '../lib/provedores';
 const PROVEDOR = PROVEDOR_STEAM;
@@ -31,7 +23,7 @@ export const PASSOS_DE_PRIVACIDADE = [
   'Espere alguns minutos (a Steam demora a aplicar) e toque em "Tentar de novo".',
 ] as const;
 
-function Esqueleto({ rotulo }: { rotulo: string }) {
+export function Esqueleto({ rotulo }: { rotulo: string }) {
   return (
     <div role="status" aria-label={rotulo} className="flex flex-col gap-3 p-4">
       <div className="h-6 w-1/3 rounded-lg bg-painel-2" />
@@ -66,50 +58,7 @@ function Cabecalho({ nome, avatarUrl }: { nome: string; avatarUrl?: string | nul
   );
 }
 
-function SemVinculo() {
-  const iniciar = useIniciarVinculo(PROVEDOR);
-  const [erro, setErro] = useState('');
-
-  async function onVincular() {
-    setErro('');
-    try {
-      const { url } = await iniciar.mutateAsync();
-      if (!urlDaSteamSegura(url)) {
-        // A resposta não é a tela de login da Steam: o navegador não vai para lugar nenhum.
-        setErro('Não foi possível iniciar o vínculo. Tente de novo.');
-        return;
-      }
-      irPara(url);
-    } catch (failure) {
-      setErro(describeAuthError(failure).message);
-    }
-  }
-
-  return (
-    <div className="flex flex-col gap-3 p-4">
-      <div className="flex items-center gap-3">
-        <Icon name="sports_esports" size={28} className="shrink-0 text-texto-suave" />
-        <div className="flex min-w-0 flex-col">
-          <span className="text-[19px] font-semibold">Steam</span>
-          <span className="text-[16px] text-texto-suave">
-            Veja as horas e as conquistas dos seus jogos.
-          </span>
-        </div>
-      </div>
-      <button
-        type="button"
-        onClick={() => void onVincular()}
-        disabled={iniciar.isPending}
-        className={`${BOTAO_PRIMARIO} self-start`}
-      >
-        {iniciar.isPending ? 'Abrindo a Steam…' : 'Vincular conta'}
-      </button>
-      <FieldError id="steam-vincular-erro" message={erro} />
-    </div>
-  );
-}
-
-function Falha({
+export function Falha({
   mensagem,
   onTentarDeNovo,
   tentando,
@@ -260,7 +209,14 @@ function DesvincularDialog({
   );
 }
 
-function ContaVinculadaCartao({ nomeGravado }: { nomeGravado: string }) {
+/**
+ * O resumo da conta Steam dentro do popup (spec `integracao-plataformas`, etapa 2, agora no popup da aba Plataformas):
+ * nome e avatar, jogos, horas, conquistas dos jogos vinculados e os mais jogados, com Atualizar e Desvincular (com
+ * confirmação). Perfil privado mostra o passo a passo e "Tentar de novo"; falha da Steam e falta de conexão têm
+ * mensagem própria.
+ */
+export function ResumoSteam({ conta }: { conta: ContaVinculada }) {
+  const nomeGravado = conta.nomeExibicao;
   const perfil = usePerfilPlataforma(PROVEDOR, true);
   const atualizar = useAtualizarPerfil(PROVEDOR);
   const desvincular = useDesvincular(PROVEDOR);
@@ -347,30 +303,4 @@ function ContaVinculadaCartao({ nomeGravado }: { nomeGravado: string }) {
       />
     </div>
   );
-}
-
-/**
- * O cartão Steam do `/perfil` (spec `integracao-plataformas`, etapa 2). Sem vínculo: "Vincular conta", que leva
- * à Steam (só se a URL for a tela de login dela). Com vínculo: nome e avatar, jogos, horas, conquistas dos jogos
- * vinculados e os mais jogados, com Atualizar e Desvincular (com confirmação). Perfil privado mostra o passo a
- * passo e "Tentar de novo"; falha da Steam e falta de conexão têm mensagem própria. A conta vem de `['integracoes']`;
- * o cartão, só depois de saber que há conta. Nada aqui quebra o resto do `/perfil`.
- */
-export function ContaSteamCard() {
-  const contas = useContas();
-
-  if (contas.isPending) {
-    return <Esqueleto rotulo="Carregando contas vinculadas" />;
-  }
-  if (contas.isError) {
-    return (
-      <Falha
-        mensagem={describeAuthError(contas.error).message}
-        onTentarDeNovo={() => void contas.refetch()}
-        tentando={contas.isFetching}
-      />
-    );
-  }
-  const conta = contas.data.find((candidata) => candidata.provedor === PROVEDOR);
-  return conta ? <ContaVinculadaCartao nomeGravado={conta.nomeExibicao} /> : <SemVinculo />;
 }

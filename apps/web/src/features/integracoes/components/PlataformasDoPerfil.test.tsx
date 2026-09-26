@@ -6,8 +6,8 @@ import { type ContaVinculada, type PerfilPlataforma } from '@checkpoint/shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { integracoesApi } from '../api/integracoes-api';
 import { irPara } from '../lib/navegar';
-import { ContaSteamCard, PASSOS_DE_PRIVACIDADE } from './ContaSteamCard';
-import { ContasVinculadas } from './ContasVinculadas';
+import { PlataformasDoPerfil } from './PlataformasDoPerfil';
+import { PASSOS_DE_PRIVACIDADE } from './ResumoSteam';
 
 vi.mock('../api/integracoes-api', () => ({
   integracoesApi: {
@@ -64,14 +64,21 @@ function erroHttp(status: number, code: string): AxiosError {
 
 const semConexao = () => new AxiosError('Network Error', 'ERR_NETWORK');
 
-function renderCartao(secao = false) {
+function renderCartao() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={client}>
-      {secao ? <ContasVinculadas /> : <ContaSteamCard />}
+      <PlataformasDoPerfil />
     </QueryClientProvider>,
   );
   return userEvent.setup({ applyAccept: false });
+}
+
+/** Com a conta vinculada: a seção mostra a linha minimizada e o resumo só aparece no popup, aberto ao clicar nela. */
+async function renderVinculado() {
+  const user = renderCartao();
+  await user.click(await screen.findByRole('button', { name: /Jogador Gravado/ }));
+  return user;
 }
 
 beforeEach(() => {
@@ -100,7 +107,7 @@ describe('carregando e falha da lista de contas', () => {
     api.listarContas.mockResolvedValue([]);
     await user.click(screen.getByRole('button', { name: 'Tentar de novo' }));
 
-    expect(await screen.findByRole('button', { name: 'Vincular conta' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Vincular conta Steam' })).toBeInTheDocument();
     expect(api.listarContas).toHaveBeenCalledTimes(2);
   });
 
@@ -121,7 +128,7 @@ describe('sem vínculo (CA-15)', () => {
     });
     const user = renderCartao();
 
-    await user.click(await screen.findByRole('button', { name: 'Vincular conta' }));
+    await user.click(await screen.findByRole('button', { name: 'Vincular conta Steam' }));
 
     expect(api.iniciarVinculo).toHaveBeenCalledWith('STEAM');
     await waitFor(() =>
@@ -141,7 +148,7 @@ describe('sem vínculo (CA-15)', () => {
     api.iniciarVinculo.mockResolvedValue({ url });
     const user = renderCartao();
 
-    await user.click(await screen.findByRole('button', { name: 'Vincular conta' }));
+    await user.click(await screen.findByRole('button', { name: 'Vincular conta Steam' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Não foi possível iniciar o vínculo. Tente de novo.',
@@ -153,7 +160,7 @@ describe('sem vínculo (CA-15)', () => {
     api.iniciarVinculo.mockRejectedValue(erroHttp(409, 'PLATAFORMA_JA_VINCULADA'));
     const user = renderCartao();
 
-    await user.click(await screen.findByRole('button', { name: 'Vincular conta' }));
+    await user.click(await screen.findByRole('button', { name: 'Vincular conta Steam' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Você já tem outra conta vinculada. Desvincule-a antes.',
@@ -165,11 +172,11 @@ describe('sem vínculo (CA-15)', () => {
     api.iniciarVinculo.mockRejectedValueOnce(erroHttp(429, 'LIMITE_TENTATIVAS'));
     const user = renderCartao();
 
-    await user.click(await screen.findByRole('button', { name: 'Vincular conta' }));
+    await user.click(await screen.findByRole('button', { name: 'Vincular conta Steam' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Muitas tentativas');
 
     api.iniciarVinculo.mockRejectedValueOnce(semConexao());
-    await user.click(screen.getByRole('button', { name: 'Vincular conta' }));
+    await user.click(screen.getByRole('button', { name: 'Vincular conta Steam' }));
     await waitFor(() =>
       expect(screen.getByRole('alert')).toHaveTextContent(
         'Sem conexão. Tente de novo quando a conexão voltar.',
@@ -181,16 +188,18 @@ describe('sem vínculo (CA-15)', () => {
     api.iniciarVinculo.mockReturnValue(new Promise(() => undefined));
     const user = renderCartao();
 
-    await user.click(await screen.findByRole('button', { name: 'Vincular conta' }));
+    await user.click(await screen.findByRole('button', { name: 'Vincular conta Steam' }));
 
-    expect(screen.getByRole('button', { name: 'Abrindo a Steam…' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Vincular conta Steam' })).toBeDisabled();
     expect(api.iniciarVinculo).toHaveBeenCalledTimes(1);
   });
 
   it('botão com pelo menos 44 px de altura (CA-22)', async () => {
     renderCartao();
 
-    expect(await screen.findByRole('button', { name: 'Vincular conta' })).toHaveClass('min-h-11');
+    expect(await screen.findByRole('button', { name: 'Vincular conta Steam' })).toHaveClass(
+      'min-h-11',
+    );
   });
 });
 
@@ -202,14 +211,14 @@ describe('vinculado (CA-16)', () => {
 
   it('enquanto o cartão carrega mostra o nome gravado e um esqueleto', async () => {
     api.perfil.mockReturnValue(new Promise(() => undefined));
-    renderCartao();
+    await renderVinculado();
 
-    expect(await screen.findByText('Jogador Gravado')).toBeInTheDocument();
+    expect((await screen.findAllByText('Jogador Gravado')).length).toBeGreaterThan(0);
     expect(screen.getByRole('status', { name: 'Carregando sua conta Steam' })).toBeInTheDocument();
   });
 
   it('nome, avatar, jogos, horas, conquistas dos vinculados e os mais jogados', async () => {
-    renderCartao();
+    await renderVinculado();
 
     expect(await screen.findByText('Jogador Sintetico')).toBeInTheDocument();
     expect(screen.getByText('38')).toBeInTheDocument();
@@ -225,10 +234,10 @@ describe('vinculado (CA-16)', () => {
   });
 
   it('o avatar é decorativo (alt vazio), sem Referer e com tamanho', async () => {
-    renderCartao();
+    await renderVinculado();
 
     await screen.findByText('Jogador Sintetico');
-    const avatar = document.querySelector('img') as HTMLImageElement;
+    const avatar = document.querySelector('img[width="56"]') as HTMLImageElement;
     expect(avatar).toHaveAttribute('src', 'https://avatars.steamstatic.com/0000_full.jpg');
     expect(avatar).toHaveAttribute('alt', '');
     expect(avatar).toHaveAttribute('referrerpolicy', 'no-referrer');
@@ -238,10 +247,10 @@ describe('vinculado (CA-16)', () => {
 
   it('sem avatar (null) mostra o ícone no lugar, sem <img>', async () => {
     api.perfil.mockResolvedValue({ ...PERFIL, avatarUrl: null });
-    renderCartao();
+    await renderVinculado();
 
     await screen.findByText('Jogador Sintetico');
-    expect(document.querySelector('img')).toBeNull();
+    expect(document.querySelector('img[width="56"]')).toBeNull();
   });
 
   it('sem jogo vinculado o cartão diz "0 conquistas em 0 jogos vinculados" (etapa 2)', async () => {
@@ -249,21 +258,21 @@ describe('vinculado (CA-16)', () => {
       ...PERFIL,
       conquistas: { desbloqueadas: 0, total: 0, jogosVinculados: 0 },
     });
-    renderCartao();
+    await renderVinculado();
 
     expect(await screen.findByText('0 conquistas em 0 jogos vinculados')).toBeInTheDocument();
   });
 
   it('biblioteca vazia: "Nenhum jogo na sua biblioteca.", sem lista de mais jogados (CA-20)', async () => {
     api.perfil.mockResolvedValue({ ...PERFIL, totalJogos: 0, minutosTotais: 0, maisJogados: [] });
-    renderCartao();
+    await renderVinculado();
 
     expect(await screen.findByText('Nenhum jogo na sua biblioteca.')).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Mais jogados' })).toBeNull();
   });
 
   it('os botões Atualizar e Desvincular têm pelo menos 44 px de altura (CA-22)', async () => {
-    renderCartao();
+    await renderVinculado();
 
     await screen.findByText('Jogador Sintetico');
     expect(screen.getByRole('button', { name: 'Atualizar' })).toHaveClass('min-h-11', 'min-w-11');
@@ -271,10 +280,10 @@ describe('vinculado (CA-16)', () => {
   });
 
   it('"Vincular conta" não aparece com a conta vinculada', async () => {
-    renderCartao();
+    await renderVinculado();
 
     await screen.findByText('Jogador Sintetico');
-    expect(screen.queryByRole('button', { name: 'Vincular conta' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Vincular conta Steam' })).toBeNull();
   });
 });
 
@@ -286,7 +295,7 @@ describe('Atualizar (CA-18)', () => {
 
   it('chama a atualização e troca os números do cartão sem nova consulta ao GET', async () => {
     api.atualizarPerfil.mockResolvedValue({ ...PERFIL, totalJogos: 39 });
-    const user = renderCartao();
+    const user = await renderVinculado();
     await screen.findByText('38');
 
     await user.click(screen.getByRole('button', { name: 'Atualizar' }));
@@ -298,7 +307,7 @@ describe('Atualizar (CA-18)', () => {
 
   it('enquanto atualiza, o botão fica desabilitado', async () => {
     api.atualizarPerfil.mockReturnValue(new Promise(() => undefined));
-    const user = renderCartao();
+    const user = await renderVinculado();
     await screen.findByText('38');
 
     await user.click(screen.getByRole('button', { name: 'Atualizar' }));
@@ -308,7 +317,7 @@ describe('Atualizar (CA-18)', () => {
 
   it('falha ao atualizar mostra a mensagem e MANTÉM os números que já estavam (CA-21)', async () => {
     api.atualizarPerfil.mockRejectedValue(erroHttp(502, 'PLATAFORMA_INDISPONIVEL'));
-    const user = renderCartao();
+    const user = await renderVinculado();
     await screen.findByText('38');
 
     await user.click(screen.getByRole('button', { name: 'Atualizar' }));
@@ -329,7 +338,7 @@ describe('Desvincular (CA-19)', () => {
   const dialogo = () => screen.getByRole('dialog', { name: 'Desvincular a Steam' });
 
   it('pede confirmação, com o foco em Cancelar; cancelar não muda nada', async () => {
-    const user = renderCartao();
+    const user = await renderVinculado();
     await screen.findByText('Jogador Sintetico');
 
     await user.click(screen.getByRole('button', { name: 'Desvincular' }));
@@ -342,21 +351,21 @@ describe('Desvincular (CA-19)', () => {
 
   it('confirmar desvincula e o cartão volta a "Vincular conta"', async () => {
     api.desvincular.mockResolvedValue(undefined);
-    const user = renderCartao();
+    const user = await renderVinculado();
     await screen.findByText('Jogador Sintetico');
     await user.click(screen.getByRole('button', { name: 'Desvincular' }));
     api.listarContas.mockResolvedValue([]);
 
     await user.click(within(dialogo()).getByRole('button', { name: 'Desvincular' }));
 
-    expect(await screen.findByRole('button', { name: 'Vincular conta' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Vincular conta Steam' })).toBeInTheDocument();
     expect(api.desvincular).toHaveBeenCalledWith('STEAM');
     expect(screen.queryByText('Jogador Sintetico')).toBeNull();
   });
 
   it('falha ao desvincular mantém o diálogo aberto com a mensagem', async () => {
     api.desvincular.mockRejectedValue(semConexao());
-    const user = renderCartao();
+    const user = await renderVinculado();
     await screen.findByText('Jogador Sintetico');
     await user.click(screen.getByRole('button', { name: 'Desvincular' }));
 
@@ -375,7 +384,7 @@ describe('perfil privado, falha da Steam e sem conexão (CA-20, CA-21)', () => {
 
   it('privado: "Seu perfil Steam está privado", o passo a passo e "Tentar de novo" que refaz a consulta', async () => {
     api.perfil.mockRejectedValueOnce(erroHttp(409, 'PLATAFORMA_PERFIL_PRIVADO'));
-    const user = renderCartao();
+    const user = await renderVinculado();
 
     expect(
       await screen.findByRole('heading', { name: 'Seu perfil Steam está privado' }),
@@ -385,7 +394,7 @@ describe('perfil privado, falha da Steam e sem conexão (CA-20, CA-21)', () => {
     expect(PASSOS_DE_PRIVACIDADE.join(' ')).toContain('"Meu perfil" como Público');
     expect(PASSOS_DE_PRIVACIDADE.join(' ')).toContain('"Detalhes do jogo" como Público');
     // O nome gravado continua na tela, e Atualizar/Desvincular seguem disponíveis.
-    expect(screen.getByText('Jogador Gravado')).toBeInTheDocument();
+    expect(screen.getAllByText('Jogador Gravado').length).toBeGreaterThan(0);
     expect(screen.getByRole('button', { name: 'Desvincular' })).toBeInTheDocument();
 
     api.perfil.mockResolvedValue(PERFIL);
@@ -412,11 +421,11 @@ describe('perfil privado, falha da Steam e sem conexão (CA-20, CA-21)', () => {
     '%s: mensagem própria com "Tentar de novo", e o resto da tela segue de pé',
     async (_nome, erro, texto) => {
       api.perfil.mockRejectedValue(erro);
-      const user = renderCartao();
+      const user = await renderVinculado();
 
       expect(await screen.findByRole('alert')).toHaveTextContent(texto);
       expect(screen.queryByRole('heading', { name: 'Seu perfil Steam está privado' })).toBeNull();
-      expect(screen.getByText('Jogador Gravado')).toBeInTheDocument();
+      expect(screen.getAllByText('Jogador Gravado').length).toBeGreaterThan(0);
 
       api.perfil.mockResolvedValue(PERFIL);
       await user.click(screen.getByRole('button', { name: 'Tentar de novo' }));
@@ -425,12 +434,96 @@ describe('perfil privado, falha da Steam e sem conexão (CA-20, CA-21)', () => {
   );
 });
 
-describe('a seção "Contas vinculadas"', () => {
+describe('a seção "Plataformas"', () => {
   it('tem o título e a região com nome acessível', async () => {
-    renderCartao(true);
+    renderCartao();
 
-    expect(screen.getByRole('region', { name: 'Contas vinculadas' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Contas vinculadas' })).toBeInTheDocument();
-    await screen.findByRole('button', { name: 'Vincular conta' });
+    expect(screen.getByRole('region', { name: 'Plataformas' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Plataformas' })).toBeInTheDocument();
+    await screen.findByRole('button', { name: 'Vincular conta Steam' });
+  });
+});
+
+describe('a aba Plataformas (spec plataformas-e-pagina-do-jogo, F3)', () => {
+  it('vinculada: linha minimizada com a plataforma, o nome da conta e "Vinculada em" (sem consultar a Steam para desenhar)', async () => {
+    api.listarContas.mockResolvedValue([CONTA]);
+    api.perfil.mockResolvedValue(PERFIL);
+    renderCartao();
+
+    const linha = await screen.findByRole('button', { name: /Jogador Gravado/ });
+    expect(linha).toHaveTextContent('Steam');
+    expect(linha).toHaveTextContent('Vinculada em 25/09/2026');
+    expect(linha).toHaveAttribute('aria-haspopup', 'dialog');
+    expect(linha).toHaveClass('min-h-14');
+    expect(api.perfil).not.toHaveBeenCalled();
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('clicar na linha abre o popup, com a logo oficial (>= 50 px) no título e Fechar; Fechar devolve o foco', async () => {
+    api.listarContas.mockResolvedValue([CONTA]);
+    api.perfil.mockResolvedValue(PERFIL);
+    const user = renderCartao();
+    const linha = await screen.findByRole('button', { name: /Jogador Gravado/ });
+
+    await user.click(linha);
+
+    const popup = await screen.findByRole('dialog', { name: 'Steam' });
+    const logo = within(popup).getByRole('img', { name: 'Steam' });
+    expect(Number(logo.getAttribute('height'))).toBeGreaterThanOrEqual(50);
+    expect(api.perfil).toHaveBeenCalledTimes(1);
+
+    await user.click(within(popup).getByRole('button', { name: 'Fechar' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('depois de aberto o popup, a linha mostra "Atualizado há X" a partir do cache', async () => {
+    api.listarContas.mockResolvedValue([CONTA]);
+    api.perfil.mockResolvedValue({ ...PERFIL, consultadoEm: new Date().toISOString() });
+    const user = renderCartao();
+    await user.click(await screen.findByRole('button', { name: /Jogador Gravado/ }));
+    await screen.findByText('Jogador Sintetico');
+    await user.click(screen.getByRole('button', { name: 'Fechar' }));
+
+    expect(await screen.findByText('Atualizado agora')).toBeInTheDocument();
+  });
+
+  it('sem vínculo: o botão "Vincular" tem a logo oficial (>= 50 px) sozinha e nome acessível "Vincular conta Steam"', async () => {
+    renderCartao();
+
+    const botao = await screen.findByRole('button', { name: 'Vincular conta Steam' });
+    const logo = botao.querySelector('img') as HTMLImageElement;
+    expect(Number(logo.getAttribute('height'))).toBeGreaterThanOrEqual(50);
+    expect(logo).toHaveAttribute('alt', '');
+    expect(botao).toHaveClass('min-h-11');
+  });
+
+  it('plataformas sem suporte não aparecem (nem "Em breve"): só a Steam tem linha', async () => {
+    const { container } = (renderCartao(), { container: document.body });
+    await screen.findByRole('button', { name: 'Vincular conta Steam' });
+
+    expect(container.querySelectorAll('[data-plataforma-linha]')).toHaveLength(1);
+    expect(screen.queryByText(/Em breve/)).toBeNull();
+    for (const nome of ['PlayStation', 'Xbox', 'Epic']) {
+      expect(screen.queryByText(new RegExp(nome))).toBeNull();
+    }
+  });
+
+  it('desvincular no popup fecha o popup e a linha volta a "Vincular"', async () => {
+    api.listarContas.mockResolvedValue([CONTA]);
+    api.perfil.mockResolvedValue(PERFIL);
+    api.desvincular.mockResolvedValue(undefined);
+    const user = renderCartao();
+    await user.click(await screen.findByRole('button', { name: /Jogador Gravado/ }));
+    await screen.findByText('Jogador Sintetico');
+    await user.click(screen.getByRole('button', { name: 'Desvincular' }));
+    api.listarContas.mockResolvedValue([]);
+    await user.click(
+      within(screen.getByRole('dialog', { name: 'Desvincular a Steam' })).getByRole('button', {
+        name: 'Desvincular',
+      }),
+    );
+
+    expect(await screen.findByRole('button', { name: 'Vincular conta Steam' })).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 });
