@@ -16,9 +16,13 @@ export interface AvisoNaFila extends DadosDoAviso {
   id: number;
 }
 
-/** 4 s, mais 1 s a cada 20 caracteres acima de 60: dá tempo de ler. */
-export function duracaoDoAviso(texto: string): number {
-  return AVISO_MIN_MS + Math.ceil(Math.max(0, texto.length - 60) / 20) * 1_000;
+/** Um aviso com ação ("Ver") fica mais: quem navega por teclado precisa de tempo para chegar ao botão. */
+export const AVISO_COM_ACAO_MS = 12_000;
+
+/** 4 s, mais 1 s a cada 20 caracteres acima de 60: dá tempo de ler. Com ação, no mínimo `AVISO_COM_ACAO_MS`. */
+export function duracaoDoAviso(texto: string, comAcao = false): number {
+  const leitura = AVISO_MIN_MS + Math.ceil(Math.max(0, texto.length - 60) / 20) * 1_000;
+  return comAcao ? Math.max(leitura, AVISO_COM_ACAO_MS) : leitura;
 }
 
 let fila: readonly AvisoNaFila[] = [];

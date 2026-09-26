@@ -754,6 +754,7 @@ html[data-aba-oculta] .gira {
     box-shadow var(--mov-rapida) var(--ease-entrada),
     opacity var(--mov-rapida) var(--ease-entrada),
     transform var(--mov-rapida) var(--ease-entrada),
+    translate var(--mov-rapida) var(--ease-entrada),
     scale var(--mov-rapida) var(--ease-elastica);
 }
 

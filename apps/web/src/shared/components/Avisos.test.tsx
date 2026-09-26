@@ -52,6 +52,7 @@ describe('Avisos (CA-41 a CA-46)', () => {
     expect(duracaoDoAviso('a'.repeat(60))).toBe(4_000);
     expect(duracaoDoAviso('a'.repeat(61))).toBe(5_000);
     expect(duracaoDoAviso('a'.repeat(120))).toBe(7_000);
+    expect(duracaoDoAviso('curto', true)).toBe(12_000);
   });
 
   it('o tempo pausa com o mouse em cima e recomeça ao sair', async () => {

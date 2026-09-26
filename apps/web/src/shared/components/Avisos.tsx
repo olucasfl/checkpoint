@@ -12,7 +12,7 @@ function AvisoNaTela({ aviso }: { aviso: AvisoNaFila }) {
   const reduzido = useMovimentoReduzido();
   const [saindo, setSaindo] = useState(false);
   const [pausado, setPausado] = useState(false);
-  const restante = useRef(duracaoDoAviso(aviso.texto));
+  const restante = useRef(duracaoDoAviso(aviso.texto, aviso.acao !== undefined));
   const inicio = useRef(0);
 
   // O tempo corre enquanto ninguém está com o mouse ou o foco no aviso; ao voltar, continua de onde parou.
@@ -39,8 +39,9 @@ function AvisoNaTela({ aviso }: { aviso: AvisoNaFila }) {
   return (
     <div
       data-aviso={aviso.chek ?? 'sucesso'}
-      onMouseEnter={() => setPausado(true)}
-      onMouseLeave={() => setPausado(false)}
+      // Só o mouse pausa: no toque o `mouseenter` emulado ficaria preso até o próximo toque fora do aviso.
+      onPointerEnter={(evento) => evento.pointerType === 'mouse' && setPausado(true)}
+      onPointerLeave={(evento) => evento.pointerType === 'mouse' && setPausado(false)}
       onFocus={() => setPausado(true)}
       onBlur={() => setPausado(false)}
       className={`${saindo ? 'aviso-out' : 'aviso-in'} pointer-events-auto mx-auto flex max-w-[640px] items-center gap-3 rounded-2xl border border-destaque bg-painel px-3.5 py-2.5 text-[16px] text-texto`}
