@@ -32,7 +32,7 @@ export function TopNav() {
           >
             <Icon name="flag" size={20} filled />
           </span>
-          checkpoint
+          Checkpoint
         </Link>
 
         <nav aria-label="Navegação principal">

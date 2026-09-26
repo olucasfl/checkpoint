@@ -1,6 +1,6 @@
 import { Icon } from '@/shared/components/Icon';
 
-/** O logo "checkpoint" (círculo `destaque` com a bandeira em `fundo` e o nome), das telas fora do catálogo. */
+/** O logo "Checkpoint" (círculo `destaque` com a bandeira em `fundo` e o nome), das telas fora do catálogo. */
 export function BrandLogo() {
   return (
     <div className="flex items-center justify-center gap-2.5">
@@ -10,7 +10,7 @@ export function BrandLogo() {
       >
         <Icon name="flag" size={22} filled />
       </div>
-      <span className="font-display text-2xl font-extrabold tracking-[-0.01em]">checkpoint</span>
+      <span className="font-display text-2xl font-extrabold tracking-[-0.01em]">Checkpoint</span>
     </div>
   );
 }

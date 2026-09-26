@@ -10,8 +10,8 @@ const ICONES = '/icons';
 
 export const MANIFEST: Partial<ManifestOptions> = {
   id: '/',
-  name: 'checkpoint',
-  short_name: 'checkpoint',
+  name: 'Checkpoint',
+  short_name: 'Checkpoint',
   description: 'Seu registro de jogos: zerados, jogando e quero jogar.',
   lang: 'pt-BR',
   dir: 'ltr',

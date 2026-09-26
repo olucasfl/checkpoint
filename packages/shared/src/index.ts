@@ -19,4 +19,4 @@ export interface HealthCheckResponse {
 }
 
 /** Exemplo de utilitario compartilhado — remova quando nao for mais necessario. */
-export const APP_NAME = 'checkpoint' as const;
+export const APP_NAME = 'Checkpoint' as const;

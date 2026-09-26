@@ -95,7 +95,7 @@ export function InstallNudge() {
                   <em>Adicionar à Tela de Início</em>.
                 </>
               ) : (
-                'Instale o checkpoint para abrir direto da tela inicial, em tela cheia.'
+                'Instale o Checkpoint para abrir direto da tela inicial, em tela cheia.'
               )}
             </span>
             {!ios && (

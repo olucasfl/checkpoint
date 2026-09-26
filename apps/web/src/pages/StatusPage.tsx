@@ -15,7 +15,7 @@ export function StatusPage() {
   return (
     <main className="safe-x flex min-h-[70vh] flex-col items-center justify-center gap-6 py-10">
       <div className="text-center">
-        <h1 className="m-0 font-display text-4xl font-extrabold tracking-[-0.02em]">checkpoint</h1>
+        <h1 className="m-0 font-display text-4xl font-extrabold tracking-[-0.02em]">Checkpoint</h1>
         <p className="mt-2 text-texto-suave">Estrutura inicial do projeto</p>
       </div>
 
