@@ -453,7 +453,7 @@ e 4, porque o SW é desligado no `dev`. "Emulação" = DevTools → Device Toolb
 - [x] **CA-01** — **Dado** o catálogo com 10 jogos (um deles com título de 120 caracteres sem espaço),
       **quando** abro `/` em 360×640, **então** `document.documentElement.scrollWidth` é igual a
       `clientWidth` (sem rolagem horizontal da página). _Verificado pelo humano no Chrome em 360×640 (2026-09-24)._
-- [x] **CA-02** — **Dado** 360×640, **quando** abro `/`, **então** vejo a barra inferior com "Jogos"
+- [x] **CA-02** — _(atualizado por `troca-de-design-estante`, F2: a barra inferior de 68 px e o link "Perfil" do topo; ver CA-34)_ **Dado** 360×640, **quando** abro `/`, **então** vejo a barra inferior com "Jogos"
       (`aria-current="page"`), "Adicionar" e nenhum item "Perfil" (ele só entra com `autenticacao`
       etapa 2); **e** o botão "Adicionar jogo" do topo não aparece. **Dado** 1280 px, **então** a barra
       inferior não existe e o topo mostra "Adicionar jogo" como hoje.
@@ -465,7 +465,7 @@ e 4, porque o SW é desligado no `dev`. "Emulação" = DevTools → Device Toolb
       **então** vou para `/` com o formulário aberto.
 - [x] **CA-05** — **Dado** 360×640 com a lista rolada até o fim, **quando** olho a última linha,
       **então** ela está inteira acima da barra inferior (nada coberto).
-- [x] **CA-06** — **Dado** 360×640, **quando** meço (DevTools → inspecionar) os itens da barra
+- [x] **CA-06** — _(atualizado por `troca-de-design-estante`, F2: alvos ≥ 44 px medidos na estante; ver CA-36)_ **Dado** 360×640, **quando** meço (DevTools → inspecionar) os itens da barra
       inferior, os filtros, as ações da linha, os botões de status e os botões do rodapé da folha,
       **então** todos têm ≥ 44 × 44 px. _Verificado pelo humano no Chrome em 360×640 (2026-09-24)._
 - [x] **CA-07** — **Dado** 360×640 (quatro filtros com contagem), **quando** arrasto a fileira de filtros, **então**
@@ -490,7 +490,7 @@ e 4, porque o SW é desligado no `dev`. "Emulação" = DevTools → Device Toolb
 - [x] **CA-13** — **Dado** `prefers-reduced-motion: reduce` emulado, **quando** abro o formulário em
       360×640, **então** a folha aparece sem animação de subida; **e** os avisos das etapas 2 a 4 também
       aparecem sem deslizar.
-- [x] **CA-14** — **Dado** o toque (emulação com toque ligado), **quando** toco numa linha da lista e
+- [x] **CA-14** — _(atualizado por `troca-de-design-estante`, F2: o hover é do tile e só em `@media (hover: hover)`; em toque as ações não existem; ver CA-24 e CA-25)_ **Dado** o toque (emulação com toque ligado), **quando** toco numa linha da lista e
       solto, **então** ela não fica com o fundo de hover preso.
 - [x] **CA-15** — **Dado** `apps/web/index.html`, **quando** o leio, **então** `#overlay-root` existe,
       é irmão de `#root` (não está dentro dele); **e** a barra inferior está dentro de `#overlay-root`

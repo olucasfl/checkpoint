@@ -562,7 +562,7 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
 ### 5.5 Catálogo de jogos (`features/games/`, spec `docs/specs/catalogo-jogos.md`, etapa 3)
 
 - **Dados:** o web busca a lista **completa** uma vez (`GET /api/games`, query `['games']`); o filtro
-  (`/?status=`, na URL) e as contagens dos painéis e botões saem dela, no cliente. Toda mutação invalida
+  (`/?status=`, na URL) e as contagens (pílulas de filtro e contadores das prateleiras) saem dela, no cliente. Toda mutação invalida
   essa query. Chamadas só pelo `apiClient`, tipos de `@checkpoint/shared`. O upload da capa manda
   `multipart/form-data` **explícito**: o `apiClient` tem `Content-Type: application/json` por padrão e,
   nesse caso, o axios converte o `FormData` em JSON (a API recebia o arquivo vazio: 400).
@@ -584,14 +584,28 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
   permite dar nota 0). O erro de digitação (fora de 0 a 10, ou casa demais) aparece **na hora** e bloqueia o
   envio; os da API vêm por `fields` (cada critério, `notas` na seção, `descricao`). Em "Quero jogar" a seção some,
   as notas digitadas ficam no estado (voltar para Jogando as recupera) e um aviso diz que serão apagadas ao salvar.
-  `DescricaoField`: textarea com `maxLength` 1000 e contador `n/1000`. A `GameRow` mostra só a **média**
-  (`RatingBar`: barra de 10 segmentos que preenche `round(média)`, número com vírgula e 1 casa, `aria-label`
-  "Nota 8,3 de 10"; "—" sem média) e o **título é um `<Link>` real** para `/jogos/:id`, esticado sobre a linha
-  por `after:absolute after:inset-0` (sem `<a>` aninhado nem `onClick` no `<li>`), com as ações em `z-10` por cima.
+  `DescricaoField`: textarea com `maxLength` 1000 e contador `n/1000`. O `GameTile` (F2; antes, `GameRow`) mostra só a **média**, como `AnelDeNota` (arco `conic-gradient` de `--pct` sobre trilho escuro, número com vírgula e 1 casa, `role="img"` "Nota 8,3 de 10"; **sem média, sem anel**; 0 é nota) e o **título é um `<Link>` real** para `/jogos/:id`, esticado sobre o tile por `after:absolute after:inset-0` (sem `<a>` aninhado nem `onClick` no `<li>`), com as ações em `z-10` por cima. A `RatingBar` (segmentos) só sobrevive no detalhe até a F3.
+- **Estante** (spec `troca-de-design-estante`, F2; substitui a lista em linhas, `GameRow` e `StatPanels`): a `GamesPage` busca a
+  lista completa e a divide no cliente com `lib/estante.ts` (puro, com teste): `agruparEmPrateleiras(games, filtro)` (Jogando agora,
+  Quero jogar, Zerados, nessa ordem, **só as que têm jogo**; a ordem interna é a da API, `atualizadoEm` desc), `destaqueDoCatalogo`
+  (o **primeiro Jogando da lista**, e **só com o filtro Todos ou Jogando**; toda edição o promove, questão 14), `chipsDoDestaque` (horas e
+  conquistas **só nos ligados à Steam**) e `nomeDaPlataforma` ("Xbox Series X|S" vira "X/S" **só na tela**: a barra parecia um "I" na
+  Manrope; o valor gravado não muda). Componentes: `DestaqueContinue` (cartão de 230 px no desktop e 176 no celular, fundo = capa enviada
+  ou oficial sob `.destaque-scrim`, senão a cor gerada; a coluna de texto tem no máximo 50%; o cartão **cresce** em vez de cortar o texto
+  se a fonte de reserva alargar os chips; no celular o `<Link>` cobre o cartão inteiro e o texto "Ver detalhes" vira `sr-only`),
+  `Prateleira` (`<section>` + `<ul aria-label>`; **grade de colunas do tamanho da capa no desktop e fileira que rola por dentro no
+  celular**, com `scroll-px-4` para o `snap` não comer o recuo; o botão-bloco "Adicionar em …" fecha a lista e abre o `GameForm` com
+  `statusInicial` = o status dela, enquanto o "Adicionar jogo" do topo mantém o padrão), `GameTile` e `AnelDeNota`. **Editar e Remover**
+  ficam em `.tile-acoes`: `display: none` por padrão (em toque nem existem na tela, e o caminho é abrir o jogo) e, **só dentro de
+  `@media (hover: hover)`**, aparecem em `:hover` e `:focus-within`, junto da elevação de −6 px e do anel; a variante `movimento-reduzido`
+  tira o `transform` e as transições (o anel continua). `StatusFilter` são pílulas de 44 px (a ativa com fundo `texto`); no desktop o grupo
+  é um contêiner em pílula que **rola por dentro quando não cabe** (em 768 a 1100 px só parte das pílulas fica à vista), no celular é uma
+  fileira que rola e traz a ativa à vista. **`GameCover`** é sempre em pé (3:4; `tile` 150 × 200 e 132 × 176, `tileCompacto` 120 × 160 e
+  108 × 144, `detalhe`, `preview`), cadeia **enviada → oficial → gerada** (o `header.jpg` saiu) com `object-fit: cover`. A **densidade
+  compacta** só troca as medidas (`compacta` em `Prateleira` e `GameTile`).
 - **Página de detalhes** (spec `avaliacao-de-jogos`, etapa 3): **`/jogos/:id`** (`pages/GameDetailPage.tsx`) acha o jogo
   na **mesma query `['games']`** do catálogo (`useGames`; **sem `GET /api/games/:id`**, um link direto carrega a lista
-  toda, como o catálogo já faz). `GameDetail` mostra a capa grande (`GameCover` `detalhe`, quadrada até 320 px, com o
-  fallback de cor + iniciais), título, plataforma e status; a **média em destaque** (`RatingBar` `grande`); os **5
+  toda, como o catálogo já faz). `GameDetail` mostra a capa grande (`GameCover` `detalhe`, em pé 3:4 até 300 × 400, com o fallback de cor + iniciais), título, plataforma e status; a **média em destaque** (`RatingBar` `grande`); os **5
   critérios** de `GAME_RATING_CRITERIA` (rótulo, descrição curta e a nota com a barra, ou "sem nota"); e a
   **descrição como texto** (`whitespace-pre-line`; nunca `dangerouslySetInnerHTML`) ou o convite "Adicionar
   descrição", que abre o formulário. Coluna única no celular; a partir de `lg` (1024 px) a capa fica ao lado do
@@ -613,7 +627,7 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
   avisos) e Zerado = `status-zerado`; chips de status usam `tint-status-*` (18% da cor). Erro: `erro` (borda e preenchimento) e `erro-texto`
   (texto de botão de perigo). O acento (logo, "Adicionar", botões principais, foco, barras) é o token **`destaque`** (§5.12).
   **`borda-controle` é `#606a8e`** (3,32:1 sobre o painel; o desenho trazia um valor de 1,86:1 que reprova a WCAG 1.4.11) e o anel de foco
-  é o `destaque`. `apagado` (segmentos da barra de nota) é temporário até a F2. `prefers-reduced-motion: reduce` desliga todas as animações e
+  é o `destaque`. `apagado` (segmentos da `RatingBar` do detalhe) é temporário até a F3. `prefers-reduced-motion: reduce` desliga todas as animações e
   transições (variante `movimento-reduzido`, §5.12). Fontes **Outfit** (`--font-display`) e **Manrope** (`--font-corpo`) e ícones
   (Material Symbols Rounded) vêm por `<link>` no `index.html` (`display=swap`, `system-ui` de reserva), sem pacote npm; offline cai a fonte do
   sistema, como antes. Sem orbes, _scanlines_, pulso nem brilhos neon: o `Backdrop` é só um halo estático (`.halo`).
@@ -622,8 +636,7 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
   esconde o problema).
 - **Testes** (Vitest + Testing Library, `apiClient`/`gamesApi` mockados; o `jsdom` não tem
   `showModal()`, então `src/test/setup.ts` tem um polyfill mínimo): `lib/*.test.ts`,
-  `GameForm.test.tsx`, `GamesPage.test.tsx`, `api/games-api.test.ts` e `styles/tokens.test.ts` (sem hex
-  fora do `@theme`, regra de movimento reduzido no CSS, links de fontes).
+  `GameForm.test.tsx`, `GamesPage.test.tsx`, `components/estante.test.tsx` (tile, prateleira, destaque, filtros e a regra CSS do hover), `AnelDeNota.test.tsx`, `GameCover.test.tsx`, `lib/estante.test.ts`, `api/games-api.test.ts` e `styles/tokens.test.ts` (sem hex fora do `@theme`, regra de movimento reduzido no CSS, links de fontes, contraste das iniciais da capa).
 
 ### 5.6 Layout mobile-first (`app/layout/`, spec `docs/specs/pwa-e-mobile.md`, etapa 1)
 
@@ -638,21 +651,19 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
   um jogo. `isNavActive(item, pathname)` decide (caminho exato ou o prefixo); a barra e o topo usam `Link` com
   `aria-current="page"` calculado por ela, e não o `NavLink`, que só marca o que casa com o próprio `to` (e com
   `end` `/jogos/:id` deixaria "Jogos" apagado).
-- **`BottomNav`** (< 768px, o `md`): fixa embaixo, renderizada por portal (`OverlayPortal`) no
+- **`BottomNav`** (< 768px, o `md`; F2: 68 px no total, sendo 67 da lista e 1 da borda de cima, fundo `painel-2`, itens de ≥ 88 × 44 com rótulo de 12 px e o ativo em `destaque` com ícone cheio): fixa embaixo, renderizada por portal (`OverlayPortal`) no
   `#overlay-root`, irmão do `#root` no `index.html`, para nenhum `transform` de ancestral prender o
   `position: fixed`. Some enquanto um campo **fora de diálogo** está focado
   (`use-typing-outside-dialog`), para não flutuar sobre o teclado virtual. "Adicionar" navega para
   `/?novo=1` (mantendo o `?status=` quando já está em `/`); a `GamesPage` abre o formulário e tira o
   `novo` da URL com `replace` (`features/games/lib/new-game.ts`).
-- **`TopNav`** (>= 768px) usa a mesma lista, mas só aparece com mais de um link; com um só, o desktop
-  fica como era (o "Adicionar" do desktop é o botão "Adicionar jogo" do catálogo).
+- **`TopNav`** (>= 768px, F2) é o logo (link para `/`) e a navegação em **pílulas** de 44 px (a ativa com fundo `texto` e `aria-current`), a mesma lista; só aparece com mais de um link e **não é renderizado em `/`**: o catálogo tem a barra própria, na `GamesPage` (logo com `aria-current="page"`, os filtros, "Adicionar jogo" e o link redondo "Perfil"). Logo e ações não encolhem e o grupo de filtros rola por dentro quando falta espaço (sem segundo ponto de quebra).
 - **Ponto de quebra único: 768px (`md`).** O catálogo usava `max-[900px]`; não usa mais.
 - **CSS** (`styles/index.css`, camada `components`): `.app-shell` (`100dvh` com `100vh` de reserva),
-  `.safe-x`, `.nav-clearance` e `.bottom-nav` (safe-area por `env()`), `.game-row` (grade no celular,
-  linha no desktop, áreas por `data-area`), `.game-title` (2 linhas no celular), `dialog.modal` (folha
+  `.safe-x`, `.nav-clearance` e `.bottom-nav` (safe-area por `env()`), `.tile-*` (título de 2 linhas, ações só com hover, elevação), `.destaque-scrim`, `.capa-*`, `dialog.modal` (folha
   inferior no celular com a animação `sheet-up`, centralizado em >= 768px), `.sheet-footer`/`.sheet-pad`.
   Globais: `touch-action: manipulation`, piso de 16px nos campos (camada `base`, evita o zoom do iOS),
-  hover da linha só com `@media (hover: hover)` e `overscroll-behavior-y: none` só no app instalado.
+  hover do tile só com `@media (hover: hover)` e `overscroll-behavior-y: none` só no app instalado.
   `env(safe-area-*)` fica em classe própria, não em classe arbitrária do Tailwind (que poderia
   espaçar o `-` dentro do `calc()`).
 - **Viewport** (`index.html`): `viewport-fit=cover` e `interactive-widget=resizes-content`, **sem**
@@ -881,8 +892,7 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
   "Jogos") troca a URL por `/?status=<filtro>` com `replace`, no mesmo efeito da `GamesPage` que trata o
   `?novo=1` (dois `setSearchParams` seguidos se sobrescreveriam), e o 1º render já filtra. Com filtro inicial
   diferente de Todos, "Todos" grava `?status=TODOS` (lido como Todos). Parâmetro explícito é respeitado.
-- **Densidade compacta:** `GameRow` com `game-row-compacta` (capa `GameCover` `compacta` 40 × 40, menos espaço)
-  e a legenda "Nota" some em ≥ 768px (a barra fica numa linha); ações continuam 44 × 44.
+- **Densidade compacta** (F2): tiles menores (`GameCover` `tileCompacto`: 120 × 160, e 108 × 144 no celular; o bloco "Adicionar" da prateleira acompanha); as ações continuam 44 × 44.
 - **Favoritas:** `groupsWithFavorites` (`features/games/lib/platforms.ts`) põe o grupo "Favoritas" primeiro
   e as tira do grupo da família (sem opção repetida); o `PlatformField` recebe as favoritas do `GameForm`.
 - **Tela** (etapa 5: `features/perfil/components/PreferenciasModal.tsx`, aberto pela linha de Preferências do
@@ -890,7 +900,7 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
   três abas em `Abas.tsx` (`tablist`/`tab`/`tabpanel`, ativação automática, setas com volta circular, Home/End, Tab só
   na ativa, foco inicial na aba ativa): **Aparência** (cor de destaque em bolinhas `role="radio"` com nome
   acessível, pela variante `bolinha` do `GrupoOpcoes`; densidade e animações, cada uma com sua prévia em
-  `PreviasAparencia.tsx`: duas linhas de jogo sintéticas nas medidas da `GameRow`, e um esqueleto que anima (ou para) mais um texto do estado), **Catálogo** (filtro inicial) e **Plataformas** (`ChipsPlataformas`:
+  `PreviasAparencia.tsx`: dois tiles sintéticos nas medidas da densidade escolhida, e um esqueleto que anima (ou para) mais um texto do estado), **Catálogo** (filtro inicial) e **Plataformas** (`ChipsPlataformas`:
   chips `aria-pressed` por família; a 9ª mostra "Até 8 favoritas" e não marca). **Sem Salvar**: cada escolha chama
   `alterarPrefs`, que aplica no `<html>` e grava por usuário, e o próprio modal usa o token `destaque`, então a cor
   nova aparece nele também. "Restaurar padrões" volta só as preferências da aba ativa (`PADROES_DA_ABA`, a partir

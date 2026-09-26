@@ -1,6 +1,6 @@
 # Spec: troca de design — "Estante de console"
 
-> Status: 🚧 em andamento (aprovada em 2026-09-25). **F1 implementada** (branch `feat/design-estante-f1`); F2 a F4 não começaram. As
+> Status: 🚧 em andamento (aprovada em 2026-09-25). **F1 e F2 implementadas** (branches `feat/design-estante-f1` e `feat/design-estante-f2`); F3 e F4 não começaram. As
 > decisões 1 a 3 e as questões 4 a 14 foram respondidas com "aceito todas as recomendações" (registro em "Decisões tomadas").
 
 ## Objetivo
@@ -73,7 +73,7 @@ commit que muda o comportamento descrito.
 | **F3** detalhe e formulários | `/jogos/:id` (anel, barras, bloco Steam, lista de conquistas), formulário "Novo jogo/Editar", diálogos de confirmação                                                                                                                                                                                                       | telas herdadas (perfil, login…)                                                                             | as quatro telas desenhadas prontas                                                                         | CA-40 a CA-54                       |
 | **F4** herdado e fechamento  | conferência visual de tudo que herda (lista abaixo), ajuste de formas nas telas herdadas, `/qa-verify` no app rodando, `ARCHITECTURE.md` e status da spec                                                                                                                                                                   | nada novo                                                                                                   | direção completa                                                                                           | CA-61 a CA-70                       |
 
-**Estado (2026-09-25):** **F1 implementada** em `feat/design-estante-f1` (7 commits, do `feat(web): tokens do tema estante e fontes outfit e manrope` ao de docs); F2, F3 e F4 não começaram.
+**Estado (2026-09-25):** **F1 implementada** em `feat/design-estante-f1` (7 commits, do `feat(web): tokens do tema estante e fontes outfit e manrope` ao de docs) e **F2 implementada** em `feat/design-estante-f2` (do `feat(web): capa em pe 3:4` ao de docs, mais os `fix` e `test` da conferência); F3 e F4 não começaram. Nada foi mesclado na `main`.
 
 **Riscos, para quem implementar.** (1) O rename de tokens toca ~39 arquivos (mecânico; o `tsc` e os testes são a rede de
 segurança). (2) `hover: translateY` e a sombra do anel são cortados por contêineres com `overflow` (as prateleiras do
@@ -461,73 +461,125 @@ magenta (questão 11, fora desta spec). Sem rolagem horizontal em nenhuma tela; 
 
 ### F2 — catálogo em estante
 
-- [ ] **CA-13** [T] — **Dado** ≥ 768 px e jogos nos três status, **quando** abro `/`, **então** a barra superior tem o logo, o grupo
+- [x] **CA-13** [T] — **Dado** ≥ 768 px e jogos nos três status, **quando** abro `/`, **então** a barra superior tem o logo, o grupo
       "Filtrar por status" com quatro botões (ícone, rótulo e contagem, "Todos" = total, exatamente o ativo com `aria-pressed="true"`),
       "Adicionar jogo" e o link "Perfil".
-- [ ] **CA-14** [T] — **Dado** o filtro "Zerado", **quando** clico nele, **então** a URL vira `/?status=ZERADO` e só a prateleira
+- [x] **CA-14** [T] — **Dado** o filtro "Zerado", **quando** clico nele, **então** a URL vira `/?status=ZERADO` e só a prateleira
       "Zerados" aparece; **e** recarregar mantém; `?status=PAUSADO` vale como "Todos" (CA-45 a CA-47 do catálogo e CA-16 do perfil continuam).
-- [ ] **CA-15** [T] — **Dado** dois jogos Jogando, "A" atualizado depois de "B", **quando** abro `/` com "Todos", **então** o destaque
+- [x] **CA-15** [T] — **Dado** dois jogos Jogando, "A" atualizado depois de "B", **quando** abro `/` com "Todos", **então** o destaque
       "Continue de onde parou" mostra **A** (título, chips de plataforma e de média quando existem) e "Ver detalhes" leva a `/jogos/<A>`; **e** A
       também aparece em "Jogando agora".
-- [ ] **CA-16** [T] — **Dado** o destaque de um jogo ligado à Steam com 2550 min e 12 de 40 conquistas, **então** os chips mostram
+- [x] **CA-16** [T] — **Dado** o destaque de um jogo ligado à Steam com 2550 min e 12 de 40 conquistas, **então** os chips mostram
       "42 h 30 min na Steam" e "12/40 conquistas"; **e** num jogo não ligado esses dois chips não existem.
-- [ ] **CA-17** [T] — **Dado** jogos sem nenhum Jogando, **quando** abro `/`, **então** não há destaque e a primeira prateleira começa
+- [x] **CA-17** [T] — **Dado** jogos sem nenhum Jogando, **quando** abro `/`, **então** não há destaque e a primeira prateleira começa
       logo abaixo da barra.
-- [ ] **CA-18** [T] — **Dado** jogos Jogando, **quando** escolho o filtro "Quero jogar" ou "Zerado", **então** o destaque não aparece; com
+- [x] **CA-18** [T] — **Dado** jogos Jogando, **quando** escolho o filtro "Quero jogar" ou "Zerado", **então** o destaque não aparece; com
       "Todos" ou "Jogando", aparece.
-- [ ] **CA-19** [T] — **Dado** o destaque de A, **quando** edito outro jogo Jogando "B" (o `atualizadoEm` de B passa a ser o maior),
+- [x] **CA-19** [T] — **Dado** o destaque de A, **quando** edito outro jogo Jogando "B" (o `atualizadoEm` de B passa a ser o maior),
       **então** o destaque passa a ser B, sem recarregar.
-- [ ] **CA-20** [T] — **Dado** jogos só em Jogando e Zerado, **quando** abro `/` com "Todos", **então** vejo as prateleiras "Jogando
+- [x] **CA-20** [T] — **Dado** jogos só em Jogando e Zerado, **quando** abro `/` com "Todos", **então** vejo as prateleiras "Jogando
       agora" e "Zerados", cada uma com ícone na cor do status, título e contador, e **não** vejo "Quero jogar".
-- [ ] **CA-21** [T] — **Dado** um jogo com média 8,3 e plataforma PC, **então** o _tile_ mostra o anel com "8,3" (`img` "Nota 8,3 de 10"),
+- [x] **CA-21** [T] — **Dado** um jogo com média 8,3 e plataforma PC, **então** o _tile_ mostra o anel com "8,3" (`img` "Nota 8,3 de 10"),
       o chip "PC" e o título; **e** um jogo sem média não tem anel, e um sem plataforma não tem chip; **e** um jogo com média 0 mostra o anel
       com "0,0".
-- [ ] **CA-22** [T] — **Dado** um jogo ligado com 2550 min e 12 de 40, **então** o _tile_ mostra "42 h · 12/40" com o `aria-label` "Tempo
+- [x] **CA-22** [T] — **Dado** um jogo ligado com 2550 min e 12 de 40, **então** o _tile_ mostra "42 h · 12/40" com o `aria-label` "Tempo
       jogado na Steam: 42 horas, 12 de 40 conquistas"; com total 0, só "42 h"; com 0 min, "0 h"; e um jogo não ligado não mostra nada.
-- [ ] **CA-23** [T] — **Dado** um _tile_, **quando** clico no título ou na capa, **então** vou a `/jogos/<id>`; **quando** clico em Editar
+- [x] **CA-23** [T] — **Dado** um _tile_, **quando** clico no título ou na capa, **então** vou a `/jogos/<id>`; **quando** clico em Editar
       ou Remover, **então** abre o formulário ou a confirmação **sem navegar**.
-- [ ] **CA-24** [T+N] — **Dado** um aparelho com hover, **quando** passo o mouse num _tile_, **então** Editar e Remover aparecem, o _tile_
+- [x] **CA-24** [T+N] — **Dado** um aparelho com hover, **quando** passo o mouse num _tile_, **então** Editar e Remover aparecem, o _tile_
       sobe 6 px e ganha o anel; **e** navegando só por Tab, ao focar o título as duas ações aparecem e são focáveis, com o anel de foco visível.
-- [ ] **CA-25** [T+N] — **Dado** um aparelho **sem** hover (toque), **então** o _tile_ não mostra Editar nem Remover e os botões não
+- [x] **CA-25** [T+N] — **Dado** um aparelho **sem** hover (toque), **então** o _tile_ não mostra Editar nem Remover e os botões não
       ocupam nem interceptam toque; **e** abrir o jogo mostra **Editar** e **Excluir** funcionando (o caminho sem hover).
-- [ ] **CA-26** [T] — **Dado** a prateleira "Jogando agora", **quando** clico no botão-bloco "Adicionar" ao fim dela, **então** abre o
+- [x] **CA-26** [T] — **Dado** a prateleira "Jogando agora", **quando** clico no botão-bloco "Adicionar" ao fim dela, **então** abre o
       formulário de novo jogo com o status **Jogando** já marcado; **e** o "Adicionar jogo" do topo abre o formulário com o padrão de hoje.
-- [ ] **CA-27** [T+N] — **Dado** a prateleira com mais jogos do que cabem numa linha, **então** [comportamento decidido na questão 4: o
-      desktop quebra em linhas **ou** rola na horizontal] **e** a página nunca ganha rolagem horizontal.
-- [ ] **CA-28** [T] — **Dado** o catálogo vazio, **então** vejo "Nenhum jogo cadastrado" com o convite a adicionar; **dado** um filtro sem
+- [x] **CA-27** [T+N] — **Dado** a prateleira com mais jogos do que cabem numa linha, **então** o desktop quebra em linhas (grade) e o celular rola dentro da prateleira (questão 4, opção c) **e** a página nunca ganha rolagem horizontal.
+- [x] **CA-28** [T] — **Dado** o catálogo vazio, **então** vejo "Nenhum jogo cadastrado" com o convite a adicionar; **dado** um filtro sem
       jogos, "Nenhum jogo neste status"; **dado** a API fora do ar, a mensagem com "Tentar de novo" (CA-41, CA-46 e CA-50 do catálogo).
-- [ ] **CA-29** [T] — **Dado** 2 Jogando, 1 Zerado e 0 Quero jogar, **então** as pílulas mostram Todos 3, Jogando 2, Quero jogar 0,
+- [x] **CA-29** [T] — **Dado** 2 Jogando, 1 Zerado e 0 Quero jogar, **então** as pílulas mostram Todos 3, Jogando 2, Quero jogar 0,
       Zerado 1 e as prateleiras 2 e 1; **quando** crio um Jogando, os números sobem para 4, 3, 0, 1 e 3, 1, **sem recarregar**; editar para
       Zerado e remover também os atualizam. (Substitui o CA-79 do catálogo.)
-- [ ] **CA-30** [T] — **Dado** ≥ 768 px, **então** os painéis grandes de contagem e o texto "Última atualização primeiro" **não** existem, e a
+- [x] **CA-30** [T] — **Dado** ≥ 768 px, **então** os painéis grandes de contagem e o texto "Última atualização primeiro" **não** existem, e a
       ordem dos jogos continua `atualizadoEm` decrescente.
-- [ ] **CA-31** [N] — **Dado** 390 px, **quando** abro `/`, **então** `document.documentElement.scrollWidth` é igual a `clientWidth` (a página
+- [x] **CA-31** [N] — **Dado** 390 px, **quando** abro `/`, **então** `document.documentElement.scrollWidth` é igual a `clientWidth` (a página
       não rola na horizontal); a fileira de filtros e cada prateleira rolam na horizontal **dentro delas**.
-- [ ] **CA-32** [T+N] — **Dado** `/?status=ZERADO` no celular, **então** a pílula "Zerado" já está visível na fileira, sem rolar.
-- [ ] **CA-33** [T] — **Dado** < 768 px, **então** o destaque compacto é um único `link` para o detalhe, sem "Ver detalhes"; e as regras de
+- [x] **CA-32** [T+N] — **Dado** `/?status=ZERADO` no celular, **então** a pílula "Zerado" já está visível na fileira, sem rolar.
+- [x] **CA-33** [T] — **Dado** < 768 px, **então** o destaque compacto é um único `link` para o detalhe, sem "Ver detalhes"; e as regras de
       aparecer (CA-15 a CA-18) valem igual.
-- [ ] **CA-34** [T] — **Dado** < 768 px, **então** a `BottomNav` tem "Jogos" (`aria-current="page"` em `/` e em `/jogos/:id`), "Adicionar"
+- [x] **CA-34** [T] — **Dado** < 768 px, **então** a `BottomNav` tem "Jogos" (`aria-current="page"` em `/` e em `/jogos/:id`), "Adicionar"
       e "Perfil", cada um com ≥ 88 × 44 px; o ativo usa `destaque`; "Adicionar" abre o formulário como folha inferior (`?novo=1` continua
       funcionando); e a barra some com o teclado aberto fora de diálogo.
-- [ ] **CA-35** [T] — **Dado** 767 px e 768 px, **então** 767 usa o layout de celular (barra inferior, prateleiras com rolagem) e 768 o de
+- [x] **CA-35** [T] — **Dado** 767 px e 768 px, **então** 767 usa o layout de celular (barra inferior, prateleiras com rolagem) e 768 o de
       desktop (barra superior, `BottomNav` ausente); não há outro ponto de quebra no catálogo.
-- [ ] **CA-36** [N] — **Dado** 360×640 e 1024 px, **quando** meço filtros, _tiles_ (links), botões e itens da barra, **então** todo alvo tem
+- [x] **CA-36** [N] — **Dado** 360×640 e 1024 px, **quando** meço filtros, _tiles_ (links), botões e itens da barra, **então** todo alvo tem
       ≥ 44 × 44 px e o texto de apoio tem ≥ 12 px.
 
 ### Capa (F2)
 
-- [ ] **CA-37** [T] — **Dado** um jogo sem capa, **então** o _tile_ mostra a capa gerada **em pé (3:4)** com as iniciais no canto superior
+- [x] **CA-37** [T] — **Dado** um jogo sem capa, **então** o _tile_ mostra a capa gerada **em pé (3:4)** com as iniciais no canto superior
       esquerdo ("Hollow Knight" → "HK"; "Celeste" → "C") sobre uma cor da paleta; **e** a cor é a mesma ao recarregar e para outro jogo com
       o mesmo título (o hash não mudou). (Substitui o CA-72 do catálogo.)
-- [ ] **CA-38** [T] — **Dado** um jogo com `capaUrl` de uma imagem larga (ex.: 16:9) ou alta, **então** o _tile_ mostra a imagem em 3:4
+- [x] **CA-38** [T] — **Dado** um jogo com `capaUrl` de uma imagem larga (ex.: 16:9) ou alta, **então** o _tile_ mostra a imagem em 3:4
       com `object-fit: cover` (recorte centralizado); **e** se ela falhar ao carregar, cai para a próxima da cadeia e, por fim, para a gerada.
       (Substitui o CA-73 do catálogo.)
-- [ ] **CA-39** [T] — **Dado** um jogo ligado à Steam e **sem** capa enviada, **então** o _tile_ mostra a capa oficial; **e** com capa
+- [x] **CA-39** [T] — **Dado** um jogo ligado à Steam e **sem** capa enviada, **então** o _tile_ mostra a capa oficial; **e** com capa
       enviada, a enviada; **e** removendo a enviada, a oficial reaparece (CA-42 da `integracao-plataformas`, inalterado).
-- [ ] **CA-40** [T] — **Dado** o formulário com uma capa, **então** o preview é em 3:4 e há a linha "A capa aparece em pé (3:4); imagens
+- [x] **CA-40** [T] — **Dado** o formulário com uma capa, **então** o preview é em 3:4 e há a linha "A capa aparece em pé (3:4); imagens
       de outra proporção são cortadas no centro."; **e** escolher um GIF ou um arquivo de 3 MB continua mostrando o erro sem enviar nada
       (CA-74 e CA-77 do catálogo).
-- [ ] **CA-41** [T] — **Dado** as seis cores da capa, **então** as iniciais têm ≥ 4,5:1 sobre cada uma (tabela).
+- [x] **CA-41** [T] — **Dado** as seis cores da capa, **então** as iniciais têm ≥ 4,5:1 sobre cada uma (tabela).
+
+#### Evidência da F2 (2026-09-25)
+
+Legenda: **T** = teste automatizado; **N** = medido no navegador (Chromium headless pelo Playwright, Vite em `localhost:5199` com a API
+**mockada** e dados sintéticos; **não** foi aparelho real).
+
+| CA            | Evidência                                                                                                                                                                                                                                                                                                                                              |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| CA-13         | T `GamesPage.test.tsx` (logo, "Perfil", grupo com `aria-pressed`, "Adicionar jogo") e `estante.test.tsx`. N 1280 px: logo, grupo de filtros (601 × 56), "Adicionar jogo" (170 × 44) e Perfil (44 × 44) na mesma barra; **nenhum `nav` visível em `/`** (o `TopNav` não é renderizado)                                                                  |
+| CA-14, CA-30  | T `GamesPage.test.tsx` (`?status=ZERADO` só com "Zerados", recarregar, inválido = Todos, sem painéis nem "Última atualização primeiro"). N: `?status=ZERADO` mostra só a prateleira `ZERADO` e sem destaque                                                                                                                                            |
+| CA-15 a CA-19 | T `GamesPage.test.tsx` e `estante.test.tsx` (destaque, chips só da Steam, sem Jogando, filtros; **editar outro Jogando o promove sem recarregar**). N: título de 52 px, chips numa linha (cartão de 1168 × 230, coluna a 50%), "Ver detalhes" de 154 × 44                                                                                              |
+| CA-20, CA-21  | T (prateleiras só com jogo, contador, anel `img` "Nota 8,3 de 10", 0 = "0,0", sem média sem anel, chip só com plataforma). N: anel de 40 px a 10 px dos cantos, chip de 26 px                                                                                                                                                                          |
+| CA-22         | T (`resumoDoCatalogo`, `estante.test.tsx`). N: "42 h · 12/40", "0 h" (com total nulo) e "10 h · 20/20", cada uma com o `aria-label` da spec                                                                                                                                                                                                            |
+| CA-23         | T (o título é o `link`; Editar abre o formulário **sem navegar**). N: clicar em "Editar Hollow Knight" abre o `dialog` e a URL segue `/`                                                                                                                                                                                                               |
+| CA-24         | T (a regra CSS: ações só em `@media (hover: hover)`, `:hover` e `:focus-within`). N (`hover: hover`): o tile sobe **−6 px**, ganha o anel (`box-shadow` de 3 px `texto` + 7 px `destaque` a 55%), as ações passam de opacidade 0 a 1 (44 × 44, dentro da capa); com **Tab** as ações aparecem e o foco tem contorno visível                            |
+| CA-25         | T (a mesma regra: `display: none` fora de `hover: hover`). N (`hover: none`, em 390 px **e** em 1024 px com toque): `.tile-acoes` com `display: none`, botões 0 × 0. O caminho é o detalhe (Editar e Excluir já existentes, `GameDetailPage.test.tsx`; **não reaberto no navegador**)                                                                  |
+| CA-26         | T (`GamesPage.test.tsx`: "Adicionar em Jogando agora" abre com Jogando; o do topo, com o padrão). N: o "Adicionar" de "Quero jogar" abre com **Quero jogar** marcado                                                                                                                                                                                   |
+| CA-27         | N: prateleira com **15 itens (14 jogos + Adicionar)** = 3 linhas no desktop, 0 itens fora da lista, sem rolagem interna; no celular a fileira rola por dentro (2208 px de conteúdo em 390) e o `scrollX` da página fica 0                                                                                                                              |
+| CA-28, CA-29  | T (estados vazio, filtrado, erro e "Tentar de novo"; pílulas 3/2/0/1 e prateleiras 2/1, depois 4/3/0/1 e 3/1 ao criar, e Zerado 0 e Todos 3 ao remover, sem recarregar)                                                                                                                                                                                |
+| CA-31, CA-32  | N 390 px: `scrollWidth` = `clientWidth` = 390; os filtros rolam (831 em 358) e cada prateleira rola dentro dela; `?status=ZERADO` traz a pílula "Zerado" à vista (`scrollLeft` 227). **Sem teste automatizado** do CA-32 (o jsdom não tem layout)                                                                                                      |
+| CA-33 a CA-35 | T `AppLayout.test.tsx` (`aria-current`, "Adicionar" abre o formulário, some com o teclado). N 390 px: o link do destaque mede 358 × 178 = o cartão; barra de 68 px com itens de 137, 114 e 114 × 44. **767 px:** barra inferior, sem "Adicionar jogo" no topo, tile de 132; **768 px:** o inverso, tile de 150                                         |
+| CA-36         | N em 360 × 640, 768, 1024 e 1280: **0 alvos abaixo de 44 × 44** (o link do tile e o do destaque medidos pelo elemento esticado), menor texto visível de **12 px**; as ações do hover medem 44 × 44                                                                                                                                                     |
+| CA-37 a CA-41 | T `GameCover.test.tsx` (em pé, iniciais, hash inalterado, `cover`, cadeia enviada → oficial → gerada), `GamesPage.test.tsx`, `GameForm.test.tsx` (linha do 3:4; GIF e 3 MB barrados) e `tokens.test.ts` (**iniciais ≥ 4,5:1 nas seis cores**, com o brilho de 28%). N: as capas quadrada e larga entram em 3:4 (`cover`) e a oficial, já em pé, também |
+| CA-58, CA-59  | T `GamesPage.test.tsx` (compacta: capas de 120 e 108) e `PreferenciasModal.test.tsx` (prévia de dois tiles e amostra de animação, Restaurar padrões). N: a compacta mede **120 × 160** (desktop) e **108 × 144** (celular), inclusive o bloco "Adicionar". **A prévia do modal só foi vista por teste, não por captura**                               |
+
+**Ainda abertos** (a F2 não os fecha): **CA-04** (verificador de contraste nos pares reais), **CA-09** (só o hover do tile foi provado com
+`prefers-reduced-motion`; faltam o formulário e o erro de campo, da F3) e os CA-61 a CA-70 e CA-75 (F4). **Não foi testado em aparelho
+real** (iOS e Android), nem com o teclado virtual aberto.
+
+#### Conferência no navegador (F2, 2026-09-25)
+
+Roteiro: Vite em `localhost:5199` com a API mockada (o navegador não falou com o Supabase, o bucket nem as portas 3333 e 5173), Chromium em
+360, 390, 767, 768, 1024 e 1280 px, com e sem toque, e com `prefers-reduced-motion`. Dados sintéticos: 18 jogos nos três status (14 em
+Jogando), com e sem vínculo Steam, com e sem média (inclusive 0), título de 120 caracteres sem espaço, capas enviadas **quadrada** e
+**larga**, capa oficial da Steam, "Xbox Series X|S" e sem plataforma. Sem erro de página nem de console em nenhuma rodada.
+
+**`prefers-reduced-motion: reduce`:** ao passar o mouse, o tile **não se move** (`transform: none`, 0 px), as transições valem 0 s e o
+**anel do hover e as ações continuam** aparecendo, como manda o CA-09.
+
+| Achado                                                                                                                             | Causa                                                                                         | Estado                                                                                                                             |
+| ---------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| O título do destaque sumia (celular) ou aparecia em tiras (desktop)                                                                | o `h2` encolhia dentro de uma coluna flex de altura fixa                                      | **corrigido** (`shrink-0`, o cartão passa a crescer; teste)                                                                        |
+| No celular o link do destaque cobria só 215 de 358 px do cartão, e um ícone de olho vazava no canto                                | o link era posicionado pela coluna de texto, e o `.icon` sobrepõe o `hidden`                  | **corrigido** (o link cobre o cartão inteiro; o ícone fica num `span`; testes)                                                     |
+| O primeiro tile de cada prateleira do celular encostava na borda (x = 0)                                                           | o `snap-start` alinhava à borda da rolagem e ignorava o `px-4`                                | **corrigido** (`scroll-px-4`; agora x = 16)                                                                                        |
+| A barra inferior media 69 px                                                                                                       | 68 da lista mais 1 da borda                                                                   | **corrigido** (67 + 1)                                                                                                             |
+| O link do logo media 32 a 36 px de altura                                                                                          | só o texto o dimensionava                                                                     | **corrigido** (`min-h-11`)                                                                                                         |
+| Em 1024 px o Perfil era espremido a 36 px                                                                                          | logo + filtros + ações somam ~1004 px para 912 disponíveis                                    | **corrigido** (logo e ações não encolhem; os filtros rolam por dentro)                                                             |
+| Em 768 a ~1100 px só parte das pílulas de filtro fica à vista (em 768: "Todos" e um pedaço de "Jogando"); o resto exige rolar      | a barra do desenho não cabe, e um segundo ponto de quebra contraria o CA-35                   | **aberto, feio mas utilizável**; decisão sua: aceitar, ou permitir um ponto de quebra só para levar os filtros a uma segunda linha |
+| No desktop a prateleira usa colunas de 150 px e deixa ~160 px livres à direita em 1280 px                                          | a grade é `auto-fill` de 150 px dentro de 1168 px                                             | **aberto, cosmético**                                                                                                              |
+| No celular, "Xbox Series X/S" e títulos de 120 caracteres aparecem com reticências                                                 | `truncate` no chip e 2 linhas no título; o texto inteiro está no detalhe e no `title` do link | **esperado**                                                                                                                       |
+| Com a fonte de reserva (as fontes ainda não carregaram) o destaque cresce a ~268 px em vez de 230 px                               | os chips alargam e quebram em duas linhas; o cartão cresce em vez de cortar o texto           | **esperado**                                                                                                                       |
+| O formulário e o detalhe seguem com o layout antigo (título em maiúsculas, cantos de 4 px, status em Zerado, Jogando, Quero jogar) | são a F3                                                                                      | **esperado**                                                                                                                       |
+| Nas capturas o título do tile parecia mais apagado no hover                                                                        | recorte da captura no meio da transição; a cor calculada é a mesma (`rgb(238, 242, 255)`)     | **não é problema**                                                                                                                 |
 
 ### F3 — detalhe e formulário
 
@@ -578,9 +630,9 @@ magenta (questão 11, fora desta spec). Sem rolagem horizontal em nenhuma tela; 
       recarregar (CA-22).
 - [x] **CA-57** [T] — **Dado** "Animações: reduzidas" e o sistema **sem** `prefers-reduced-motion`, **quando** abro `/`, **então** nenhuma
       animação nem transição roda (elevação, folha, esqueleto, tremor). (Substitui os CA-18, CA-37 na parte de efeitos e CA-41 do perfil.)
-- [ ] **CA-58** [T] — **Dado** densidade Compacta, **então** os _tiles_ medem 120 × 160 (desktop) e 108 × 144 (celular), o catálogo fica mais
+- [x] **CA-58** [T] — **Dado** densidade Compacta, **então** os _tiles_ medem 120 × 160 (desktop) e 108 × 144 (celular), o catálogo fica mais
       baixo, e os links e ações continuam com ≥ 44 px. (Substitui o CA-17 do perfil.)
-- [ ] **CA-59** [T] — **Dado** "Restaurar padrões" na aba Aparência, **então** voltam Azul, Confortável e Completas, e as outras abas ficam
+- [x] **CA-59** [T] — **Dado** "Restaurar padrões" na aba Aparência, **então** voltam Azul, Confortável e Completas, e as outras abas ficam
       como estavam (CA-40 do perfil, com o padrão novo); **e** a mini-prévia do modal muda com a densidade e com as animações, na hora.
 - [x] **CA-60** [T] — **Dado** as quatro cores de destaque, **então** o texto `fundo` sobre cada uma dá ≥ 4,5:1 (`tokens.test.ts`; CA-23 do perfil).
 
@@ -783,3 +835,13 @@ Todas foram **aceitas como recomendadas** (2026-09-25), com os registros abaixo.
 - [x] **14. O destaque é "o último Jogando por `atualizadoEm`".** Editar qualquer campo de um jogo (até a descrição) o torna o destaque,
       porque toda edição atualiza `atualizadoEm`; e a "última vez jogado" da Steam não entra. É a regra que você definiu; registrado como
       consequência.
+
+**Decisões tomadas na F2 (2026-09-25), com o humano:**
+
+- **`RatingBar` e o token `apagado` saem na F3**, não na F2 (o detalhe ainda os usa).
+- **"Xbox Series X|S" aparece como "Xbox Series X/S" só na tela**; o valor gravado e enviado à API continua `X|S`.
+- **Editar e Remover** só existem em aparelho com hover (`display: none` em toque); no desktop aparecem no hover e no foco por teclado.
+- **O destaque** é o primeiro Jogando da lista, só com o filtro Todos ou Jogando.
+- **Prateleira cheia** = grade no desktop e fileira rolável no celular; **densidade compacta** = 120 × 160 (desktop) e 108 × 144 (celular).
+- **A barra do catálogo** tem o logo (com `aria-current`), os filtros, "Adicionar jogo" e o Perfil; o `TopNav` só aparece nas outras telas.
+- **Sem segundo ponto de quebra** no catálogo: onde a barra não cabe (768 a ~1100 px), o grupo de filtros rola por dentro (achado aberto na conferência da F2).
