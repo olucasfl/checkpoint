@@ -21,6 +21,7 @@ import {
 } from '../lib/conquistas';
 import { atualizadoHaTexto } from '../lib/tempo-relativo';
 import { avisar } from '@/shared/lib/avisos';
+import { chegouAos100, textoDoMarco } from '@/features/games/lib/marcos';
 
 const PROVEDOR = 'STEAM' as const;
 
@@ -262,8 +263,12 @@ export function BlocoSteam({ game }: { game: Game }) {
   async function onAtualizar() {
     setErroAtualizar('');
     try {
-      await atualizar.mutateAsync();
-      avisar({ texto: 'Dados da Steam atualizados.' });
+      const novo = await atualizar.mutateAsync();
+      if (chegouAos100(dados, novo.dados)) {
+        avisar({ texto: textoDoMarco('conquistas-100', game.titulo), chek: 'comemorando' });
+      } else {
+        avisar({ texto: 'Dados da Steam atualizados.' });
+      }
     } catch (failure) {
       setErroAtualizar(describeAuthError(failure).message);
     }

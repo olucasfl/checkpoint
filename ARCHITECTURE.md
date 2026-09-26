@@ -1004,6 +1004,15 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
   levam o Chek (sempre `aria-hidden`; o texto vale sem ele): catálogo vazio e filtro sem resultado `dormindo`, erro da lista e `ErrorBoundary` `confuso`,
   perfil Steam privado `cadeado`. **Rota `*`** (`NaoEncontradaPage`, dentro do `RequireAuth` e do `AppLayout`): quem não tem sessão vai ao login antes, então
   o 404 não revela rotas.
+- **Criar, remover e marcos** (F5): `GameForm.onDone` devolve `{ jogo, criado }` (`ResultadoDoSalvar`) e a `GamesPage` o usa para: (1) o **jogo novo** (`novoId`, 2 s):
+  o tile "assenta" (`.tile-novo`: `translate`, `scale`, `opacity`) e ganha um anel `destaque` que some por `opacity` (`.tile-anel-novo`, `--mov-realce`), e a página rola até
+  ele (`scrollIntoView` centralizado, `auto` em movimento reduzido, sem mover o foco) se ele estiver fora da vista; se o filtro ativo **esconde** o jogo, o aviso
+  diz "Adicionado em <status>" com **Ver**, que troca o filtro; (2) os **marcos** (`lib/marcos.ts`, puro): primeiro jogo (criar com a lista vazia de ANTES de
+  abrir o formulário), jogo que **passa** a Zerado (nunca ao carregar a lista) e 100% das conquistas (o **Atualizar** do `BlocoSteam` que leva o total ao
+  máximo). Um marco é um `avisar({ chek: 'comemorando' })`, por ocorrência e **sem gravar nada** (sem confete, sem som). **Remover**: a lista e a contagem já
+  não têm o jogo; `useJogosComSaida` devolve uma cópia visual `saindo` (`.tile-sai`, inerte e `aria-hidden`) por 200 ms na mesma posição, e `useFlip` (Web Animations
+  API, duração e curva lidas dos tokens) desliza os vizinhos ao novo lugar. Sem movimento (reduzido) nada é retido e nada desliza. `Contador` troca o número
+  das pílulas e das prateleiras com um fade curto (o valor novo já está no DOM).
 
 ---
 

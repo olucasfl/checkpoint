@@ -15,6 +15,10 @@ interface GameTileProps {
   onRemove: (game: Game) => void;
   /** Densidade "compacta" do /perfil: capas menores (120 × 160 no desktop, 108 × 144 no celular). */
   compacta?: boolean;
+  /** O jogo acabou de ser criado: assenta com um anel que some. */
+  novo?: boolean;
+  /** Cópia visual de um jogo que acabou de sair: some sozinha, sem cliques nem leitor de tela. */
+  saindo?: boolean;
 }
 
 const ACAO =
@@ -26,7 +30,14 @@ const ACAO =
  * direito. Abaixo: o título (o `<Link>` real do detalhe, esticado sobre o tile inteiro; as ações ficam por cima) e, só
  * nos jogos ligados à Steam, "42 h · 12/40". Em toque as ações não existem na tela: o caminho é abrir o jogo.
  */
-export function GameTile({ game, onEdit, onRemove, compacta = false }: GameTileProps) {
+export function GameTile({
+  game,
+  onEdit,
+  onRemove,
+  compacta = false,
+  novo = false,
+  saindo = false,
+}: GameTileProps) {
   const reduzido = useMovimentoReduzido();
   const capas = capasDoJogo(game);
   const resumo = resumoDoCatalogo(game.dadosPlataforma);
@@ -36,11 +47,15 @@ export function GameTile({ game, onEdit, onRemove, compacta = false }: GameTileP
     <li
       data-tile
       data-status={game.status}
+      data-flip-id={game.id}
+      data-novo={novo ? 'true' : undefined}
+      {...(saindo ? { inert: true, 'aria-hidden': true } : {})}
       className={`tile relative flex shrink-0 snap-start flex-col gap-1.5 md:gap-2 ${
         compacta ? 'w-[108px] md:w-[120px]' : 'w-[132px] md:w-[150px]'
-      }`}
+      }${novo ? ' tile-novo' : ''}${saindo ? ' tile-sai pointer-events-none' : ''}`}
     >
       <div className="tile-capa relative rounded-xl md:rounded-[14px]">
+        {novo && <span aria-hidden="true" className="tile-anel-novo" />}
         <GameCover
           titulo={game.titulo}
           capaUrl={capas[0] ?? null}

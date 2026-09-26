@@ -40,11 +40,17 @@ import { Field, FieldError, inputClass, LABEL } from '@/shared/components/form-p
 import { PlatformField } from './PlatformField';
 import { StatusPicker } from './StatusPicker';
 
+/** O que o formulário devolve ao terminar: o jogo salvo e se foi criado (o formulário abriu sem jogo). */
+export interface ResultadoDoSalvar {
+  jogo: Game;
+  criado: boolean;
+}
+
 interface GameFormProps {
   /** Jogo em edição; ausente = jogo novo. */
   game?: Game;
-  /** Salvou tudo (jogo e capa): o diálogo pode fechar. */
-  onDone: () => void;
+  /** Salvou tudo (jogo e capa): o diálogo pode fechar. Traz o jogo como ficou e se o salvar o CRIOU. */
+  onDone: (resultado?: ResultadoDoSalvar) => void;
   onCancel: () => void;
   /** Jogo NOVO: a pessoa ligou um item da Steam a um jogo que já existia. Quem abriu leva ao jogo. */
   onLinkedExisting?: (jogoId: string) => void;
@@ -208,7 +214,7 @@ export function GameForm({
         return;
       }
       if (ligacaoOk) {
-        onDone();
+        onDone({ jogo: result.game, criado: !game });
       }
     } catch (failure) {
       setError(forForm(describeError(failure)));
@@ -427,7 +433,11 @@ export function GameForm({
         onCriar={aplicarItem}
         onVinculado={(jogoId) => {
           setBuscando(false);
-          (onLinkedExisting ?? onDone)(jogoId);
+          if (onLinkedExisting) {
+            onLinkedExisting(jogoId);
+          } else {
+            onDone();
+          }
         }}
       />
 

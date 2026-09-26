@@ -1,8 +1,8 @@
 # Spec: personalização com o Chek e sistema de animações
 
-> Status: ✅ aprovada (2026-09-26). As 9 questões foram respondidas (ver "Decisões tomadas e questões resolvidas"). A implementação segue
-> as fases F1 a F5; **a F1 para no mock das expressões do Chek até o humano aprovar o desenho**, e as demais seguem sem parar entre si
-> (gate e conferência visual em cada uma).
+> Status: 🚧 em andamento (aprovada em 2026-09-26). **F1 a F5 implementadas** na branch `feat/personalizacao-chek` (cadeia a partir de `feat/ajustes-catalogo`), cada
+> uma com o gate verde e uma passada visual (360 e 1280 px, API mockada). Faltam o `/qa-verify` completo, os critérios de aparelho real e a captura de quadros
+> fina do CA-59. O desenho das 5 expressões foi aprovado pelo humano.
 
 ## Objetivo
 
@@ -483,6 +483,16 @@ Tudo que a spec assumiu sem perguntar (corrija o que discordar):
 13. **O `og-image` sai do precache** (355 KB que só robôs pedem).
 14. **Troca de tela por View Transitions com o _cross-fade_ padrão do navegador**, sem CSS nosso, desligada em movimento reduzido.
 15. **Sem confete** (Q7) e **sem som nem vibração** (Q8).
+
+## O que ficou diferente do escrito (implementação)
+
+- **"Saindo…" do Sair** (`/perfil`): a linha continua com o texto; sem o indicador (a linha não é um botão com rótulo trocável). O texto já diz o estado.
+- **Voltar por histórico** (`navigate(-1)`) não leva `viewTransition` (a API do React Router não aceita opções nessa chamada); os links do catálogo ao detalhe levam.
+- **100% das conquistas** comemora depois de **Atualizar** (o caminho que a spec descreve de forma mais clara); recarregar o detalhe sozinho não compara com o valor anterior.
+- **Trocar senha e o retorno da Steam** mantêm o aviso que já tinham (na `/perfil`, em `role="status"`); não passam pelo `Avisos`.
+- **"Prateleira sem jogos"**: a prateleira vazia nunca é desenhada (some), então o Chek dormindo só aparece no catálogo vazio e no filtro sem resultado.
+- **Banner de conexão**: ganhou a saída suave, mas sem o Chek (é uma faixa compacta); o Chek confuso vive no erro da lista e no `ErrorBoundary`.
+- **Esqueleto do /perfil**: o cabeçalho usa a sessão (já carregada) e o cartão Steam já tinha esqueleto; não há esqueleto novo no perfil.
 
 ## Decisões tomadas e questões resolvidas
 

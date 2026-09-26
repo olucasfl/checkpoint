@@ -68,6 +68,8 @@
   --mov-enfase: 320ms;
   --mov-max: 600ms;
   --mov-laco: 1400ms;
+  /* O realce do jogo novo (um anel que some) dura mais que um feedback: é onde o olho procura o tile, não movimento. */
+  --mov-realce: 2000ms;
   --mov-laco-lento: 1800ms;
   --ease-entrada: cubic-bezier(0.2, 0.8, 0.2, 1);
   --ease-saida: cubic-bezier(0.4, 0, 1, 1);
@@ -490,6 +492,31 @@ button:disabled {
     animation: check-pop var(--mov-enfase) var(--ease-elastica);
   }
 
+  /* Jogo recém-criado: o tile "assenta" (sobe 8px e cresce de 0,96 a 1, com a curva elástica) e um anel `destaque` some
+     por `opacity` em 2 s, para a pessoa achar onde ele foi parar. Só `translate`, `scale` e `opacity`. */
+  .tile-novo {
+    animation: tile-assenta var(--mov-enfase) var(--ease-elastica);
+  }
+
+  .tile-anel-novo {
+    position: absolute;
+    inset: -5px;
+    border: 3px solid var(--color-destaque);
+    border-radius: 18px;
+    pointer-events: none;
+    animation: anel-novo var(--mov-realce) ease-in forwards;
+  }
+
+  /* Cópia visual do tile que saiu (remover ou mudar de status): some enquanto os vizinhos ainda não fecharam o espaço. */
+  .tile-sai {
+    animation: tile-some var(--mov-padrao) var(--ease-saida) forwards;
+  }
+
+  /* O número do contador troca com um fade curto. */
+  .contador-troca {
+    animation: contador-troca var(--mov-rapida) var(--ease-entrada);
+  }
+
   /* Bandeira do Chek do carregamento: balança em torno do pé do mastro (`rotate`, não `transform`). Só existe com `animado`. */
   .chek-bandeira {
     transform-origin: 256px 156px;
@@ -601,6 +628,51 @@ button:disabled {
   to {
     opacity: 1;
     scale: 1;
+  }
+}
+
+@keyframes tile-assenta {
+  from {
+    opacity: 0;
+    translate: 0 8px;
+    scale: 0.96;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+    scale: 1;
+  }
+}
+
+@keyframes anel-novo {
+  0%,
+  60% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes tile-some {
+  from {
+    opacity: 1;
+    scale: 1;
+  }
+  to {
+    opacity: 0;
+    scale: 0.96;
+  }
+}
+
+@keyframes contador-troca {
+  from {
+    opacity: 0;
+    translate: 0 4px;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
   }
 }
 

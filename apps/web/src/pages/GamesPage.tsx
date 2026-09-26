@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { type Game, type GameStatus } from '@checkpoint/shared';
 import { Chek } from '@/shared/components/Chek/Chek';
@@ -18,7 +18,8 @@ import { agruparEmPrateleiras, destaqueDoCatalogo } from '@/features/games/lib/e
 import { comFiltroInicial, paramsDoFiltro } from '@/features/games/lib/initial-filter';
 import { wantsNewGame, withoutNewGameParam } from '@/features/games/lib/new-game';
 import { parseStatusFilter, type StatusFilter as Filter } from '@/features/games/lib/status-filter';
-import { avisar } from '@/shared/lib/avisos';
+import { useMovimentoReduzido } from '@/shared/hooks/use-movimento-reduzido';
+import { avisarDoSalvar } from '@/features/games/lib/avisar-do-salvar';
 
 /** Estado do diálogo: fechado, novo jogo (com o status da prateleira que o abriu, se veio de uma) ou edição. */
 type FormDialog = { open: false } | { open: true; game?: Game; status?: GameStatus };
@@ -62,6 +63,46 @@ export function GamesPage() {
       setSearchParams(next, { replace: true });
     }
   }, [searchParams, setSearchParams, filtroInicial]);
+
+  // O jogo recém-criado: assenta, ganha um anel por 2 s (`--mov-realce`) e a página rola até ele se estiver fora da vista.
+  const [novoId, setNovoId] = useState<string | null>(null);
+  const jaRolou = useRef<string | null>(null);
+  const reduzido = useMovimentoReduzido();
+  // Quantos jogos havia quando o formulário abriu (o "primeiro jogo" vale para a lista vazia de ANTES do salvar).
+  const jogosAoAbrir = useRef(0);
+
+  useEffect(() => {
+    if (form.open) {
+      jogosAoAbrir.current = games.length;
+    }
+    // Só a abertura importa: a lista muda depois do salvar e não pode reescrever o "antes".
+  }, [form.open]);
+
+  useEffect(() => {
+    if (!novoId) {
+      return undefined;
+    }
+    const timer = setTimeout(() => setNovoId(null), 2_000);
+    return () => clearTimeout(timer);
+  }, [novoId]);
+
+  useEffect(() => {
+    if (!novoId || jaRolou.current === novoId) {
+      return;
+    }
+    const tile = [...document.querySelectorAll<HTMLElement>('[data-flip-id]')].find(
+      (el) => el.dataset.flipId === novoId,
+    );
+    if (!tile) {
+      return;
+    }
+    jaRolou.current = novoId;
+    const caixa = tile.getBoundingClientRect();
+    // A barra inferior (68 px) cobre o pé da tela no celular: o que fica atrás dela não está à vista.
+    if (caixa.top < 0 || caixa.bottom > window.innerHeight - 80) {
+      tile.scrollIntoView?.({ block: 'center', behavior: reduzido ? 'auto' : 'smooth' });
+    }
+  }, [novoId, games, reduzido]);
 
   function changeFilter(next: Filter) {
     setSearchParams(paramsDoFiltro(next, filtroInicial));
@@ -128,6 +169,7 @@ export function GamesPage() {
               onRemove={setToDelete}
               onAdicionar={(status) => setForm({ open: true, status })}
               compacta={densidade === 'compacta'}
+              novoId={novoId}
               onVerMais={filter === 'TODOS' ? changeFilter : undefined}
             />
           ))}
@@ -143,9 +185,17 @@ export function GamesPage() {
           <GameForm
             game={form.game}
             statusInicial={form.status}
-            onDone={() => {
+            onDone={(resultado) => {
               setForm({ open: false });
-              avisar({ texto: form.game ? 'Jogo atualizado.' : 'Jogo adicionado.' });
+              avisarDoSalvar(resultado, {
+                anterior: form.game,
+                listaVazia: jogosAoAbrir.current === 0,
+                filtro: filter,
+                aoVer: changeFilter,
+              });
+              if (resultado?.criado && (filter === 'TODOS' || filter === resultado.jogo.status)) {
+                setNovoId(resultado.jogo.id);
+              }
             }}
             onCancel={() => setForm({ open: false })}
             onLinkedExisting={(jogoId) => {

@@ -11,6 +11,7 @@ import { GameForm } from '@/features/games/components/GameForm';
 import { useTemContaSteam } from '@/features/integracoes/api/use-integracoes';
 import { BibliotecaSteamDialog } from '@/features/integracoes/components/BibliotecaSteamDialog';
 import { ListError } from '@/features/games/components/ListStates';
+import { avisarDoSalvar } from '@/features/games/lib/avisar-do-salvar';
 
 /**
  * `/jogos/:id` (spec avaliacao-de-jogos, etapa 3). Não há rota nova na API: o jogo é achado na query `['games']`
@@ -93,7 +94,10 @@ export function GameDetailPage() {
         {editing && game && (
           <GameForm
             game={game}
-            onDone={() => setEditing(false)}
+            onDone={(resultado) => {
+              setEditing(false);
+              avisarDoSalvar(resultado, { anterior: game });
+            }}
             onCancel={() => setEditing(false)}
           />
         )}
