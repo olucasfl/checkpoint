@@ -927,11 +927,12 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
 
 - **`/perfil`** ganha a seção **Plataformas** (`PlataformasDoPerfil`, entre "Conta" e "Preferências"; antes, "Contas vinculadas" com o cartão
   Steam): uma linha por plataforma **com suporte** (`plataformasDisponiveis()` do cadastro; as outras não aparecem, nem "Em breve"). Vinculada:
-  linha minimizada (marcador neutro, nome da plataforma, nome da conta e "Atualizado há X" só do que já está no cache, ou "Vinculada em
-  dd/mm/aaaa"; **desenhar a linha nunca chama a plataforma**), toda ela um botão de 56 px que abre o **popup** (`PlataformaDialog`, `<dialog>` nativo com a
+  linha minimizada (a **logo oficial** da plataforma à esquerda, com o nome só para leitor de tela; a **foto** da conta, o nome da conta e "Atualizado há X",
+  ou "Vinculada em dd/mm/aaaa" enquanto o resumo não chega; **desenhar a linha faz uma consulta ao resumo**, com `staleTime` de 30 s, e o popup reaproveita
+  a mesma resposta em vez de consultar de novo), toda ela um botão de 56 px que quebra a linha em tela estreita e abre o **popup** (`PlataformaDialog`, `<dialog>` nativo com a
   logo oficial no título e "Fechar"; o conteúdo é `Record<Provedor, …>`). Não vinculada: nome e o botão **Vincular** (nome acessível "Vincular
   conta Steam") com a **logo oficial** dentro (>= 50 px). Dados pelo `apiClient` (`api/integracoes-api.ts`) e TanStack Query (`['integracoes',
-'contas']` e `['integracoes', 'resumo', provedor]`, esta só habilitada com conta vinculada e **sem _retry_**: 409 e 502 se resolvem com
+'contas']` e `['integracoes', 'resumo', provedor]`, esta habilitada com conta vinculada e **sem _retry_**: 409 e 502 se resolvem com
   "Tentar de novo").
 - **Marca da plataforma** (spec `plataformas-e-pagina-do-jogo`, F1): o cadastro `PLATAFORMAS` (`packages/shared/src/plataformas.ts`: `id`,
   `slug`, `nome`, `ligadoA`, `disponivel`, `capacidades`, `marcador` e `logo`) é a fonte de `Provedor`, `PROVEDORES` e `PROVEDOR_SLUG`.
@@ -971,7 +972,11 @@ noreferrer"`), números (jogos, horas, "já jogados"), mais jogados (5), backlog
   status sugerido (`lib/biblioteca.ts`: 0 min = Quero jogar, >0 = Jogando, **nunca** Zerado), a capa oficial é só **prévia**;
   ao salvar cria o jogo e **só depois** liga (falha da ligação: jogo salvo, formulário passa a editar, o próximo Salvar
   reenvia sem 409); a confirmação de plataforma vem **antes** de criar qualquer coisa. A página do jogo tem **Vincular à
-  Steam** (modo `vincular`). Ligar invalida `['games']` e o cartão do perfil.
+  Steam** (modo `vincular`). Ligar invalida `['games']` e o cartão do perfil. **Visual da lista (`BibliotecaSteamDialog`)**: cada item é um cartão com a
+  capa na proporção exata do cabeçalho da Steam (`aspect-[460/215]`, sem corte; 120 px no celular, 148 px a partir de `sm`), título em Outfit, as horas com
+  ícone de relógio e entrada em cascata (`update-in` com `animation-delay` de 45 ms por item, até o 8º; só `opacity` e `transform`); o esqueleto de
+  carregamento tem o mesmo desenho do cartão; a biblioteca vazia mostra o Chek `dormindo` e o perfil privado, o Chek `cadeado`. O cabeçalho do diálogo
+  **não** é `sticky`: o `<dialog>` já é o contêiner de rolagem e um cabeçalho fixo brigava com ele.
 - **Horas e conquistas (etapa 4)**: a página `/jogos/:id` de um jogo ligado ganha a seção **Steam** (`BlocoSteam`, uma `SecaoRecolhivel` aberta por padrão, com a **logo oficial** de 50 px sozinha no `h2` e o resumo "42 h 30 min · 12/40 conquistas" na linha fechada): dentro dela, **"Atualizado há 12 minutos"** (`lib/tempo-relativo.ts`, `Intl.RelativeTimeFormat` pt-BR, a partir do `atualizadoEm` do dado; "agora" abaixo de 1 min; nunca "Invalid Date"), três cartões de dados ("Tempo jogado na Steam" "42 h 30 min", "Último jogo em" dd/mm/aaaa ou "Nunca jogado", "Conquistas · 12 de 40" com a barra `role="progressbar"` em `ouro` e a porcentagem), **Atualizar**, **Desvincular** (confirmação; só a camada da Steam some: título, status, notas e capa
   ficam, e **Vincular à Steam** volta) e **Abrir na Steam** (`rel="noopener noreferrer"`). A lista tem dois `<details>`,
   **os dois FECHADOS por padrão**, com seta e "Toque para ver" ("Toque para fechar" aberto) e o estado guardado no aparelho: **Desbloqueadas** (por data decrescente) e **Faltam** (da mais comum à mais rara), com contador, ícone de 52 px (`width`/`height`/`loading="lazy"`; cadeado ou `visibility_off` sem ícone), nome, descrição ("Conquista oculta" se oculta e bloqueada), data e "12,4% dos jogadores" (ou "Raridade indisponível"); uma coluna no celular e, a partir de 1024 px, as duas listas lado a lado. O detalhe **só é pedido nesta página**

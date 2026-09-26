@@ -179,10 +179,10 @@ chips, anel, Editar/Excluir) não muda**, para reduzir o conflito com a branch d
 é o modal de preferências). Uma linha por plataforma do cadastro (`PLATAFORMAS_EM_ORDEM`), 56 px, no molde de
 `ListaDeLinhas`.
 
-- **Vinculada** (minimizada): `PlataformaMarca` (ícone), nome da conta (`nomeExibicao`), "atualizado há X" (o
-  `tempo-relativo` que já existe, a partir do `consultadoEm` do resumo; **sem chamar a plataforma para desenhar a linha**:
-  usa o `nomeExibicao` da `ContaVinculada` e, se o resumo já estiver no cache do TanStack, o horário dele; senão "—"
-  discreto) e uma seta. **A linha inteira é um botão** que abre o popup.
+- **Vinculada** (minimizada): `PlataformaMarca` (a **logo oficial**, >= 50 px; **decisão de 2026-09-26**, no lugar do ícone neutro), a **foto** da conta
+  (`avatarUrl` do resumo), o nome da conta (`nomeExibicao`), "atualizado há X" (o `tempo-relativo` que já existe, a partir do
+  `consultadoEm` do resumo) e uma seta. **Mudou em 2026-09-26:** a linha agora **consulta o resumo** para ter a foto (`staleTime` de 30 s; o
+  popup reaproveita a resposta); antes dela chegar, mostra o `nomeExibicao` da `ContaVinculada` e "Vinculada em". **A linha inteira é um botão** que abre o popup.
 - **Não vinculada** e `disponivel`: logo, nome e o botão **"Vincular"** (`min-h-11`, com a logo da plataforma dentro do
   botão; nome acessível "Vincular conta Steam"). Só a Steam funciona.
 - **Não suportadas** (PlayStation, Xbox, Epic): **não aparecem** (decisão Q2); a lista vem de `plataformasDisponiveis()`.
@@ -220,7 +220,7 @@ dependem dele; o cabeçalho e as ações continuam.
 | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
 | Popup a **frio**               | **4**: `GetPlayerSummaries` + `GetOwnedGames` (as de hoje) **+** `GetBadges` **+** `GetRecentlyPlayedGames` (5 se mantivermos `GetSteamLevel`) |
 | Popup a **quente** (≤ 10 min)  | **0** (tudo do cache; X-de-Y e conquistas vêm do banco)                                                                                        |
-| Só desenhar a **linha** da aba | **0** (usa `ContaVinculada` e o cache se houver)                                                                                               |
+| Só desenhar a **linha** da aba | **2 a frio, 0 a quente** (consulta o resumo para a foto; o popup depois usa a mesma resposta)                                                  |
 | **Atualizar** (≥ 30 s)         | ignora o cache e refaz as 4; antes de 30 s devolve o que tem, sem chamar                                                                       |
 
 As duas chamadas novas ficam num `CarregadorEmCache` novo (`NIVEL_E_ATIVIDADE_CACHE_TTL_MS = 10 min`, chave por SteamID,
@@ -327,7 +327,7 @@ export interface ResumoContaPlataforma {
 - [x] **CA-22** — **Dado** sem vínculo, **então** a linha mostra a logo, "Steam" e o botão "Vincular" (nome acessível "Vincular conta Steam") que leva à Steam (`vinculo`, como hoje).
 - [x] **CA-23** — **Dado** as plataformas sem provider (PlayStation, Xbox, Epic), **então** nenhuma aparece na seção Plataformas do perfil (só as `disponivel`).
 - [x] **CA-24** — **Dado** o retorno `/perfil?steam=vinculada` ou `?steam=erro&motivo=…`, **então** o aviso é o mesmo de hoje e a URL é limpa (regressão).
-- [x] **CA-25** — **Dado** a linha da Steam, **quando** abre `/perfil`, **então** **nenhuma** chamada à Steam é feita só para desenhá-la (teste: 0 chamadas ao `SteamClient`).
+- [x] **CA-25** — **Dado** a linha da Steam, **quando** abre `/perfil`, **então** é feita **uma** consulta ao resumo da conta (a foto e o "atualizado há X"), e o popup, ao abrir logo depois, **não** consulta de novo (teste: `resumo` chamado 1 vez). Revisto em 2026-09-26; antes era "nenhuma chamada".
 - [~] **CA-26** — **Dado** 360 e 1280 px, **então** não há rolagem horizontal e o nome longo da conta trunca.
 
 ### F4 — popup da Steam
