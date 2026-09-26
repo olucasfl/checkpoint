@@ -20,7 +20,13 @@ function corpo(fonte: string, inicio: RegExp): string[] {
 const PERMITIDAS = new Set(['transform', 'opacity', 'scale', 'translate', 'rotate']);
 const keyframes = [...css.matchAll(/@keyframes\s+([\w-]+)\s*\{/g)].map((m) => m[1] ?? '');
 const declaracoesDeAnimacao = [...css.matchAll(/(?:^|\s)(animation|transition):\s*([^;]+);/g)];
-const LACOS = new Set(['esqueleto-pulso', 'previa-elevar', 'chek-balanco', 'gira']);
+const LACOS = new Set([
+  'esqueleto-pulso',
+  'previa-elevar',
+  'chek-balanco',
+  'gira',
+  'splash-flutua',
+]);
 
 describe('sistema de movimento (CA-13 a CA-17)', () => {
   it('os tokens de duração e de curva existem, com os valores da spec', () => {

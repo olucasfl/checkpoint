@@ -71,6 +71,10 @@
   /* O realce do jogo novo (um anel que some) dura mais que um feedback: é onde o olho procura o tile, não movimento. */
   --mov-realce: 2000ms;
   --mov-laco-lento: 1800ms;
+  /* Abertura do PWA (splash): entradas mais longas que um feedback, porque não respondem a um toque, contam uma história. */
+  --mov-splash-rapida: 400ms;
+  --mov-splash-media: 700ms;
+  --mov-splash-longa: 1000ms;
   --ease-entrada: cubic-bezier(0.2, 0.8, 0.2, 1);
   --ease-saida: cubic-bezier(0.4, 0, 1, 1);
   --ease-elastica: cubic-bezier(0.34, 1.4, 0.64, 1);
@@ -584,6 +588,116 @@ button:disabled {
   .banner-in {
     animation: banner-in var(--mov-padrao) var(--ease-entrada);
   }
+
+  /*
+   * Abertura do PWA (`shared/components/Splash`). O estado de repouso é a tela pronta: cada animação só tem `from` e
+   * roda com `backwards`, então com movimento reduzido (animation: none) tudo aparece já no lugar. Só `opacity`,
+   * `transform`, `translate`, `scale` e `rotate`.
+   */
+  .splash {
+    position: fixed;
+    inset: 0;
+    z-index: 90;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    overflow: hidden;
+    background: var(--color-fundo);
+    padding: env(safe-area-inset-top, 0px) 16px env(safe-area-inset-bottom, 0px);
+  }
+
+  .splash-saindo {
+    pointer-events: none;
+    animation: splash-saida var(--mov-max) var(--ease-saida) forwards;
+  }
+
+  .splash-halo {
+    position: absolute;
+    left: 50%;
+    top: 42%;
+    width: min(130vw, 760px);
+    aspect-ratio: 1;
+    translate: -50% -50%;
+    border-radius: 9999px;
+    pointer-events: none;
+    background: radial-gradient(
+      closest-side,
+      color-mix(in srgb, var(--color-acento) 30%, transparent),
+      transparent
+    );
+    animation: splash-halo var(--mov-splash-longa) var(--ease-entrada) backwards;
+  }
+
+  /* O Chek cai de cima (com o achatamento do pouso) e depois acorda com um "pulo" curto. */
+  .splash-chek {
+    position: relative;
+    animation: splash-desce var(--mov-splash-media) var(--ease-entrada) backwards;
+    animation-delay: 120ms;
+  }
+  .splash-acorda {
+    animation: splash-acorda var(--mov-splash-rapida) var(--ease-elastica);
+  }
+
+  .splash-nome {
+    position: relative;
+    overflow: hidden;
+    padding: 4px 6px;
+    color: var(--color-texto);
+  }
+  .splash-letra {
+    display: inline-block;
+    animation: splash-letra var(--mov-splash-rapida) var(--ease-entrada) backwards;
+    animation-delay: calc(650ms + var(--i) * 45ms);
+  }
+  /* O brilho que atravessa o nome no fim. Parado (movimento reduzido) fica invisível. */
+  .splash-brilho {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    pointer-events: none;
+    background: linear-gradient(
+      100deg,
+      transparent 30%,
+      color-mix(in srgb, var(--color-texto) 22%, transparent) 50%,
+      transparent 70%
+    );
+    animation: splash-brilho var(--mov-splash-media) ease-in-out;
+    animation-delay: 1900ms;
+  }
+
+  .splash-sobe {
+    animation: splash-sobe var(--mov-splash-rapida) var(--ease-entrada) backwards;
+    animation-delay: 1250ms;
+  }
+
+  /* As seis peças do conector do Chek acendem em sequência, como uma barra de carregamento. */
+  .splash-pinos {
+    display: flex;
+    gap: 7px;
+    margin-top: 6px;
+  }
+  .splash-pino {
+    width: 9px;
+    height: 24px;
+    border-radius: 3px;
+    background: var(--color-ouro);
+    animation: splash-pino var(--mov-splash-rapida) var(--ease-elastica) backwards;
+    animation-delay: calc(950ms + var(--i) * 140ms);
+  }
+
+  /* Peças do mundo dos jogos: chegam girando de fora da tela e depois flutuam de leve (o laço vem primeiro no `animation`). */
+  .splash-glifo {
+    position: absolute;
+    left: var(--x);
+    top: var(--y);
+    opacity: 0.55;
+    animation:
+      splash-flutua var(--mov-laco-lento) ease-in-out infinite alternate,
+      splash-glifo-chega var(--mov-splash-media) var(--ease-entrada) backwards;
+    animation-delay: calc(var(--atraso) + 700ms), var(--atraso);
+  }
 }
 
 @keyframes banner-in {
@@ -804,5 +918,106 @@ html[data-aba-oculta] .gira {
   @variant movimento-reduzido {
     transform: none !important;
     translate: none !important;
+  }
+}
+
+/* Abertura do PWA: só o estado inicial (`from`); o final é o estilo de repouso da classe. */
+@keyframes splash-halo {
+  from {
+    opacity: 0;
+    scale: 0.5;
+  }
+}
+
+@keyframes splash-desce {
+  0% {
+    opacity: 0;
+    translate: 0 -140px;
+  }
+  55% {
+    opacity: 1;
+    translate: 0 6px;
+    scale: 1.05 0.94;
+  }
+  75% {
+    translate: 0 -9px;
+    scale: 0.98 1.03;
+  }
+  100% {
+    translate: 0 0;
+    scale: 1;
+  }
+}
+
+@keyframes splash-acorda {
+  0% {
+    scale: 1;
+  }
+  40% {
+    scale: 1.08 0.93;
+  }
+  70% {
+    scale: 0.97 1.05;
+  }
+  100% {
+    scale: 1;
+  }
+}
+
+@keyframes splash-letra {
+  from {
+    opacity: 0;
+    translate: 0 0.6em;
+    rotate: 5deg;
+  }
+}
+
+@keyframes splash-sobe {
+  from {
+    opacity: 0;
+    translate: 0 10px;
+  }
+}
+
+@keyframes splash-pino {
+  from {
+    opacity: 0.16;
+    scale: 0.6;
+  }
+}
+
+@keyframes splash-brilho {
+  0% {
+    opacity: 1;
+    translate: -140% 0;
+  }
+  100% {
+    opacity: 1;
+    translate: 140% 0;
+  }
+}
+
+@keyframes splash-glifo-chega {
+  from {
+    opacity: 0;
+    translate: var(--dx) var(--dy);
+    rotate: var(--giro);
+    scale: 0.3;
+  }
+}
+
+@keyframes splash-flutua {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes splash-saida {
+  to {
+    opacity: 0;
+    scale: 1.06;
   }
 }
