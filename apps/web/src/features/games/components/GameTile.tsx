@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { useMovimentoReduzido } from '@/shared/hooks/use-movimento-reduzido';
 import { type Game } from '@checkpoint/shared';
 import { Icon } from '@/shared/components/Icon';
 import { capasDoJogo } from '@/features/integracoes/lib/capa';
@@ -7,6 +8,7 @@ import { nomeDaPlataforma } from '../lib/estante';
 import { platformIcon } from '../lib/status-meta';
 import { AnelDeNota } from './AnelDeNota';
 import { GameCover } from './GameCover';
+import { SeloDePlataformas } from './SeloDePlataformas';
 
 interface GameTileProps {
   game: Game;
@@ -14,6 +16,10 @@ interface GameTileProps {
   onRemove: (game: Game) => void;
   /** Densidade "compacta" do /perfil: capas menores (120 × 160 no desktop, 108 × 144 no celular). */
   compacta?: boolean;
+  /** O jogo acabou de ser criado: assenta com um anel que some. */
+  novo?: boolean;
+  /** Cópia visual de um jogo que acabou de sair: some sozinha, sem cliques nem leitor de tela. */
+  saindo?: boolean;
 }
 
 const ACAO =
@@ -21,11 +27,19 @@ const ACAO =
 
 /**
  * Um jogo na prateleira. A capa em pé leva o **anel da média** (só com média) no canto superior direito, o **chip da
- * plataforma** (só com plataforma) no inferior esquerdo e, em aparelho com hover, **Editar** e **Remover** no inferior
+ * plataforma** (só com plataforma) no inferior esquerdo, o **selo das plataformas ligadas** no superior esquerdo e, em aparelho com hover, **Editar** e **Remover** no inferior
  * direito. Abaixo: o título (o `<Link>` real do detalhe, esticado sobre o tile inteiro; as ações ficam por cima) e, só
  * nos jogos ligados à Steam, "42 h · 12/40". Em toque as ações não existem na tela: o caminho é abrir o jogo.
  */
-export function GameTile({ game, onEdit, onRemove, compacta = false }: GameTileProps) {
+export function GameTile({
+  game,
+  onEdit,
+  onRemove,
+  compacta = false,
+  novo = false,
+  saindo = false,
+}: GameTileProps) {
+  const reduzido = useMovimentoReduzido();
   const capas = capasDoJogo(game);
   const resumo = resumoDoCatalogo(game.dadosPlataforma);
   const plataforma = game.plataforma?.trim() ? nomeDaPlataforma(game.plataforma.trim()) : null;
@@ -34,17 +48,22 @@ export function GameTile({ game, onEdit, onRemove, compacta = false }: GameTileP
     <li
       data-tile
       data-status={game.status}
+      data-flip-id={game.id}
+      data-novo={novo ? 'true' : undefined}
+      {...(saindo ? { inert: true, 'aria-hidden': true } : {})}
       className={`tile relative flex shrink-0 snap-start flex-col gap-1.5 md:gap-2 ${
         compacta ? 'w-[108px] md:w-[120px]' : 'w-[132px] md:w-[150px]'
-      }`}
+      }${novo ? ' tile-novo' : ''}${saindo ? ' tile-sai pointer-events-none' : ''}`}
     >
       <div className="tile-capa relative rounded-xl md:rounded-[14px]">
+        {novo && <span aria-hidden="true" className="tile-anel-novo" />}
         <GameCover
           titulo={game.titulo}
           capaUrl={capas[0] ?? null}
           alternativas={capas.slice(1)}
           variant={compacta ? 'tileCompacto' : 'tile'}
         />
+        <SeloDePlataformas dados={game.dadosPlataforma} />
         <div className="absolute right-2 top-2 md:right-2.5 md:top-2.5">
           <AnelDeNota nota={game.notaMedia} />
         </div>
@@ -79,6 +98,7 @@ export function GameTile({ game, onEdit, onRemove, compacta = false }: GameTileP
 
       <Link
         to={`/jogos/${game.id}`}
+        viewTransition={!reduzido}
         title={game.titulo}
         className="tile-titulo font-display text-[15px] font-semibold leading-tight text-texto after:absolute after:inset-0 after:content-[''] md:text-base"
       >

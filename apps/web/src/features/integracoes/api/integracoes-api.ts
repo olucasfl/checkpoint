@@ -5,7 +5,7 @@ import {
   type DetalheJogoPlataforma,
   type IniciarVinculoResponse,
   type ItemBiblioteca,
-  type PerfilPlataforma,
+  type ResumoContaPlataforma,
   type Provedor,
   type VincularJogoRequest,
 } from '@checkpoint/shared';
@@ -35,15 +35,20 @@ export const integracoesApi = {
     return response.data;
   },
 
-  /** `GET /api/integracoes/:provedor/perfil`: o cartão (409 se privado ou não vinculado, 502 se a Steam falhou). */
-  async perfil(provedor: Provedor): Promise<PerfilPlataforma> {
-    const response = await apiClient.get<PerfilPlataforma>(`${rota(provedor)}/perfil`);
+  /**
+   * `GET /api/integracoes/:provedor/resumo`: o popup da conta (409 se privado ou não vinculado, 502 se a plataforma
+   * falhou). Nenhuma chamada nova à plataforma: sai do mesmo cache de 10 min.
+   */
+  async resumo(provedor: Provedor): Promise<ResumoContaPlataforma> {
+    const response = await apiClient.get<ResumoContaPlataforma>(`${rota(provedor)}/resumo`);
     return response.data;
   },
 
-  /** `POST /api/integracoes/:provedor/perfil/atualizacao`: ignora o cache (no máximo uma consulta a cada 30 s). */
-  async atualizarPerfil(provedor: Provedor): Promise<PerfilPlataforma> {
-    const response = await apiClient.post<PerfilPlataforma>(`${rota(provedor)}/perfil/atualizacao`);
+  /** `POST /api/integracoes/:provedor/resumo/atualizacao`: ignora o cache (no máximo uma consulta a cada 30 s). */
+  async atualizarResumo(provedor: Provedor): Promise<ResumoContaPlataforma> {
+    const response = await apiClient.post<ResumoContaPlataforma>(
+      `${rota(provedor)}/resumo/atualizacao`,
+    );
     return response.data;
   },
 
@@ -52,10 +57,21 @@ export const integracoesApi = {
     await apiClient.delete(rota(provedor));
   },
 
-  /** `GET /api/integracoes/:provedor/biblioteca`: a biblioteca do usuário (busca por título, até 50 itens). */
-  async biblioteca(provedor: Provedor, busca?: string): Promise<ItemBiblioteca[]> {
+  /**
+   * `GET /api/integracoes/:provedor/biblioteca`: a biblioteca do usuário (busca por título, até 50 itens).
+   * `nuncaJogados` é o backlog: só os itens com 0 minutos.
+   */
+  async biblioteca(
+    provedor: Provedor,
+    busca?: string,
+    opcoes: { nuncaJogados?: boolean } = {},
+  ): Promise<ItemBiblioteca[]> {
+    const params = {
+      ...(busca ? { busca } : {}),
+      ...(opcoes.nuncaJogados ? { nuncaJogados: true } : {}),
+    };
     const response = await apiClient.get<ItemBiblioteca[]>(`${rota(provedor)}/biblioteca`, {
-      params: busca ? { busca } : undefined,
+      params: Object.keys(params).length > 0 ? params : undefined,
     });
     return response.data;
   },

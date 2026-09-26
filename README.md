@@ -164,7 +164,7 @@ Os testes automatizados (`npm test`) **não** falam com a Steam: tudo é mockado
 2. Deixe **públicos**, no perfil Steam da conta de teste, o "Meu perfil" **e** os "Detalhes do jogo" (Steam →
    Perfil → Editar perfil → Configurações de privacidade). Perfil privado é um estado tratado (o cartão mostra o
    passo a passo), mas sem dados não há o que ver.
-3. `npm run dev`, entre com a sua conta em <http://localhost:5173>, abra **Perfil → Contas vinculadas** e clique em
+3. `npm run dev`, entre com a sua conta em <http://localhost:5173>, abra **Perfil → Plataformas** e clique em
    **Vincular conta**. Depois de entrar na Steam, o navegador volta para
    `http://localhost:5173/perfil?steam=vinculada` e o cartão mostra jogos, horas e conquistas.
 4. Em **Novo jogo → Buscar na Steam** (ou no **Vincular à Steam** da página de um jogo) ligue um jogo da biblioteca; a

@@ -1,5 +1,9 @@
+import { useRef } from 'react';
 import { type Game, type GameStatus } from '@checkpoint/shared';
+import { Contador } from '@/shared/components/Contador';
+import { useFlip } from '@/shared/hooks/use-flip';
 import { Icon } from '@/shared/components/Icon';
+import { useJogosComSaida } from '../lib/use-jogos-com-saida';
 import { STATUS_META } from '../lib/status-meta';
 import { GameTile } from './GameTile';
 
@@ -13,12 +17,16 @@ interface PrateleiraProps {
   /** O botão-bloco ao fim da prateleira: abre o formulário de novo jogo com o status dela. */
   onAdicionar: (status: GameStatus) => void;
   compacta?: boolean;
+  /** No celular, em "Todos": mostra só os primeiros jogos e o botão leva ao filtro desta prateleira. */
+  onVerMais?: (status: GameStatus) => void;
+  /** O jogo recém-criado (assenta e ganha um anel que some). */
+  novoId?: string | null;
 }
 
 /**
- * Uma prateleira da estante: ícone na cor do status, título, contador e a lista. No celular a lista rola na horizontal
- * DENTRO dela (a página não rola); a partir de 768 px quebra em linhas (grade de colunas do tamanho da capa), então o
- * anel e a elevação do hover nunca são cortados por um contêiner de rolagem. O botão-bloco "Adicionar" fecha a lista.
+ * Uma prateleira da estante: ícone na cor do status, título, contador e a lista. A lista é uma grade de colunas do tamanho da capa (nada rola de lado), então o anel e a elevação do hover
+ * nunca são cortados. Com `onVerMais` (filtro Todos), no celular só os 4 primeiros jogos aparecem e "Ver mais" leva ao filtro
+ * da prateleira, onde todos aparecem. O botão-bloco "Adicionar" fecha a lista.
  */
 export function Prateleira({
   status,
@@ -29,7 +37,12 @@ export function Prateleira({
   onRemove,
   onAdicionar,
   compacta = false,
+  onVerMais,
+  novoId = null,
 }: PrateleiraProps) {
+  const itens = useJogosComSaida(jogos, 200);
+  const lista = useRef<HTMLUListElement>(null);
+  useFlip(lista, itens.map((item) => `${item.game.id}${item.saindo ? '-' : ''}`).join(','));
   const tituloId = `prateleira-${status.toLowerCase()}`;
   const bloco = compacta
     ? 'h-[144px] w-[108px] md:h-[160px] md:w-[120px]'
@@ -39,33 +52,40 @@ export function Prateleira({
     <section
       aria-labelledby={tituloId}
       data-prateleira={status}
-      className="flex min-w-0 flex-col gap-3 md:gap-4"
+      className="flex min-w-0 flex-col gap-4 rounded-2xl border border-borda bg-painel p-4 md:gap-4 md:border-0 md:bg-transparent md:p-0"
     >
-      <div className="flex items-center gap-2 md:gap-2.5">
+      <div
+        className={`flex items-center gap-2 border-b-2 pb-3 md:gap-2.5 md:border-b-0 md:pb-0 ${STATUS_META[status].border}`}
+      >
         <Icon name={icone} size={26} filled className={STATUS_META[status].text} />
         <h2 id={tituloId} className="m-0 font-display text-[19px] font-bold md:text-[22px]">
           {titulo}
         </h2>
         <span className="inline-flex h-[22px] items-center rounded-full bg-painel-3 px-2.5 text-xs font-bold text-texto-suave md:h-6 md:text-[13px]">
-          {jogos.length}
+          <Contador valor={jogos.length} />
         </span>
       </div>
 
       <ul
+        ref={lista}
         aria-label={titulo}
-        className={`scroll-row m-0 -mx-4 flex list-none snap-x scroll-px-4 gap-3.5 overflow-x-auto px-4 pb-1 pt-1.5 md:mx-0 md:grid md:overflow-visible md:px-0 md:scroll-px-0 md:pb-0 md:pt-0 ${
+        className={`m-0 grid list-none justify-start gap-x-3.5 gap-y-5 p-0 ${
+          compacta ? 'grid-cols-[repeat(auto-fill,108px)]' : 'grid-cols-[repeat(auto-fill,132px)]'
+        } ${!onVerMais ? '' : '[&>li:nth-child(n+5):not([data-adicionar])]:max-md:hidden'} ${
           compacta
             ? 'md:grid-cols-[repeat(auto-fill,120px)] md:gap-x-4 md:gap-y-5'
             : 'md:grid-cols-[repeat(auto-fill,150px)] md:gap-x-[22px] md:gap-y-6'
         }`}
       >
-        {jogos.map((game) => (
+        {itens.map(({ game, saindo }) => (
           <GameTile
             key={game.id}
             game={game}
             onEdit={onEdit}
             onRemove={onRemove}
             compacta={compacta}
+            novo={!saindo && game.id === novoId}
+            saindo={saindo}
           />
         ))}
         <li data-adicionar className="shrink-0 snap-start">
@@ -80,6 +100,17 @@ export function Prateleira({
           </button>
         </li>
       </ul>
+
+      {onVerMais && jogos.length > 4 && (
+        <button
+          type="button"
+          onClick={() => onVerMais(status)}
+          className="flex h-11 items-center justify-center gap-2 rounded-full border border-borda-controle bg-painel font-display text-[15px] font-semibold text-texto-suave hover:text-texto md:hidden"
+        >
+          <Icon name="expand_more" size={20} />
+          {`Ver mais (${jogos.length - 4})`}
+        </button>
+      )}
     </section>
   );
 }

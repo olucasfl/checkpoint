@@ -6,6 +6,7 @@ import { type DadosJogoPlataforma, type Game, type GameStatus } from '@checkpoin
 import { describe, expect, it, vi } from 'vitest';
 import { DestaqueContinue } from './DestaqueContinue';
 import { GameTile } from './GameTile';
+import { ListLoading } from './ListStates';
 import { Prateleira } from './Prateleira';
 import { StatusFilter } from './StatusFilter';
 
@@ -63,6 +64,27 @@ describe('GameTile (CA-15 a CA-19)', () => {
 
     expect(screen.getByRole('img', { name: 'Nota 8,3 de 10' })).toBeInTheDocument();
     expect(screen.getByText('42 h · 12/40')).toBeInTheDocument();
+  });
+
+  it('com vínculo: um selo "Ligado à Steam" no canto livre, sem tocar no anel nem no chip; sem vínculo: nenhum', () => {
+    const { container, rerender } = noRouter(
+      <GameTile
+        game={jogo('a', { notaMedia: 8.3, plataforma: 'PC', dadosPlataforma: [steam] })}
+        {...acoes}
+      />,
+    );
+
+    const selo = screen.getByRole('img', { name: 'Ligado à Steam' });
+    expect(selo).toHaveAttribute('data-selo-plataformas');
+    expect(selo).toHaveClass('left-2', 'top-2'); // o anel é top/right; o chip, bottom/left; as ações, bottom/right
+    expect(container.querySelectorAll('[data-selo-plataformas]')).toHaveLength(1);
+
+    rerender(
+      <MemoryRouter>
+        <GameTile game={jogo('b')} {...acoes} />
+      </MemoryRouter>,
+    );
+    expect(container.querySelector('[data-selo-plataformas]')).toBeNull();
   });
 
   it('Editar e Remover têm nome acessível com o título e chamam o jogo certo', async () => {
@@ -200,5 +222,18 @@ describe('StatusFilter em pílulas (CA-12)', () => {
 
     await userEvent.click(screen.getByRole('button', { name: /Zerado/ }));
     expect(onChange).toHaveBeenCalledWith('ZERADO');
+  });
+});
+
+describe('ListLoading (CA-28)', () => {
+  it('é o esqueleto de uma prateleira: status ocupado com quatro capas em pé, sem spinner', () => {
+    const { container } = render(<ListLoading />);
+
+    expect(screen.getByRole('status', { name: 'Carregando jogos' })).toHaveAttribute(
+      'aria-busy',
+      'true',
+    );
+    expect(container.querySelectorAll('[class*="aspect-"]')).toHaveLength(4);
+    expect(container.querySelector('.gira')).toBeNull();
   });
 });

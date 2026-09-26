@@ -2,15 +2,21 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { BrandLogo } from './BrandLogo';
 
-describe('BrandLogo (F4)', () => {
-  it('círculo `destaque` com a bandeira e o nome "checkpoint" em minúsculas, como no catálogo', () => {
+describe('BrandLogo', () => {
+  it('o Chek (decorativo) e o nome "Checkpoint"', () => {
     const { container } = render(<BrandLogo />);
 
-    expect(screen.getByText('checkpoint')).toBeInTheDocument();
-    expect(container.querySelector('[aria-hidden="true"]')).toHaveClass(
-      'rounded-full',
-      'bg-destaque',
-      'text-fundo',
+    expect(screen.getByText('Checkpoint')).toBeInTheDocument();
+    expect(container.querySelector('svg[data-chek="feliz"]')).toHaveAttribute(
+      'aria-hidden',
+      'true',
     );
+  });
+
+  it('com `mostrarChek` falso, só o nome (o Chek já está acima do cartão)', () => {
+    const { container } = render(<BrandLogo mostrarChek={false} />);
+
+    expect(screen.getByText('Checkpoint')).toBeInTheDocument();
+    expect(container.querySelector('svg')).toBeNull();
   });
 });

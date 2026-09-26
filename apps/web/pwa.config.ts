@@ -10,8 +10,8 @@ const ICONES = '/icons';
 
 export const MANIFEST: Partial<ManifestOptions> = {
   id: '/',
-  name: 'checkpoint',
-  short_name: 'checkpoint',
+  name: 'Checkpoint',
+  short_name: 'Checkpoint',
   description: 'Seu registro de jogos: zerados, jogando e quero jogar.',
   lang: 'pt-BR',
   dir: 'ltr',
@@ -54,9 +54,11 @@ export const pwaOptions: Partial<VitePWAOptions> = {
   // O registro é feito por `shared/lib/pwa/use-app-update.ts`, não por um script injetado.
   injectRegister: false,
   manifest: MANIFEST,
-  includeAssets: ['icons/*.png', 'favicon.svg'],
+  includeAssets: ['icons/*.png', 'favicon.svg', 'favicon.ico'],
   workbox: {
     globPatterns: ['**/*.{js,css,html,svg,png,webp,woff2}'],
+    // A imagem de compartilhamento (355 KB) só é pedida por robôs de rede social; no precache seria peso sem uso.
+    globIgnores: ['og-image-*.png'],
     navigateFallback: 'index.html',
     // Defensivo: se a API um dia vier para a mesma origem, a navegação a ela não vira o shell.
     navigateFallbackDenylist: [/^\/api\//],

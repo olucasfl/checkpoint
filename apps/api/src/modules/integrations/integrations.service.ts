@@ -12,6 +12,7 @@ import {
   type ItemBiblioteca,
   type JogoParecido,
   type PerfilPlataforma,
+  type ResumoContaPlataforma,
   type Provedor,
   type VincularJogoRequest,
 } from '@checkpoint/shared';
@@ -24,6 +25,7 @@ import {
   CACHE_MAX_ENTRIES,
   LIBRARY_CACHE_TTL_MS,
   MAIS_JOGADOS_NO_CARTAO,
+  MAIS_JOGADOS_NO_RESUMO,
   MAX_JOGOS_PARECIDOS,
 } from './integrations.constants';
 import {
@@ -223,6 +225,54 @@ export class IntegrationsService {
   }
 
   /**
+   * O popup da plataforma (spec `plataformas-e-pagina-do-jogo`, F4a). NENHUMA chamada nova: tudo sai da biblioteca e do
+   * perfil do MESMO cache de 10 min do cartão (`obterBiblioteca`) e do que está gravado no banco (as conquistas dos
+   * jogos vinculados e quais itens já estão ligados). A frio custa o que o cartão já custava; a quente, zero. Com
+   * `atualizar`, ignora o cache, no máximo uma consulta a cada 30 s (como o cartão).
+   */
+  async resumo(
+    userId: string,
+    provedor: Provedor,
+    opcoes: { atualizar?: boolean } = {},
+  ): Promise<ResumoContaPlataforma> {
+    const conta = await this.contaDe(userId, provedor);
+    if (!conta) {
+      throw integracaoErrors.naoVinculada();
+    }
+    const biblioteca = await this.obterBiblioteca(userId, provedor, conta, opcoes);
+    const [conquistas, ligadosNoBanco] = await Promise.all([
+      this.conquistasDosJogosVinculados(userId, provedor),
+      this.prisma.jogoPlataforma.findMany({
+        where: { userId, provedor },
+        select: { idExterno: true },
+      }),
+    ]);
+    const idsDaBiblioteca = new Set(biblioteca.itens.map((item) => item.idExterno));
+    const jogosJogados = biblioteca.itens.filter((item) => item.minutosJogados > 0).length;
+
+    return {
+      provedor,
+      nomeExibicao: biblioteca.perfil.nomeExibicao,
+      avatarUrl: biblioteca.perfil.avatarUrl,
+      perfilUrl: biblioteca.perfil.perfilUrl,
+      membroDesde: biblioteca.perfil.membroDesdeAno ?? null,
+      status: biblioteca.perfil.status ?? null,
+      jogandoAgora: biblioteca.perfil.jogandoAgora ?? null,
+      totalJogos: biblioteca.itens.length,
+      minutosTotais: biblioteca.itens.reduce((soma, item) => soma + item.minutosJogados, 0),
+      jogosJogados,
+      nuncaJogados: biblioteca.itens.length - jogosJogados,
+      maisJogados: this.maisJogados(biblioteca.itens, MAIS_JOGADOS_NO_RESUMO),
+      noCheckpoint: {
+        ligados: ligadosNoBanco.filter((vinculo) => idsDaBiblioteca.has(vinculo.idExterno)).length,
+        naBiblioteca: biblioteca.itens.length,
+      },
+      conquistas,
+      consultadoEm: new Date(biblioteca.consultadoEm).toISOString(),
+    };
+  }
+
+  /**
    * A biblioteca do diálogo "Buscar na Steam" (etapa 3). Usa o MESMO cache de 10 min do cartão do perfil:
    * abrir o diálogo logo depois do `/perfil` não chama a plataforma. Sem paginação: `busca` (por trecho da
    * `chaveDeTitulo`, sem caixa nem acento) e `limite` (padrão 30) mantêm a resposta pequena, ordenada por horas
@@ -232,7 +282,7 @@ export class IntegrationsService {
   async biblioteca(
     userId: string,
     provedor: Provedor,
-    query: { busca?: string; limite?: number } = {},
+    query: { busca?: string; limite?: number; nuncaJogados?: boolean } = {},
   ): Promise<ItemBiblioteca[]> {
     const conta = await this.contaDe(userId, provedor);
     if (!conta) {
@@ -244,6 +294,7 @@ export class IntegrationsService {
     const escolhidos = biblioteca.itens
       .map((item, indice) => ({ item, chave: biblioteca.chaves[indice] ?? '' }))
       .filter(({ chave }) => buscada === '' || chave.includes(buscada))
+      .filter(({ item }) => query.nuncaJogados !== true || item.minutosJogados === 0)
       .sort(
         (a, b) =>
           b.item.minutosJogados - a.item.minutosJogados ||
@@ -645,13 +696,16 @@ export class IntegrationsService {
     }
   }
 
-  private maisJogados(itens: ItemDaBiblioteca[]): PerfilPlataforma['maisJogados'] {
+  private maisJogados(
+    itens: ItemDaBiblioteca[],
+    limite: number = MAIS_JOGADOS_NO_CARTAO,
+  ): PerfilPlataforma['maisJogados'] {
     return itens
       .filter((item) => item.minutosJogados > 0)
       .sort(
         (a, b) => b.minutosJogados - a.minutosJogados || a.titulo.localeCompare(b.titulo, 'pt-BR'),
       )
-      .slice(0, MAIS_JOGADOS_NO_CARTAO)
+      .slice(0, limite)
       .map((item) => ({
         idExterno: item.idExterno,
         titulo: item.titulo,

@@ -2,6 +2,7 @@ import { type ReactNode } from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { PrefsSync } from '@/app/PrefsSync';
 import { AuthProvider } from '@/features/auth/session/AuthProvider';
+import { useAbaVisivel } from '@/shared/hooks/use-aba-visivel';
 import { queryClient } from '@/shared/lib/query-client';
 
 interface AppProvidersProps {
@@ -10,6 +11,8 @@ interface AppProvidersProps {
 
 /** Ponto unico para registrar providers globais (query, sessão, tema, etc). */
 export function AppProviders({ children }: AppProvidersProps) {
+  useAbaVisivel();
+
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>

@@ -1,7 +1,7 @@
 import { applyDecorators } from '@nestjs/common';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type, type TransformFnParams } from 'class-transformer';
-import { IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import { IsBoolean, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 import { TrimString } from '../../../common/dto/transforms';
 import {
   BIBLIOTECA_BUSCA_MAX,
@@ -51,4 +51,16 @@ export class BibliotecaQueryDto {
     message: `O limite deve ser um inteiro de 1 a ${BIBLIOTECA_LIMITE_MAXIMO}`,
   })
   limite?: number;
+
+  @ApiPropertyOptional({
+    description: 'Só os itens nunca abertos (0 minutos): o backlog. Só `true` ou `false`.',
+    type: Boolean,
+  })
+  @IsOptional()
+  @Transform(({ obj, key }: TransformFnParams) => {
+    const raw: unknown = obj[key];
+    return raw === 'true' ? true : raw === 'false' ? false : raw;
+  })
+  @IsBoolean({ message: 'nuncaJogados deve ser true ou false' })
+  nuncaJogados?: boolean;
 }

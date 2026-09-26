@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { Contador } from '@/shared/components/Contador';
 import { Icon } from '@/shared/components/Icon';
 import { type StatusCounts } from '../lib/count-by-status';
 import { FILTER_ORDER, type StatusFilter as Filter } from '../lib/status-filter';
@@ -25,8 +26,8 @@ function countOf(filter: Filter, counts: StatusCounts): number {
 /**
  * Filtros em pílulas de 44 px com ícone, rótulo e contagem, `aria-pressed`. A ativa tem fundo `texto` e texto `fundo`.
  * No desktop o grupo é um contêiner em pílula (`painel` com `borda`) e as inativas não têm contorno; no celular é uma
- * fileira que rola na horizontal DENTRO dela (a página não rola de lado) e cada inativa leva `borda-controle` (a `borda`
- * decorativa não passa de 3:1). Traz o filtro ativo para a vista ao abrir `/?status=ZERADO`.
+ * grade de 2 colunas (nada fica cortado nem exige arrastar) e cada inativa leva `borda-controle` (a `borda`
+ * decorativa não passa de 3:1). Se o grupo rolar por dentro (desktop estreito), traz o filtro ativo para a vista.
  */
 export function StatusFilter({ filter, counts, onChange }: StatusFilterProps) {
   const rowRef = useRef<HTMLDivElement>(null);
@@ -46,7 +47,7 @@ export function StatusFilter({ filter, counts, onChange }: StatusFilterProps) {
       ref={rowRef}
       role="group"
       aria-label="Filtrar por status"
-      className="scroll-row flex w-full snap-x gap-2 overflow-x-auto md:w-auto md:min-w-0 md:gap-1 md:rounded-full md:border md:border-borda md:bg-painel md:p-[5px]"
+      className="grid w-full grid-cols-2 gap-2 md:flex md:w-auto md:min-w-0 md:gap-1 md:rounded-full md:border md:border-borda md:bg-painel md:p-[5px]"
     >
       {FILTER_ORDER.map((option) => {
         const active = option === filter;
@@ -57,7 +58,7 @@ export function StatusFilter({ filter, counts, onChange }: StatusFilterProps) {
             type="button"
             aria-pressed={active}
             onClick={() => onChange(option)}
-            className={`flex h-11 shrink-0 snap-start items-center gap-2 whitespace-nowrap rounded-full border px-[18px] font-display text-[15px] transition-colors md:px-5 ${
+            className={`flex h-11 min-w-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-full border px-3 font-display text-[15px] transition-colors md:shrink-0 md:justify-start md:gap-2 md:px-5 ${
               active
                 ? 'border-transparent bg-texto font-bold text-fundo'
                 : 'border-borda-controle bg-painel font-semibold text-texto-suave hover:text-texto md:border-transparent md:bg-transparent'
@@ -65,11 +66,10 @@ export function StatusFilter({ filter, counts, onChange }: StatusFilterProps) {
           >
             <Icon name={iconOf(option)} size={19} filled={active} />
             {labelOf(option)}
-            <span
+            <Contador
+              valor={countOf(option, counts)}
               className={`text-xs font-extrabold ${active ? 'text-fundo/70' : 'text-texto-suave'}`}
-            >
-              {countOf(option, counts)}
-            </span>
+            />
           </button>
         );
       })}

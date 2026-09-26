@@ -2,7 +2,7 @@ import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { connectivity } from '@/shared/lib/connectivity';
-import { ConnectionBanner } from './ConnectionBanner';
+import { BANNER_SAIDA_MS, ConnectionBanner } from './ConnectionBanner';
 
 const probe = vi.fn<() => Promise<unknown>>();
 
@@ -77,6 +77,11 @@ describe('ConnectionBanner', () => {
     expect(region()).toHaveTextContent('Conexão restabelecida');
     act(() => {
       vi.advanceTimersByTime(1);
+    });
+    // A saída é suave (CA-40): o aviso ganha `banner-out` e só some depois de BANNER_SAIDA_MS.
+    expect(document.querySelector('[data-connection="restored"]')).toHaveClass('banner-out');
+    act(() => {
+      vi.advanceTimersByTime(BANNER_SAIDA_MS);
     });
     expect(region()).toBeEmptyDOMElement();
   });

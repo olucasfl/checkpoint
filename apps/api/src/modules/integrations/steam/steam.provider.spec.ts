@@ -14,7 +14,7 @@ import {
   STEAM_OPENID_ENDPOINT,
   type SteamOpenId,
 } from './steam-open-id';
-import { NOME_PADRAO_DA_CONTA, SteamProvider } from './steam.provider';
+import { NOME_PADRAO_DA_CONTA, SteamProvider, anoDaCriacao, statusDaSteam } from './steam.provider';
 import {
   SteamClient,
   type SteamBiblioteca,
@@ -200,6 +200,33 @@ describe('SteamProvider.listarBiblioteca', () => {
       avatarUrl: 'https://avatars.steamstatic.com/0000_full.jpg',
       perfilUrl: 'https://steamcommunity.com/profiles/x/',
       publico: true,
+      membroDesdeAno: null,
+      status: null,
+      jogandoAgora: null,
+    });
+  });
+
+  it('o ano de criação e o status saem de timecreated, personastate e gameextrainfo (SIMULADO: sem fixture real de timecreated)', async () => {
+    const { provider, client } = montar();
+    client.listarJogos.mockResolvedValue(bibliotecaPublica);
+
+    client.obterPerfil.mockResolvedValue({ ...perfilPublico, criadoEmUnix: 1300000000, estado: 1 });
+    await expect(provider.listarBiblioteca(STEAM_ID)).resolves.toMatchObject({
+      perfil: { membroDesdeAno: 2011, status: 'online', jogandoAgora: null },
+    });
+
+    client.obterPerfil.mockResolvedValue({ ...perfilPublico, estado: 0 });
+    await expect(provider.listarBiblioteca(STEAM_ID)).resolves.toMatchObject({
+      perfil: { status: 'offline' },
+    });
+
+    client.obterPerfil.mockResolvedValue({
+      ...perfilPublico,
+      estado: 1,
+      jogandoAgora: 'Celeste',
+    });
+    await expect(provider.listarBiblioteca(STEAM_ID)).resolves.toMatchObject({
+      perfil: { status: 'jogando', jogandoAgora: 'Celeste' },
     });
   });
 
@@ -769,5 +796,29 @@ describe('SteamProvider.obterDetalhe (etapa 4)', () => {
       descricao: null,
       raridadePercentual: null,
     });
+  });
+});
+
+describe('anoDaCriacao e statusDaSteam', () => {
+  it.each([
+    [1300000000, 2011],
+    [0, null],
+    [-1, null],
+    [null, null],
+    [undefined, null],
+    [Number.NaN, null],
+  ])('anoDaCriacao(%p) = %p', (entrada, esperado) => {
+    expect(anoDaCriacao(entrada)).toBe(esperado);
+  });
+
+  it.each([
+    [0, null, 'offline'],
+    [1, null, 'online'],
+    [3, null, 'online'],
+    [0, 'Celeste', 'jogando'],
+    [null, null, null],
+    [undefined, undefined, null],
+  ])('statusDaSteam(%p, %p) = %p', (estado, jogo, esperado) => {
+    expect(statusDaSteam(estado, jogo)).toBe(esperado);
   });
 });

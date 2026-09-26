@@ -5,6 +5,7 @@ import { ModalDialog } from '@/shared/components/ModalDialog';
 import { useDeleteGame } from '../api/use-games';
 import { describeError } from '../lib/api-error';
 import { FieldError } from '@/shared/components/form-parts';
+import { avisar } from '@/shared/lib/avisos';
 
 interface DeleteGameDialogProps {
   /** Jogo a remover; `null` = diálogo fechado. */
@@ -26,6 +27,7 @@ export function DeleteGameDialog({ game, onClose, onDeleted }: DeleteGameDialogP
     setError('');
     try {
       await mutation.mutateAsync(game.id);
+      avisar({ texto: 'Jogo removido.' });
       onDeleted?.();
       onClose();
     } catch (failure) {

@@ -9,7 +9,7 @@ describe('ambiente de teste do web', () => {
   it('renderiza no jsdom e usa os matchers do jest-dom', () => {
     render(<h1>{APP_NAME}</h1>);
 
-    expect(screen.getByRole('heading', { name: 'checkpoint' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Checkpoint' })).toBeInTheDocument();
   });
 
   it('resolve o alias @/ para apps/web/src', () => {

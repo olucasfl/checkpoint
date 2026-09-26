@@ -31,8 +31,8 @@ vi.mock('@/features/integracoes/api/integracoes-api', () => ({
   integracoesApi: {
     listarContas: vi.fn(),
     iniciarVinculo: vi.fn(),
-    perfil: vi.fn(),
-    atualizarPerfil: vi.fn(),
+    resumo: vi.fn(),
+    atualizarResumo: vi.fn(),
     desvincular: vi.fn(),
   },
 }));
@@ -439,8 +439,8 @@ describe('"Instalar app" só quando dá para instalar (CA-06)', () => {
   it('Safari do iOS: o botão mostra o passo a passo, sem prompt nativo', async () => {
     vi.mocked(ehSafariIos).mockReturnValue(true);
     const user = renderPerfil();
-    // A seção "Contas vinculadas" carrega de forma assíncrona e o esqueleto dela também é um `status`.
-    await screen.findByRole('button', { name: 'Vincular conta' });
+    // A seção "Plataformas" carrega de forma assíncrona e o esqueleto dela também é um `status`.
+    await screen.findByRole('button', { name: 'Vincular conta Steam' });
 
     await user.click(screen.getByRole('button', { name: 'Instalar app' }));
 
@@ -449,14 +449,14 @@ describe('"Instalar app" só quando dá para instalar (CA-06)', () => {
   });
 });
 
-describe('aviso do retorno da Steam e seção "Contas vinculadas" (CA-15)', () => {
-  it('sem vínculo, a seção "Contas vinculadas" fica entre Conta e Preferências, com "Vincular conta"', async () => {
+describe('aviso do retorno da Steam e seção "Plataformas" (CA-15)', () => {
+  it('sem vínculo, a seção "Plataformas" fica entre Conta e Preferências, com "Vincular conta"', async () => {
     renderPerfil();
 
     const secoes = screen.getAllByRole('region').map((secao) => secao.getAttribute('aria-label'));
-    expect(secoes.indexOf('Conta')).toBeLessThan(secoes.indexOf('Contas vinculadas'));
-    expect(secoes.indexOf('Contas vinculadas')).toBeLessThan(secoes.indexOf('Preferências'));
-    expect(await screen.findByRole('button', { name: 'Vincular conta' })).toBeInTheDocument();
+    expect(secoes.indexOf('Conta')).toBeLessThan(secoes.indexOf('Plataformas'));
+    expect(secoes.indexOf('Plataformas')).toBeLessThan(secoes.indexOf('Preferências'));
+    expect(await screen.findByRole('button', { name: 'Vincular conta Steam' })).toBeInTheDocument();
   });
 
   it('?steam=vinculada mostra o aviso de sucesso e limpa a URL', async () => {
@@ -490,7 +490,7 @@ describe('aviso do retorno da Steam e seção "Contas vinculadas" (CA-15)', () =
   ])('%s é ignorado: nenhum aviso', async (entrada) => {
     renderPerfil(entrada);
 
-    await screen.findByRole('button', { name: 'Vincular conta' });
+    await screen.findByRole('button', { name: 'Vincular conta Steam' });
     expect(screen.queryByText(/Steam vinculada|Vínculo|Não foi possível confirmar/)).toBeNull();
   });
 

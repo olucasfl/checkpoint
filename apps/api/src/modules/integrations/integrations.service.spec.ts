@@ -1,6 +1,7 @@
 import { HttpException, Logger } from '@nestjs/common';
 import { type ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
+import { type StatusNaPlataforma } from '@checkpoint/shared';
 import { type PrismaService } from '../../database/prisma.service';
 import { AuthTokensService } from '../auth/auth-tokens.service';
 import { IntegrationsService } from './integrations.service';
@@ -1510,5 +1511,180 @@ describe('IntegrationsService.detalheDoJogo e atualizarJogo (etapa 4, CA-43 a CA
     await expect(limite.service.atualizarJogo(ANA, 'STEAM', GAME)).rejects.toBeInstanceOf(
       PlataformaLimiteError,
     );
+  });
+});
+
+describe('IntegrationsService.resumo (spec plataformas-e-pagina-do-jogo, F4a)', () => {
+  const perfilBasico = {
+    nomeExibicao: 'Jogador',
+    avatarUrl: 'https://avatars.steamstatic.com/a.jpg',
+    perfilUrl: 'https://steamcommunity.com/profiles/x/',
+    publico: true,
+    membroDesdeAno: 2011,
+    status: 'online' as StatusNaPlataforma,
+    jogandoAgora: null as string | null,
+  };
+
+  function comContaEBiblioteca(itens: ItemDaBiblioteca[], perfil = perfilBasico) {
+    const ctx = montar();
+    ctx.prisma.contaVinculada.findUnique.mockResolvedValue({
+      idExterno: STEAM_ID,
+      nomeExibicao: 'Jogador',
+    });
+    ctx.provider.listarBiblioteca.mockResolvedValue({ itens, perfil });
+    return ctx;
+  }
+
+  it('sem conta vinculada → 409 PLATAFORMA_NAO_VINCULADA, sem chamar a plataforma', async () => {
+    const ctx = montar();
+
+    await expect(statusEcodeDe(ctx.service.resumo(ANA, 'STEAM'))).resolves.toEqual({
+      status: 409,
+      code: 'PLATAFORMA_NAO_VINCULADA',
+    });
+    expect(ctx.provider.listarBiblioteca).not.toHaveBeenCalled();
+  });
+
+  it('totais, jogados, backlog, top 5 e a ligação com o catálogo (só itens que ainda estão na biblioteca)', async () => {
+    const ctx = comContaEBiblioteca([
+      item('1', 'Zebra', 600),
+      item('2', 'Alfa', 600),
+      item('3', 'Beta', 1200),
+      item('4', 'Gama', 60),
+      item('5', 'Delta', 30),
+      item('6', 'Épsilon', 10),
+      item('7', 'Nunca A', 0),
+      item('8', 'Nunca B', 0),
+    ]);
+    // 3 ligados no banco; o appid 99 saiu da biblioteca e NÃO conta.
+    ctx.prisma.jogoPlataforma.findMany.mockResolvedValue([
+      { idExterno: '1', conquistasTotal: 40, conquistasDesbloqueadas: 12 },
+      { idExterno: '3', conquistasTotal: 10, conquistasDesbloqueadas: 10 },
+      { idExterno: '99', conquistasTotal: null, conquistasDesbloqueadas: null },
+    ]);
+
+    const resumo = await ctx.service.resumo(ANA, 'STEAM');
+
+    expect(resumo).toMatchObject({
+      provedor: 'STEAM',
+      nomeExibicao: 'Jogador',
+      membroDesde: 2011,
+      status: 'online',
+      jogandoAgora: null,
+      totalJogos: 8,
+      minutosTotais: 2500,
+      jogosJogados: 6,
+      nuncaJogados: 2,
+      noCheckpoint: { ligados: 2, naBiblioteca: 8 },
+      conquistas: { desbloqueadas: 22, total: 50, jogosVinculados: 3 },
+      consultadoEm: new Date(NOW).toISOString(),
+    });
+    // Por horas, empate pelo título, sem quem nunca jogou, no máximo 5.
+    expect(resumo.maisJogados.map((jogo) => jogo.titulo)).toEqual([
+      'Beta',
+      'Alfa',
+      'Zebra',
+      'Gama',
+      'Delta',
+    ]);
+  });
+
+  it('o perfil sem os campos novos (privado ou não devolvidos) vira null, nunca undefined', async () => {
+    const { membroDesdeAno: _a, status: _b, jogandoAgora: _c, ...semNovos } = perfilBasico;
+    const ctx = comContaEBiblioteca([item('1', 'A', 10)], semNovos as typeof perfilBasico);
+
+    await expect(ctx.service.resumo(ANA, 'STEAM')).resolves.toMatchObject({
+      membroDesde: null,
+      status: null,
+      jogandoAgora: null,
+    });
+  });
+
+  it('em jogo: o nome do jogo em andamento', async () => {
+    const ctx = comContaEBiblioteca([item('1', 'A', 10)], {
+      ...perfilBasico,
+      status: 'jogando',
+      jogandoAgora: 'Celeste',
+    });
+
+    await expect(ctx.service.resumo(ANA, 'STEAM')).resolves.toMatchObject({
+      status: 'jogando',
+      jogandoAgora: 'Celeste',
+    });
+  });
+
+  it('CUSTO: a frio, uma consulta à biblioteca e ao perfil (a mesma do cartão); a quente, ZERO; o cartão e o popup dividem o cache', async () => {
+    const ctx = comContaEBiblioteca([item('1', 'A', 10)]);
+
+    await ctx.service.resumo(ANA, 'STEAM');
+    expect(ctx.provider.listarBiblioteca).toHaveBeenCalledTimes(1);
+
+    jest.spyOn(Date, 'now').mockReturnValue(NOW + 9 * 60_000);
+    await ctx.service.resumo(ANA, 'STEAM');
+    await ctx.service.perfil(ANA, 'STEAM');
+    await ctx.service.biblioteca(ANA, 'STEAM');
+    expect(ctx.provider.listarBiblioteca).toHaveBeenCalledTimes(1);
+
+    jest.spyOn(Date, 'now').mockReturnValue(NOW + 10 * 60_000 + 1);
+    await ctx.service.resumo(ANA, 'STEAM');
+    expect(ctx.provider.listarBiblioteca).toHaveBeenCalledTimes(2);
+  });
+
+  it('atualizar: antes de 30 s devolve o que já tem, sem chamar a Steam; depois consulta', async () => {
+    const ctx = comContaEBiblioteca([item('1', 'A', 10)]);
+    const primeira = await ctx.service.resumo(ANA, 'STEAM', { atualizar: true });
+
+    jest.spyOn(Date, 'now').mockReturnValue(NOW + 29_000);
+    const segunda = await ctx.service.resumo(ANA, 'STEAM', { atualizar: true });
+    expect(segunda.consultadoEm).toBe(primeira.consultadoEm);
+    expect(ctx.provider.listarBiblioteca).toHaveBeenCalledTimes(1);
+
+    jest.spyOn(Date, 'now').mockReturnValue(NOW + 30_000);
+    await ctx.service.resumo(ANA, 'STEAM', { atualizar: true });
+    expect(ctx.provider.listarBiblioteca).toHaveBeenCalledTimes(2);
+  });
+
+  it('perfil privado e Steam fora do ar sobem como erro de domínio (o filtro do controller os vira 409 e 502), nada é gravado', async () => {
+    const privado = comContaEBiblioteca([]);
+    privado.provider.listarBiblioteca.mockRejectedValue(new PerfilPrivadoError());
+    await expect(privado.service.resumo(ANA, 'STEAM')).rejects.toBeInstanceOf(PerfilPrivadoError);
+
+    const fora = comContaEBiblioteca([]);
+    fora.provider.listarBiblioteca.mockRejectedValue(new PlataformaIndisponivelError());
+    await expect(fora.service.resumo(ANA, 'STEAM')).rejects.toBeInstanceOf(
+      PlataformaIndisponivelError,
+    );
+    expect(fora.prisma.contaVinculada.update).not.toHaveBeenCalled();
+  });
+
+  it('biblioteca pública e vazia: tudo zero, sem erro e sem divisão por zero', async () => {
+    const ctx = comContaEBiblioteca([]);
+
+    await expect(ctx.service.resumo(ANA, 'STEAM')).resolves.toMatchObject({
+      totalJogos: 0,
+      jogosJogados: 0,
+      nuncaJogados: 0,
+      maisJogados: [],
+      noCheckpoint: { ligados: 0, naBiblioteca: 0 },
+    });
+  });
+});
+
+describe('IntegrationsService.biblioteca com nuncaJogados (backlog)', () => {
+  it('só os itens com 0 minutos; sem o filtro, todos', async () => {
+    const ctx = montar();
+    ctx.prisma.contaVinculada.findUnique.mockResolvedValue({
+      idExterno: STEAM_ID,
+      nomeExibicao: 'Jogador',
+    });
+    ctx.provider.listarBiblioteca.mockResolvedValue({
+      itens: [item('1', 'Jogado', 90), item('2', 'Nunca', 0)],
+      perfil: { nomeExibicao: 'Jogador', avatarUrl: null, perfilUrl: null, publico: true },
+    });
+
+    const backlog = await ctx.service.biblioteca(ANA, 'STEAM', { nuncaJogados: true });
+    expect(backlog.map((i) => i.titulo)).toEqual(['Nunca']);
+    const todos = await ctx.service.biblioteca(ANA, 'STEAM', { nuncaJogados: false });
+    expect(todos.map((i) => i.titulo)).toEqual(['Jogado', 'Nunca']);
   });
 });

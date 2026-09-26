@@ -1,5 +1,6 @@
 import { type ReactNode } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
+import { Avisos } from '@/shared/components/Avisos';
 import { ConnectionBanner } from '@/shared/components/ConnectionBanner';
 import { ErrorBoundary } from '@/shared/components/ErrorBoundary';
 import { InstallNudge } from '@/shared/components/InstallNudge';
@@ -27,6 +28,7 @@ export function AppFrame({ children }: { children: ReactNode }) {
 
       <BottomNav />
       <ConnectionBanner />
+      <Avisos />
       <UpdatePrompt />
       <InstallNudge />
     </div>

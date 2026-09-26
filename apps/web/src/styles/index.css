@@ -43,8 +43,37 @@
   --color-capa-5: #facc15;
   --color-capa-6: #a78bfa;
 
+  /* O mascote Chek (a marca): o corpo, a base do cartucho, o mastro e o degradê dourado da bandeira. O resto do Chek
+     reusa `fundo`, `texto`, `ouro` e `acento`. Nunca segue o `destaque` do /perfil. */
+  --color-chek-corpo-1: #8fbaff;
+  --color-chek-corpo-2: #3f79f0;
+  --color-chek-base: #2a4fa3;
+  --color-chek-mastro: #dfe8ff;
+  --color-ouro-1: #ffe08a;
+  --color-ouro-2: #ffbf47;
+
   --font-display: 'Outfit', system-ui, sans-serif;
   --font-corpo: 'Manrope', system-ui, sans-serif;
+}
+
+/*
+ * Sistema de movimento (spec personalizacao-chek-e-animacoes, F2): TODA duração e curva de animação ou transição passa
+ * por estes tokens (motion.test.ts vigia). Nenhum feedback passa de `--mov-max`; os laços da espera (esqueleto, Chek,
+ * ícone girando) têm duração própria. Laços e @keyframes só animam `transform`, `opacity` e as propriedades
+ * individuais `scale`/`translate`/`rotate`.
+ */
+:root {
+  --mov-rapida: 120ms;
+  --mov-padrao: 200ms;
+  --mov-enfase: 320ms;
+  --mov-max: 600ms;
+  --mov-laco: 1400ms;
+  /* O realce do jogo novo (um anel que some) dura mais que um feedback: é onde o olho procura o tile, não movimento. */
+  --mov-realce: 2000ms;
+  --mov-laco-lento: 1800ms;
+  --ease-entrada: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-saida: cubic-bezier(0.4, 0, 1, 1);
+  --ease-elastica: cubic-bezier(0.34, 1.4, 0.64, 1);
 }
 
 /* Cor de destaque escolhida no /perfil (spec perfil, etapa 3; cores novas na troca de design). Azul é o padrão
@@ -183,7 +212,28 @@ button:disabled {
     max-height: calc(100dvh - env(safe-area-inset-top) - 16px);
     border-radius: 24px 24px 0 0;
     box-shadow: 0 30px 80px color-mix(in srgb, var(--color-fundo) 60%, transparent);
-    animation: sheet-up 0.2s ease-out;
+    /* Entrada e saída só por CSS (`@starting-style` + `allow-discrete`): o <dialog> fecha NA HORA para o Esc e o foco,
+       e o visual acompanha. Sem suporte, abre e fecha de uma vez. */
+    opacity: 1;
+    transform: translateY(0);
+    transition:
+      opacity var(--mov-padrao) var(--ease-entrada),
+      transform var(--mov-padrao) var(--ease-entrada),
+      overlay var(--mov-padrao) allow-discrete,
+      display var(--mov-padrao) allow-discrete;
+  }
+
+  dialog.modal:not([open]) {
+    opacity: 0;
+    transform: translateY(100%);
+    transition-timing-function: var(--ease-saida);
+  }
+
+  @starting-style {
+    dialog.modal[open] {
+      opacity: 0;
+      transform: translateY(100%);
+    }
   }
 
   /* Rodapé das ações do diálogo acima da barra de gestos (formulário: rodapé sticky; confirmação:
@@ -213,13 +263,31 @@ button:disabled {
       width: 440px;
     }
 
+    .aviso-pilha {
+      inset-inline: 0;
+      bottom: 24px;
+    }
+
+    body:has(.update-prompt > *, .install-nudge > *) .aviso-pilha {
+      bottom: 100px;
+    }
+
     dialog.modal {
       width: min(640px, calc(100vw - 32px));
       margin: auto;
       max-height: calc(100vh - 2rem);
       max-height: calc(100dvh - 2rem);
       border-radius: 24px;
-      animation: none;
+    }
+
+    dialog.modal:not([open]) {
+      transform: translateY(12px) scale(0.98);
+    }
+
+    @starting-style {
+      dialog.modal[open] {
+        transform: translateY(12px) scale(0.98);
+      }
     }
 
     .sheet-footer {
@@ -308,12 +376,8 @@ button:disabled {
   }
 
   @media (hover: hover) {
-    .tile {
-      transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
-    }
-
     .tile-capa {
-      transition: box-shadow 0.22s;
+      transition: box-shadow var(--mov-padrao) var(--ease-entrada);
     }
 
     .tile:hover {
@@ -333,8 +397,8 @@ button:disabled {
       pointer-events: none;
       transform: translateY(6px);
       transition:
-        opacity 0.2s,
-        transform 0.2s;
+        opacity var(--mov-padrao) var(--ease-entrada),
+        transform var(--mov-padrao) var(--ease-entrada);
     }
 
     .tile:hover .tile-acoes,
@@ -400,32 +464,125 @@ button:disabled {
   }
 
   /* ---- Animações (só CSS) ---- */
-  .shake-error {
-    animation: shake 0.35s ease-in-out 3;
+  /* Avisos de sucesso: acima da barra inferior (68px + safe-area) no celular, e acima do aviso de versão e do convite de
+     instalação quando eles estão na tela (76px a mais); no desktop, embaixo no centro. */
+  .aviso-pilha {
+    inset-inline: 16px;
+    bottom: calc(68px + env(safe-area-inset-bottom) + 12px);
   }
 
+  body:has(.update-prompt > *, .install-nudge > *) .aviso-pilha {
+    bottom: calc(68px + env(safe-area-inset-bottom) + 88px);
+  }
+
+  .aviso-in {
+    animation: update-in var(--mov-padrao) var(--ease-entrada);
+  }
+
+  .aviso-out {
+    animation: aviso-out var(--mov-padrao) var(--ease-saida) forwards;
+  }
+
+  .banner-out {
+    animation: banner-out var(--mov-padrao) var(--ease-saida) forwards;
+  }
+
+  /* O check do aviso "pula" ao entrar (escala e opacidade). */
+  .check-pop {
+    animation: check-pop var(--mov-enfase) var(--ease-elastica);
+  }
+
+  /* Jogo recém-criado: o tile "assenta" (sobe 8px e cresce de 0,96 a 1, com a curva elástica) e um anel `destaque` some
+     por `opacity` em 2 s, para a pessoa achar onde ele foi parar. Só `translate`, `scale` e `opacity`. */
+  .tile-novo {
+    animation: tile-assenta var(--mov-enfase) var(--ease-elastica);
+  }
+
+  .tile-anel-novo {
+    position: absolute;
+    inset: -5px;
+    border: 3px solid var(--color-destaque);
+    border-radius: 18px;
+    pointer-events: none;
+    animation: anel-novo var(--mov-realce) ease-in forwards;
+  }
+
+  /* Cópia visual do tile que saiu (remover ou mudar de status): some enquanto os vizinhos ainda não fecharam o espaço. */
+  .tile-sai {
+    animation: tile-some var(--mov-padrao) var(--ease-saida) forwards;
+  }
+
+  /* O número do contador troca com um fade curto. */
+  .contador-troca {
+    animation: contador-troca var(--mov-rapida) var(--ease-entrada);
+  }
+
+  /* Bandeira do Chek do carregamento: balança em torno do pé do mastro (`rotate`, não `transform`). Só existe com `animado`. */
+  .chek-bandeira {
+    transform-origin: 256px 156px;
+    animation: chek-balanco var(--mov-laco-lento) ease-in-out infinite alternate;
+  }
+
+  /* Indicador de pedido em andamento (botão pendente e ícone de "Atualizar"): gira só enquanto o pedido existe. */
+  .gira {
+    animation: gira var(--mov-laco) linear infinite;
+  }
+
+  /* Reserva de largura do botão pendente: os dois textos (repouso e ocupado, este com o espaço do indicador) ocupam a
+     mesma célula, invisíveis, então a largura é a do maior e o botão não pula. Não anima. */
+  .reserva {
+    display: inline-grid;
+    justify-items: center;
+    align-items: center;
+    vertical-align: middle;
+  }
+
+  .reserva > *,
+  .reserva::before,
+  .reserva::after {
+    grid-area: 1 / 1;
+  }
+
+  .reserva::before,
+  .reserva::after {
+    visibility: hidden;
+    height: 0;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+
+  .reserva::before {
+    content: attr(data-normal);
+  }
+
+  .reserva::after {
+    content: attr(data-ocupado);
+    padding-inline-start: 24px;
+  }
+
+  /* Um ciclo só (antes eram 3): nada pisca mais de 3 vezes por segundo e o erro não repete em laço. */
+  .shake-error {
+    animation: shake var(--mov-padrao) var(--ease-entrada) 1;
+  }
+
+  /* Esqueleto: pulso de `opacity` (antes, um degradê deslizante da posição do fundo, que não é `transform` nem
+     `opacity`). Parado, é a cor `esqueleto`. */
   .skeleton {
-    background: linear-gradient(
-      90deg,
-      var(--color-painel-2),
-      var(--color-esqueleto),
-      var(--color-painel-2)
-    );
-    background-size: 200% 100%;
-    animation: shimmer 1.4s linear infinite;
+    background: var(--color-esqueleto);
+    animation: esqueleto-pulso var(--mov-laco) ease-in-out infinite alternate;
   }
 
   /* Amostra do /perfil > Animações: o tile de exemplo sobe e desce em laço (para com "Reduzidas", pela regra global). */
   .previa-elevar {
-    animation: previa-elevar 1.4s ease-in-out infinite alternate;
+    animation: previa-elevar var(--mov-laco) ease-in-out infinite alternate;
   }
 
   .update-in {
-    animation: update-in 0.2s ease-out;
+    animation: update-in var(--mov-padrao) var(--ease-entrada);
   }
 
   .banner-in {
-    animation: banner-in 0.18s ease-out;
+    animation: banner-in var(--mov-padrao) var(--ease-entrada);
   }
 }
 
@@ -441,6 +598,84 @@ button:disabled {
 }
 
 /* Nome próprio: `pulse`, `spin`, `ping` e `bounce` colidem com as animações do Tailwind. */
+@keyframes banner-out {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes aviso-out {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+@keyframes check-pop {
+  from {
+    opacity: 0;
+    scale: 0.5;
+  }
+  to {
+    opacity: 1;
+    scale: 1;
+  }
+}
+
+@keyframes tile-assenta {
+  from {
+    opacity: 0;
+    translate: 0 8px;
+    scale: 0.96;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+    scale: 1;
+  }
+}
+
+@keyframes anel-novo {
+  0%,
+  60% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes tile-some {
+  from {
+    opacity: 1;
+    scale: 1;
+  }
+  to {
+    opacity: 0;
+    scale: 0.96;
+  }
+}
+
+@keyframes contador-troca {
+  from {
+    opacity: 0;
+    translate: 0 4px;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+
 @keyframes update-in {
   from {
     opacity: 0;
@@ -448,15 +683,6 @@ button:disabled {
   }
   to {
     opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes sheet-up {
-  from {
-    transform: translateY(100%);
-  }
-  to {
     transform: translateY(0);
   }
 }
@@ -483,13 +709,57 @@ button:disabled {
   }
 }
 
-@keyframes shimmer {
+@keyframes chek-balanco {
   from {
-    background-position: 200% 0;
+    rotate: -6deg;
   }
   to {
-    background-position: -200% 0;
+    rotate: 6deg;
   }
+}
+
+@keyframes gira {
+  to {
+    rotate: 360deg;
+  }
+}
+
+@keyframes esqueleto-pulso {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0.55;
+  }
+}
+
+/* Laços da espera param com a aba oculta (o hook `useAbaVisivel` marca o <html>). */
+html[data-aba-oculta] .skeleton,
+html[data-aba-oculta] .chek-bandeira,
+html[data-aba-oculta] .gira {
+  animation-play-state: paused;
+}
+
+/*
+ * Pressão (F2): botões, pílulas, tiles e itens de navegação encolhem de leve enquanto pressionados e voltam com a curva
+ * elástica. É a propriedade `scale` (não `transform`), para não brigar com a elevação do tile nem com o `translate`
+ * do Tailwind. Sem camada, vale sobre `transition-colors`: as transições de cor destes elementos passam pelo mesmo
+ * sistema de duração.
+ */
+:where(button:not(:disabled), [role='button'], .tile, nav a) {
+  transition:
+    color var(--mov-rapida) var(--ease-entrada),
+    background-color var(--mov-rapida) var(--ease-entrada),
+    border-color var(--mov-rapida) var(--ease-entrada),
+    box-shadow var(--mov-rapida) var(--ease-entrada),
+    opacity var(--mov-rapida) var(--ease-entrada),
+    transform var(--mov-rapida) var(--ease-entrada),
+    translate var(--mov-rapida) var(--ease-entrada),
+    scale var(--mov-rapida) var(--ease-elastica);
+}
+
+:where(button:not(:disabled), [role='button'], .tile, nav a):active {
+  scale: 0.97;
 }
 
 /*
@@ -514,6 +784,13 @@ button:disabled {
   @variant movimento-reduzido {
     animation: none !important;
     transition: none !important;
+  }
+}
+
+/* Movimento reduzido: sem escala de pressão (o fundo e a cor de hover continuam mudando). */
+:where(button, [role='button'], .tile, nav a):active {
+  @variant movimento-reduzido {
+    scale: none !important;
   }
 }
 

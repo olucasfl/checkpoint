@@ -4,12 +4,17 @@ import { FieldError, LABEL, inputClass } from '@/shared/components/form-parts';
 import { ModalDialog } from '@/shared/components/ModalDialog';
 import { describeAuthError } from '@/features/auth/lib/auth-errors';
 import { useGames } from '@/features/games/api/use-games';
+import { Chek } from '@/shared/components/Chek/Chek';
+import { Icon } from '@/shared/components/Icon';
+import { PlataformaMarca } from '@/shared/components/PlataformaMarca';
+import { PROVEDOR_STEAM } from '../lib/provedores';
 import { useBiblioteca, useVincularJogo } from '../api/use-integracoes';
 import { jogoAtualDoErro, precisaConfirmarPlataforma } from '../lib/biblioteca';
 import { classificarFalhaDoCartao } from '../lib/estado-do-cartao';
 import { horasCurtas } from '../lib/format';
+import { avisar } from '@/shared/lib/avisos';
 
-const PROVEDOR = 'STEAM' as const;
+const PROVEDOR = PROVEDOR_STEAM;
 const BUSCA_ATRASO_MS = 300;
 
 const BOTAO =
@@ -28,6 +33,8 @@ interface AlvoDoVinculo {
 }
 
 interface BibliotecaSteamDialogProps {
+  /** O backlog: só os itens nunca abertos (0 minutos). */
+  soNuncaJogados?: boolean;
   open: boolean;
   modo: ModoBiblioteca;
   onClose: () => void;
@@ -43,20 +50,23 @@ interface Conflito {
   jogoAtual: { id: string; titulo: string };
 }
 
+/** A capa tem a proporção exata da imagem de cabeçalho da Steam (460x215): nada é cortado. */
 function Capa({ url }: { url: string | null }) {
-  return url ? (
-    // Decorativa (o título está ao lado) e sem `Referer`: a imagem vem de um domínio da Steam.
-    <img
-      src={url}
-      alt=""
-      width={92}
-      height={43}
-      loading="lazy"
-      referrerPolicy="no-referrer"
-      className="h-[43px] w-[92px] shrink-0 rounded-xl bg-painel-2 object-cover"
-    />
-  ) : (
-    <div aria-hidden="true" className="h-[43px] w-[92px] shrink-0 rounded-xl bg-painel-2" />
+  return (
+    <div className="aspect-[460/215] w-[120px] shrink-0 overflow-hidden rounded-lg bg-painel-3 shadow-[0_4px_14px_rgb(0_0_0/0.35)] sm:w-[148px]">
+      {url ? (
+        // Decorativa (o título está ao lado) e sem `Referer`: a imagem vem de um domínio da Steam.
+        <img
+          src={url}
+          alt=""
+          width={460}
+          height={215}
+          loading="lazy"
+          referrerPolicy="no-referrer"
+          className="size-full object-cover transition-transform duration-[var(--mov-enfase)] ease-[var(--ease-entrada)] group-hover:scale-105"
+        />
+      ) : null}
+    </div>
   );
 }
 
@@ -125,7 +135,9 @@ function ItemDaLista({
   ocupado,
   onCriar,
   onVincular,
+  indice,
 }: {
+  indice: number;
   item: ItemBiblioteca;
   modo: ModoBiblioteca;
   ocupado: boolean;
@@ -136,12 +148,21 @@ function ItemDaLista({
   const jaLigadoAoAlvo = modo.tipo === 'vincular' && item.vinculadoA?.id === modo.jogo.id;
 
   return (
-    <li className="flex flex-col gap-3 rounded-xl bg-painel-2 p-3">
-      <div className="flex min-w-0 items-center gap-3">
+    <li
+      // Entrada em cascata (só opacity e transform; as primeiras 8 linhas, o resto entra junto).
+      style={{ animationDelay: `${Math.min(indice, 8) * 45}ms`, animationFillMode: 'backwards' }}
+      className="update-in group flex flex-col gap-3 rounded-2xl border border-borda bg-painel-2 p-3 transition-[transform,border-color] duration-[var(--mov-padrao)] ease-[var(--ease-entrada)] hover:-translate-y-0.5 hover:border-borda-controle"
+    >
+      <div className="flex min-w-0 items-center gap-3.5">
         <Capa url={item.capaUrl} />
-        <div className="flex min-w-0 flex-col">
-          <span className="text-[17px] font-semibold [overflow-wrap:anywhere]">{item.titulo}</span>
-          <span className="text-[15px] text-texto-suave">{horasCurtas(item.minutosJogados)}</span>
+        <div className="flex min-w-0 flex-col gap-1">
+          <span className="font-display text-[18px] font-bold leading-tight tracking-[-0.01em] [overflow-wrap:anywhere]">
+            {item.titulo}
+          </span>
+          <span className="inline-flex items-center gap-1 text-[14px] font-medium text-texto-suave">
+            <Icon name="schedule" size={16} />
+            {horasCurtas(item.minutosJogados)}
+          </span>
         </div>
       </div>
 
@@ -311,6 +332,7 @@ function Conteudo({
   onClose,
   onCriar,
   onVinculado,
+  soNuncaJogados = false,
 }: Omit<BibliotecaSteamDialogProps, 'open'>) {
   const [busca, setBusca] = useState('');
   const [buscaAplicada, setBuscaAplicada] = useState('');
@@ -319,7 +341,7 @@ function Conteudo({
   );
   const [conflito, setConflito] = useState<Conflito | null>(null);
   const [erro, setErro] = useState('');
-  const biblioteca = useBiblioteca(PROVEDOR, buscaAplicada, true);
+  const biblioteca = useBiblioteca(PROVEDOR, buscaAplicada, true, soNuncaJogados);
   const vincular = useVincularJogo(PROVEDOR);
 
   // O debounce evita uma consulta por tecla: a busca só vai à API 300 ms depois de a pessoa parar de digitar.
@@ -332,6 +354,7 @@ function Conteudo({
     setErro('');
     try {
       await vincular.mutateAsync({ jogoId: alvo.id, idExterno: item.idExterno, mover });
+      avisar({ texto: 'Jogo vinculado à Steam.' });
       onVinculado(alvo.id);
     } catch (failure) {
       const jogoAtual = jogoAtualDoErro(failure);
@@ -364,14 +387,17 @@ function Conteudo({
         <div className="flex min-w-0 flex-col gap-1">
           <h2
             id="biblioteca-steam-titulo"
-            className="m-0 font-display text-xl font-extrabold tracking-[-0.01em] text-destaque"
+            className="m-0 flex items-center gap-2 font-display text-xl font-extrabold tracking-[-0.01em] text-destaque"
           >
+            <PlataformaMarca provedor={PROVEDOR} variante="marcador" tamanho="g" decorativa />
             {titulo}
           </h2>
           <p className="m-0 text-[16px] text-texto-suave">
-            {modo.tipo === 'novo'
-              ? 'Escolha um jogo da sua biblioteca para criar ou ligar a um jogo seu.'
-              : `Escolha o jogo da Steam que é «${modo.jogo.titulo}».`}
+            {soNuncaJogados
+              ? 'Só os jogos que você nunca abriu. Escolha um para criar ou ligar a um jogo seu.'
+              : modo.tipo === 'novo'
+                ? 'Escolha um jogo da sua biblioteca para criar ou ligar a um jogo seu.'
+                : `Escolha o jogo da Steam que é «${modo.jogo.titulo}».`}
           </p>
         </div>
         <button type="button" onClick={onClose} className={`${BOTAO_CONTORNO} shrink-0`}>
@@ -415,15 +441,37 @@ function Conteudo({
           <FieldError id="biblioteca-steam-erro" message={erro} />
 
           {biblioteca.isPending && (
-            <p role="status" className="m-0 text-[16px] text-texto-suave">
-              Carregando sua biblioteca…
-            </p>
+            <div role="status" aria-busy="true" className="flex flex-col gap-2.5">
+              <p className="sr-only">Carregando sua biblioteca…</p>
+              {[0, 1, 2].map((indice) => (
+                <div
+                  key={indice}
+                  aria-hidden="true"
+                  className="flex flex-col gap-3 rounded-2xl border border-borda bg-painel-2 p-3"
+                >
+                  <div className="flex items-center gap-3.5">
+                    <div className="skeleton aspect-[460/215] w-[120px] shrink-0 rounded-lg sm:w-[148px]" />
+                    <div className="flex flex-1 flex-col gap-2">
+                      <div className="skeleton h-4 w-3/4 rounded-full" />
+                      <div className="skeleton h-3 w-1/4 rounded-full" />
+                    </div>
+                  </div>
+                  <div className="flex gap-2.5">
+                    <div className="skeleton h-11 w-28 rounded-full" />
+                    <div className="skeleton h-11 w-44 rounded-full" />
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
           {falha === 'privado' && (
-            <p role="alert" className="m-0 text-[16px] font-semibold text-ouro">
-              Seu perfil Steam está privado. Deixe o perfil e os detalhes do jogo públicos (o passo
-              a passo está no seu Perfil) e tente de novo.
-            </p>
+            <div className="flex flex-col items-center gap-3 py-4 text-center">
+              <Chek expressao="cadeado" altura={72} />
+              <p role="alert" className="m-0 text-[16px] font-semibold text-ouro">
+                Seu perfil Steam está privado. Deixe o perfil e os detalhes do jogo públicos (o
+                passo a passo está no seu Perfil) e tente de novo.
+              </p>
+            </div>
           )}
           {(falha === 'erro' || falha === 'sem-conexao') && (
             <FieldError
@@ -446,17 +494,23 @@ function Conteudo({
             </button>
           )}
           {biblioteca.isSuccess && itens.length === 0 && (
-            <p className="m-0 text-[16px] text-texto-suave">
-              {buscaAplicada
-                ? `Nenhum jogo encontrado para «${buscaAplicada}».`
-                : 'Sua biblioteca da Steam está vazia.'}
-            </p>
+            <div className="flex flex-col items-center gap-3 py-6 text-center">
+              <Chek expressao="dormindo" altura={72} />
+              <p className="m-0 text-[16px] text-texto-suave">
+                {buscaAplicada
+                  ? `Nenhum jogo encontrado para «${buscaAplicada}».`
+                  : soNuncaJogados
+                    ? 'Você não tem jogos nunca abertos na Steam.'
+                    : 'Sua biblioteca da Steam está vazia.'}
+              </p>
+            </div>
           )}
           {itens.length > 0 && (
             <ul aria-label="Jogos da Steam" className="m-0 flex list-none flex-col gap-3 p-0">
-              {itens.map((item) => (
+              {itens.map((item, indice) => (
                 <ItemDaLista
                   key={item.idExterno}
+                  indice={indice}
                   item={item}
                   modo={modo}
                   ocupado={vincular.isPending}

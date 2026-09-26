@@ -4,15 +4,17 @@ Mapa único de `spec ↔ status`. **Este arquivo é a fonte da verdade sobre o q
 confie em adivinhar nome de arquivo. Quem cria ou fecha uma spec atualiza esta tabela no mesmo
 commit — `/docs-sync` confere se ela bate com a realidade.
 
-| Feature                             | Spec                                                     | Status          |
-| ----------------------------------- | -------------------------------------------------------- | --------------- |
-| Catálogo de jogos                   | [catalogo-jogos.md](catalogo-jogos.md)                   | 🚧 em andamento |
-| PWA e mobile                        | [pwa-e-mobile.md](pwa-e-mobile.md)                       | 🚧 em andamento |
-| Autenticação                        | [autenticacao.md](autenticacao.md)                       | ✅ implementada |
-| Perfil                              | [perfil.md](perfil.md)                                   | 🚧 em andamento |
-| Avaliação de jogos                  | [avaliacao-de-jogos.md](avaliacao-de-jogos.md)           | ✅ implementada |
-| Integração com plataformas (Steam)  | [integracao-plataformas.md](integracao-plataformas.md)   | 🚧 em andamento |
-| Troca de design: Estante de console | [troca-de-design-estante.md](troca-de-design-estante.md) | 🚧 em andamento |
+| Feature                               | Spec                                                                     | Status          |
+| ------------------------------------- | ------------------------------------------------------------------------ | --------------- |
+| Catálogo de jogos                     | [catalogo-jogos.md](catalogo-jogos.md)                                   | 🚧 em andamento |
+| PWA e mobile                          | [pwa-e-mobile.md](pwa-e-mobile.md)                                       | 🚧 em andamento |
+| Autenticação                          | [autenticacao.md](autenticacao.md)                                       | ✅ implementada |
+| Perfil                                | [perfil.md](perfil.md)                                                   | 🚧 em andamento |
+| Avaliação de jogos                    | [avaliacao-de-jogos.md](avaliacao-de-jogos.md)                           | ✅ implementada |
+| Integração com plataformas (Steam)    | [integracao-plataformas.md](integracao-plataformas.md)                   | 🚧 em andamento |
+| Troca de design: Estante de console   | [troca-de-design-estante.md](troca-de-design-estante.md)                 | 🚧 em andamento |
+| Plataformas e página do jogo          | [plataformas-e-pagina-do-jogo.md](plataformas-e-pagina-do-jogo.md)       | 🚧 em andamento |
+| Personalização com o Chek e animações | [personalizacao-chek-e-animacoes.md](personalizacao-chek-e-animacoes.md) | 🚧 em andamento |
 
 ## Legenda de status
 

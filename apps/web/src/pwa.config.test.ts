@@ -24,8 +24,8 @@ describe('manifest (CA-25)', () => {
   it('campos da spec', () => {
     expect(MANIFEST).toMatchObject({
       id: '/',
-      name: 'checkpoint',
-      short_name: 'checkpoint',
+      name: 'Checkpoint',
+      short_name: 'Checkpoint',
       description: 'Seu registro de jogos: zerados, jogando e quero jogar.',
       lang: 'pt-BR',
       dir: 'ltr',
@@ -94,6 +94,11 @@ describe('service worker (workbox)', () => {
     expect(denylist.some((pattern) => pattern.test('/api/games'))).toBe(true);
     expect(denylist.some((pattern) => pattern.test('/status'))).toBe(false);
     expect(denylist.some((pattern) => pattern.test('/'))).toBe(false);
+  });
+
+  it('a imagem de compartilhamento fica fora do precache (CA-09)', () => {
+    expect(pwaOptions.workbox?.globIgnores).toContain('og-image-*.png');
+    expect(pwaOptions.includeAssets).toContain('favicon.ico');
   });
 
   it('limpa caches antigos e NÃO ativa a versão nova sozinha', () => {

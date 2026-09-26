@@ -16,15 +16,31 @@
          "black-translucent"): a barra de status do iOS fica preta e o app começa abaixo dela. -->
     <meta name="theme-color" content="#0b0f1a" />
     <meta name="description" content="Seu registro de jogos: zerados, jogando e quero jogar." />
+    <!-- Compartilhamento. `%SITE_URL%` vem de `site.config.ts` (a URL precisa ser absoluta). -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Checkpoint" />
+    <meta property="og:title" content="Checkpoint" />
+    <meta
+      property="og:description"
+      content="Seu registro de jogos: zerados, jogando e quero jogar."
+    />
+    <meta property="og:url" content="%SITE_URL%/" />
+    <meta property="og:image" content="%SITE_URL%/og-image-1200x630.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Checkpoint, com o mascote Chek" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content="%SITE_URL%/og-image-1200x630.png" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black" />
-    <meta name="apple-mobile-web-app-title" content="checkpoint" />
+    <meta name="apple-mobile-web-app-title" content="Checkpoint" />
     <meta name="format-detection" content="telephone=no" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/favicon.ico" sizes="48x48" />
     <link rel="icon" href="/icons/favicon-32.png" sizes="32x32" type="image/png" />
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon-180.png" />
-    <title>checkpoint</title>
+    <title>Checkpoint</title>
     <!-- Fontes e ícones por <link>, sem pacote npm (spec catalogo-jogos, "Fontes e ícones").
          Outfit: títulos, números e botões. Manrope: texto. Material Symbols Rounded: ícones. -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />

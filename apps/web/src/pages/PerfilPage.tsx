@@ -5,7 +5,7 @@ import { usePrefs } from '@/shared/hooks/use-prefs';
 import { UNEXPECTED_MESSAGE } from '@/features/auth/lib/auth-errors';
 import { avisoDoPerfil } from '@/features/auth/lib/perfil-avisos';
 import { useAuth } from '@/features/auth/session/use-auth';
-import { ContasVinculadas } from '@/features/integracoes/components/ContasVinculadas';
+import { PlataformasDoPerfil } from '@/features/integracoes/components/PlataformasDoPerfil';
 import {
   avisoDoRetorno,
   semParametrosDoRetorno,
@@ -20,6 +20,7 @@ import {
 } from '@/features/perfil/components/PreferenciasModal';
 import { SessoesAtivas } from '@/features/perfil/components/SessoesAtivas';
 import { ZonaDePerigo } from '@/features/perfil/components/ZonaDePerigo';
+import { avisar } from '@/shared/lib/avisos';
 
 const SEM_CONEXAO_PARA_SAIR = 'Sem conexão. Para sair, conecte-se.';
 
@@ -59,6 +60,8 @@ export function PerfilPage() {
       setAviso(SEM_CONEXAO_PARA_SAIR);
     } else if (resultado === 'erro') {
       setAviso(UNEXPECTED_MESSAGE);
+    } else {
+      avisar({ texto: 'Você saiu da conta.' });
     }
   }
 
@@ -118,7 +121,7 @@ export function PerfilPage() {
         </ListaDeLinhas>
         {aviso && <FieldError id="perfil-aviso" message={aviso} />}
 
-        <ContasVinculadas />
+        <PlataformasDoPerfil />
 
         <ListaDeLinhas rotulo="Preferências">
           <LinhaBotao

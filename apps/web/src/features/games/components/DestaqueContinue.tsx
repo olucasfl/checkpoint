@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useMovimentoReduzido } from '@/shared/hooks/use-movimento-reduzido';
 import { type Game } from '@checkpoint/shared';
 import { Icon } from '@/shared/components/Icon';
 import { capasDoJogo } from '@/features/integracoes/lib/capa';
@@ -18,6 +19,7 @@ const CHIP =
  * contraste; os chips têm fundo escuro próprio. Horas e conquistas só aparecem nos jogos ligados à Steam.
  */
 export function DestaqueContinue({ game }: { game: Game }) {
+  const reduzido = useMovimentoReduzido();
   const [falharam, setFalharam] = useState<readonly string[]>([]);
   const imagem = capasDoJogo(game).find((url) => !falharam.includes(url)) ?? null;
   const chips = chipsDoDestaque(game);
@@ -89,6 +91,7 @@ export function DestaqueContinue({ game }: { game: Game }) {
         {/* Um só link: cobre o cartão no celular (texto invisível, o nome acessível continua) e vira o botão no desktop. */}
         <Link
           to={`/jogos/${game.id}`}
+          viewTransition={!reduzido}
           className="absolute inset-0 z-10 md:static md:z-auto md:mt-1 md:inline-flex md:h-11 md:items-center md:gap-2 md:self-start md:rounded-full md:bg-texto md:px-5 md:font-display md:text-[15px] md:font-bold md:text-fundo"
         >
           {/* `.icon` tem display próprio: o `hidden` direto no ícone não valeria no celular. */}

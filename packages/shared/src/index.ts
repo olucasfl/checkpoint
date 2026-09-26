@@ -10,6 +10,7 @@
 export * from './auth';
 export * from './games';
 export * from './integracoes';
+export * from './plataformas';
 
 /** Exemplo de contrato compartilhado — substitua quando as entidades existirem. */
 export interface HealthCheckResponse {
@@ -19,4 +20,4 @@ export interface HealthCheckResponse {
 }
 
 /** Exemplo de utilitario compartilhado — remova quando nao for mais necessario. */
-export const APP_NAME = 'checkpoint' as const;
+export const APP_NAME = 'Checkpoint' as const;
