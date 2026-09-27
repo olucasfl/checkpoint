@@ -46,14 +46,21 @@ export function chegouAos100(antes: Conquistas, depois: Conquistas): boolean {
   return !completo(antes) && completo(depois);
 }
 
-export function textoDoMarco(marco: Marco, titulo: string): string {
+export function textoDoMarco(
+  marco: Marco,
+  titulo: string,
+  vocabulario: { conquistas: string; artigo: 'as' | 'os' } = {
+    conquistas: 'conquistas',
+    artigo: 'as',
+  },
+): string {
   switch (marco) {
     case 'primeiro-jogo':
       return 'Seu primeiro jogo no catálogo! Bem-vindo ao Checkpoint.';
     case 'zerado':
       return `Zerado! «${titulo}» entrou para os Zerados.`;
     case 'conquistas-100':
-      return `100% das conquistas em «${titulo}»!`;
+      return `100% ${vocabulario.artigo === 'as' ? 'das' : 'dos'} ${vocabulario.conquistas} em «${titulo}»!`;
   }
 }
 

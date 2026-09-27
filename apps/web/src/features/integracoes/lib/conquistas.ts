@@ -1,4 +1,13 @@
-import { type Conquista, type DadosJogoPlataforma, type Game } from '@checkpoint/shared';
+import {
+  PLATAFORMAS,
+  PLATAFORMAS_EM_ORDEM,
+  type Conquista,
+  type DadosJogoPlataforma,
+  type Game,
+  type PlataformaInfo,
+  type RaridadeDoTrofeu,
+  type TipoDeTrofeu,
+} from '@checkpoint/shared';
 
 const DATA = new Intl.DateTimeFormat('pt-BR', {
   day: '2-digit',
@@ -36,11 +45,39 @@ export function ultimoJogoTexto(iso: string | null): string {
   return data === null ? 'Nunca jogado' : `Último jogo em ${data}`;
 }
 
-/** "12,4% dos jogadores", ou "Raridade indisponível" quando a Steam não devolveu o percentual. */
-export function raridadeTexto(percentual: number | null): string {
-  return percentual === null
-    ? 'Raridade indisponível'
-    : `${PERCENTUAL.format(percentual)}% dos jogadores`;
+/** "Ouro", "Platina"…: o tipo do troféu em TEXTO (nunca só cor nem só ícone). */
+export const TIPO_DE_TROFEU_TEXTO: Record<TipoDeTrofeu, string> = {
+  platina: 'Platina',
+  ouro: 'Ouro',
+  prata: 'Prata',
+  bronze: 'Bronze',
+};
+
+export const RARIDADE_TEXTO: Record<RaridadeDoTrofeu, string> = {
+  ultrarraro: 'Ultrarraro',
+  'muito-raro': 'Muito raro',
+  raro: 'Raro',
+  comum: 'Comum',
+};
+
+/**
+ * "12,4% dos jogadores", ou "Raridade indisponível" quando a plataforma não devolveu o percentual. Com o nível de raridade
+ * (troféus da PlayStation), ele vem na frente: "Raro · 4,8% dos jogadores".
+ */
+export function raridadeTexto(
+  percentual: number | null,
+  nivel: RaridadeDoTrofeu | null = null,
+): string {
+  const base =
+    percentual === null
+      ? 'Raridade indisponível'
+      : `${PERCENTUAL.format(percentual)}% dos jogadores`;
+  return nivel === null ? base : `${RARIDADE_TEXTO[nivel]} · ${base}`;
+}
+
+/** "Conquista"/"Troféu" com a inicial maiúscula (para rótulos). */
+export function capitalizada(palavra: string): string {
+  return palavra.charAt(0).toUpperCase() + palavra.slice(1);
 }
 
 /** "Desbloqueada em dd/mm/aaaa", ou `null` quando não há data (nunca inventa uma). */
@@ -72,16 +109,20 @@ export function separarConquistas(conquistas: readonly Conquista[]): {
   return { desbloqueadas, faltam };
 }
 
-/** O que a barra de progresso mostra: "12 de 40 conquistas" e a fração (0 a 100). `null` sem total (nada a mostrar). */
+/**
+ * O que a barra de progresso mostra: "12 de 40 conquistas" (ou "troféus", pelo vocabulário da plataforma) e a fração
+ * (0 a 100). `null` sem total (nada a mostrar).
+ */
 export function progressoDasConquistas(
   desbloqueadas: number | null,
   total: number | null,
+  vocabulario: PlataformaInfo['vocabulario'] = PLATAFORMAS.STEAM.vocabulario,
 ): { texto: string; percentual: number; desbloqueadas: number; total: number } | null {
   if (desbloqueadas === null || total === null || total <= 0) {
     return null;
   }
   return {
-    texto: `${desbloqueadas} de ${total} ${total === 1 ? 'conquista' : 'conquistas'}`,
+    texto: `${desbloqueadas} de ${total} ${total === 1 ? vocabulario.conquista : vocabulario.conquistas}`,
     percentual: Math.min(100, Math.round((desbloqueadas / total) * 100)),
     desbloqueadas,
     total,
@@ -120,10 +161,18 @@ export function comDadosAtualizados(
 export function resumoDoCatalogo(
   dados: readonly DadosJogoPlataforma[],
 ): { texto: string; rotulo: string } | null {
-  const doProvedor = dados[0];
+  // O primeiro vínculo na ordem do cadastro (Steam, PlayStation…): o mesmo que o destaque e o tile mostram.
+  const doProvedor = [...dados].sort(
+    (a, b) =>
+      PLATAFORMAS_EM_ORDEM.findIndex((p) => p.id === a.provedor) -
+      PLATAFORMAS_EM_ORDEM.findIndex((p) => p.id === b.provedor),
+  )[0];
   if (!doProvedor) {
     return null;
   }
+  const plataforma = PLATAFORMAS[doProvedor.provedor];
+  const { vocabulario } = plataforma;
+  const jogadoNa = `Tempo jogado ${plataforma.ligadoA.replace(/^à /, 'na ').replace(/^ao /, 'no ')}`;
   const minutos = Math.max(0, Math.floor(doProvedor.minutosJogados));
   const horas = Math.floor(minutos / 60);
   const curto = minutos > 0 && horas === 0 ? `${minutos} min` : `${horas} h`;
@@ -134,10 +183,10 @@ export function resumoDoCatalogo(
 
   const { conquistasTotal: total, conquistasDesbloqueadas: desbloqueadas } = doProvedor;
   if (total === null || total <= 0 || desbloqueadas === null) {
-    return { texto: curto, rotulo: `Tempo jogado na Steam: ${longo}` };
+    return { texto: curto, rotulo: `${jogadoNa}: ${longo}` };
   }
   return {
     texto: `${curto} · ${desbloqueadas}/${total}`,
-    rotulo: `Tempo jogado na Steam: ${longo}, ${desbloqueadas} de ${total} ${total === 1 ? 'conquista' : 'conquistas'}`,
+    rotulo: `${jogadoNa}: ${longo}, ${desbloqueadas} de ${total} ${total === 1 ? vocabulario.conquista : vocabulario.conquistas}`,
   };
 }

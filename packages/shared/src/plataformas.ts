@@ -71,6 +71,10 @@ export interface PlataformaInfo {
    * "os troféus"): os textos concordam com ele ("mostradas"/"mostrados").
    */
   vocabulario: { conquista: string; conquistas: string; artigo: 'as' | 'os' };
+  /** O que aparece quando o jogo não tem conquistas/troféus lidos. */
+  textoSemConquistas: string;
+  /** A página do jogo na loja da plataforma (`{id}` vira o id do item); `null` quando não há link estável. */
+  paginaDoJogo: { modelo: string; formatoDoId: string } | null;
   /** O formato da capa na busca da biblioteca: `paisagem` (Steam, 460x215) ou `quadrada` (o ícone do jogo na PlayStation). */
   capaNaBusca: 'paisagem' | 'quadrada';
   /** Textos de plataforma do jogo que combinam com esta (para a confirmação ao ligar um jogo). */
@@ -103,6 +107,8 @@ const CADASTRO = {
     },
     vocabulario: { conquista: 'conquista', conquistas: 'conquistas', artigo: 'as' },
     capaNaBusca: 'paisagem',
+    textoSemConquistas: 'Este jogo não tem conquistas.',
+    paginaDoJogo: { modelo: 'https://store.steampowered.com/app/{id}', formatoDoId: '^\\d{1,10}$' },
     plataformasCompativeis: ['PC', 'Steam Deck'],
     plataformaPadrao: 'PC',
     privacidade: {
@@ -148,6 +154,10 @@ const CADASTRO = {
     },
     vocabulario: { conquista: 'troféu', conquistas: 'troféus', artigo: 'os' },
     capaNaBusca: 'quadrada',
+    textoSemConquistas:
+      'Os troféus só aparecem depois que o console sincroniza com a PSN. Se este jogo tem troféus, abra-o no console e sincronize.',
+    // Sem link estável para a página do jogo na PlayStation Store: nada de "Abrir na PlayStation".
+    paginaDoJogo: null,
     plataformasCompativeis: ['PS1', 'PS2', 'PS3', 'PS4', 'PS5', 'PSP'],
     plataformaPadrao: null,
     privacidade: null,

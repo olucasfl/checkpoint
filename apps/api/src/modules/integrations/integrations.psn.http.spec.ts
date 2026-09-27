@@ -604,3 +604,189 @@ describe('desvincular e chave ausente (CA-04, CA-22)', () => {
     expect(ctx.psn.trocarNpsso).not.toHaveBeenCalled();
   });
 });
+
+describe('detalhe do jogo ligado à PlayStation (CA-41 a CA-47, F3)', () => {
+  const defs = [
+    {
+      id: 0,
+      nome: 'Tudo Exemplo',
+      descricao: 'Ganhe todos.',
+      iconeUrl: 'https://psnobj.prod.dl.playstation.net/0.png',
+      tipo: 'platina',
+      oculto: false,
+    },
+    {
+      id: 1,
+      nome: 'Segredo Exemplo',
+      descricao: 'NÃO PODE SAIR',
+      iconeUrl: 'https://psnobj.prod.dl.playstation.net/1.png',
+      tipo: 'bronze',
+      oculto: true,
+    },
+    {
+      id: 2,
+      nome: 'Bronze Exemplo',
+      descricao: 'Faça o bronze.',
+      iconeUrl: null,
+      tipo: 'bronze',
+      oculto: false,
+    },
+  ];
+  const ganhos = [
+    { id: 0, ganho: false, ganhoEm: null, raridade: 0, taxaPercentual: 0.94 },
+    { id: 1, ganho: false, ganhoEm: null, raridade: 1, taxaPercentual: 1.2 },
+    {
+      id: 2,
+      ganho: true,
+      ganhoEm: new Date('2026-02-01T10:00:00Z'),
+      raridade: 3,
+      taxaPercentual: 60.1,
+    },
+  ];
+
+  function ligar(atualizadoEm = new Date()) {
+    vincularNoBanco(ANA_ID);
+    ctx.db.games.push({ id: JOGO_ID, userId: ANA_ID, titulo: 'Jogo Exemplo', plataforma: 'PS5' });
+    ctx.db.jogos.push({
+      id: 'v1',
+      userId: ANA_ID,
+      gameId: JOGO_ID,
+      provedor: 'PLAYSTATION',
+      idExterno: TITLE_PS5,
+      minutosJogados: 600,
+      conquistasTotal: 0,
+      conquistasDesbloqueadas: 0,
+      atualizadoEm,
+    });
+    ctx.psn.conjuntoDeTrofeus.mockResolvedValue({
+      npCommunicationId: 'NPWR00000_00',
+      servico: 'trophy2',
+      definidos: { platina: 1, ouro: 0, prata: 0, bronze: 2 },
+      ganhos: { platina: 0, ouro: 0, prata: 0, bronze: 1 },
+    });
+    ctx.psn.definicoesDeTrofeus.mockResolvedValue(defs);
+    ctx.psn.ganhosDeTrofeus.mockResolvedValue(ganhos);
+  }
+
+  it('a lista traz tipo, raridade e o porTipo; o oculto e bloqueado sai SEM nome nem descrição; o gravado é atualizado (CA-42, CA-43)', async () => {
+    const token = await ctx.tokenFor(ANA_ID);
+    ligar();
+
+    const r = await pedir('GET', `/integracoes/playstation/jogos/${JOGO_ID}`, token);
+
+    expect(r.status).toBe(200);
+    const conquistas = r.corpo?.conquistas as Record<string, unknown>[];
+    expect(conquistas).toHaveLength(3);
+    expect(conquistas[0]).toMatchObject({
+      id: '0',
+      tipo: 'platina',
+      raridadeNivel: 'ultrarraro',
+      raridadePercentual: 0.9,
+      desbloqueada: false,
+    });
+    expect(conquistas[1]).toMatchObject({
+      oculta: true,
+      nome: '',
+      descricao: null,
+      iconeUrl: null,
+    });
+    expect(JSON.stringify(r.corpo)).not.toContain('NÃO PODE SAIR');
+    expect(JSON.stringify(r.corpo)).not.toContain('Segredo Exemplo');
+    expect(conquistas[2]).toMatchObject({
+      desbloqueada: true,
+      desbloqueadaEm: '2026-02-01T10:00:00.000Z',
+      raridadeNivel: 'comum',
+    });
+    expect(r.corpo?.porTipo).toEqual({
+      platina: { total: 1, desbloqueados: 0 },
+      ouro: { total: 0, desbloqueados: 0 },
+      prata: { total: 0, desbloqueados: 0 },
+      bronze: { total: 2, desbloqueados: 1 },
+    });
+    expect(r.corpo?.dados).toMatchObject({ conquistasTotal: 3, conquistasDesbloqueadas: 1 });
+    expect(ctx.db.jogos[0]).toMatchObject({ conquistasTotal: 3, conquistasDesbloqueadas: 1 });
+    // porTipo é calculado na resposta, nunca gravado.
+    expect(JSON.stringify(ctx.db.jogos)).not.toContain('porTipo');
+    semSegredo(JSON.stringify(r.corpo));
+  });
+
+  it('a frio: exatamente as 3 chamadas de troféus; a quente (< 5 min): nenhuma; o gravado recente não relê as horas (CA-45, CA-46)', async () => {
+    const token = await ctx.tokenFor(ANA_ID);
+    ligar();
+
+    await pedir('GET', `/integracoes/playstation/jogos/${JOGO_ID}`, token);
+    expect(ctx.psn.conjuntoDeTrofeus).toHaveBeenCalledTimes(1);
+    expect(ctx.psn.definicoesDeTrofeus).toHaveBeenCalledTimes(1);
+    expect(ctx.psn.ganhosDeTrofeus).toHaveBeenCalledTimes(1);
+    expect(ctx.psn.jogados).not.toHaveBeenCalled();
+
+    await pedir('GET', `/integracoes/playstation/jogos/${JOGO_ID}`, token);
+    expect(ctx.psn.conjuntoDeTrofeus).toHaveBeenCalledTimes(1);
+    expect(ctx.psn.definicoesDeTrofeus).toHaveBeenCalledTimes(1);
+    expect(ctx.psn.ganhosDeTrofeus).toHaveBeenCalledTimes(1);
+  });
+
+  it('dado gravado com mais de 1 h: as horas são relidas da biblioteca (uma vez, do cache de 10 min) (CA-46)', async () => {
+    const token = await ctx.tokenFor(ANA_ID);
+    ligar(new Date(Date.now() - 2 * 3_600_000));
+    ctx.psn.jogados.mockResolvedValue([{ ...jogo, minutosJogados: 900 }]);
+
+    const r = await pedir('GET', `/integracoes/playstation/jogos/${JOGO_ID}`, token);
+
+    expect(r.corpo?.dados).toMatchObject({ minutosJogados: 900 });
+    expect(ctx.psn.jogados).toHaveBeenCalledTimes(1);
+  });
+
+  it('"Atualizar" duas vezes em 30 s: a 1ª refaz, a 2ª devolve o gravado sem chamar a Sony (CA-46)', async () => {
+    const token = await ctx.tokenFor(ANA_ID);
+    ligar(new Date(Date.now() - 60_000));
+    ctx.psn.jogados.mockResolvedValue([{ ...jogo, minutosJogados: 700 }]);
+
+    const primeira = await pedir(
+      'POST',
+      `/integracoes/playstation/jogos/${JOGO_ID}/atualizacao`,
+      token,
+    );
+    const chamadas = ctx.psn.ganhosDeTrofeus.mock.calls.length + ctx.psn.jogados.mock.calls.length;
+    const segunda = await pedir(
+      'POST',
+      `/integracoes/playstation/jogos/${JOGO_ID}/atualizacao`,
+      token,
+    );
+
+    expect(primeira.status).toBe(200);
+    expect(primeira.corpo?.dados).toMatchObject({ minutosJogados: 700 });
+    expect(segunda.status).toBe(200);
+    expect(ctx.psn.jogados.mock.calls.length + ctx.psn.ganhosDeTrofeus.mock.calls.length).toBe(
+      chamadas,
+    );
+  });
+
+  it('a Sony fora do ar: o GET devolve o gravado com aviso INDISPONIVEL (nunca 502); o "Atualizar" é 502 (CA-47)', async () => {
+    const token = await ctx.tokenFor(ANA_ID);
+    ligar(new Date(Date.now() - 60_000));
+    ctx.psn.definicoesDeTrofeus.mockRejectedValue(new PlataformaIndisponivelError());
+
+    const detalhe = await pedir('GET', `/integracoes/playstation/jogos/${JOGO_ID}`, token);
+    const atualizar = await pedir(
+      'POST',
+      `/integracoes/playstation/jogos/${JOGO_ID}/atualizacao`,
+      token,
+    );
+
+    expect(detalhe.status).toBe(200);
+    expect(detalhe.corpo).toMatchObject({ aviso: 'INDISPONIVEL', conquistas: [] });
+    expect(atualizar.status).toBe(502);
+  });
+
+  it('jogo sem troféus lidos (nunca sincronizou): 200 com SEM_CONQUISTAS e 0 de 0', async () => {
+    const token = await ctx.tokenFor(ANA_ID);
+    ligar();
+    ctx.psn.conjuntoDeTrofeus.mockResolvedValue(null);
+
+    const r = await pedir('GET', `/integracoes/playstation/jogos/${JOGO_ID}`, token);
+
+    expect(r.corpo).toMatchObject({ aviso: 'SEM_CONQUISTAS', conquistas: [], porTipo: null });
+    expect(r.corpo?.dados).toMatchObject({ conquistasTotal: 0, conquistasDesbloqueadas: 0 });
+  });
+});

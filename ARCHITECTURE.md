@@ -1002,7 +1002,7 @@ noreferrer"`), números (jogos, horas, "já jogados"), mais jogados (5), backlog
   ícone de relógio e entrada em cascata (`update-in` com `animation-delay` de 45 ms por item, até o 8º; só `opacity` e `transform`); o esqueleto de
   carregamento tem o mesmo desenho do cartão; a biblioteca vazia mostra o Chek `dormindo` e o perfil privado, o Chek `cadeado`. O cabeçalho do diálogo
   **não** é `sticky`: o `<dialog>` já é o contêiner de rolagem e um cabeçalho fixo brigava com ele.
-- **Horas e conquistas (etapa 4)**: a página `/jogos/:id` de um jogo ligado ganha a seção **Steam** (`BlocoSteam`, uma `SecaoRecolhivel` aberta por padrão, com a **logo oficial** de 50 px sozinha no `h2` e o resumo "42 h 30 min · 12/40 conquistas" na linha fechada): dentro dela, **"Atualizado há 12 minutos"** (`lib/tempo-relativo.ts`, `Intl.RelativeTimeFormat` pt-BR, a partir do `atualizadoEm` do dado; "agora" abaixo de 1 min; nunca "Invalid Date"), três cartões de dados ("Tempo jogado na Steam" "42 h 30 min", "Último jogo em" dd/mm/aaaa ou "Nunca jogado", "Conquistas · 12 de 40" com a barra `role="progressbar"` em `ouro` e a porcentagem), **Atualizar**, **Desvincular** (confirmação; só a camada da Steam some: título, status, notas e capa
+- **Horas e conquistas (etapa 4)**: a página `/jogos/:id` de um jogo ligado ganha a seção **Steam** (`BlocoPlataforma`, uma `SecaoRecolhivel` aberta por padrão, com a **logo oficial** de 50 px sozinha no `h2` e o resumo "42 h 30 min · 12/40 conquistas" na linha fechada): dentro dela, **"Atualizado há 12 minutos"** (`lib/tempo-relativo.ts`, `Intl.RelativeTimeFormat` pt-BR, a partir do `atualizadoEm` do dado; "agora" abaixo de 1 min; nunca "Invalid Date"), três cartões de dados ("Tempo jogado na Steam" "42 h 30 min", "Último jogo em" dd/mm/aaaa ou "Nunca jogado", "Conquistas · 12 de 40" com a barra `role="progressbar"` em `ouro` e a porcentagem), **Atualizar**, **Desvincular** (confirmação; só a camada da Steam some: título, status, notas e capa
   ficam, e **Vincular à Steam** volta) e **Abrir na Steam** (`rel="noopener noreferrer"`). A lista tem dois `<details>`,
   **os dois FECHADOS por padrão**, com seta e "Toque para ver" ("Toque para fechar" aberto) e o estado guardado no aparelho: **Desbloqueadas** (por data decrescente) e **Faltam** (da mais comum à mais rara), com contador, ícone de 52 px (`width`/`height`/`loading="lazy"`; cadeado ou `visibility_off` sem ícone), nome, descrição ("Conquista oculta" se oculta e bloqueada), data e "12,4% dos jogadores" (ou "Raridade indisponível"); uma coluna no celular e, a partir de 1024 px, as duas listas lado a lado. O detalhe **só é pedido nesta página**
   (`useDetalheJogo`, sem _retry_; abrir `/` não faz nenhuma request de conquistas) e os valores novos entram direto no cache do
@@ -1013,7 +1013,7 @@ noreferrer"`), números (jogos, horas, "já jogados"), mais jogados (5), backlog
 - **Precedência da capa** (`lib/capa.ts` + `GameCover`): a enviada, depois a oficial (`library_600x900.jpg`), depois o
   `header.jpg` do mesmo app (derivado da URL oficial, só na CDN conhecida) e por fim a gerada (cor e inicial). O `GameCover` tenta
   a próxima quando uma falha ao carregar (`onError`); nada é gravado, então remover a enviada faz a oficial reaparecer.
-- **Testes** (Vitest): `components/BlocoSteam.test.tsx`, `lib/capa.test.ts`, `lib/conquistas.test.ts`, `games/components/GameCover.test.tsx`, `components/BibliotecaPlataformaDialog.test.tsx`, `lib/biblioteca.test.ts`, `games/components/GameForm.steam.test.tsx`, `components/PlataformasDoPerfil.test.tsx` (as linhas, o popup e todos os estados, o desvio da URL fora da Steam, o
+- **Testes** (Vitest): `components/BlocoPlataforma.test.tsx`, `lib/capa.test.ts`, `lib/conquistas.test.ts`, `games/components/GameCover.test.tsx`, `components/BibliotecaPlataformaDialog.test.tsx`, `lib/biblioteca.test.ts`, `games/components/GameForm.steam.test.tsx`, `components/PlataformasDoPerfil.test.tsx` (as linhas, o popup e todos os estados, o desvio da URL fora da Steam, o
   diálogo, Atualizar, privacidade), `lib/lib.test.ts` (URL da Steam, avisos, horas, classificação),
   `pages/PerfilPage.test.tsx` (a seção entre Conta e Preferências e os avisos do retorno; a API de integrações é
   mockada).
@@ -1044,6 +1044,24 @@ noreferrer"`), números (jogos, horas, "já jogados"), mais jogados (5), backlog
   criar e vale para a primeira plataforma cujas `plataformasCompativeis` não incluem a do jogo. O item traz `plataformaSugerida` (`PS5`, `PS4`, `PC` ou vazio);
   sem ela vale a `plataformaPadrao` do cadastro. A página do jogo tem um **Vincular {ligadoA}** por plataforma que o jogo ainda não tem. `PROVEDOR_STEAM` e
   `useTemContaSteam` acabaram.
+- **Página do jogo e tile** (F3): `BlocoPlataforma` virou **`BlocoPlataforma`** (um componente para todas; `SecoesDasPlataformas` monta uma seção por ligação, na ordem do
+  cadastro). Os textos saem do cadastro: `vocabulario` ("Conquistas · 12 de 40" / "Troféus · 3 de 6", "Conquista oculta" / "Troféu oculto"), `paginaDoJogo`
+  (o link "Abrir na Steam" vem de um modelo com `{id}`; a PlayStation não tem, então não há "Abrir na PlayStation") e `textoSemConquistas` (na PlayStation, "Os
+  troféus só aparecem depois que o console sincroniza com a PSN"). Na PlayStation a seção mostra a **contagem por tipo** (`porTipo`: "Platina 0 de 1 · Ouro 0 de 1…",
+  em texto), e cada troféu traz o **tipo** ("Ouro") e a **raridade** ("Raro · 4,8% dos jogadores") em texto, nunca só cor. O troféu oculto e bloqueado chega da
+  API **sem nome nem descrição** e a tela mostra "Troféu oculto". Aviso `REAUTENTICAR`: o gravado continua, com o Chek `confuso` e o botão **Reconectar** (o formulário
+  do NPSSO). Tile, destaque e linha do catálogo: `resumoDoCatalogo` e `chipsDoDestaque` usam o nome e o vocabulário da primeira plataforma ligada na ordem do cadastro
+  ("Tempo jogado na PlayStation: 10 horas, 12 de 40 troféus"); o selo (`selosDoJogo`) já era por cadastro (dois selos e "+N"). O marco de 100% ("100% dos troféus em «X»!")
+  concorda pelo `artigo` do vocabulário.
+- **Página do jogo e tile** (F3): `BlocoSteam` virou **`BlocoPlataforma`** (um componente para todas; `SecoesDasPlataformas` monta uma seção por ligação, na ordem do
+  cadastro). Os textos saem do cadastro: `vocabulario` ("Conquistas · 12 de 40" / "Troféus · 3 de 6", "Conquista oculta" / "Troféu oculto"), `paginaDoJogo`
+  (o link "Abrir na Steam" vem de um modelo com `{id}`; a PlayStation não tem, então não há "Abrir na PlayStation") e `textoSemConquistas` (na PlayStation, "Os
+  troféus só aparecem depois que o console sincroniza com a PSN"). Na PlayStation a seção mostra a **contagem por tipo** (`porTipo`: "Platina 0 de 1 · Ouro 0 de 1…",
+  em texto), e cada troféu traz o **tipo** ("Ouro") e a **raridade** ("Raro · 4,8% dos jogadores") em texto, nunca só cor. O troféu oculto e bloqueado chega da
+  API **sem nome nem descrição** e a tela mostra "Troféu oculto". Aviso `REAUTENTICAR`: o gravado continua, com o Chek `confuso` e o botão **Reconectar** (o formulário
+  do NPSSO). Tile, destaque e linha do catálogo: `resumoDoCatalogo` e `chipsDoDestaque` usam o nome e o vocabulário da primeira plataforma ligada na ordem do cadastro
+  ("Tempo jogado na PlayStation: 10 horas, 12 de 40 troféus"); o selo (`selosDoJogo`) já era por cadastro (dois selos e "+N"). O marco de 100% ("100% dos troféus em «X»!")
+  concorda pelo `artigo` do vocabulário.
 - **Testes** (F2): `PlataformasDoPerfil.playstation.test.tsx` (o diálogo, o campo, o valor só no corpo, nada em URL, armazenamento do navegador nem cache, os
   erros, `reautenticar`), `GameForm.plataformas.test.tsx` (dois botões, PS4 e PS5 como itens distintos, confirmação pelo cadastro), `lib/plataforma-texto.test.ts`,
   `lib/biblioteca.test.ts`, `shared/lib/plataformas.test.ts` (o cadastro) e `lib/sem-provedor-solto.test.ts` (sem exceção).
@@ -1090,7 +1108,7 @@ noreferrer"`), números (jogos, horas, "já jogados"), mais jogados (5), backlog
   o tile "assenta" (`.tile-novo`: `translate`, `scale`, `opacity`) e ganha um anel `destaque` que some por `opacity` (`.tile-anel-novo`, `--mov-realce`), e a página rola até
   ele (`scrollIntoView` centralizado, `auto` em movimento reduzido, sem mover o foco) se ele estiver fora da vista; se o filtro ativo **esconde** o jogo, o aviso
   diz "Adicionado em <status>" com **Ver**, que troca o filtro; (2) os **marcos** (`lib/marcos.ts`, puro): primeiro jogo (criar com a lista vazia de ANTES de
-  abrir o formulário), jogo que **passa** a Zerado (nunca ao carregar a lista) e 100% das conquistas (o **Atualizar** do `BlocoSteam` que leva o total ao
+  abrir o formulário), jogo que **passa** a Zerado (nunca ao carregar a lista) e 100% das conquistas (o **Atualizar** do `BlocoPlataforma` que leva o total ao
   máximo). Um marco é um `avisar({ chek: 'comemorando' })`, por ocorrência e **sem gravar nada** (sem confete, sem som). **Remover**: a lista e a contagem já
   não têm o jogo; `useJogosComSaida` devolve uma cópia visual `saindo` (`.tile-sai`, inerte e `aria-hidden`) por 200 ms na mesma posição, e `useFlip` (Web Animations
   API, duração e curva lidas dos tokens) desliza os vizinhos ao novo lugar. Sem movimento (reduzido) nada é retido e nada desliza. `Contador` troca o número

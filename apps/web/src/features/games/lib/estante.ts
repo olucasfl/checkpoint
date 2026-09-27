@@ -1,4 +1,4 @@
-import { type Game, type GameStatus } from '@checkpoint/shared';
+import { PLATAFORMAS, PLATAFORMAS_EM_ORDEM, type Game, type GameStatus } from '@checkpoint/shared';
 import { horasEMinutos } from '@/features/integracoes/lib/conquistas';
 import { formatRating } from './rating-input';
 import { type StatusFilter } from './status-filter';
@@ -57,25 +57,39 @@ export function nomeDaPlataforma(plataforma: string): string {
 export interface ChipsDoDestaque {
   plataforma: string | null;
   media: string | null;
+  /** "42 h 30 min na Steam" (o nome da plataforma vem do cadastro). */
   horas: string | null;
+  /** O mesmo sem o nome da plataforma, para o celular. */
+  horasCurtas: string | null;
   conquistas: string | null;
 }
 
 /**
- * Os chips do destaque: plataforma (se houver), média (se houver; 0 é nota) e, **só nos jogos ligados à Steam**, as
- * horas ("42 h 30 min na Steam") e as conquistas ("12/40 conquistas", só com total > 0).
+ * Os chips do destaque: plataforma (se houver), média (se houver; 0 é nota) e, **só nos jogos ligados a uma plataforma**, as
+ * horas ("42 h 30 min na Steam") e as conquistas ("12/40 conquistas" ou "12/40 troféus", só com total > 0), no vocabulário
+ * do cadastro da primeira plataforma ligada (a ordem do cadastro).
  */
 export function chipsDoDestaque(game: Game): ChipsDoDestaque {
   const plataforma = game.plataforma?.trim() ? nomeDaPlataforma(game.plataforma.trim()) : null;
   const media = game.notaMedia === null ? null : formatRating(game.notaMedia);
-  const steam = game.dadosPlataforma[0];
-  const horas = steam ? `${horasEMinutos(steam.minutosJogados)} na Steam` : null;
-  const conquistas =
-    steam &&
-    steam.conquistasTotal !== null &&
-    steam.conquistasTotal > 0 &&
-    steam.conquistasDesbloqueadas !== null
-      ? `${steam.conquistasDesbloqueadas}/${steam.conquistasTotal} conquistas`
+  const ligada = [...game.dadosPlataforma].sort(
+    (a, b) =>
+      PLATAFORMAS_EM_ORDEM.findIndex((p) => p.id === a.provedor) -
+      PLATAFORMAS_EM_ORDEM.findIndex((p) => p.id === b.provedor),
+  )[0];
+  const cadastro = ligada ? PLATAFORMAS[ligada.provedor] : null;
+  const horasTexto = ligada ? horasEMinutos(ligada.minutosJogados) : null;
+  const horas =
+    ligada && cadastro
+      ? `${horasTexto} ${cadastro.ligadoA.replace(/^à /, 'na ').replace(/^ao /, 'no ')}`
       : null;
-  return { plataforma, media, horas, conquistas };
+  const conquistas =
+    ligada &&
+    cadastro &&
+    ligada.conquistasTotal !== null &&
+    ligada.conquistasTotal > 0 &&
+    ligada.conquistasDesbloqueadas !== null
+      ? `${ligada.conquistasDesbloqueadas}/${ligada.conquistasTotal} ${cadastro.vocabulario.conquistas}`
+      : null;
+  return { plataforma, media, horas, horasCurtas: horasTexto, conquistas };
 }

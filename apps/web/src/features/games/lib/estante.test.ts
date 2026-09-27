@@ -126,6 +126,23 @@ describe('chipsDoDestaque (CA-15, CA-16)', () => {
       plataforma: 'Xbox Series X/S',
       media: '8,3',
       horas: '42 h 30 min na Steam',
+      horasCurtas: '42 h 30 min',
+      conquistas: '12/40 conquistas',
+    });
+  });
+
+  it('jogo da PlayStation: "na PlayStation" e "troféus" pelo cadastro; com as duas, a primeira do cadastro (Steam) manda', () => {
+    const psn = steam({ provedor: 'PLAYSTATION', idExterno: 'PPSA01234_00' });
+
+    expect(chipsDoDestaque(jogo('a', 'JOGANDO', { dadosPlataforma: [psn] }))).toMatchObject({
+      horas: '42 h 30 min na PlayStation',
+      horasCurtas: '42 h 30 min',
+      conquistas: '12/40 troféus',
+    });
+    expect(
+      chipsDoDestaque(jogo('a', 'JOGANDO', { dadosPlataforma: [psn, steam()] })),
+    ).toMatchObject({
+      horas: '42 h 30 min na Steam',
       conquistas: '12/40 conquistas',
     });
   });
@@ -135,6 +152,7 @@ describe('chipsDoDestaque (CA-15, CA-16)', () => {
       plataforma: null,
       media: null,
       horas: null,
+      horasCurtas: null,
       conquistas: null,
     });
   });

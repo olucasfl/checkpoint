@@ -215,3 +215,54 @@ describe('resumoDoCatalogo (CA-41)', () => {
     expect(resumoDoCatalogo([])).toBeNull();
   });
 });
+
+describe('vocabulário da PlayStation (troféus)', () => {
+  it('raridade com o nível na frente: "Raro · 4,8% dos jogadores"; sem percentual, "Raridade indisponível"', () => {
+    expect(raridadeTexto(4.8, 'raro')).toBe('Raro · 4,8% dos jogadores');
+    expect(raridadeTexto(0.9, 'ultrarraro')).toBe('Ultrarraro · 0,9% dos jogadores');
+    expect(raridadeTexto(60, 'comum')).toBe('Comum · 60,0% dos jogadores');
+    expect(raridadeTexto(null, 'muito-raro')).toBe('Muito raro · Raridade indisponível');
+    expect(raridadeTexto(12.4)).toBe('12,4% dos jogadores');
+  });
+
+  it('o resumo do catálogo usa o nome e o vocabulário da plataforma do jogo', () => {
+    const psn = {
+      provedor: 'PLAYSTATION',
+      idExterno: 'PPSA01234_00',
+      minutosJogados: 600,
+      ultimaVezJogadoEm: null,
+      conquistasTotal: 40,
+      conquistasDesbloqueadas: 12,
+      capaUrl: null,
+      atualizadoEm: '2026-09-25T12:00:00.000Z',
+    } as DadosJogoPlataforma;
+
+    expect(resumoDoCatalogo([psn])).toEqual({
+      texto: '10 h · 12/40',
+      rotulo: 'Tempo jogado na PlayStation: 10 horas, 12 de 40 troféus',
+    });
+  });
+
+  it('com Steam e PlayStation, o resumo é o da primeira do cadastro (Steam), qualquer que seja a ordem da API', () => {
+    const base = {
+      idExterno: '1',
+      minutosJogados: 60,
+      ultimaVezJogadoEm: null,
+      conquistasTotal: null,
+      conquistasDesbloqueadas: null,
+      capaUrl: null,
+      atualizadoEm: '2026-09-25T12:00:00.000Z',
+    };
+    const steam = { ...base, provedor: 'STEAM' } as DadosJogoPlataforma;
+    const psn = { ...base, provedor: 'PLAYSTATION' } as DadosJogoPlataforma;
+
+    expect(resumoDoCatalogo([psn, steam])?.rotulo).toBe('Tempo jogado na Steam: 1 hora');
+  });
+
+  it('a barra usa o vocabulário: "3 de 6 troféus" e "1 de 1 troféu"', () => {
+    const voc = { conquista: 'troféu', conquistas: 'troféus', artigo: 'os' } as const;
+
+    expect(progressoDasConquistas(3, 6, voc)?.texto).toBe('3 de 6 troféus');
+    expect(progressoDasConquistas(1, 1, voc)?.texto).toBe('1 de 1 troféu');
+  });
+});
