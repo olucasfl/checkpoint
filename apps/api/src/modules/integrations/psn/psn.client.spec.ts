@@ -15,6 +15,7 @@ import {
   definicoesDeTrofeus,
   ganhosDeTrofeus,
   jogadosDuasVersoes,
+  ACCOUNT_ID_SINTETICO,
   perfil,
   resumoDeTrofeus,
   tokensSinteticos,
@@ -183,7 +184,7 @@ describe('PsnClient — falhas (CA-07) [~: o formato dos erros da Sony é suposi
       }
     }
 
-    const erro = await erroDe(new SemPacote().perfil(ACCESS_SINTETICO));
+    const erro = await erroDe(new SemPacote().perfil(ACCESS_SINTETICO, ACCOUNT_ID_SINTETICO));
 
     expect(erro).toBeInstanceOf(PlataformaIndisponivelError);
     expect(erro.message).not.toContain(SEGREDO);
@@ -220,10 +221,15 @@ describe('PsnClient — leituras', () => {
   it('perfil: onlineId e o avatar', async () => {
     const pacote: Pacote = { getProfileFromAccountId: jest.fn().mockResolvedValue(perfil) };
 
-    await expect(cliente(pacote).perfil(ACCESS_SINTETICO)).resolves.toEqual({
+    await expect(cliente(pacote).perfil(ACCESS_SINTETICO, ACCOUNT_ID_SINTETICO)).resolves.toEqual({
       onlineId: 'conta_exemplo',
       avatarUrl: 'https://image.api.playstation.com/exemplo/avatar-l.png',
     });
+    // Regressão: com o alias `me` o endpoint falhava sempre e a conta ficava "Conta PlayStation".
+    expect(pacote.getProfileFromAccountId).toHaveBeenCalledWith(
+      { accessToken: ACCESS_SINTETICO },
+      ACCOUNT_ID_SINTETICO,
+    );
   });
 
   it('jogados: um item por titleId, horas em minutos e a categoria (PS4 e PS5 do mesmo jogo são itens distintos) (CA-17)', async () => {

@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { type ContaVinculada, type PlataformaInfo, type Provedor } from '@checkpoint/shared';
 import { plataformasDisponiveis } from '@checkpoint/shared';
 import { FieldError } from '@/shared/components/form-parts';
-import { Icon } from '@/shared/components/Icon';
 import { PlataformaMarca } from '@/shared/components/PlataformaMarca';
 import { describeAuthError } from '@/features/auth/lib/auth-errors';
 import { useContas, useIniciarVinculo, useResumoPlataforma } from '../api/use-integracoes';
@@ -14,7 +13,9 @@ import { PlataformaDialog } from './PlataformaDialog';
 import { Esqueleto, Falha } from './ResumoPlataforma';
 import { VincularCredencialDialog } from './VincularCredencialDialog';
 
-const LINHA = 'flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 text-left';
+// Cada plataforma é um cartão compacto (3 por linha no desktop, 2 no celular); a altura segue o conteúdo, sem sobra.
+const QUADRADO =
+  'flex min-h-28 min-w-0 flex-col gap-2 overflow-hidden rounded-2xl border border-borda bg-painel p-3 text-left';
 
 /**
  * Uma plataforma que a pessoa já vinculou: linha minimizada com o marcador, o nome da conta e "atualizado há X". A linha
@@ -45,36 +46,40 @@ function LinhaVinculada({
       onClick={onAbrir}
       aria-haspopup="dialog"
       data-plataforma-linha={provedor}
-      className={`${LINHA} min-h-14 w-full transition-colors hover:bg-acao-hover`}
+      className={`${QUADRADO} w-full transition-colors hover:bg-acao-hover`}
     >
-      {/* A logo oficial fica sozinha; o nome da plataforma vai só para leitor de tela. */}
-      <PlataformaMarca provedor={provedor} variante="logo" decorativa />
-      <span className="sr-only">{plataforma.nome}</span>
-      <span className="flex min-w-[10rem] flex-1 items-center gap-3">
+      <span className="flex items-start justify-between gap-2">
+        <PlataformaMarca
+          provedor={provedor}
+          variante="logo"
+          decorativa
+          className="text-texto-suave"
+        />
         {avatarUrl ? (
           <img
             src={avatarUrl}
             alt=""
-            width={44}
-            height={44}
-            className="size-11 shrink-0 rounded-full border border-borda object-cover"
+            width={40}
+            height={40}
+            className="size-10 shrink-0 rounded-full border border-borda object-cover"
           />
         ) : null}
+      </span>
+      <span className="flex min-w-0 flex-col gap-2">
         <span className="flex min-w-0 flex-col">
-          <span className="text-[17px] font-semibold [overflow-wrap:anywhere]">
+          <span className="line-clamp-2 text-[16px] font-semibold leading-tight [overflow-wrap:anywhere]">
             {conta.nomeExibicao}
           </span>
-          <span className="flex flex-wrap items-center gap-2 text-[13px] font-medium text-texto-suave">
+          <span className="flex flex-wrap items-center gap-x-2 text-[12px] font-medium text-texto-suave">
             {detalhe}
             {reautenticar ? (
-              <span className="rounded-full bg-painel-3 px-2.5 py-0.5 font-display text-[12px] font-bold uppercase tracking-[0.08em] text-ouro">
+              <span className="rounded-full bg-painel-3 px-2 py-0.5 font-display text-[11px] font-bold uppercase tracking-[0.08em] text-ouro">
                 Reconectar
               </span>
             ) : null}
           </span>
         </span>
       </span>
-      <Icon name="chevron_right" size={24} className="shrink-0 text-texto-suave" />
     </button>
   );
 }
@@ -108,26 +113,24 @@ function LinhaNaoVinculada({ plataforma }: { plataforma: PlataformaInfo }) {
   }
 
   return (
-    <div data-plataforma-linha={provedor} className="flex flex-col gap-3 p-4">
-      <div className="flex items-center gap-3">
-        <PlataformaMarca provedor={provedor} variante="marcador" tamanho="g" decorativa />
-        <div className="flex min-w-0 flex-col">
-          <span className="text-[19px] font-semibold">{plataforma.nome}</span>
-          <span className="text-[16px] text-texto-suave">
-            Veja as horas e {plataforma.vocabulario.artigo} {plataforma.vocabulario.conquistas} dos
-            seus jogos.
-          </span>
-        </div>
-      </div>
+    <div data-plataforma-linha={provedor} className={QUADRADO}>
+      <PlataformaMarca
+        provedor={provedor}
+        variante="logo"
+        decorativa
+        className="text-texto-suave"
+      />
+      <span className="line-clamp-3 text-[13px] leading-snug text-texto-suave">
+        Veja as horas e {plataforma.vocabulario.artigo} {plataforma.vocabulario.conquistas} dos seus
+        jogos.
+      </span>
       <button
         type="button"
         onClick={() => void onVincular()}
         disabled={iniciar.isPending}
         aria-label={`Vincular conta ${plataforma.nome}`}
-        className="inline-flex min-h-11 items-center gap-3 self-start rounded-full border border-borda-controle bg-painel-2 pr-5 font-display text-[15px] font-bold transition-colors hover:bg-acao-hover disabled:cursor-wait disabled:opacity-60"
+        className="inline-flex min-h-11 items-center justify-center rounded-full border border-borda-controle bg-painel-2 px-4 font-display text-[15px] font-bold transition-colors hover:bg-acao-hover disabled:cursor-wait disabled:opacity-60"
       >
-        {/* A logo oficial fica sozinha, com o espaço livre dela; o texto do botão vem depois, separado. */}
-        <PlataformaMarca provedor={provedor} variante="logo" decorativa />
         <span aria-hidden="true">{iniciar.isPending ? 'Abrindo…' : 'Vincular'}</span>
       </button>
       <FieldError id={`${plataforma.slug}-vincular-erro`} message={erro} />
@@ -169,7 +172,7 @@ export function PlataformasDoPerfil() {
     corpo = plataformasDisponiveis().map((plataforma) => {
       const conta = dados.find((candidata) => candidata.provedor === plataforma.id);
       return (
-        <div key={plataforma.id} className="border-b border-borda last:border-b-0">
+        <div key={plataforma.id} className="contents">
           {conta ? (
             <>
               <LinhaVinculada
@@ -209,7 +212,11 @@ export function PlataformasDoPerfil() {
       <h2 className="m-0 px-1 font-display text-sm font-bold uppercase tracking-[0.14em] text-texto-suave">
         Plataformas
       </h2>
-      <div className="overflow-hidden rounded-2xl bg-painel">{corpo}</div>
+      {contas.isPending || contas.isError ? (
+        <div className="overflow-hidden rounded-2xl bg-painel">{corpo}</div>
+      ) : (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{corpo}</div>
+      )}
     </section>
   );
 }

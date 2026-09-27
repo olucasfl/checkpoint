@@ -200,9 +200,11 @@ export class PsnClient {
     });
   }
 
-  async perfil(accessToken: string): Promise<PsnPerfil> {
+  async perfil(accessToken: string, accountId: string): Promise<PsnPerfil> {
+    // O endpoint de perfil não aceita o alias `me` (falhava sempre): vai o `accountId` real da conta.
+    this.validarAccountId(accountId);
     return this.chamar('getProfileFromAccountId', async (psn) => {
-      const resposta: unknown = await psn.getProfileFromAccountId({ accessToken }, 'me');
+      const resposta: unknown = await psn.getProfileFromAccountId({ accessToken }, accountId);
       if (!isRecord(resposta)) {
         throw this.formatoInesperado('getProfileFromAccountId');
       }

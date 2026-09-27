@@ -142,7 +142,7 @@ export class PsnProvider implements GameProvider {
     }
     let nome: string | null = null;
     try {
-      nome = (await this.client.perfil(tokens.accessToken)).onlineId;
+      nome = (await this.client.perfil(tokens.accessToken, accountId)).onlineId;
     } catch {
       // Só rótulo: o nome se corrige na próxima leitura do perfil.
     }
@@ -164,7 +164,7 @@ export class PsnProvider implements GameProvider {
         this.jogados.obter(idExterno, () => this.client.jogados(token), { ignorarCache: true }),
         this.client.resumoDeTrofeus(token),
         // O perfil só enfeita (nome e foto): falhar aqui não derruba a biblioteca.
-        this.client.perfil(token).catch(() => null),
+        this.client.perfil(token, idExterno).catch(() => null),
       ]);
       const itens = jogos.map((jogo): ItemDaBiblioteca => ({
         idExterno: jogo.titleId,

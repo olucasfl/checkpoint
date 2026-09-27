@@ -460,7 +460,7 @@ describe('a seção "Plataformas"', () => {
 });
 
 describe('a aba Plataformas (spec plataformas-e-pagina-do-jogo, F3)', () => {
-  it('vinculada: linha minimizada com o símbolo, o nome da conta e a foto (uma consulta ao resumo)', async () => {
+  it('vinculada: quadrado com o símbolo, o nome da conta e a foto (uma consulta ao resumo)', async () => {
     api.listarContas.mockResolvedValue([CONTA]);
     api.resumo.mockResolvedValue(PERFIL);
     renderCartao();
@@ -469,7 +469,7 @@ describe('a aba Plataformas (spec plataformas-e-pagina-do-jogo, F3)', () => {
     expect(linha).toHaveTextContent('Steam');
     expect(linha.querySelector('[data-plataforma-marcador="STEAM"]')).not.toBeNull();
     expect(linha).toHaveAttribute('aria-haspopup', 'dialog');
-    expect(linha).toHaveClass('min-h-14');
+    expect(linha).toHaveClass('min-h-28');
     await waitFor(() => expect(api.resumo).toHaveBeenCalledTimes(1));
     expect(screen.queryByRole('dialog')).toBeNull();
   });
@@ -502,12 +502,14 @@ describe('a aba Plataformas (spec plataformas-e-pagina-do-jogo, F3)', () => {
     expect(await screen.findByText('Atualizado agora')).toBeInTheDocument();
   });
 
-  it('sem vínculo: o botão "Vincular" tem o símbolo com o nome e nome acessível "Vincular conta Steam"', async () => {
+  it('sem vínculo: o quadrado tem o símbolo e o botão "Vincular" com nome acessível "Vincular conta Steam"', async () => {
     renderCartao();
 
     const botao = await screen.findByRole('button', { name: 'Vincular conta Steam' });
-    expect(botao.querySelector('[data-plataforma-marcador="STEAM"]')).not.toBeNull();
-    expect(botao.querySelector('img')).toBeNull();
+    const quadrado = botao.closest('[data-plataforma-linha="STEAM"]') as HTMLElement;
+    expect(quadrado).toHaveClass('min-h-28');
+    expect(quadrado.querySelector('[data-plataforma-marcador="STEAM"]')).not.toBeNull();
+    expect(quadrado.querySelector('img')).toBeNull();
     expect(botao).toHaveClass('min-h-11');
   });
 

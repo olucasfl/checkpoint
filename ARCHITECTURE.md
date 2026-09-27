@@ -1057,6 +1057,10 @@ noreferrer"`), números (jogos, horas, "já jogados"), mais jogados (5), backlog
   `playstation.svg`), desenhado por `PlataformaMarca` como máscara na cor do texto, pequeno e com o nome em texto ao lado. `logo` é `null` nas duas (o
   `steam-logo.svg` grande não é mais usado); onde este documento fala de "logo oficial >= 50 px", vale o símbolo. No `GameForm` os botões "Buscar na X" viraram **um só
   botão, "Buscar em uma plataforma"**, que abre uma lista (`role="menu"`) com as plataformas ainda sem ligação; escolher uma abre a biblioteca dela.
+- **Plataformas em quadrados e nome da PSN** (pós-F4): no `/perfil` cada plataforma é um **cartão compacto** (cartão compacto, altura pelo conteúdo) numa grade de 3 por linha no desktop e 2 no
+  celular, com o símbolo e o nome, a foto e o nome da conta e o "atualizado há X" (não vinculada: o botão "Vincular"). O `PsnClient.perfil` passou a receber o
+  `accountId` real: com o alias `me` o endpoint de perfil falhava sempre e a conta ficava "Conta PlayStation"; o nome e a foto vêm do `onlineId` e se corrigem na
+  próxima leitura do resumo.
 - **Popup da conta e linha do perfil** (F4): `ResumoSteam` virou **`ResumoPlataforma`** (um popup para todas, textos do cadastro). Steam continua igual. Na PlayStation o
   popup mostra **Nível de troféu** ("Nível 312", "faixa 4 de 10", "42% até o próximo nível") e a contagem **por tipo** em texto (`resumo.nivel`/`resumo.trofeus`), e
   **não** mostra "membro desde", status, "Abrir perfil" nem backlog (a PSN não dá; o backlog só aparece com a capacidade `backlog` do cadastro). O passo a passo de
