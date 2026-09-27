@@ -2,12 +2,12 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { AxiosError } from 'axios';
-import { type ContaVinculada, type ResumoContaPlataforma } from '@checkpoint/shared';
+import { PLATAFORMAS, type ContaVinculada, type ResumoContaPlataforma } from '@checkpoint/shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { integracoesApi } from '../api/integracoes-api';
 import { irPara } from '../lib/navegar';
 import { PlataformasDoPerfil } from './PlataformasDoPerfil';
-import { PASSOS_DE_PRIVACIDADE } from './ResumoSteam';
+const PASSOS_DE_PRIVACIDADE = PLATAFORMAS.STEAM.privacidade?.passos ?? [];
 
 vi.mock('../api/integracoes-api', () => ({
   integracoesApi: {
@@ -31,6 +31,7 @@ const CONTA: ContaVinculada = {
   idExterno: 'STEAMID_SINTETICO',
   nomeExibicao: 'Jogador Gravado',
   vinculadaEm: '2026-09-25T12:00:00.000Z',
+  estado: 'ativa',
 };
 
 const PERFIL: ResumoContaPlataforma = {
@@ -459,21 +460,21 @@ describe('a seção "Plataformas"', () => {
 });
 
 describe('a aba Plataformas (spec plataformas-e-pagina-do-jogo, F3)', () => {
-  it('vinculada: linha minimizada com a logo oficial, o nome da conta e a foto (uma consulta ao resumo)', async () => {
+  it('vinculada: quadrado com o símbolo, o nome da conta e a foto (uma consulta ao resumo)', async () => {
     api.listarContas.mockResolvedValue([CONTA]);
     api.resumo.mockResolvedValue(PERFIL);
     renderCartao();
 
     const linha = await screen.findByRole('button', { name: /Jogador Gravado/ });
     expect(linha).toHaveTextContent('Steam');
-    expect(linha.querySelector('[data-plataforma-logo="STEAM"]')).not.toBeNull();
+    expect(linha.querySelector('[data-plataforma-marcador="STEAM"]')).not.toBeNull();
     expect(linha).toHaveAttribute('aria-haspopup', 'dialog');
-    expect(linha).toHaveClass('min-h-14');
+    expect(linha).toHaveClass('min-h-28');
     await waitFor(() => expect(api.resumo).toHaveBeenCalledTimes(1));
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
-  it('clicar na linha abre o popup, com a logo oficial (>= 50 px) no título e Fechar; Fechar devolve o foco', async () => {
+  it('clicar na linha abre o popup, com o símbolo e o nome no título e Fechar; Fechar devolve o foco', async () => {
     api.listarContas.mockResolvedValue([CONTA]);
     api.resumo.mockResolvedValue(PERFIL);
     const user = renderCartao();
@@ -482,8 +483,8 @@ describe('a aba Plataformas (spec plataformas-e-pagina-do-jogo, F3)', () => {
     await user.click(linha);
 
     const popup = await screen.findByRole('dialog', { name: 'Steam' });
-    const logo = within(popup).getByRole('img', { name: 'Steam' });
-    expect(Number(logo.getAttribute('height'))).toBeGreaterThanOrEqual(50);
+    expect(popup.querySelector('[data-plataforma-marcador="STEAM"]')).not.toBeNull();
+    expect(popup.querySelector('img[src*="/plataformas/"]')).toBeNull();
     expect(api.resumo).toHaveBeenCalledTimes(1);
 
     await user.click(within(popup).getByRole('button', { name: 'Fechar' }));
@@ -501,23 +502,25 @@ describe('a aba Plataformas (spec plataformas-e-pagina-do-jogo, F3)', () => {
     expect(await screen.findByText('Atualizado agora')).toBeInTheDocument();
   });
 
-  it('sem vínculo: o botão "Vincular" tem a logo oficial (>= 50 px) sozinha e nome acessível "Vincular conta Steam"', async () => {
+  it('sem vínculo: o quadrado tem o símbolo e o botão "Vincular" com nome acessível "Vincular conta Steam"', async () => {
     renderCartao();
 
     const botao = await screen.findByRole('button', { name: 'Vincular conta Steam' });
-    const logo = botao.querySelector('img') as HTMLImageElement;
-    expect(Number(logo.getAttribute('height'))).toBeGreaterThanOrEqual(50);
-    expect(logo).toHaveAttribute('alt', '');
+    const quadrado = botao.closest('[data-plataforma-linha="STEAM"]') as HTMLElement;
+    expect(quadrado).toHaveClass('min-h-28');
+    expect(quadrado.querySelector('[data-plataforma-marcador="STEAM"]')).not.toBeNull();
+    expect(quadrado.querySelector('img')).toBeNull();
     expect(botao).toHaveClass('min-h-11');
   });
 
-  it('plataformas sem suporte não aparecem (nem "Em breve"): só a Steam tem linha', async () => {
+  it('só as plataformas com suporte aparecem (nem "Em breve"): Steam e PlayStation têm linha; Xbox e Epic não', async () => {
     const { container } = (renderCartao(), { container: document.body });
     await screen.findByRole('button', { name: 'Vincular conta Steam' });
 
-    expect(container.querySelectorAll('[data-plataforma-linha]')).toHaveLength(1);
+    expect(container.querySelectorAll('[data-plataforma-linha]')).toHaveLength(2);
+    expect(screen.getByRole('button', { name: 'Vincular conta PlayStation' })).toBeInTheDocument();
     expect(screen.queryByText(/Em breve/)).toBeNull();
-    for (const nome of ['PlayStation', 'Xbox', 'Epic']) {
+    for (const nome of ['Xbox', 'Epic']) {
       expect(screen.queryByText(new RegExp(nome))).toBeNull();
     }
   });

@@ -1,7 +1,10 @@
 import { useState } from 'react';
 import {
+  PLATAFORMAS,
+  temCapacidade,
   type ContaVinculada,
   type ItemBiblioteca,
+  type PlataformaInfo,
   type ResumoContaPlataforma,
 } from '@checkpoint/shared';
 import { Chek } from '@/shared/components/Chek/Chek';
@@ -15,7 +18,12 @@ import { GameForm } from '@/features/games/components/GameForm';
 import { useAtualizarResumo, useDesvincular, useResumoPlataforma } from '../api/use-integracoes';
 import { classificarFalhaDoCartao } from '../lib/estado-do-cartao';
 import { horasCurtas, textoDasConquistas } from '../lib/format';
-import { PROVEDOR_STEAM } from '../lib/provedores';
+import {
+  comPlataforma,
+  dePlataforma as dePlataformaDoCadastro,
+  horasEConquistas,
+  naPlataforma,
+} from '../lib/plataforma-texto';
 import {
   percentualDoBacklog,
   textoDoBacklog,
@@ -23,26 +31,13 @@ import {
   textoNoCheckpoint,
 } from '../lib/resumo';
 import { atualizadoHaTexto } from '../lib/tempo-relativo';
-import { BibliotecaSteamDialog } from './BibliotecaSteamDialog';
-
-const PROVEDOR = PROVEDOR_STEAM;
+import { BibliotecaPlataformaDialog } from './BibliotecaPlataformaDialog';
+import { VincularCredencialDialog } from './VincularCredencialDialog';
 
 const BOTAO =
   'min-h-11 min-w-11 rounded-full px-4 font-display text-[15px] disabled:cursor-wait disabled:opacity-60 font-bold';
 const BOTAO_CONTORNO = `${BOTAO} border border-borda-controle font-semibold hover:bg-acao-hover`;
 const BOTAO_PRIMARIO = `${BOTAO} bg-destaque font-extrabold text-fundo`;
-
-export const PASSOS_DE_PRIVACIDADE = [
-  'Abra a Steam e vá em Perfil › Editar perfil › Configurações de privacidade.',
-  'Deixe "Meu perfil" como Público.',
-  'Deixe "Detalhes do jogo" como Público.',
-  'Espere alguns minutos (a Steam demora a aplicar) e toque em "Tentar de novo".',
-] as const;
-
-/** A atribuição legal da Valve e a declaração de que o app não é afiliado a ela (spec, "Marca e logos"). */
-export const ATRIBUICAO_DA_VALVE =
-  '©2024 Valve Corporation. Steam and the Steam logo are trademarks and/or registered trademarks of Valve Corporation in the U.S. and/or other countries. All rights reserved.';
-export const NAO_AFILIADO = 'Não afiliado à Valve';
 
 export function Esqueleto({ rotulo }: { rotulo: string }) {
   return (
@@ -54,7 +49,20 @@ export function Esqueleto({ rotulo }: { rotulo: string }) {
   );
 }
 
-function Cabecalho({ nome, resumo }: { nome: string; resumo?: ResumoContaPlataforma }) {
+/** "na Steam" → "Na Steam" (o começo de uma frase). */
+function capitalizar(texto: string): string {
+  return texto.charAt(0).toUpperCase() + texto.slice(1);
+}
+
+function Cabecalho({
+  nome,
+  plataforma,
+  resumo,
+}: {
+  nome: string;
+  plataforma: PlataformaInfo;
+  resumo?: ResumoContaPlataforma;
+}) {
   const status = resumo ? textoDoStatus(resumo.status, resumo.jogandoAgora) : null;
   return (
     <div className="flex min-w-0 items-center gap-3">
@@ -76,12 +84,12 @@ function Cabecalho({ nome, resumo }: { nome: string; resumo?: ResumoContaPlatafo
         <span className="text-[19px] font-semibold [overflow-wrap:anywhere]">{nome}</span>
         {resumo?.membroDesde != null && (
           <span className="text-[14px] font-medium text-texto-suave">
-            Na Steam desde {resumo.membroDesde}
+            {`${capitalizar(naPlataforma(plataforma))} desde ${resumo.membroDesde}`}
           </span>
         )}
         {status && (
           <span
-            data-status-steam={resumo?.status ?? undefined}
+            data-status-plataforma={resumo?.status ?? undefined}
             className="text-[14px] font-semibold text-texto-suave"
           >
             {status}
@@ -94,7 +102,7 @@ function Cabecalho({ nome, resumo }: { nome: string; resumo?: ResumoContaPlatafo
             rel="noopener noreferrer"
             className="inline-flex min-h-11 items-center gap-1 text-[14px] font-semibold text-destaque underline underline-offset-4"
           >
-            Abrir perfil na Steam
+            Abrir perfil {naPlataforma(plataforma)}
             <Icon name="open_in_new" size={16} />
           </a>
         )}
@@ -114,7 +122,7 @@ export function Falha({
 }) {
   return (
     <div className="flex flex-col gap-3 p-4">
-      <FieldError id="steam-falha" message={mensagem} />
+      <FieldError id="plataforma-falha" message={mensagem} />
       <button
         type="button"
         onClick={onTentarDeNovo}
@@ -128,21 +136,26 @@ export function Falha({
 }
 
 function PerfilPrivado({
+  plataforma,
   onTentarDeNovo,
   tentando,
 }: {
+  plataforma: PlataformaInfo;
   onTentarDeNovo: () => void;
   tentando: boolean;
 }) {
   return (
     <div className="flex flex-col gap-3">
       <Chek expressao="cadeado" altura={72} />
-      <h3 className="m-0 text-[19px] font-bold text-ouro">Seu perfil Steam está privado</h3>
+      <h3 className="m-0 text-[19px] font-bold text-ouro">
+        Seu perfil {plataforma.nome} está privado
+      </h3>
       <p className="m-0 text-[16px] text-texto-suave">
-        A Steam só entrega horas e conquistas de perfis públicos. Para mudar:
+        A {plataforma.nome} só entrega horas e {plataforma.vocabulario.conquistas} de perfis
+        públicos. Para mudar:
       </p>
       <ol className="m-0 flex flex-col gap-1.5 pl-6 text-[16px]">
-        {PASSOS_DE_PRIVACIDADE.map((passo) => (
+        {(plataforma.privacidade?.passos ?? []).map((passo) => (
           <li key={passo}>{passo}</li>
         ))}
       </ol>
@@ -179,16 +192,72 @@ function Estatistica({
 
 const TITULO_BLOCO = 'm-0 text-[14px] font-semibold uppercase tracking-[0.08em] text-texto-suave';
 
+/** "Platina 3 · Ouro 20 · Prata 50 · Bronze 100": os troféus da conta por tipo, em texto. */
+const TIPOS_DA_CONTA = [
+  ['platina', 'Platina'],
+  ['ouro', 'Ouro'],
+  ['prata', 'Prata'],
+  ['bronze', 'Bronze'],
+] as const;
+
+/** O nível e a contagem por tipo, só quando a plataforma os devolve (o bloco vem do DADO presente, não do provedor). */
+function NivelETrofeus({ resumo }: { resumo: ResumoContaPlataforma }) {
+  const { nivel, trofeus } = resumo;
+  if (!nivel && !trofeus) {
+    return null;
+  }
+  return (
+    <section aria-label="Troféus da conta" data-bloco="trofeus" className="flex flex-col gap-2">
+      {nivel ? (
+        <div className="flex flex-col gap-0.5">
+          <h3 className={TITULO_BLOCO}>Nível de troféu</h3>
+          <p className="m-0 font-display text-[22px] font-extrabold">
+            Nível {nivel.valor}
+            {nivel.faixa !== null ? (
+              <span className="ml-2 text-[14px] font-semibold text-texto-suave">
+                faixa {nivel.faixa} de 10
+              </span>
+            ) : null}
+          </p>
+          {nivel.progressoPercentual !== null ? (
+            <p className="m-0 text-[14px] font-medium text-texto-suave">
+              {nivel.progressoPercentual}% até o próximo nível
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+      {trofeus ? (
+        <ul aria-label="Troféus por tipo" className="m-0 flex list-none flex-wrap gap-2 p-0">
+          {TIPOS_DA_CONTA.map(([tipo, rotulo]) => (
+            <li
+              key={tipo}
+              className="flex items-center gap-1.5 rounded-full bg-painel-2 px-3 py-1.5 text-[14px] font-semibold"
+            >
+              <Icon name="emoji_events" size={18} filled className="text-ouro" />
+              <span>{rotulo}</span>
+              <span className="text-texto-suave">{trofeus[tipo]}</span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </section>
+  );
+}
+
 function DadosDoResumo({
   resumo,
+  plataforma,
   onVerBacklog,
 }: {
   resumo: ResumoContaPlataforma;
+  plataforma: PlataformaInfo;
   onVerBacklog: () => void;
 }) {
   const percentual = percentualDoBacklog(resumo.nuncaJogados, resumo.totalJogos);
   return (
     <div className="flex flex-col gap-4">
+      <NivelETrofeus resumo={resumo} />
+
       <dl className="m-0 grid grid-cols-2 gap-2.5 sm:grid-cols-3">
         <Estatistica rotulo="Jogos" valor={String(resumo.totalJogos)} />
         <Estatistica rotulo="Horas" valor={horasCurtas(resumo.minutosTotais)} />
@@ -218,59 +287,70 @@ function DadosDoResumo({
             </section>
           )}
 
-          <section aria-label="Backlog" className="flex flex-col gap-2">
-            <h3 className={TITULO_BLOCO}>Backlog</h3>
-            <p className="m-0 text-[17px]">
-              {textoDoBacklog(resumo.nuncaJogados)} · {percentual}%
-            </p>
-            {resumo.nuncaJogados > 0 && (
-              <button
-                type="button"
-                onClick={onVerBacklog}
-                className={`${BOTAO_CONTORNO} self-start`}
-              >
-                Ver e importar
-              </button>
-            )}
-          </section>
+          {/* O backlog só existe onde a plataforma lista o que foi comprado e nunca aberto (capacidade `backlog`). */}
+          {temCapacidade(plataforma.id as ContaVinculada['provedor'], 'backlog') && (
+            <section aria-label="Backlog" className="flex flex-col gap-2">
+              <h3 className={TITULO_BLOCO}>Backlog</h3>
+              <p className="m-0 text-[17px]">
+                {textoDoBacklog(resumo.nuncaJogados)} · {percentual}%
+              </p>
+              {resumo.nuncaJogados > 0 && (
+                <button
+                  type="button"
+                  onClick={onVerBacklog}
+                  className={`${BOTAO_CONTORNO} self-start`}
+                >
+                  Ver e importar
+                </button>
+              )}
+            </section>
+          )}
         </>
       )}
 
       <p className="m-0 text-[16px]">
         {textoNoCheckpoint(resumo.noCheckpoint.ligados, resumo.noCheckpoint.naBiblioteca)}
       </p>
-      <p className="m-0 text-[16px]">{textoDasConquistas(resumo.conquistas)}</p>
+      <p className="m-0 text-[16px]">
+        {textoDasConquistas(resumo.conquistas, plataforma.vocabulario)}
+      </p>
     </div>
   );
 }
 
 function DesvincularDialog({
   open,
+  plataforma,
   onClose,
   onConfirmar,
   desvinculando,
   erro,
 }: {
   open: boolean;
+  plataforma: PlataformaInfo;
   onClose: () => void;
   onConfirmar: () => void;
   desvinculando: boolean;
   erro: string;
 }) {
   return (
-    <ModalDialog open={open} onClose={onClose} labelledBy="desvincular-steam-titulo">
+    <ModalDialog open={open} onClose={onClose} labelledBy="desvincular-plataforma-titulo">
       <div className="sheet-pad flex flex-col gap-5 px-7 pt-7">
         <h2
-          id="desvincular-steam-titulo"
+          id="desvincular-plataforma-titulo"
           className="m-0 font-display text-xl font-extrabold tracking-[-0.01em] text-destaque"
         >
-          Desvincular a Steam
+          Desvincular a {plataforma.nome}
         </h2>
         <p className="m-0 text-[19px]">
-          Isso remove das suas telas as horas e as conquistas da Steam. Seus jogos, notas, status e
-          capas continuam como estão.
+          Isso remove das suas telas {horasEConquistas(plataforma)}{' '}
+          {dePlataformaDoCadastro(plataforma)}
+          {plataforma.vinculo.tipo === 'credencial'
+            ? ' e apaga a credencial guardada (cifrada) e as ligações dos jogos'
+            : ''}
+          . Seus jogos, notas, status e capas continuam como estão.
         </p>
-        <FieldError id="desvincular-steam-erro" message={erro} />
+        <FieldError id="desvincular-plataforma-erro" message={erro} />
         <div className="flex flex-wrap justify-end gap-2.5">
           <button
             type="button"
@@ -295,16 +375,20 @@ function DesvincularDialog({
 }
 
 /**
- * O resumo da conta Steam dentro do popup (spec `plataformas-e-pagina-do-jogo`, F4a): cabeçalho (avatar, nome, "Na Steam
+ * O resumo da conta de uma plataforma dentro do popup (genérico por capacidade e por dado presente: a PlayStation mostra
+ * nível e troféus, a Steam mostra backlog e "membro desde"; spec `integracao-playstation`, F4). Resumo da Steam (spec `plataformas-e-pagina-do-jogo`, F4a): cabeçalho (avatar, nome, "Na Steam
  * desde", status, link do perfil), números, mais jogados (5), backlog com "Ver e importar", "X dos seus Y jogos já estão
  * no checkpoint", conquistas dos jogos vinculados e as ações (Atualizar, Importar jogos, Desvincular). Tudo vem do mesmo
  * cache de 10 min do cartão: abrir o popup a quente não chama a Steam. Perfil privado mostra o passo a passo e "Tentar
  * de novo"; falha da Steam e falta de conexão têm mensagem própria. O rodapé traz a atribuição legal da Valve.
  */
-export function ResumoSteam({ conta }: { conta: ContaVinculada }) {
-  const resumo = useResumoPlataforma(PROVEDOR, true);
-  const atualizar = useAtualizarResumo(PROVEDOR);
-  const desvincular = useDesvincular(PROVEDOR);
+export function ResumoPlataforma({ conta }: { conta: ContaVinculada }) {
+  const provedor = conta.provedor;
+  const plataforma = PLATAFORMAS[provedor];
+  const [reconectando, setReconectando] = useState(false);
+  const resumo = useResumoPlataforma(provedor, true);
+  const atualizar = useAtualizarResumo(provedor);
+  const desvincular = useDesvincular(provedor);
   const [confirmando, setConfirmando] = useState(false);
   const [erroAtualizar, setErroAtualizar] = useState('');
   const [erroDesvincular, setErroDesvincular] = useState('');
@@ -316,7 +400,7 @@ export function ResumoSteam({ conta }: { conta: ContaVinculada }) {
     setErroAtualizar('');
     try {
       await atualizar.mutateAsync();
-      avisar({ texto: 'Perfil Steam atualizado.' });
+      avisar({ texto: `Perfil ${plataforma.nome} atualizado.` });
     } catch (failure) {
       setErroAtualizar(describeAuthError(failure).message);
     }
@@ -327,7 +411,7 @@ export function ResumoSteam({ conta }: { conta: ContaVinculada }) {
     try {
       await desvincular.mutateAsync();
       setConfirmando(false);
-      avisar({ texto: 'Conta Steam desvinculada.' });
+      avisar({ texto: `${plataforma.rotuloDaConta} desvinculada.` });
     } catch (failure) {
       setErroDesvincular(describeAuthError(failure).message);
     }
@@ -344,26 +428,61 @@ export function ResumoSteam({ conta }: { conta: ContaVinculada }) {
 
   return (
     <div className="flex flex-col gap-4 pb-1">
-      <Cabecalho nome={dados?.nomeExibicao ?? conta.nomeExibicao} resumo={dados} />
+      <Cabecalho
+        nome={dados?.nomeExibicao ?? conta.nomeExibicao}
+        plataforma={plataforma}
+        resumo={dados}
+      />
 
-      {resumo.isPending && <Esqueleto rotulo="Carregando sua conta Steam" />}
-      {dados && <DadosDoResumo resumo={dados} onVerBacklog={() => setImportando('backlog')} />}
+      {resumo.isPending && <Esqueleto rotulo={`Carregando sua conta ${plataforma.nome}`} />}
+      {dados && (
+        <DadosDoResumo
+          resumo={dados}
+          plataforma={plataforma}
+          onVerBacklog={() => setImportando('backlog')}
+        />
+      )}
       {falha === 'privado' && (
-        <PerfilPrivado onTentarDeNovo={() => void resumo.refetch()} tentando={tentando} />
+        <PerfilPrivado
+          plataforma={plataforma}
+          onTentarDeNovo={() => void resumo.refetch()}
+          tentando={tentando}
+        />
+      )}
+      {falha === 'reautenticar' && (
+        <div role="status" data-estado="reautenticar" className="flex flex-col gap-3">
+          <Chek expressao="confuso" altura={72} />
+          <h3 className="m-0 text-[19px] font-bold text-ouro">
+            Sua conexão {comPlataforma(plataforma)} expirou
+          </h3>
+          <p className="m-0 text-[16px] text-texto-suave">
+            Sua conta e os jogos ligados continuam aí. Cole um código novo para voltar a atualizar
+            as horas e {plataforma.vocabulario.artigo} {plataforma.vocabulario.conquistas}.
+          </p>
+          {plataforma.vinculo.tipo === 'credencial' && (
+            <button
+              type="button"
+              onClick={() => setReconectando(true)}
+              className={`${BOTAO_PRIMARIO} self-start`}
+            >
+              Reconectar
+            </button>
+          )}
+        </div>
       )}
       {(falha === 'erro' || falha === 'sem-conexao') && (
         <Falha
           mensagem={
             falha === 'sem-conexao'
               ? 'Sem conexão. Tente de novo quando a conexão voltar.'
-              : 'Não foi possível falar com a Steam agora.'
+              : `Não foi possível falar ${comPlataforma(plataforma)} agora.`
           }
           onTentarDeNovo={() => void resumo.refetch()}
           tentando={tentando}
         />
       )}
 
-      <FieldError id="steam-atualizar-erro" message={erroAtualizar} />
+      <FieldError id="plataforma-atualizar-erro" message={erroAtualizar} />
       <div className="flex flex-wrap items-center gap-2.5">
         <button
           type="button"
@@ -394,18 +513,30 @@ export function ResumoSteam({ conta }: { conta: ContaVinculada }) {
       {atualizado && <p className="m-0 text-[13px] font-medium text-texto-suave">{atualizado}</p>}
 
       <footer className="flex flex-col gap-1 border-t border-borda pt-3 text-[12px] leading-snug text-texto-suave">
-        <p className="m-0">{ATRIBUICAO_DA_VALVE}</p>
-        <p className="m-0 font-semibold">{NAO_AFILIADO}</p>
+        {plataforma.rodapeLegal.atribuicao && (
+          <p className="m-0">{plataforma.rodapeLegal.atribuicao}</p>
+        )}
+        <p className="m-0 font-semibold">{plataforma.rodapeLegal.naoAfiliado}</p>
       </footer>
 
+      {plataforma.vinculo.tipo === 'credencial' && (
+        <VincularCredencialDialog
+          open={reconectando}
+          plataforma={plataforma}
+          reautenticar
+          onClose={() => setReconectando(false)}
+        />
+      )}
       <DesvincularDialog
         open={confirmando}
+        plataforma={plataforma}
         onClose={() => setConfirmando(false)}
         onConfirmar={() => void onDesvincular()}
         desvinculando={desvincular.isPending}
         erro={erroDesvincular}
       />
-      <BibliotecaSteamDialog
+      <BibliotecaPlataformaDialog
+        provedor={provedor}
         open={importando !== null}
         modo={{ tipo: 'novo' }}
         soNuncaJogados={importando === 'backlog'}
@@ -424,6 +555,7 @@ export function ResumoSteam({ conta }: { conta: ContaVinculada }) {
         {criando && (
           <GameForm
             itemInicial={criando}
+            provedorInicial={provedor}
             onDone={() => setCriando(null)}
             onCancel={() => setCriando(null)}
             onLinkedExisting={() => setCriando(null)}

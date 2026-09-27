@@ -88,22 +88,38 @@ model User {
 // de tela vive so no web. Acrescentar um valor depois e `ALTER TYPE ... ADD VALUE`, tambem aditivo.
 enum Provedor {
   STEAM
+  PLAYSTATION
 }
 
 // A conta do usuario numa plataforma, com a posse ja comprovada (na Steam, pelo OpenID). Uma por provedor.
 // Desvincular apaga esta linha e todos os JogoPlataforma do provedor (feito no service, numa transacao).
 model ContaVinculada {
-  id           String   @id @default(uuid())
-  userId       String
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  provedor     Provedor
+  id                String                @id @default(uuid())
+  userId            String
+  user              User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provedor          Provedor
   // Na Steam, o SteamID64. Ja comprovado pelo provedor: o usuario nunca o digita.
-  idExterno    String   @db.VarChar(40)
-  nomeExibicao String   @db.VarChar(80)
-  vinculadaEm  DateTime @default(now())
+  idExterno         String                @db.VarChar(40)
+  nomeExibicao      String                @db.VarChar(80)
+  vinculadaEm       DateTime              @default(now())
+  // `null` = ativa. Preenchida quando a plataforma recusou a credencial guardada (PlayStation): o usuario
+  // precisa colar um NPSSO novo. A Steam nunca a preenche.
+  reautenticarDesde DateTime?
+  credencial        CredencialPlataforma?
 
   @@unique([userId, provedor])
   @@unique([userId, provedor, idExterno])
+}
+
+// O refresh token da plataforma, CIFRADO (AES-256-GCM, `v1:<iv>:<tag>:<texto>`). Tabela a parte para que
+// nenhum select/include de ContaVinculada vaze o segredo. O NPSSO nunca e gravado.
+model CredencialPlataforma {
+  id             String         @id @default(uuid())
+  contaId        String         @unique
+  conta          ContaVinculada @relation(fields: [contaId], references: [id], onDelete: Cascade)
+  refreshCifrado String
+  expiraEm       DateTime
+  atualizadoEm   DateTime       @updatedAt
 }
 
 // A camada da plataforma sobre um jogo do catalogo: o ULTIMO valor consultado, nunca substitui titulo,

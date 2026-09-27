@@ -8,6 +8,12 @@ import { integracoesApi } from '@/features/integracoes/api/integracoes-api';
 import { gamesApi } from '../api/games-api';
 import { GameForm } from './GameForm';
 
+/** O botão único "Buscar em uma plataforma" abre a lista; a pessoa escolhe a plataforma. */
+async function buscarEm(user: ReturnType<typeof userEvent.setup>, nome: string) {
+  await user.click(await screen.findByRole('button', { name: 'Buscar em uma plataforma' }));
+  await user.click(await screen.findByRole('menuitem', { name: nome }));
+}
+
 vi.mock('../api/games-api', () => ({
   gamesApi: {
     list: vi.fn(),
@@ -31,6 +37,7 @@ const CONTA: ContaVinculada = {
   idExterno: 'STEAMID_SINTETICO',
   nomeExibicao: 'Jogador Sintetico',
   vinculadaEm: '2026-09-25T12:00:00.000Z',
+  estado: 'ativa',
 };
 
 const item = (over: Partial<ItemBiblioteca> = {}): ItemBiblioteca => ({
@@ -84,7 +91,7 @@ function renderForm() {
 }
 
 async function buscarECriar(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(await screen.findByRole('button', { name: 'Buscar na Steam' }));
+  await buscarEm(user, 'Steam');
   await user.click(await screen.findByRole('button', { name: /Criar jogo: Jogo Sintetico/ }));
 }
 
@@ -103,8 +110,8 @@ describe('GameForm — buscar na Steam (jogo novo)', () => {
     integ.listarContas.mockResolvedValue([]);
     renderForm();
 
-    expect(await screen.findByText(/Vincule sua Steam no perfil/)).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Buscar na Steam' })).toBeNull();
+    expect(await screen.findByText(/Vincule sua conta no perfil/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Buscar em uma plataforma' })).toBeNull();
   });
 
   it('editar um jogo existente não mostra a busca', async () => {
@@ -116,7 +123,7 @@ describe('GameForm — buscar na Steam (jogo novo)', () => {
     );
 
     await screen.findByLabelText('Título');
-    expect(screen.queryByRole('button', { name: 'Buscar na Steam' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Buscar em uma plataforma' })).toBeNull();
   });
 
   it('"Criar jogo" preenche título, PC e status pelas horas (capa só como prévia); "Remover ligação" tira o chip', async () => {
@@ -250,7 +257,7 @@ describe('GameForm — buscar na Steam (jogo novo)', () => {
     ]);
     const { user, onLinkedExisting, onDone } = renderForm();
 
-    await user.click(await screen.findByRole('button', { name: 'Buscar na Steam' }));
+    await buscarEm(user, 'Steam');
     await user.click(
       await screen.findByRole('button', { name: 'Vincular Jogo Sintetico a Jogo Sintetico' }),
     );
@@ -270,7 +277,12 @@ describe('GameForm — jogo novo já ligado a um item (itemInicial, "Ver e impor
     });
     render(
       <QueryClientProvider client={client}>
-        <GameForm onDone={onDone} onCancel={vi.fn()} itemInicial={item(over)} />
+        <GameForm
+          onDone={onDone}
+          onCancel={vi.fn()}
+          itemInicial={item(over)}
+          provedorInicial="STEAM"
+        />
       </QueryClientProvider>,
     );
     return { onDone, user: userEvent.setup({ applyAccept: false }) };

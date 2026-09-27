@@ -1,14 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  plataformasDisponiveis,
+  temCapacidade,
   type DetalheJogoPlataforma,
   type Game,
+  type PlataformaInfo,
   type ResumoContaPlataforma,
   type Provedor,
   type VincularJogoRequest,
 } from '@checkpoint/shared';
 import { GAMES_QUERY_KEY } from '@/features/games/api/use-games';
 import { comDadosAtualizados } from '../lib/conquistas';
-import { PROVEDOR_STEAM } from '../lib/provedores';
 import { integracoesApi } from './integracoes-api';
 
 /** As contas vinculadas. O logout local limpa o `queryClient` inteiro, estas chaves junto. */
@@ -34,19 +36,45 @@ export function useResumoPlataforma(provedor: Provedor, enabled: boolean) {
   });
 }
 
-/** Há conta Steam vinculada? `undefined` enquanto carrega ou se a consulta falhou (a tela some com o atalho). */
-export function useTemConta(provedor: Provedor): boolean | undefined {
+/**
+ * As plataformas com conta vinculada que têm biblioteca para buscar ("Buscar na Steam", "Buscar na PlayStation"), na ordem
+ * do cadastro. `undefined` enquanto as contas carregam ou se a consulta falhou (a tela some com o atalho); lista vazia =
+ * nenhuma conta vinculada. As telas nunca perguntam "é a Steam?": perguntam quais plataformas a pessoa tem.
+ */
+export function usePlataformasComBiblioteca(): readonly PlataformaInfo[] | undefined {
   const contas = useContas();
-  return contas.data?.some((conta) => conta.provedor === provedor);
-}
-
-/** O atalho das telas que só falam com a Steam (ver `lib/provedores.ts`). */
-export function useTemContaSteam(): boolean | undefined {
-  return useTemConta(PROVEDOR_STEAM);
+  if (contas.data === undefined) {
+    return undefined;
+  }
+  const dados = contas.data;
+  return plataformasDisponiveis().filter(
+    (plataforma) =>
+      temCapacidade(plataforma.id as Provedor, 'biblioteca') &&
+      dados.some((conta) => conta.provedor === plataforma.id),
+  );
 }
 
 export function useIniciarVinculo(provedor: Provedor) {
   return useMutation({ mutationFn: () => integracoesApi.iniciarVinculo(provedor) });
+}
+
+/**
+ * O vínculo por credencial (PlayStation). O NPSSO equivale a uma senha: a mutação NÃO fica com ele (quem chama dá
+ * `reset()` logo depois), e o cache do TanStack Query nunca o guarda além do voo do POST. Sucesso: a lista de contas é
+ * buscada de novo e o resumo antigo (de antes de reautenticar) sai do cache.
+ */
+export function useVincularComCredencial(provedor: Provedor) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    // `gcTime: 0`: sem quem observe (depois do `reset()`), a mutação sai do cache e leva o `variables` com ela.
+    gcTime: 0,
+    mutationFn: (credencial: string) =>
+      integracoesApi.vincularComCredencial(provedor, { credencial }),
+    onSuccess: () => {
+      queryClient.removeQueries({ queryKey: resumoQueryKey(provedor) });
+      void queryClient.invalidateQueries({ queryKey: CONTAS_QUERY_KEY });
+    },
+  });
 }
 
 /** O "Atualizar" do popup: o resultado entra direto no cache do resumo. */
@@ -111,6 +139,24 @@ export function useVincularJogo(provedor: Provedor) {
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: GAMES_QUERY_KEY });
       void queryClient.invalidateQueries({ queryKey: resumoQueryKey(provedor) });
+    },
+  });
+}
+
+/**
+ * Ligar um jogo a um item de QUALQUER plataforma, com o provedor na chamada (o formulário de jogo novo pode ligar a mais
+ * de uma plataforma). Mesmas invalidações de `useVincularJogo`.
+ */
+export function useVincularJogoEm() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (entrada: { provedor: Provedor; jogoId: string; idExterno: string }) =>
+      integracoesApi.vincularJogo(entrada.provedor, entrada.jogoId, {
+        idExterno: entrada.idExterno,
+      }),
+    onSettled: (_dados, _erro, entrada) => {
+      void queryClient.invalidateQueries({ queryKey: GAMES_QUERY_KEY });
+      void queryClient.invalidateQueries({ queryKey: resumoQueryKey(entrada.provedor) });
     },
   });
 }

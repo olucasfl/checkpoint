@@ -36,7 +36,24 @@ export class PerfilPrivadoError extends PlataformaError {
   }
 }
 
-/** O item (na Steam, o appid) não está na biblioteca do usuário: só se liga o que ele tem. */
+/**
+ * A plataforma recusou a credencial guardada do usuário (PlayStation: o refresh token venceu ou foi revogado):
+ * ele precisa colar uma credencial nova. Não é falha da plataforma: o service marca a conta como `reautenticar`.
+ */
+export class PlataformaReautenticarError extends PlataformaError {
+  constructor(message = 'A credencial guardada na plataforma não vale mais') {
+    super('PLATAFORMA_REAUTENTICAR', message);
+  }
+}
+
+/** A credencial que o usuário acabou de colar (PlayStation: o NPSSO) foi recusada pela plataforma. */
+export class CredencialInvalidaError extends PlataformaError {
+  constructor(message = 'A plataforma recusou a credencial') {
+    super('PLATAFORMA_CREDENCIAL_INVALIDA', message);
+  }
+}
+
+/** O item (na Steam, o appid; na PlayStation, o titleId) não está na biblioteca do usuário: só se liga o que ele tem. */
 export class PlataformaItemNaoEncontradoError extends PlataformaError {
   constructor(message = 'O item não está na biblioteca do usuário') {
     super('PLATAFORMA_ITEM_NAO_ENCONTRADO', message);
@@ -44,12 +61,13 @@ export class PlataformaItemNaoEncontradoError extends PlataformaError {
 }
 
 /**
- * Identificador externo (SteamID, appid) fora do formato. É erro de VALIDAÇÃO (na rota vira 400), nunca
+ * Identificador externo fora do formato: `idConta` (SteamID, accountId) ou `idItem` (appid, titleId). É erro de
+ * VALIDAÇÃO (na rota vira 400), nunca
  * "perfil privado": a Steam responde 400 em HTML a um ID malformado, então o formato é conferido antes.
  */
 export class IdExternoInvalidoError extends Error {
   constructor(
-    readonly campo: 'steamId' | 'appId',
+    readonly campo: 'idConta' | 'idItem',
     message: string,
   ) {
     super(message);

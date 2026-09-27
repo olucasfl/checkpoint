@@ -146,6 +146,8 @@ export type ApiErrorField =
   | 'nuncaJogados'
   // Corpo do vínculo de jogo (spec integracao-plataformas).
   | 'idExterno'
+  // Credencial colada no vínculo da PlayStation (spec integracao-playstation).
+  | 'credencial'
   | 'mover';
 
 /**

@@ -28,6 +28,7 @@ describe('IntegrationsModule', () => {
             () => ({
               STEAM_API_KEY: 'ABCDEF0123456789ABCDEF0123456789',
               JWT_ACCESS_SECRET: 'segredo-de-acesso-sintetico-com-mais-de-32-caracteres',
+              PSN_TOKEN_ENCRYPTION_KEY: '',
             }),
           ],
         }),

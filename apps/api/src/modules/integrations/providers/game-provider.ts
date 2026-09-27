@@ -1,9 +1,28 @@
 import {
   type AvisoPlataforma,
   type Conquista,
+  type NivelDaConta,
   type Provedor,
   type StatusNaPlataforma,
+  type TipoDeTrofeu,
+  type ContagemTrofeus,
+  type TrofeusPorTipo,
 } from '@checkpoint/shared';
+
+/**
+ * O que o service sabe da conta vinculada e repassa às leituras. A Steam o ignora (a chave é da API); a PlayStation
+ * usa `contaId` para achar a credencial cifrada e `nomeExibicao` como nome quando a Sony não devolve um.
+ */
+export interface ContextoDaConta {
+  contaId: string;
+  nomeExibicao: string;
+}
+
+/** A sessão nova que um vínculo por credencial devolve; o service a cifra e grava, e nunca a devolve ao cliente. */
+export interface SessaoDaPlataforma {
+  refreshToken: string;
+  expiraEm: Date;
+}
 
 /** Quem é o usuário na plataforma, sem os dados de jogo. */
 export interface PerfilBasico {
@@ -17,6 +36,9 @@ export interface PerfilBasico {
   status?: StatusNaPlataforma | null;
   /** O jogo em andamento, quando `status` é `jogando`. */
   jogandoAgora?: string | null;
+  /** O nível da conta, quando a plataforma tem (troféus da PlayStation). */
+  nivel?: NivelDaConta | null;
+  trofeus?: TrofeusPorTipo | null;
 }
 
 /** Um item da biblioteca do usuário, do jeito neutro da plataforma. */
@@ -24,6 +46,8 @@ export interface ItemDaBiblioteca {
   idExterno: string;
   titulo: string;
   capaUrl: string | null;
+  /** O texto de plataforma sugerido a um jogo novo criado a partir do item (`PS5`, `PS4`, `PC`); `null` = sem sugestão. */
+  plataformaSugerida?: string | null;
   minutosJogados: number;
   ultimaVezJogadoEm: Date | null;
 }
@@ -55,6 +79,8 @@ export interface DetalheDoJogo {
   conquistasDesbloqueadas: number | null;
   conquistas: Conquista[];
   aviso: AvisoPlataforma | null;
+  /** Total e desbloqueados por tipo de troféu; só a PlayStation. */
+  porTipo?: Record<TipoDeTrofeu, ContagemTrofeus> | null;
 }
 
 /**
@@ -63,10 +89,25 @@ export interface DetalheDoJogo {
  * valor a `Provedor`, sem mexer no `IntegrationsService`.
  *
  * Os métodos lançam os erros de `plataforma-errors.ts`: `PerfilPrivadoError`, `PlataformaIndisponivelError`,
- * `PlataformaLimiteError` e `IdExternoInvalidoError`.
+ * `PlataformaLimiteError`, `PlataformaReautenticarError` e `IdExternoInvalidoError`.
  */
 export interface GameProvider {
   readonly id: Provedor;
+
+  /**
+   * Como a conta é vinculada: `redirecionamento` (Steam: `iniciarVinculo` + `concluirVinculo`) ou `credencial`
+   * (PlayStation: `vincularComCredencial`). É o que o service consulta; nunca o `id`.
+   */
+  readonly modoDeVinculo: 'redirecionamento' | 'credencial';
+
+  /**
+   * Só `modoDeVinculo: 'credencial'`. Troca a credencial colada pelo usuário por uma sessão e devolve o ID da conta
+   * (já comprovado), o nome e a sessão a guardar (cifrada). A credencial NUNCA é guardada nem devolvida. Lança
+   * `CredencialInvalidaError` se a plataforma a recusa.
+   */
+  vincularComCredencial?(
+    credencial: string,
+  ): Promise<{ idExterno: string; nomeExibicao: string; sessao: SessaoDaPlataforma }>;
 
   /**
    * Monta o endereço para onde o navegador vai provar quem é o usuário na plataforma. `returnTo` é o
@@ -88,7 +129,10 @@ export interface GameProvider {
    * A biblioteca e o perfil, na mesma consulta (o cartão do `/perfil` precisa dos dois, e a detecção de
    * privacidade cruza as duas chamadas). Lança `PerfilPrivadoError` se os dados não são públicos.
    */
-  listarBiblioteca(idExterno: string): Promise<{ itens: ItemDaBiblioteca[]; perfil: PerfilBasico }>;
+  listarBiblioteca(
+    idExterno: string,
+    ctx: ContextoDaConta,
+  ): Promise<{ itens: ItemDaBiblioteca[]; perfil: PerfilBasico }>;
 
   /**
    * O resumo de UM jogo: horas, última vez jogado, capa e as contagens de conquistas (etapa 3); a lista
@@ -98,6 +142,7 @@ export interface GameProvider {
   obterJogo(
     idExterno: string,
     idJogo: string,
+    ctx: ContextoDaConta,
   ): Promise<{ dados: DadosDoJogo; conquistas: Conquista[]; aviso: AvisoPlataforma | null }>;
 
   /**
@@ -106,5 +151,10 @@ export interface GameProvider {
    * `CONQUISTAS_PRIVADAS` (horas e vínculo ficam). Os outros erros da plataforma sobem: quem chama decide (o `GET`
    * devolve o valor gravado, nunca 502).
    */
-  obterDetalhe(idExterno: string, idJogo: string, opcoes: OpcoesDoDetalhe): Promise<DetalheDoJogo>;
+  obterDetalhe(
+    idExterno: string,
+    idJogo: string,
+    opcoes: OpcoesDoDetalhe,
+    ctx: ContextoDaConta,
+  ): Promise<DetalheDoJogo>;
 }

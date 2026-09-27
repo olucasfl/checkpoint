@@ -14,6 +14,15 @@ const falsa = (id: string, nome: string, ligadoA: string): PlataformaInfo => ({
   logo: null,
   ligadoA,
   rotuloDaConta: nome,
+  vinculo: { tipo: 'redirecionamento', hostDeLogin: 'x.example', caminhoDeLogin: '/login' },
+  vocabulario: { conquista: 'conquista', conquistas: 'conquistas', artigo: 'as' },
+  capaNaBusca: 'paisagem',
+  textoSemConquistas: '',
+  paginaDoJogo: null,
+  plataformasCompativeis: [],
+  plataformaPadrao: null,
+  privacidade: null,
+  rodapeLegal: { atribuicao: null, naoAfiliado: '' },
 });
 const cadastro = [
   falsa('STEAM', 'Steam', 'à Steam'),
@@ -44,6 +53,21 @@ describe('selosDoJogo', () => {
       visiveis: ['STEAM', 'XBOX'],
       extras: 1,
       rotulo: 'Ligado a Steam, Xbox e mais 1',
+    });
+  });
+});
+
+describe('selosDoJogo com o cadastro real (Steam e PlayStation)', () => {
+  it('só a PlayStation: "Ligado à PlayStation"; as duas: "Ligado a Steam e PlayStation", na ordem do cadastro', () => {
+    expect(selosDoJogo(dados('PLAYSTATION'))).toEqual({
+      visiveis: ['PLAYSTATION'],
+      extras: 0,
+      rotulo: 'Ligado à PlayStation',
+    });
+    expect(selosDoJogo(dados('PLAYSTATION', 'STEAM'))).toEqual({
+      visiveis: ['STEAM', 'PLAYSTATION'],
+      extras: 0,
+      rotulo: 'Ligado a Steam e PlayStation',
     });
   });
 });

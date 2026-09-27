@@ -15,6 +15,7 @@ import {
 } from './providers/plataforma-errors';
 import { type GameProvider, type ItemDaBiblioteca } from './providers/game-provider';
 import { ProviderRegistry } from './providers/provider-registry';
+import { CifraDeCredencial } from './psn/cifra-de-credencial';
 import { VinculoStateService } from './vinculo/vinculo-state.service';
 
 // Valores sintéticos e óbvios (RULES.md §8).
@@ -36,6 +37,15 @@ const config = {
     })[key],
 } as unknown as ConfigService<never, true>;
 
+/** A chave de cifra de teste: 64 hexadecimais sintéticos e óbvios (RULES.md §8). */
+export const CHAVE_SINTETICA = '0123456789abcdef'.repeat(4);
+
+function configComChave() {
+  return {
+    get: (key: string) => (key === 'PSN_TOKEN_ENCRYPTION_KEY' ? CHAVE_SINTETICA : undefined),
+  };
+}
+
 const jwt = new JwtService({});
 
 function item(idExterno: string, titulo: string, minutosJogados: number): ItemDaBiblioteca {
@@ -49,8 +59,10 @@ function montar() {
       findMany: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
+      updateMany: jest.fn(),
       deleteMany: jest.fn(),
     },
+    credencialPlataforma: { upsert: jest.fn() },
     game: { findMany: jest.fn(), findFirst: jest.fn() },
     jogoPlataforma: {
       findMany: jest.fn(),
@@ -71,6 +83,7 @@ function montar() {
 
   const provider = {
     id: 'STEAM' as const,
+    modoDeVinculo: 'redirecionamento' as const,
     iniciarVinculo: jest.fn((ctx: { state: string }) => ({
       url: `https://steamcommunity.com/openid/login?state=${ctx.state}`,
     })),
@@ -86,6 +99,7 @@ function montar() {
     registry,
     vinculoState,
     config as never,
+    new CifraDeCredencial(configComChave() as never),
   );
   return { service, prisma, provider, vinculoState };
 }
@@ -489,6 +503,7 @@ describe('IntegrationsService.listarContas', () => {
         idExterno: STEAM_ID,
         nomeExibicao: 'Jogador',
         vinculadaEm: '2026-09-25T12:00:00.000Z',
+        estado: 'ativa',
       },
     ]);
   });
@@ -778,6 +793,7 @@ describe('IntegrationsService.biblioteca (CA-23 a CA-25)', () => {
       idExterno: '7',
       titulo: 'Celeste',
       capaUrl: 'https://cdn.cloudflare.steamstatic.com/steam/apps/7/library_600x900.jpg',
+      plataformaSugerida: null,
       minutosJogados: 90,
       ultimaVezJogadoEm: '2026-02-22T17:24:41.000Z',
       jogosParecidos: [],
@@ -988,7 +1004,7 @@ describe('IntegrationsService.vincularJogo (CA-26 a CA-31, CA-66, CA-67)', () =>
         }) as unknown,
       }),
     );
-    expect(ctx.provider.obterJogo).toHaveBeenCalledWith(STEAM_ID, APP);
+    expect(ctx.provider.obterJogo).toHaveBeenCalledWith(STEAM_ID, APP, expect.anything());
     expect(ctx.prisma.$transaction).not.toHaveBeenCalled();
   });
 
@@ -1344,33 +1360,41 @@ describe('IntegrationsService.detalheDoJogo e atualizarJogo (etapa 4, CA-43 a CA
   it('GET: só reconsulta as horas se o dado é MAIS VELHO que 1 h (1 h exata ainda não)', async () => {
     const exata = comVinculo(HORA);
     await exata.service.detalheDoJogo(ANA, 'STEAM', GAME);
-    expect(exata.provider.obterDetalhe).toHaveBeenCalledWith(STEAM_ID, APP, {
-      comHoras: false,
-      ignorarCache: false,
-    });
+    expect(exata.provider.obterDetalhe).toHaveBeenCalledWith(
+      STEAM_ID,
+      APP,
+      { comHoras: false, ignorarCache: false },
+      expect.anything(),
+    );
 
     const velho = comVinculo(HORA + 1);
     await velho.service.detalheDoJogo(ANA, 'STEAM', GAME);
-    expect(velho.provider.obterDetalhe).toHaveBeenCalledWith(STEAM_ID, APP, {
-      comHoras: true,
-      ignorarCache: false,
-    });
+    expect(velho.provider.obterDetalhe).toHaveBeenCalledWith(
+      STEAM_ID,
+      APP,
+      { comHoras: true, ignorarCache: false },
+      expect.anything(),
+    );
   });
 
   it('POST: antes de 30 s não reconsulta as horas nem ignora o cache; a partir de 30 s, sim', async () => {
     const cedo = comVinculo(29_999);
     await cedo.service.atualizarJogo(ANA, 'STEAM', GAME);
-    expect(cedo.provider.obterDetalhe).toHaveBeenCalledWith(STEAM_ID, APP, {
-      comHoras: false,
-      ignorarCache: false,
-    });
+    expect(cedo.provider.obterDetalhe).toHaveBeenCalledWith(
+      STEAM_ID,
+      APP,
+      { comHoras: false, ignorarCache: false },
+      expect.anything(),
+    );
 
     const tarde = comVinculo(30_000);
     await tarde.service.atualizarJogo(ANA, 'STEAM', GAME);
-    expect(tarde.provider.obterDetalhe).toHaveBeenCalledWith(STEAM_ID, APP, {
-      comHoras: true,
-      ignorarCache: true,
-    });
+    expect(tarde.provider.obterDetalhe).toHaveBeenCalledWith(
+      STEAM_ID,
+      APP,
+      { comHoras: true, ignorarCache: true },
+      expect.anything(),
+    );
   });
 
   it('jogo de outro usuário ou sem vínculo → 404 e a plataforma nem é chamada', async () => {

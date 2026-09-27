@@ -12,7 +12,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { avisosNaFila } from '@/shared/lib/avisos';
 import { storage } from '@/shared/lib/storage/storage';
 import { integracoesApi } from '../api/integracoes-api';
-import { BlocoSteam } from './BlocoSteam';
+import { BlocoPlataforma } from './BlocoPlataforma';
 
 vi.mock('../api/integracoes-api', () => ({
   integracoesApi: { detalheDoJogo: vi.fn(), atualizarJogo: vi.fn(), desvincularJogo: vi.fn() },
@@ -95,7 +95,7 @@ function abrir(game: Game = jogo()) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const view = render(
     <QueryClientProvider client={client}>
-      <BlocoSteam game={game} />
+      <BlocoPlataforma game={game} provedor="STEAM" />
     </QueryClientProvider>,
   );
   return { ...view, user: userEvent.setup({ applyAccept: false }) };
@@ -105,7 +105,7 @@ beforeEach(() => {
   vi.resetAllMocks();
 });
 
-describe('BlocoSteam — dados (CA-51)', () => {
+describe('BlocoPlataforma — dados (CA-51)', () => {
   it('horas, última vez, barra de progresso, Atualizar, Desvincular e Abrir na Steam', async () => {
     api.detalheDoJogo.mockResolvedValue(detalhe());
     abrir();
@@ -166,7 +166,7 @@ describe('BlocoSteam — dados (CA-51)', () => {
   });
 });
 
-describe('BlocoSteam — lista de conquistas (CA-52, CA-53)', () => {
+describe('BlocoPlataforma — lista de conquistas (CA-52, CA-53)', () => {
   it('Desbloqueadas e Faltam (as duas FECHADAS, com "Toque para ver"), na ordem certa e com contagem', async () => {
     api.detalheDoJogo.mockResolvedValue(detalhe());
     const { container } = abrir();
@@ -244,7 +244,7 @@ describe('BlocoSteam — lista de conquistas (CA-52, CA-53)', () => {
   });
 });
 
-describe('BlocoSteam — avisos (CA-47 a CA-50)', () => {
+describe('BlocoPlataforma — avisos (CA-47 a CA-50)', () => {
   it('jogo sem conquistas (400 "no stats", fixture real): sem barra e "Este jogo não tem conquistas" (CA-48)', async () => {
     api.detalheDoJogo.mockResolvedValue(
       detalhe({
@@ -301,7 +301,7 @@ describe('BlocoSteam — avisos (CA-47 a CA-50)', () => {
   });
 });
 
-describe('BlocoSteam — 100% das conquistas (CA-56)', () => {
+describe('BlocoPlataforma — 100% das conquistas (CA-56)', () => {
   it('Atualizar que leva as conquistas a 100% comemora com o Chek', async () => {
     api.detalheDoJogo.mockResolvedValue(detalhe());
     api.atualizarJogo.mockResolvedValue(
@@ -333,7 +333,7 @@ describe('BlocoSteam — 100% das conquistas (CA-56)', () => {
   });
 });
 
-describe('BlocoSteam — Atualizar e Desvincular', () => {
+describe('BlocoPlataforma — Atualizar e Desvincular', () => {
   it('Atualizar chama o POST, mostra "Atualizando…" e troca os dados', async () => {
     api.detalheDoJogo.mockResolvedValue(detalhe());
     let resolver: (valor: DetalheJogoPlataforma) => void = () => undefined;
@@ -401,17 +401,17 @@ describe('BlocoSteam — Atualizar e Desvincular', () => {
   });
 });
 
-describe('BlocoSteam — seção recolhível (spec plataformas-e-pagina-do-jogo, F2)', () => {
+describe('BlocoPlataforma — seção recolhível (spec plataformas-e-pagina-do-jogo, F2)', () => {
   beforeEach(() => storage.raw.removeAllWithPrefix('checkpoint:'));
 
-  it('o título é a logo oficial sozinha (nome acessível "Steam", >= 50 px) e a linha fechada resume horas e conquistas', async () => {
+  it('o título é o símbolo com o nome em texto (sem imagem de marca) e a linha fechada resume horas e conquistas', async () => {
     api.detalheDoJogo.mockResolvedValue(detalhe());
     const { container } = abrir();
 
     const titulo = await screen.findByRole('heading', { level: 2, name: 'Steam' });
-    const logo = within(titulo).getByRole('img', { name: 'Steam' });
-    expect(Number(logo.getAttribute('height'))).toBeGreaterThanOrEqual(50);
-    expect(titulo).toHaveTextContent('');
+    expect(titulo.querySelector('[data-plataforma-marcador="STEAM"]')).not.toBeNull();
+    expect(titulo.querySelector('img')).toBeNull();
+    expect(titulo).toHaveTextContent('Steam');
     expect(
       within(container.querySelector('summary') as HTMLElement).getByText(
         '42 h 30 min · 12/40 conquistas',

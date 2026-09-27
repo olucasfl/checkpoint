@@ -56,6 +56,7 @@ export const CONTA: Record<keyof ContaVinculada, Tipo> = {
   idExterno: 'string',
   nomeExibicao: 'string',
   vinculadaEm: 'iso',
+  estado: 'string',
 };
 
 export const JOGO_PARECIDO: Record<keyof JogoParecido, Tipo> = {
@@ -68,6 +69,7 @@ export const ITEM_BIBLIOTECA: Record<keyof ItemBiblioteca, Tipo> = {
   idExterno: 'string',
   titulo: 'string',
   capaUrl: 'string?',
+  plataformaSugerida: 'string?',
   minutosJogados: 'number',
   ultimaVezJogadoEm: 'iso?',
   jogosParecidos: { lista: JOGO_PARECIDO },

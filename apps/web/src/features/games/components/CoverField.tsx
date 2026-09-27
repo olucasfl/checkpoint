@@ -12,8 +12,10 @@ interface CoverFieldProps {
   file: File | null;
   /** A capa atual foi marcada para sair ao salvar. */
   removing: boolean;
-  /** Capa oficial do item da Steam escolhido: só PRÉVIA (não é salva com o jogo). */
+  /** Capa oficial do item da plataforma escolhido: só PRÉVIA (não é salva com o jogo). */
   oficialUrl?: string | null;
+  /** De quem é a capa oficial, com o artigo ("da Steam", "da PlayStation"), para o texto da prévia. */
+  oficialDe?: string;
   error: string | undefined;
   onPick: (file: File) => void;
   onProblem: (message: string) => void;
@@ -33,6 +35,7 @@ export function CoverField({
   file,
   removing,
   oficialUrl = null,
+  oficialDe = 'da plataforma',
   error,
   onPick,
   onProblem,
@@ -107,7 +110,7 @@ export function CoverField({
             </button>
           </div>
           {mostrandoOficial && (
-            <span className="text-sm font-semibold">Prévia da capa oficial da Steam</span>
+            <span className="text-sm font-semibold">Prévia da capa oficial {oficialDe}</span>
           )}
           <span className="text-sm text-texto-suave">
             Envie um arquivo (JPEG, PNG ou WebP, até 2 MB) para usar a sua.

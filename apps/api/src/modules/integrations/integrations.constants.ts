@@ -60,3 +60,19 @@ export const BIBLIOTECA_BUSCA_MAX = 100;
 
 /** Quantos jogos do catálogo com o mesmo título um item da biblioteca sugere ("já no seu catálogo"). */
 export const MAX_JOGOS_PARECIDOS = 3;
+
+// PlayStation (spec integracao-playstation): API não oficial, atrás do `PsnClient`.
+/** Cada chamada à Sony desiste depois disso (o pacote não tem timeout; ver `PsnClient`). */
+export const PSN_REQUEST_TIMEOUT_MS = 8_000;
+
+/** Quantos itens a biblioteca pede por página e quantas páginas no máximo (um laço nunca vira tempestade). */
+export const PSN_PAGINA_TAMANHO = 100;
+export const PSN_PAGINAS_MAXIMAS = 10;
+
+/** Definições de troféu e o mapa `titleId → npCommunicationId` são dado do jogo (dividido entre usuários). */
+export const PSN_DEFINICOES_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+export const PSN_MAPA_TITULO_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+export const PSN_GANHOS_CACHE_TTL_MS = 5 * 60 * 1000;
+
+/** Folga antes de o access token vencer: renova um pouco antes para nunca mandar um token no limite. */
+export const PSN_TOKEN_FOLGA_MS = 60 * 1000;

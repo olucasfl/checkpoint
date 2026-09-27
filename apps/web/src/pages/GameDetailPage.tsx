@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { type Provedor } from '@checkpoint/shared';
 import { Icon } from '@/shared/components/Icon';
 import { ModalDialog } from '@/shared/components/ModalDialog';
 import { useConnectivity } from '@/shared/hooks/use-connectivity';
@@ -8,8 +9,8 @@ import { DeleteGameDialog } from '@/features/games/components/DeleteGameDialog';
 import { DetailLoading, GameNotFound } from '@/features/games/components/DetailStates';
 import { GameDetail } from '@/features/games/components/GameDetail';
 import { GameForm } from '@/features/games/components/GameForm';
-import { useTemContaSteam } from '@/features/integracoes/api/use-integracoes';
-import { BibliotecaSteamDialog } from '@/features/integracoes/components/BibliotecaSteamDialog';
+import { usePlataformasComBiblioteca } from '@/features/integracoes/api/use-integracoes';
+import { BibliotecaPlataformaDialog } from '@/features/integracoes/components/BibliotecaPlataformaDialog';
 import { ListError } from '@/features/games/components/ListStates';
 import { avisarDoSalvar } from '@/features/games/lib/avisar-do-salvar';
 
@@ -27,10 +28,14 @@ export function GameDetailPage() {
   const { data, isPending, isError, refetch } = useGames();
   const [editing, setEditing] = useState(false);
   const [removing, setRemoving] = useState(false);
-  const [vinculando, setVinculando] = useState(false);
-  const temContaSteam = useTemContaSteam();
+  const [vinculando, setVinculando] = useState<Provedor | null>(null);
+  const plataformas = usePlataformasComBiblioteca();
 
   const game = data?.find((candidate) => candidate.id === id);
+  // O vínculo é 1 para 1 POR plataforma: as que a pessoa tem e este jogo ainda não tem.
+  const semVinculo = (plataformas ?? []).filter(
+    (plataforma) => !game?.dadosPlataforma.some((dados) => dados.provedor === plataforma.id),
+  );
 
   // Voltar desfaz a navegação quando ela veio do app (o catálogo reaparece com o filtro que estava); num
   // link direto (`key` "default", sem histórico do app) vai ao catálogo.
@@ -54,10 +59,10 @@ export function GameDetailPage() {
           Voltar
         </button>
 
-        {game && temContaSteam === false && game.dadosPlataforma.length === 0 && (
+        {game && plataformas?.length === 0 && game.dadosPlataforma.length === 0 && (
           <p className="m-0 text-[16px] text-texto-suave">
             <Link to="/perfil" className="font-semibold text-destaque underline">
-              Vincule sua Steam no perfil
+              Vincule sua conta no perfil
             </Link>{' '}
             para ligar este jogo à sua biblioteca.
           </p>
@@ -75,15 +80,20 @@ export function GameDetailPage() {
             onEdit={() => setEditing(true)}
             onRemove={() => setRemoving(true)}
             acoesExtras={
-              temContaSteam === true && game.dadosPlataforma.length === 0 ? (
-                <button
-                  type="button"
-                  onClick={() => setVinculando(true)}
-                  className="flex h-12 items-center gap-2 rounded-full border border-borda-controle px-[22px] font-display text-[15px] font-bold transition-colors hover:bg-painel-3"
-                >
-                  <Icon name="link" size={20} />
-                  Vincular à Steam
-                </button>
+              semVinculo.length > 0 ? (
+                <>
+                  {semVinculo.map((plataforma) => (
+                    <button
+                      key={plataforma.id}
+                      type="button"
+                      onClick={() => setVinculando(plataforma.id as Provedor)}
+                      className="flex h-12 items-center gap-2 rounded-full border border-borda-controle px-[22px] font-display text-[15px] font-bold transition-colors hover:bg-painel-3"
+                    >
+                      <Icon name="link" size={20} />
+                      Vincular {plataforma.ligadoA}
+                    </button>
+                  ))}
+                </>
               ) : null
             }
           />
@@ -103,14 +113,17 @@ export function GameDetailPage() {
         )}
       </ModalDialog>
 
-      {game && (
-        <BibliotecaSteamDialog
-          open={vinculando}
-          modo={{ tipo: 'vincular', jogo: game }}
-          onClose={() => setVinculando(false)}
-          onVinculado={() => setVinculando(false)}
-        />
-      )}
+      {game &&
+        (plataformas ?? []).map((plataforma) => (
+          <BibliotecaPlataformaDialog
+            key={plataforma.id}
+            provedor={plataforma.id as Provedor}
+            open={vinculando === plataforma.id}
+            modo={{ tipo: 'vincular', jogo: game }}
+            onClose={() => setVinculando(null)}
+            onVinculado={() => setVinculando(null)}
+          />
+        ))}
 
       <DeleteGameDialog
         game={removing ? (game ?? null) : null}

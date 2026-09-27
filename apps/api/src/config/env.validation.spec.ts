@@ -261,3 +261,34 @@ describe('validateEnv — TRUST_PROXY_HOPS (opcional, saltos de proxy confiávei
     },
   );
 });
+
+describe('validateEnv — PSN_TOKEN_ENCRYPTION_KEY (spec integracao-playstation, CA-04)', () => {
+  // 64 hexadecimais óbvios, nunca uma chave real.
+  const CHAVE = '0123456789abcdef'.repeat(4);
+
+  it('é OPCIONAL: ausente ou vazia, o app sobe (a PlayStation fica desligada)', () => {
+    expect(() => validateEnv(valid)).not.toThrow();
+    expect(() => validateEnv({ ...valid, PSN_TOKEN_ENCRYPTION_KEY: '' })).not.toThrow();
+  });
+
+  it('presente e válida (64 hexadecimais): aceita', () => {
+    expect(validateEnv({ ...valid, PSN_TOKEN_ENCRYPTION_KEY: CHAVE })).toMatchObject({
+      PSN_TOKEN_ENCRYPTION_KEY: CHAVE,
+    });
+    expect(() =>
+      validateEnv({ ...valid, PSN_TOKEN_ENCRYPTION_KEY: CHAVE.toUpperCase() }),
+    ).not.toThrow();
+  });
+
+  it.each([
+    ['curta', CHAVE.slice(0, 62)],
+    ['longa', `${CHAVE}00`],
+    ['fora do hexadecimal', `${CHAVE.slice(0, 63)}z`],
+    ['com espaço', ` ${CHAVE.slice(1)}`],
+  ])('presente e malformada (%s): o boot FALHA, sem imprimir o valor', (_nome, chave) => {
+    const mensagem = messageOf({ ...valid, PSN_TOKEN_ENCRYPTION_KEY: chave });
+
+    expect(mensagem).toContain('PSN_TOKEN_ENCRYPTION_KEY');
+    expect(mensagem).not.toContain(chave.trim());
+  });
+});

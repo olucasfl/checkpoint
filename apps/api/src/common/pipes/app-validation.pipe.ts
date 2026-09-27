@@ -22,6 +22,7 @@ const FIELDS: readonly ApiErrorField[] = [
   'limite',
   'nuncaJogados',
   'idExterno',
+  'credencial',
   'mover',
 ];
 

@@ -15,13 +15,19 @@ export function horasCurtas(minutos: number): string {
     : `${NUMERO.format(Math.floor(horas))} h`;
 }
 
-/** "12 conquistas em 3 jogos vinculados" (singular quando é 1; zero é plural, como em "0 conquistas"). */
-export function textoDasConquistas(conquistas: {
-  desbloqueadas: number;
-  jogosVinculados: number;
-}): string {
+/** "12 conquistas em 3 jogos vinculados" ("troféus" na PlayStation; singular quando é 1; zero é plural). */
+export function textoDasConquistas(
+  conquistas: {
+    desbloqueadas: number;
+    jogosVinculados: number;
+  },
+  vocabulario: { conquista: string; conquistas: string } = {
+    conquista: 'conquista',
+    conquistas: 'conquistas',
+  },
+): string {
   const { desbloqueadas, jogosVinculados } = conquistas;
-  const primeira = desbloqueadas === 1 ? 'conquista' : 'conquistas';
+  const primeira = desbloqueadas === 1 ? vocabulario.conquista : vocabulario.conquistas;
   const segunda = jogosVinculados === 1 ? 'jogo vinculado' : 'jogos vinculados';
   return `${desbloqueadas} ${primeira} em ${jogosVinculados} ${segunda}`;
 }

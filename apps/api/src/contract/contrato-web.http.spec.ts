@@ -87,6 +87,7 @@ const CONTA: Record<keyof ContaVinculada, Tipo> = {
   idExterno: 'string',
   nomeExibicao: 'string',
   vinculadaEm: 'iso',
+  estado: 'string',
 };
 
 const JOGO_PARECIDO: Record<keyof JogoParecido, Tipo> = {
@@ -99,6 +100,7 @@ const ITEM_BIBLIOTECA: Record<keyof ItemBiblioteca, Tipo> = {
   idExterno: 'string',
   titulo: 'string',
   capaUrl: 'string?',
+  plataformaSugerida: 'string?',
   minutosJogados: 'number',
   ultimaVezJogadoEm: 'iso?',
   jogosParecidos: { lista: JOGO_PARECIDO },
@@ -139,6 +141,14 @@ const RESUMO: Record<keyof ResumoContaPlataforma, Tipo> = {
   noCheckpoint: { objeto: { ligados: 'number', naBiblioteca: 'number' } },
   conquistas: {
     objeto: { desbloqueadas: 'number', total: 'number', jogosVinculados: 'number' },
+  },
+  nivel: {
+    objeto: { valor: 'number', progressoPercentual: 'number?', faixa: 'number?' },
+    nulo: true,
+  },
+  trofeus: {
+    objeto: { platina: 'number', ouro: 'number', prata: 'number', bronze: 'number' },
+    nulo: true,
   },
   consultadoEm: 'iso',
 };

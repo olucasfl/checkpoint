@@ -1,5 +1,11 @@
 import { useEffect, useState } from 'react';
-import { type Game, type ItemBiblioteca } from '@checkpoint/shared';
+import {
+  PLATAFORMAS,
+  type Game,
+  type ItemBiblioteca,
+  type PlataformaInfo,
+  type Provedor,
+} from '@checkpoint/shared';
 import { FieldError, LABEL, inputClass } from '@/shared/components/form-parts';
 import { ModalDialog } from '@/shared/components/ModalDialog';
 import { describeAuthError } from '@/features/auth/lib/auth-errors';
@@ -7,14 +13,19 @@ import { useGames } from '@/features/games/api/use-games';
 import { Chek } from '@/shared/components/Chek/Chek';
 import { Icon } from '@/shared/components/Icon';
 import { PlataformaMarca } from '@/shared/components/PlataformaMarca';
-import { PROVEDOR_STEAM } from '../lib/provedores';
 import { useBiblioteca, useVincularJogo } from '../api/use-integracoes';
 import { jogoAtualDoErro, precisaConfirmarPlataforma } from '../lib/biblioteca';
+import {
+  comPlataforma,
+  dePlataforma,
+  horasEConquistas,
+  naPlataforma,
+  textoDaConfirmacaoDePlataforma,
+} from '../lib/plataforma-texto';
 import { classificarFalhaDoCartao } from '../lib/estado-do-cartao';
 import { horasCurtas } from '../lib/format';
 import { avisar } from '@/shared/lib/avisos';
 
-const PROVEDOR = PROVEDOR_STEAM;
 const BUSCA_ATRASO_MS = 300;
 
 const BOTAO =
@@ -32,7 +43,9 @@ interface AlvoDoVinculo {
   plataforma: string | null;
 }
 
-interface BibliotecaSteamDialogProps {
+interface BibliotecaPlataformaDialogProps {
+  /** De qual plataforma é a biblioteca (Steam, PlayStation…): os textos e o formato da capa saem do cadastro. */
+  provedor: Provedor;
   /** O backlog: só os itens nunca abertos (0 minutos). */
   soNuncaJogados?: boolean;
   open: boolean;
@@ -50,17 +63,23 @@ interface Conflito {
   jogoAtual: { id: string; titulo: string };
 }
 
-/** A capa tem a proporção exata da imagem de cabeçalho da Steam (460x215): nada é cortado. */
-function Capa({ url }: { url: string | null }) {
+/**
+ * A capa tem a proporção da imagem que a plataforma entrega (Steam: cabeçalho 460x215; PlayStation: o ícone quadrado
+ * do jogo), então nada é cortado. O formato vem do cadastro (`capaNaBusca`).
+ */
+function Capa({ url, formato }: { url: string | null; formato: PlataformaInfo['capaNaBusca'] }) {
+  const quadrada = formato === 'quadrada';
   return (
-    <div className="aspect-[460/215] w-[120px] shrink-0 overflow-hidden rounded-lg bg-painel-3 shadow-[0_4px_14px_rgb(0_0_0/0.35)] sm:w-[148px]">
+    <div
+      className={`${quadrada ? 'aspect-square w-[72px] sm:w-[84px]' : 'aspect-[460/215] w-[120px] sm:w-[148px]'} shrink-0 overflow-hidden rounded-lg bg-painel-3 shadow-[0_4px_14px_rgb(0_0_0/0.35)]`}
+    >
       {url ? (
-        // Decorativa (o título está ao lado) e sem `Referer`: a imagem vem de um domínio da Steam.
+        // Decorativa (o título está ao lado) e sem `Referer`: a imagem vem de um domínio da plataforma.
         <img
           src={url}
           alt=""
-          width={460}
-          height={215}
+          width={quadrada ? 84 : 460}
+          height={quadrada ? 84 : 215}
           loading="lazy"
           referrerPolicy="no-referrer"
           className="size-full object-cover transition-transform duration-[var(--mov-enfase)] ease-[var(--ease-entrada)] group-hover:scale-105"
@@ -72,16 +91,21 @@ function Capa({ url }: { url: string | null }) {
 
 function SeletorDeJogo({
   item,
+  plataforma,
   ocupado,
   onEscolher,
 }: {
   item: ItemBiblioteca;
+  plataforma: PlataformaInfo;
   ocupado: boolean;
   onEscolher: (alvo: AlvoDoVinculo) => void;
 }) {
   const jogos = useGames();
   const [escolhido, setEscolhido] = useState('');
-  const semVinculo = (jogos.data ?? []).filter((jogo) => jogo.dadosPlataforma.length === 0);
+  // O vínculo é 1 para 1 POR plataforma: um jogo já ligado à Steam ainda pode ser ligado à PlayStation.
+  const semVinculo = (jogos.data ?? []).filter(
+    (jogo) => !jogo.dadosPlataforma.some((dados) => dados.provedor === plataforma.id),
+  );
   const id = `outro-jogo-${item.idExterno}`;
 
   if (jogos.isPending) {
@@ -90,7 +114,7 @@ function SeletorDeJogo({
   if (semVinculo.length === 0) {
     return (
       <p className="m-0 text-[16px] text-texto-suave">
-        Você não tem jogos sem vínculo com a Steam.
+        Você não tem jogos sem vínculo {comPlataforma(plataforma)}.
       </p>
     );
   }
@@ -131,6 +155,7 @@ function SeletorDeJogo({
 
 function ItemDaLista({
   item,
+  plataforma,
   modo,
   ocupado,
   onCriar,
@@ -138,6 +163,7 @@ function ItemDaLista({
   indice,
 }: {
   indice: number;
+  plataforma: PlataformaInfo;
   item: ItemBiblioteca;
   modo: ModoBiblioteca;
   ocupado: boolean;
@@ -154,7 +180,7 @@ function ItemDaLista({
       className="update-in group flex flex-col gap-3 rounded-2xl border border-borda bg-painel-2 p-3 transition-[transform,border-color] duration-[var(--mov-padrao)] ease-[var(--ease-entrada)] hover:-translate-y-0.5 hover:border-borda-controle"
     >
       <div className="flex min-w-0 items-center gap-3.5">
-        <Capa url={item.capaUrl} />
+        <Capa url={item.capaUrl} formato={plataforma.capaNaBusca} />
         <div className="flex min-w-0 flex-col gap-1">
           <span className="font-display text-[18px] font-bold leading-tight tracking-[-0.01em] [overflow-wrap:anywhere]">
             {item.titulo}
@@ -236,6 +262,7 @@ function ItemDaLista({
           {escolhendoOutro && (
             <SeletorDeJogo
               item={item}
+              plataforma={plataforma}
               ocupado={ocupado}
               onEscolher={(alvo) => onVincular(alvo, item)}
             />
@@ -249,10 +276,12 @@ function ItemDaLista({
 function ConfirmarPlataforma({
   alvo,
   item,
+  plataforma,
   onConfirmar,
   onVoltar,
   ocupado,
 }: {
+  plataforma: PlataformaInfo;
   alvo: AlvoDoVinculo;
   item: ItemBiblioteca;
   onConfirmar: () => void;
@@ -262,8 +291,8 @@ function ConfirmarPlataforma({
   return (
     <div role="group" aria-label="Confirmar a plataforma" className="flex flex-col gap-4">
       <p className="m-0 text-[19px]">
-        «{alvo.titulo}» é um jogo de {alvo.plataforma}. Ao ligá-lo a «{item.titulo}», as horas e as
-        conquistas mostradas serão as da Steam. A plataforma do jogo não muda.
+        «{alvo.titulo}» é um jogo de {alvo.plataforma}. Ao ligá-lo a «{item.titulo}»,{' '}
+        {textoDaConfirmacaoDePlataforma(plataforma)}. A plataforma do jogo não muda.
       </p>
       <div className="flex flex-wrap justify-end gap-2.5">
         <button
@@ -289,11 +318,13 @@ function ConfirmarPlataforma({
 
 function ConflitoDeVinculo({
   conflito,
+  plataforma,
   onMover,
   onVoltar,
   ocupado,
 }: {
   conflito: Conflito;
+  plataforma: PlataformaInfo;
   onMover: () => void;
   onVoltar: () => void;
   ocupado: boolean;
@@ -302,8 +333,9 @@ function ConflitoDeVinculo({
     <div role="group" aria-label="Item já ligado a outro jogo" className="flex flex-col gap-4">
       <p className="m-0 text-[19px]">
         «{conflito.item.titulo}» já está ligado a «{conflito.jogoAtual.titulo}». Se você mover o
-        vínculo, «{conflito.jogoAtual.titulo}» perde as horas e as conquistas da Steam e «
-        {conflito.alvo.titulo}» passa a mostrá-las. Nada é copiado nem apagado dos jogos.
+        vínculo, «{conflito.jogoAtual.titulo}» perde {horasEConquistas(plataforma)}{' '}
+        {dePlataforma(plataforma)} e «{conflito.alvo.titulo}» passa a mostrá-las. Nada é copiado nem
+        apagado dos jogos.
       </p>
       <div className="flex flex-wrap justify-end gap-2.5">
         <button
@@ -328,12 +360,14 @@ function ConflitoDeVinculo({
 }
 
 function Conteudo({
+  provedor,
   modo,
   onClose,
   onCriar,
   onVinculado,
   soNuncaJogados = false,
-}: Omit<BibliotecaSteamDialogProps, 'open'>) {
+}: Omit<BibliotecaPlataformaDialogProps, 'open'>) {
+  const plataforma = PLATAFORMAS[provedor];
   const [busca, setBusca] = useState('');
   const [buscaAplicada, setBuscaAplicada] = useState('');
   const [pendente, setPendente] = useState<{ alvo: AlvoDoVinculo; item: ItemBiblioteca } | null>(
@@ -341,8 +375,8 @@ function Conteudo({
   );
   const [conflito, setConflito] = useState<Conflito | null>(null);
   const [erro, setErro] = useState('');
-  const biblioteca = useBiblioteca(PROVEDOR, buscaAplicada, true, soNuncaJogados);
-  const vincular = useVincularJogo(PROVEDOR);
+  const biblioteca = useBiblioteca(provedor, buscaAplicada, true, soNuncaJogados);
+  const vincular = useVincularJogo(provedor);
 
   // O debounce evita uma consulta por tecla: a busca só vai à API 300 ms depois de a pessoa parar de digitar.
   useEffect(() => {
@@ -354,7 +388,7 @@ function Conteudo({
     setErro('');
     try {
       await vincular.mutateAsync({ jogoId: alvo.id, idExterno: item.idExterno, mover });
-      avisar({ texto: 'Jogo vinculado à Steam.' });
+      avisar({ texto: `Jogo vinculado ${plataforma.ligadoA}.` });
       onVinculado(alvo.id);
     } catch (failure) {
       const jogoAtual = jogoAtualDoErro(failure);
@@ -370,7 +404,7 @@ function Conteudo({
 
   function pedirVinculo(alvo: AlvoDoVinculo, item: ItemBiblioteca) {
     setErro('');
-    if (precisaConfirmarPlataforma(alvo.plataforma)) {
+    if (precisaConfirmarPlataforma(alvo.plataforma, plataforma)) {
       setPendente({ alvo, item });
       return;
     }
@@ -379,17 +413,18 @@ function Conteudo({
 
   const falha = biblioteca.isError ? classificarFalhaDoCartao(biblioteca.error) : undefined;
   const itens = biblioteca.data ?? [];
-  const titulo = modo.tipo === 'novo' ? 'Buscar na Steam' : 'Vincular à Steam';
+  const titulo =
+    modo.tipo === 'novo' ? `Buscar ${naPlataforma(plataforma)}` : `Vincular ${plataforma.ligadoA}`;
 
   return (
     <div className="sheet-pad flex max-h-[85dvh] flex-col gap-4 overflow-y-auto px-5 pt-6">
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 flex-col gap-1">
           <h2
-            id="biblioteca-steam-titulo"
+            id="biblioteca-plataforma-titulo"
             className="m-0 flex items-center gap-2 font-display text-xl font-extrabold tracking-[-0.01em] text-destaque"
           >
-            <PlataformaMarca provedor={PROVEDOR} variante="marcador" tamanho="g" decorativa />
+            <PlataformaMarca provedor={provedor} variante="marcador" tamanho="g" decorativa />
             {titulo}
           </h2>
           <p className="m-0 text-[16px] text-texto-suave">
@@ -397,7 +432,7 @@ function Conteudo({
               ? 'Só os jogos que você nunca abriu. Escolha um para criar ou ligar a um jogo seu.'
               : modo.tipo === 'novo'
                 ? 'Escolha um jogo da sua biblioteca para criar ou ligar a um jogo seu.'
-                : `Escolha o jogo da Steam que é «${modo.jogo.titulo}».`}
+                : `Escolha o jogo ${dePlataforma(plataforma)} que é «${modo.jogo.titulo}».`}
           </p>
         </div>
         <button type="button" onClick={onClose} className={`${BOTAO_CONTORNO} shrink-0`}>
@@ -407,6 +442,7 @@ function Conteudo({
 
       {pendente ? (
         <ConfirmarPlataforma
+          plataforma={plataforma}
           alvo={pendente.alvo}
           item={pendente.item}
           ocupado={vincular.isPending}
@@ -415,6 +451,7 @@ function Conteudo({
         />
       ) : conflito ? (
         <ConflitoDeVinculo
+          plataforma={plataforma}
           conflito={conflito}
           ocupado={vincular.isPending}
           onVoltar={() => setConflito(null)}
@@ -423,11 +460,11 @@ function Conteudo({
       ) : (
         <>
           <div className="flex flex-col gap-2">
-            <label htmlFor="biblioteca-steam-busca" className={LABEL}>
+            <label htmlFor="biblioteca-plataforma-busca" className={LABEL}>
               Buscar por título
             </label>
             <input
-              id="biblioteca-steam-busca"
+              id="biblioteca-plataforma-busca"
               type="search"
               value={busca}
               maxLength={100}
@@ -438,7 +475,7 @@ function Conteudo({
             />
           </div>
 
-          <FieldError id="biblioteca-steam-erro" message={erro} />
+          <FieldError id="biblioteca-plataforma-erro" message={erro} />
 
           {biblioteca.isPending && (
             <div role="status" aria-busy="true" className="flex flex-col gap-2.5">
@@ -468,18 +505,22 @@ function Conteudo({
             <div className="flex flex-col items-center gap-3 py-4 text-center">
               <Chek expressao="cadeado" altura={72} />
               <p role="alert" className="m-0 text-[16px] font-semibold text-ouro">
-                Seu perfil Steam está privado. Deixe o perfil e os detalhes do jogo públicos (o
-                passo a passo está no seu Perfil) e tente de novo.
+                Seu perfil {plataforma.nome} está privado.{' '}
+                {plataforma.privacidade
+                  ? 'Deixe o perfil e os detalhes do jogo públicos (o passo a passo está no seu Perfil) e tente de novo.'
+                  : 'Deixe-o público e tente de novo.'}
               </p>
             </div>
           )}
-          {(falha === 'erro' || falha === 'sem-conexao') && (
+          {(falha === 'erro' || falha === 'sem-conexao' || falha === 'reautenticar') && (
             <FieldError
-              id="biblioteca-steam-falha"
+              id="biblioteca-plataforma-falha"
               message={
                 falha === 'sem-conexao'
                   ? 'Sem conexão. Tente de novo quando a conexão voltar.'
-                  : 'Não foi possível falar com a Steam agora.'
+                  : falha === 'reautenticar'
+                    ? `Sua conexão ${comPlataforma(plataforma)} expirou. Reconecte a conta no perfil.`
+                    : `Não foi possível falar ${comPlataforma(plataforma)} agora.`
               }
             />
           )}
@@ -500,16 +541,20 @@ function Conteudo({
                 {buscaAplicada
                   ? `Nenhum jogo encontrado para «${buscaAplicada}».`
                   : soNuncaJogados
-                    ? 'Você não tem jogos nunca abertos na Steam.'
-                    : 'Sua biblioteca da Steam está vazia.'}
+                    ? `Você não tem jogos nunca abertos ${naPlataforma(plataforma)}.`
+                    : `Sua biblioteca ${dePlataforma(plataforma)} está vazia.`}
               </p>
             </div>
           )}
           {itens.length > 0 && (
-            <ul aria-label="Jogos da Steam" className="m-0 flex list-none flex-col gap-3 p-0">
+            <ul
+              aria-label={`Jogos ${dePlataforma(plataforma)}`}
+              className="m-0 flex list-none flex-col gap-3 p-0"
+            >
               {itens.map((item, indice) => (
                 <ItemDaLista
                   key={item.idExterno}
+                  plataforma={plataforma}
                   indice={indice}
                   item={item}
                   modo={modo}
@@ -527,15 +572,16 @@ function Conteudo({
 }
 
 /**
- * A biblioteca da Steam num diálogo (spec `integracao-plataformas`, etapa 3). No modo `novo`, cada item vira
+ * A biblioteca de uma plataforma num diálogo (spec `integracao-plataformas`, etapa 3; genérica por `provedor` na spec
+ * `integracao-playstation`, F2: "Buscar na Steam", "Buscar na PlayStation"). No modo `novo`, cada item vira
  * "Criar jogo" (ou "Criar outro jogo", quando já há jogos parecidos no catálogo, que ganham "Vincular a este") e há
  * "Vincular a outro jogo que já tenho", com todos os jogos sem vínculo. No modo `vincular`, o jogo já está
  * escolhido. NUNCA vincula sozinho: todo vínculo é um clique. Jogo de outra plataforma pede confirmação; item já
  * ligado a outro jogo oferece "Mover o vínculo" (a API só move com `mover: true`).
  */
-export function BibliotecaSteamDialog({ open, ...resto }: BibliotecaSteamDialogProps) {
+export function BibliotecaPlataformaDialog({ open, ...resto }: BibliotecaPlataformaDialogProps) {
   return (
-    <ModalDialog open={open} onClose={resto.onClose} labelledBy="biblioteca-steam-titulo">
+    <ModalDialog open={open} onClose={resto.onClose} labelledBy="biblioteca-plataforma-titulo">
       <Conteudo {...resto} />
     </ModalDialog>
   );

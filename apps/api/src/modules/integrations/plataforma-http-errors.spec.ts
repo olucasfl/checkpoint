@@ -32,7 +32,7 @@ describe('plataformaHttpError — domínio → HTTP (CA-20, CA-21)', () => {
   });
 
   it.each([
-    ['ID malformado', new IdExternoInvalidoError('steamId', 'x')],
+    ['ID malformado', new IdExternoInvalidoError('idConta', 'x')],
     ['provedor desconhecido', new ProvedorNaoSuportadoError('xbox')],
   ])('%s → 400 VALIDACAO', (_nome, erro) => {
     const http = plataformaHttpError(erro);

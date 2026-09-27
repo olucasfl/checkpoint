@@ -11,6 +11,7 @@ import {
   Max,
   Min,
   MinLength,
+  ValidateIf,
   validateSync,
 } from 'class-validator';
 
@@ -126,6 +127,21 @@ export class EnvironmentVariables {
     message: 'STEAM_API_KEY deve ter 32 caracteres hexadecimais (a chave da Steam Web API)',
   })
   STEAM_API_KEY: string;
+
+  /**
+   * Chave do AES-256-GCM que cifra o refresh token da PlayStation (spec integracao-playstation): 64
+   * hexadecimais (32 bytes). OPCIONAL: ausente (ou vazia), a PlayStation fica desligada e o resto do app sobe;
+   * presente e malformada, o boot falha. SÓ o backend a usa; a mensagem de erro não ecoa o valor.
+   */
+  @ValidateIf(
+    (o: EnvironmentVariables) =>
+      o.PSN_TOKEN_ENCRYPTION_KEY !== undefined && o.PSN_TOKEN_ENCRYPTION_KEY !== '',
+  )
+  @Matches(/^[0-9a-fA-F]{64}$/, {
+    message:
+      'PSN_TOKEN_ENCRYPTION_KEY deve ter 64 caracteres hexadecimais (32 bytes) ou ficar ausente',
+  })
+  PSN_TOKEN_ENCRYPTION_KEY?: string;
 
   /**
    * Endereço em que o NAVEGADOR alcança a API, usado no `return_to` e no `realm` do OpenID da Steam. Em

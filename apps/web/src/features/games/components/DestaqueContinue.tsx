@@ -77,14 +77,14 @@ export function DestaqueContinue({ game }: { game: Game }) {
             <span className={CHIP}>
               <Icon name="schedule" size={16} />
               <span className="max-md:hidden">{chips.horas}</span>
-              <span className="md:hidden">{chips.horas.replace(' na Steam', '')}</span>
+              <span className="md:hidden">{chips.horasCurtas}</span>
             </span>
           )}
           {chips.conquistas && (
             <span className={CHIP}>
               <Icon name="military_tech" size={16} filled className="text-ouro" />
               <span className="max-md:hidden">{chips.conquistas}</span>
-              <span className="md:hidden">{chips.conquistas.replace(' conquistas', '')}</span>
+              <span className="md:hidden">{chips.conquistas.replace(/ \S+$/, '')}</span>
             </span>
           )}
         </div>

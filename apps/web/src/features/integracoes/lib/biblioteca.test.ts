@@ -1,10 +1,10 @@
 import { AxiosError } from 'axios';
-import { chaveDeTitulo } from '@checkpoint/shared';
+import { PLATAFORMAS, chaveDeTitulo } from '@checkpoint/shared';
 import { describe, expect, it } from 'vitest';
 import {
-  PLATAFORMA_PADRAO,
   TITULO_MAX,
   jogoAtualDoErro,
+  plataformaDoNovoJogo,
   precisaConfirmarPlataforma,
   statusSugerido,
   tituloDoItem,
@@ -31,20 +31,48 @@ describe('statusSugerido (nunca Zerado)', () => {
   });
 });
 
-describe('precisaConfirmarPlataforma', () => {
-  it.each([null, undefined, '', '   ', 'PC', 'pc', ' PC '])('%j não pede confirmação', (valor) => {
-    expect(precisaConfirmarPlataforma(valor)).toBe(false);
-  });
-
-  it.each(['PS5', 'Nintendo Switch', 'Steam Deck', 'PlayStation'])(
-    '%s pede confirmação',
+describe('precisaConfirmarPlataforma (pelo cadastro)', () => {
+  it.each([null, undefined, '', '   ', 'PC', 'pc', ' PC ', 'Steam Deck'])(
+    'Steam: %j não pede confirmação',
     (valor) => {
-      expect(precisaConfirmarPlataforma(valor)).toBe(true);
+      expect(precisaConfirmarPlataforma(valor, PLATAFORMAS.STEAM)).toBe(false);
     },
   );
 
-  it('a plataforma padrão do jogo novo é PC', () => {
-    expect(PLATAFORMA_PADRAO).toBe('PC');
+  it.each(['PS5', 'Nintendo Switch', 'PlayStation', 'Xbox One'])(
+    'Steam: %s pede confirmação',
+    (valor) => {
+      expect(precisaConfirmarPlataforma(valor, PLATAFORMAS.STEAM)).toBe(true);
+    },
+  );
+
+  it.each([null, '', 'PS5', 'ps4', ' PS3 ', 'PSP', 'PS1', 'PS2'])(
+    'PlayStation: %j não pede confirmação',
+    (valor) => {
+      expect(precisaConfirmarPlataforma(valor, PLATAFORMAS.PLAYSTATION)).toBe(false);
+    },
+  );
+
+  it.each(['Xbox One', 'Nintendo Switch', 'PC', 'Steam Deck'])(
+    'PlayStation: %s pede confirmação',
+    (valor) => {
+      expect(precisaConfirmarPlataforma(valor, PLATAFORMAS.PLAYSTATION)).toBe(true);
+    },
+  );
+});
+
+describe('plataformaDoNovoJogo', () => {
+  const item = (plataformaSugerida?: string | null) =>
+    ({ plataformaSugerida }) as Parameters<typeof plataformaDoNovoJogo>[0];
+
+  it('usa a sugestão do item (PS5, PS4…) e, sem ela, a padrão do cadastro', () => {
+    expect(plataformaDoNovoJogo(item('PS5'), PLATAFORMAS.PLAYSTATION)).toBe('PS5');
+    expect(plataformaDoNovoJogo(item(null), PLATAFORMAS.STEAM)).toBe('PC');
+    expect(plataformaDoNovoJogo(item(undefined), PLATAFORMAS.STEAM)).toBe('PC');
+  });
+
+  it('PlayStation sem sugestão (categoria desconhecida) fica vazia, para a pessoa escolher', () => {
+    expect(plataformaDoNovoJogo(item(null), PLATAFORMAS.PLAYSTATION)).toBe('');
   });
 });
 

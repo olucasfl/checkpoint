@@ -416,6 +416,7 @@ describe('Vincular à Steam (spec integracao-plataformas, etapa 3)', () => {
     idExterno: 'STEAMID_SINTETICO',
     nomeExibicao: 'Jogador Sintetico',
     vinculadaEm: '2026-09-25T12:00:00.000Z',
+    estado: 'ativa' as const,
   };
   const dados = {
     provedor: 'STEAM' as const,
@@ -446,7 +447,7 @@ describe('Vincular à Steam (spec integracao-plataformas, etapa 3)', () => {
     await waitFor(() => expect(integracoesApi.listarContas).toHaveBeenCalled());
     expect(screen.queryByRole('button', { name: 'Vincular à Steam' })).toBeNull();
     expect(
-      await screen.findByRole('link', { name: 'Vincule sua Steam no perfil' }),
+      await screen.findByRole('link', { name: 'Vincule sua conta no perfil' }),
     ).toHaveAttribute('href', '/perfil');
   });
 
@@ -458,6 +459,27 @@ describe('Vincular à Steam (spec integracao-plataformas, etapa 3)', () => {
 
     await waitFor(() => expect(integracoesApi.listarContas).toHaveBeenCalled());
     expect(screen.queryByRole('button', { name: 'Vincular à Steam' })).toBeNull();
+  });
+
+  it('com as duas contas: um botão por plataforma; o vínculo é 1 para 1 POR plataforma (ligado à Steam ainda oferece a PlayStation)', async () => {
+    vi.mocked(integracoesApi.listarContas).mockResolvedValue([
+      conta,
+      { ...conta, provedor: 'PLAYSTATION' as const, nomeExibicao: 'conta_exemplo' },
+    ]);
+    vi.mocked(integracoesApi.biblioteca).mockResolvedValue([]);
+    api.list.mockResolvedValue([game({ dadosPlataforma: [dados] })]);
+    const user = renderAt();
+    await screen.findByRole('heading', { level: 1, name: 'Celeste' });
+
+    expect(
+      await screen.findByRole('button', { name: 'Vincular à PlayStation' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Vincular à Steam' })).toBeNull();
+
+    await user.click(screen.getByRole('button', { name: 'Vincular à PlayStation' }));
+    expect(
+      await screen.findByText('Escolha o jogo da PlayStation que é «Celeste».'),
+    ).toBeInTheDocument();
   });
 });
 
@@ -477,6 +499,7 @@ describe('bloco Steam na página do jogo (spec integracao-plataformas, etapa 4)'
     idExterno: 'STEAMID_SINTETICO',
     nomeExibicao: 'Jogador Sintetico',
     vinculadaEm: '2026-09-25T12:00:00.000Z',
+    estado: 'ativa' as const,
   };
 
   it('jogo ligado mostra o bloco Steam; jogo sem ligação não pede o detalhe', async () => {
@@ -555,6 +578,7 @@ describe('ações do jogo com a fonte mais larga (F1 da troca de design)', () =>
         idExterno: 'STEAMID_SINTETICO',
         nomeExibicao: 'Jogador Sintetico',
         vinculadaEm: '2026-09-25T12:00:00.000Z',
+        estado: 'ativa' as const,
       },
     ]);
     renderAt();

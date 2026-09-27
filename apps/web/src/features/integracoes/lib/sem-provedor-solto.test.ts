@@ -1,22 +1,24 @@
 import { describe, expect, it } from 'vitest';
+import { PROVEDORES } from '@checkpoint/shared';
 
-// Todo o código-fonte do web, menos os próprios testes e as fixtures: nenhuma tela decide por "é a Steam?".
+// Todo o código-fonte do web, menos os próprios testes e as fixtures: nenhuma tela decide por "é a Steam?" nem por "é
+// a PlayStation?". Com dois provedores, escolher um à mão é um bug: as telas recebem o provedor por prop ou pelo
+// cadastro (`@checkpoint/shared`).
 const sources = import.meta.glob<string>(
   ['/src/**/*.{ts,tsx}', '!/src/**/*.test.{ts,tsx}', '!/src/test/**'],
   { query: '?raw', import: 'default', eager: true },
 );
 
-/** O único arquivo que escreve o código do provedor à mão (as telas que só falam com a Steam). */
-const EXCECAO = '/src/features/integracoes/lib/provedores.ts';
-
 describe('sem provedor solto nas telas', () => {
-  it("o código 'STEAM' só aparece na exceção nomeada", () => {
-    const achados = Object.entries(sources)
-      .filter(([arquivo]) => arquivo !== EXCECAO)
-      .filter(([, fonte]) => /['"`]STEAM['"`]/.test(fonte))
-      .map(([arquivo]) => arquivo);
-    expect(achados).toEqual([]);
-  });
+  it.each(PROVEDORES)(
+    "o código '%s' não aparece em nenhum arquivo do web (sem exceção)",
+    (codigo) => {
+      const achados = Object.entries(sources)
+        .filter(([, fonte]) => new RegExp(`['"\`]${codigo}['"\`]`).test(fonte))
+        .map(([arquivo]) => arquivo);
+      expect(achados).toEqual([]);
+    },
+  );
 
   it('nenhuma tela compara o provedor com um texto', () => {
     const achados = Object.entries(sources)
@@ -25,7 +27,15 @@ describe('sem provedor solto nas telas', () => {
     expect(achados).toEqual([]);
   });
 
-  it('a exceção existe (senão o teste acima passaria à toa)', () => {
-    expect(Object.keys(sources)).toContain(EXCECAO);
+  it('as constantes do provedor fixo acabaram (PROVEDOR_STEAM, useTemContaSteam)', () => {
+    const achados = Object.entries(sources)
+      .filter(([, fonte]) => /PROVEDOR_STEAM|useTemContaSteam|urlDaSteamSegura/.test(fonte))
+      .map(([arquivo]) => arquivo);
+    expect(achados).toEqual([]);
+  });
+
+  it('o levantamento enxerga o código-fonte (senão os testes acima passariam à toa)', () => {
+    expect(Object.keys(sources).length).toBeGreaterThan(50);
+    expect(Object.keys(sources)).toContain('/src/features/integracoes/api/use-integracoes.ts');
   });
 });

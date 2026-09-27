@@ -191,7 +191,9 @@ implementado.
   `API_PUBLIC_URL` (o endereço em que o **navegador** alcança a API, usado no `return_to`/`realm` do OpenID: em
   produção o domínio da Vercel, por causa do rewrite de `/api`; em dev `http://localhost:3333`) e
   `WEB_PUBLIC_URL` (a origem do web, para onde o retorno do vínculo redireciona), as duas **sem barra final e
-  sem caminho**; falta ou valor inválido **derruba a aplicação** com a
+  sem caminho**; e, **opcional**, `PSN_TOKEN_ENCRYPTION_KEY` (spec `integracao-playstation`: 64 hexadecimais, a chave do AES-256-GCM que
+  cifra o refresh token da PlayStation; **ausente** = a PlayStation fica desligada e o resto do app sobe, com um aviso único no log;
+  **presente e malformada** = o boot falha; a mensagem não ecoa o valor); falta ou valor inválido **derruba a aplicação** com a
   lista de erros. `SUPABASE_SERVICE_ROLE_KEY` também recusa uma chave que comece com
   `sb_publishable_` (a chave pública, sujeita a RLS, com que todo upload falharia com 403). Variável de ambiente nova em `apps/api/.env` **precisa** ganhar um campo aqui, ou
   o `ConfigService` não a expõe (nem para leitura).
@@ -222,6 +224,11 @@ implementado.
   único e sempre normalizado, `senhaHash`) e `RefreshSession` (uma linha por dispositivo logado; o `id` é o
   `sid` dos tokens; guarda só o **SHA-256** do refresh token e o do anterior, mais um rótulo do dispositivo
   derivado do `User-Agent`, sem IP), com `onDelete: Cascade`.
+- **PlayStation** (spec `integracao-playstation`, F1, migration `integracao_playstation`, **só aditiva**): `Provedor` ganhou `PLAYSTATION`
+  (`ALTER TYPE … ADD VALUE`), `ContaVinculada.reautenticarDesde DateTime?` (coluna **nula**: `null` = ativa; preenchida quando a Sony recusa a
+  credencial guardada) e o model **`CredencialPlataforma`** (`contaId @unique` → `ContaVinculada`, `onDelete: Cascade`; `refreshCifrado`,
+  `expiraEm`, `atualizadoEm`), numa **tabela à parte** para que nenhum `select`/`include` de `ContaVinculada` vaze o segredo. O `refreshCifrado`
+  é `v1:<iv>:<tag>:<texto>` (AES-256-GCM, IV por gravação, a conta como AAD); o **NPSSO nunca é gravado**.
 - **`Provedor`, `ContaVinculada` e `JogoPlataforma`** (spec `integracao-plataformas`, etapa 1, migration
   `integracao_plataformas`, **só aditiva**: um enum e duas tabelas, nenhuma coluna existente tocada).
   `Provedor` é um enum do Postgres (`STEAM`; acrescentar um valor é `ALTER TYPE … ADD VALUE`). `ContaVinculada`
@@ -356,6 +363,24 @@ apps/api/src/modules/games/
     `VinculoRecusadoError`) **não** são `HttpException`: carregam o `code` estável (`ApiErrorCode`), e quem
     responde HTTP os mapeia (`plataforma-http-errors.ts`: `PlataformaExceptionFilter` no controller; falha da
     plataforma é **502**, nunca 500; perfil privado é 409; ID malformado e provedor desconhecido são 400).
+  - **PlayStation** (spec `integracao-playstation`, F1; `psn/`). A PSN **não tem API pública**: o app usa a **`psn-api` 2.18.1** (versão exata,
+    **API NÃO OFICIAL** da comunidade, que fala com os endpoints do app móvel da Sony e pode quebrar ou mudar sem aviso; a conformidade com
+    os termos da Sony **não foi verificada**, é risco aceito, ver a spec R1). Só o **`PsnClient`** (`psn/psn.client.ts`) a importa (teste
+    `sem-import-direto.spec.ts`), por `import()` dinâmico na primeira chamada (uma falha de carga não derruba o boot): timeout de 8 s por
+    `Promise.race` (o pacote não tem timeout), **nenhuma mensagem do pacote é repassada nem logada** (ela embute a resposta da Sony; o log tem só o
+    nome da chamada e o tipo do erro), tipos neutros e erros de domínio. **`PsnSessao`** guarda o access token **só em memória**, por conta,
+    junta refreshes simultâneos e, sem token, lê a credencial, decifra (`CifraDeCredencial`, AES-256-GCM) e renova, regravando o refresh se a
+    Sony devolver um novo; refresh vencido/recusado ou cifra que não decifra → `PlataformaReautenticarError`. **`PsnProvider`** implementa o
+    `GameProvider`: o item da biblioteca é o `titleId` (PS4 e PS5 são itens distintos; nada agrupa versões) e a conta é o `accountId`.
+    **Vínculo por credencial:** `POST :provedor/vinculo/credencial` (corpo `{ credencial }`, DTO permissivo `[A-Za-z0-9_-]{32,128}` lido cru e sem
+    ecoar o valor; 5/min por usuário; `no-store`) troca o NPSSO por uma sessão, grava a conta e a credencial cifrada **numa** operação e devolve a
+    `ContaVinculada` (sem segredo); o NPSSO nunca sai da função. Mesmo `accountId` já vinculado renova a credencial (e limpa `reautenticarDesde`);
+    outro é 409. `GameProvider` ganhou `modoDeVinculo` (`redirecionamento` | `credencial`; o service consulta isto, nunca o `id`),
+    `vincularComCredencial?` e um **contexto `{ contaId, nomeExibicao }`** nas leituras (a Steam o ignora). **Estado `reautenticar`:** quando a Sony
+    recusa a credencial, o service grava `reautenticarDesde` e responde **409 `PLATAFORMA_REAUTENTICAR`** sem chamar a Sony nas leituras seguintes;
+    o `GET .../jogos/:id` devolve o gravado com `aviso: 'REAUTENTICAR'` (nunca 409). Falha de rede, 5xx, limite e timeout **não** marcam
+    `reautenticar` (são 502). A PlayStation só é registrada em `GAME_PROVIDERS` com a `PSN_TOKEN_ENCRYPTION_KEY`; sem ela as rotas dela respondem
+    400 `VALIDACAO` (provedor desconhecido). `IdExternoInvalidoError.campo` virou `'idConta' | 'idItem'` (rótulo neutro).
   - **`SteamClient`** (`steam/steam.client.ts`) fala com a Steam Web API (`api.steampowered.com`) pelo `fetch`
     nativo, **sem SDK**, no padrão do `StorageService`: timeout de 8 s, sem _retry_, isolado atrás de métodos
     simples (`obterPerfil`, `listarJogos`, `obterConquistasDoJogador`, `obterSchema`,
@@ -939,11 +964,11 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
   `PlataformaMarca` (`shared/components/`) é o único lugar que desenha plataforma: `marcador` (glifo NEUTRO, sem marca registrada, para selos e
   botões pequenos) e `logo` (a marca oficial, **sozinha**, com espaço livre ao redor e **nunca abaixo de 50 px de altura**: um valor menor sobe para
   50; sem arquivo, ou se ele falhar, cai no marcador com o nome). A logo da Steam é o vetor extraído do PDF oficial da Valve, sem alteração
-  (`docs/design/plataformas/steam/`, o inverso branco em `apps/web/public/plataformas/steam-logo.svg`; um teste compara os dois byte a byte). Só
-  `features/integracoes/lib/provedores.ts` escreve o código do provedor à mão (`sem-provedor-solto.test.ts`).
-- **Popup da Steam** (`ResumoSteam`, F4a): cabeçalho (avatar decorativo, nome, "Na Steam desde <ano>", status, "Abrir perfil na Steam" com `rel="noopener
+  (`docs/design/plataformas/steam/`, o inverso branco em `apps/web/public/plataformas/steam-logo.svg`; um teste compara os dois byte a byte). Nenhum arquivo do web (fora dos testes e do `shared`) escreve o código de um provedor à mão (`sem-provedor-solto.test.ts`, **sem exceção** desde a
+  spec `integracao-playstation`, F2: `lib/provedores.ts` e `PROVEDOR_STEAM` acabaram; as telas recebem o provedor por prop ou pelo cadastro).
+- **Popup da Steam** (`ResumoSteam`, F4a; hoje `ResumoPlataforma`, ver §5.13.1): cabeçalho (avatar decorativo, nome, "Na Steam desde <ano>", status, "Abrir perfil na Steam" com `rel="noopener
 noreferrer"`), números (jogos, horas, "já jogados"), mais jogados (5), backlog ("N nunca abertos · P%" e **Ver e importar**, que abre o
-  `BibliotecaSteamDialog` só com os nunca abertos e, em "Criar jogo", o `GameForm` com `itemInicial`), "X dos seus Y jogos já estão no checkpoint",
+  `BibliotecaPlataformaDialog` só com os nunca abertos e, em "Criar jogo", o `GameForm` com `itemInicial`), "X dos seus Y jogos já estão no checkpoint",
   conquistas dos vinculados e as ações (**Atualizar** com "Atualizado há X", **Importar jogos**, **Desvincular** com confirmação), mais o rodapé com a
   **atribuição legal da Valve** e "Não afiliado à Valve". Perfil privado: o aviso e o passo a passo de sempre, mantendo o cabeçalho e as ações. Sem
   VAC, amigos, preço nem gênero. Nível/XP e atividade recente ficam para a F4b.
@@ -953,7 +978,7 @@ noreferrer"`), números (jogos, horas, "já jogados"), mais jogados (5), backlog
 - **Vincular**: `POST vinculo` com **`withCredentials: true` só nesta chamada** (em produção o `/api` é do mesmo
   site pelo rewrite da Vercel e não muda nada; em dev, localhost:5173 → :3333, o navegador só aceita o cookie
   `checkpoint_vinculo` com ele). O navegador só vai à URL devolvida se ela for a tela de login da Steam
-  (`lib/steam-url.ts`: `https`, `steamcommunity.com`, sem porta nem usuário, `/openid/login`); qualquer outra é
+  (`lib/vinculo-url.ts`, `urlDeVinculoSegura(plataforma, url)`, que lê `vinculo.hostDeLogin` e `caminhoDeLogin` do cadastro: `https`, o host, sem porta nem usuário, o caminho; a Steam usa `steamcommunity.com` e `/openid/login`); qualquer outra é
   recusada com uma mensagem. A navegação passa por `lib/navegar.ts` (`irPara`), que os testes mockam.
 - **Aviso do retorno**: a API redireciona para `/perfil?steam=vinculada` ou `?steam=erro&motivo=…` (um
   redirecionamento externo não carrega o `state` da navegação, então o aviso vem na query). A `PerfilPage` o lê
@@ -962,7 +987,7 @@ noreferrer"`), números (jogos, horas, "já jogados"), mais jogados (5), backlog
 - **Formatação** (`lib/format.ts`): `horasCurtas` ("45 min", "1,5 h", "42 h", "1.234 h", arredondando para baixo) e
   `textoDasConquistas` (singular e plural). `lib/estado-do-cartao.ts` classifica a falha (`privado`, `sem-conexao`,
   `erro`).
-- **Biblioteca e vínculo de jogo (etapa 3)**: `BibliotecaSteamDialog` (dois modos: `novo` e `vincular`, num `ModalDialog`;
+- **Biblioteca e vínculo de jogo (etapa 3)**: `BibliotecaPlataformaDialog` (dois modos: `novo` e `vincular`, num `ModalDialog`;
   busca com _debounce_ de 300 ms; estados carregando, vazia, privada e erro com **Tentar de novo**). No modo `novo`, cada item
   é **Criar jogo** (ou **Criar outro jogo**, quando há parecidos, que ganham **Vincular a este**), mais **Vincular a outro
   jogo que já tenho** (seletor só dos jogos sem `dadosPlataforma`); item já ligado mostra "Já ligado a «X»" e não cria. Nunca
@@ -972,12 +997,12 @@ noreferrer"`), números (jogos, horas, "já jogados"), mais jogados (5), backlog
   status sugerido (`lib/biblioteca.ts`: 0 min = Quero jogar, >0 = Jogando, **nunca** Zerado), a capa oficial é só **prévia**;
   ao salvar cria o jogo e **só depois** liga (falha da ligação: jogo salvo, formulário passa a editar, o próximo Salvar
   reenvia sem 409); a confirmação de plataforma vem **antes** de criar qualquer coisa. A página do jogo tem **Vincular à
-  Steam** (modo `vincular`). Ligar invalida `['games']` e o cartão do perfil. **Visual da lista (`BibliotecaSteamDialog`)**: cada item é um cartão com a
+  Steam** (modo `vincular`). Ligar invalida `['games']` e o cartão do perfil. **Visual da lista (`BibliotecaPlataformaDialog`)**: cada item é um cartão com a
   capa na proporção exata do cabeçalho da Steam (`aspect-[460/215]`, sem corte; 120 px no celular, 148 px a partir de `sm`), título em Outfit, as horas com
   ícone de relógio e entrada em cascata (`update-in` com `animation-delay` de 45 ms por item, até o 8º; só `opacity` e `transform`); o esqueleto de
   carregamento tem o mesmo desenho do cartão; a biblioteca vazia mostra o Chek `dormindo` e o perfil privado, o Chek `cadeado`. O cabeçalho do diálogo
   **não** é `sticky`: o `<dialog>` já é o contêiner de rolagem e um cabeçalho fixo brigava com ele.
-- **Horas e conquistas (etapa 4)**: a página `/jogos/:id` de um jogo ligado ganha a seção **Steam** (`BlocoSteam`, uma `SecaoRecolhivel` aberta por padrão, com a **logo oficial** de 50 px sozinha no `h2` e o resumo "42 h 30 min · 12/40 conquistas" na linha fechada): dentro dela, **"Atualizado há 12 minutos"** (`lib/tempo-relativo.ts`, `Intl.RelativeTimeFormat` pt-BR, a partir do `atualizadoEm` do dado; "agora" abaixo de 1 min; nunca "Invalid Date"), três cartões de dados ("Tempo jogado na Steam" "42 h 30 min", "Último jogo em" dd/mm/aaaa ou "Nunca jogado", "Conquistas · 12 de 40" com a barra `role="progressbar"` em `ouro` e a porcentagem), **Atualizar**, **Desvincular** (confirmação; só a camada da Steam some: título, status, notas e capa
+- **Horas e conquistas (etapa 4)**: a página `/jogos/:id` de um jogo ligado ganha a seção **Steam** (`BlocoPlataforma`, uma `SecaoRecolhivel` aberta por padrão, com a **logo oficial** de 50 px sozinha no `h2` e o resumo "42 h 30 min · 12/40 conquistas" na linha fechada): dentro dela, **"Atualizado há 12 minutos"** (`lib/tempo-relativo.ts`, `Intl.RelativeTimeFormat` pt-BR, a partir do `atualizadoEm` do dado; "agora" abaixo de 1 min; nunca "Invalid Date"), três cartões de dados ("Tempo jogado na Steam" "42 h 30 min", "Último jogo em" dd/mm/aaaa ou "Nunca jogado", "Conquistas · 12 de 40" com a barra `role="progressbar"` em `ouro` e a porcentagem), **Atualizar**, **Desvincular** (confirmação; só a camada da Steam some: título, status, notas e capa
   ficam, e **Vincular à Steam** volta) e **Abrir na Steam** (`rel="noopener noreferrer"`). A lista tem dois `<details>`,
   **os dois FECHADOS por padrão**, com seta e "Toque para ver" ("Toque para fechar" aberto) e o estado guardado no aparelho: **Desbloqueadas** (por data decrescente) e **Faltam** (da mais comum à mais rara), com contador, ícone de 52 px (`width`/`height`/`loading="lazy"`; cadeado ou `visibility_off` sem ícone), nome, descrição ("Conquista oculta" se oculta e bloqueada), data e "12,4% dos jogadores" (ou "Raridade indisponível"); uma coluna no celular e, a partir de 1024 px, as duas listas lado a lado. O detalhe **só é pedido nesta página**
   (`useDetalheJogo`, sem _retry_; abrir `/` não faz nenhuma request de conquistas) e os valores novos entram direto no cache do
@@ -988,10 +1013,64 @@ noreferrer"`), números (jogos, horas, "já jogados"), mais jogados (5), backlog
 - **Precedência da capa** (`lib/capa.ts` + `GameCover`): a enviada, depois a oficial (`library_600x900.jpg`), depois o
   `header.jpg` do mesmo app (derivado da URL oficial, só na CDN conhecida) e por fim a gerada (cor e inicial). O `GameCover` tenta
   a próxima quando uma falha ao carregar (`onError`); nada é gravado, então remover a enviada faz a oficial reaparecer.
-- **Testes** (Vitest): `components/BlocoSteam.test.tsx`, `lib/capa.test.ts`, `lib/conquistas.test.ts`, `games/components/GameCover.test.tsx`, `components/BibliotecaSteamDialog.test.tsx`, `lib/biblioteca.test.ts`, `games/components/GameForm.steam.test.tsx`, `components/PlataformasDoPerfil.test.tsx` (as linhas, o popup e todos os estados, o desvio da URL fora da Steam, o
+- **Testes** (Vitest): `components/BlocoPlataforma.test.tsx`, `lib/capa.test.ts`, `lib/conquistas.test.ts`, `games/components/GameCover.test.tsx`, `components/BibliotecaPlataformaDialog.test.tsx`, `lib/biblioteca.test.ts`, `games/components/GameForm.steam.test.tsx`, `components/PlataformasDoPerfil.test.tsx` (as linhas, o popup e todos os estados, o desvio da URL fora da Steam, o
   diálogo, Atualizar, privacidade), `lib/lib.test.ts` (URL da Steam, avisos, horas, classificação),
   `pages/PerfilPage.test.tsx` (a seção entre Conta e Preferências e os avisos do retorno; a API de integrações é
   mockada).
+
+### 5.13.1 PlayStation no web (spec `docs/specs/integracao-playstation.md`, F2 a F4)
+
+- **O cadastro manda, não um `if`.** `PlataformaInfo` ganhou `vinculo` (`redirecionamento` com `hostDeLogin`/`caminhoDeLogin`, ou `credencial` com o rótulo
+  "NPSSO", a explicação, o endereço, os passos e a observação), `vocabulario` (`conquista`/`conquistas`/`artigo`: "as conquistas", "os troféus"),
+  `plataformasCompativeis` (para a confirmação ao ligar), `plataformaPadrao`, `privacidade` (o passo a passo da Steam; `null` na PlayStation), `rodapeLegal`
+  (`atribuicao` e `naoAfiliado`) e `capaNaBusca` (`paisagem` na Steam, `quadrada` na PlayStation). A PlayStation não tem logo (`logo: null`): o
+  `PlataformaMarca` cai no marcador neutro (`videogame_asset`) com o nome, até o pacote oficial da Sony chegar. Os textos concordam pelo cadastro
+  (`lib/plataforma-texto.ts`: `dePlataforma`, `naPlataforma`, `comPlataforma`, `textoDaConfirmacaoDePlataforma`), então "Buscar na PlayStation", "Ligado à
+  PlayStation" e "as horas e os troféus mostrados serão os da PlayStation" saem sem código próprio.
+- **Vincular por credencial** (F2): a linha "não vinculada" olha `plataforma.vinculo.tipo`. Por credencial, **Vincular** abre o `VincularCredencialDialog`
+  (um `ModalDialog`), que explica o que é o NPSSO, que **equivale a uma senha**, que o app o usa **uma única vez**, onde pegá-lo (o endereço é um link
+  `target="_blank" rel="noopener noreferrer"` que a pessoa abre sozinha; o app **nunca** monta uma URL com o valor nem o lê de `location`) e tem o campo
+  (`type="password"`, `autocomplete="off"`, `spellcheck={false}`). O valor vive **só no estado do componente** (some ao enviar, ao fechar e em erro), vai **só no
+  corpo do POST** `vinculo/credencial` (`integracoesApi.vincularComCredencial`), e a mutação (`useVincularComCredencial`, `gcTime: 0`, `reset()` logo depois) **não
+  fica com o valor** no cache do TanStack Query. Sucesso: o diálogo fecha, um aviso "Conta PlayStation vinculada." e a lista de contas é buscada de novo. Erro
+  (código recusado, conta já vinculada, plataforma fora do ar): o texto pelo `code`, **dentro** do diálogo, com o Chek `confuso`; o valor não é reenviado sozinho.
+- **Conta em `reautenticar`** (F2): `ContaVinculada.estado`. A linha mostra o selo **Reconectar**, **não** consulta o resumo (a API responderia 409) e, ao
+  tocar, abre o mesmo diálogo com "Sua conexão com a PlayStation expirou" e o Chek `confuso`; a conta e os jogos ligados continuam. Um código novo volta o
+  estado a `ativa`.
+- **Biblioteca e formulário genéricos** (F2): `BibliotecaPlataformaDialog` recebe `provedor` (textos, capa e privacidade do cadastro). O seletor de "Vincular a outro
+  jogo que já tenho" lista os jogos **sem vínculo COM ESSA plataforma** (o vínculo é 1 para 1 por plataforma). O `GameForm` mostra **um botão "Buscar na …" por
+  plataforma vinculada com biblioteca** (`usePlataformasComBiblioteca`, na ordem do cadastro), guarda **um item por plataforma** (o primeiro escolhido manda no
+  título, na plataforma e no status) e, ao salvar, cria o jogo e **só depois** liga cada item (`useVincularJogoEm`); a confirmação de plataforma sai **antes** de
+  criar e vale para a primeira plataforma cujas `plataformasCompativeis` não incluem a do jogo. O item traz `plataformaSugerida` (`PS5`, `PS4`, `PC` ou vazio);
+  sem ela vale a `plataformaPadrao` do cadastro. A página do jogo tem um **Vincular {ligadoA}** por plataforma que o jogo ainda não tem. `PROVEDOR_STEAM` e
+  `useTemContaSteam` acabaram.
+- **Página do jogo e tile** (F3): `BlocoSteam` virou **`BlocoPlataforma`** (um componente para todas; `SecoesDasPlataformas` monta uma seção por ligação, na ordem do
+  cadastro). Os textos saem do cadastro: `vocabulario` ("Conquistas · 12 de 40" / "Troféus · 3 de 6", "Conquista oculta" / "Troféu oculto"), `paginaDoJogo`
+  (o link "Abrir na Steam" vem de um modelo com `{id}`; a PlayStation não tem, então não há "Abrir na PlayStation") e `textoSemConquistas` (na PlayStation, "Os
+  troféus só aparecem depois que o console sincroniza com a PSN"). Na PlayStation a seção mostra a **contagem por tipo** (`porTipo`: "Platina 0 de 1 · Ouro 0 de 1…",
+  em texto), e cada troféu traz o **tipo** ("Ouro") e a **raridade** ("Raro · 4,8% dos jogadores") em texto, nunca só cor. O troféu oculto e bloqueado chega da
+  API **sem nome nem descrição** e a tela mostra "Troféu oculto". Aviso `REAUTENTICAR`: o gravado continua, com o Chek `confuso` e o botão **Reconectar** (o formulário
+  do NPSSO). Tile, destaque e linha do catálogo: `resumoDoCatalogo` e `chipsDoDestaque` usam o nome e o vocabulário da primeira plataforma ligada na ordem do cadastro
+  ("Tempo jogado na PlayStation: 10 horas, 12 de 40 troféus"); o selo (`selosDoJogo`) já era por cadastro (dois selos e "+N"). O marco de 100% ("100% dos troféus em «X»!")
+  concorda pelo `artigo` do vocabulário.
+- **Símbolos e busca única** (pós-F4): as plataformas usam só o **símbolo** (`marcador.simbolo`, SVG de uma cor em `apps/web/public/plataformas/steam.svg` e
+  `playstation.svg`), desenhado por `PlataformaMarca` como máscara na cor do texto, pequeno e com o nome em texto ao lado. `logo` é `null` nas duas (o
+  `steam-logo.svg` grande não é mais usado); onde este documento fala de "logo oficial >= 50 px", vale o símbolo. No `GameForm` os botões "Buscar na X" viraram **um só
+  botão, "Buscar em uma plataforma"**, que abre uma lista (`role="menu"`) com as plataformas ainda sem ligação; escolher uma abre a biblioteca dela.
+- **Plataformas em quadrados e nome da PSN** (pós-F4): no `/perfil` cada plataforma é um **cartão compacto** (cartão compacto, altura pelo conteúdo) numa grade de 3 por linha no desktop e 2 no
+  celular, com o símbolo e o nome, a foto e o nome da conta e o "atualizado há X" (não vinculada: o botão "Vincular"). O `PsnClient.perfil` passou a receber o
+  `accountId` real: com o alias `me` o endpoint de perfil falhava sempre e a conta ficava "Conta PlayStation"; o nome e a foto vêm do `onlineId` e se corrigem na
+  próxima leitura do resumo.
+- **Popup da conta e linha do perfil** (F4): `ResumoSteam` virou **`ResumoPlataforma`** (um popup para todas, textos do cadastro). Steam continua igual. Na PlayStation o
+  popup mostra **Nível de troféu** ("Nível 312", "faixa 4 de 10", "42% até o próximo nível") e a contagem **por tipo** em texto (`resumo.nivel`/`resumo.trofeus`), e
+  **não** mostra "membro desde", status, "Abrir perfil" nem backlog (a PSN não dá; o backlog só aparece com a capacidade `backlog` do cadastro). O passo a passo de
+  privacidade, a atribuição legal e o "Não afiliado à …" saem do cadastro (`privacidade`, `rodapeLegal`); o da PlayStation é provisório, sem atribuição inventada e sem logo.
+  Em `reautenticar` (409 `PLATAFORMA_REAUTENTICAR`) o popup mostra o Chek `confuso`, "Sua conexão com a PlayStation expirou" e **Reconectar** (o formulário do NPSSO);
+  cabeçalho e Desvincular continuam. O Desvincular de plataforma por credencial avisa que a credencial guardada também é apagada. `textoDasConquistas(n, vocabulario)`
+  concorda em "12 troféus em 2 jogos vinculados".
+- **Testes** (F2): `PlataformasDoPerfil.playstation.test.tsx` (o diálogo, o campo, o valor só no corpo, nada em URL, armazenamento do navegador nem cache, os
+  erros, `reautenticar`), `GameForm.plataformas.test.tsx` (dois botões, PS4 e PS5 como itens distintos, confirmação pelo cadastro), `lib/plataforma-texto.test.ts`,
+  `lib/biblioteca.test.ts`, `shared/lib/plataformas.test.ts` (o cadastro) e `lib/sem-provedor-solto.test.ts` (sem exceção).
 
 ### 5.14 O Chek e o movimento (`shared/components/Chek/`, spec `docs/specs/personalizacao-chek-e-animacoes.md`)
 
@@ -1035,7 +1114,7 @@ noreferrer"`), números (jogos, horas, "já jogados"), mais jogados (5), backlog
   o tile "assenta" (`.tile-novo`: `translate`, `scale`, `opacity`) e ganha um anel `destaque` que some por `opacity` (`.tile-anel-novo`, `--mov-realce`), e a página rola até
   ele (`scrollIntoView` centralizado, `auto` em movimento reduzido, sem mover o foco) se ele estiver fora da vista; se o filtro ativo **esconde** o jogo, o aviso
   diz "Adicionado em <status>" com **Ver**, que troca o filtro; (2) os **marcos** (`lib/marcos.ts`, puro): primeiro jogo (criar com a lista vazia de ANTES de
-  abrir o formulário), jogo que **passa** a Zerado (nunca ao carregar a lista) e 100% das conquistas (o **Atualizar** do `BlocoSteam` que leva o total ao
+  abrir o formulário), jogo que **passa** a Zerado (nunca ao carregar a lista) e 100% das conquistas (o **Atualizar** do `BlocoPlataforma` que leva o total ao
   máximo). Um marco é um `avisar({ chek: 'comemorando' })`, por ocorrência e **sem gravar nada** (sem confete, sem som). **Remover**: a lista e a contagem já
   não têm o jogo; `useJogosComSaida` devolve uma cópia visual `saindo` (`.tile-sai`, inerte e `aria-hidden`) por 200 ms na mesma posição, e `useFlip` (Web Animations
   API, duração e curva lidas dos tokens) desliza os vizinhos ao novo lugar. Sem movimento (reduzido) nada é retido e nada desliza. `Contador` troca o número
@@ -1141,16 +1220,17 @@ mudanças de schema por um agente.
 
 ## 8. Variáveis de ambiente
 
-| Arquivo         | Variáveis                                                              | Para quê                                                                                                                                                                                                                                                                                                      |
-| --------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `apps/api/.env` | `NODE_ENV`, `PORT`, `DATABASE_URL`, `CORS_ORIGIN`                      | Validadas em `src/config/env.validation.ts`; falta/erro derruba o boot                                                                                                                                                                                                                                        |
-| `apps/api/.env` | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_STORAGE_BUCKET` | Storage das capas; validadas em `env.validation.ts` (obrigatórias). O valor da chave é a **secret key** (`sb_secret_…`) e só o backend a usa: nunca vai para o web nem para log                                                                                                                               |
-| `apps/api/.env` | `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `AUTH_REGISTRATION_OPEN`    | Autenticação; obrigatórias em `env.validation.ts`. Os dois segredos têm ≥ 32 caracteres e são **diferentes**; gere cada um localmente (`node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"`). Nunca vão para o web, spec, log ou PR. `AUTH_REGISTRATION_OPEN` é `true` ou `false` |
-| `apps/api/.env` | `AUTH_REGISTRATION_LIMIT_PER_HOUR`                                     | **Opcional**, só dev/teste: sobrescreve o limite de 3 registros por hora por IP. Em ambiente exposto, deixe ausente                                                                                                                                                                                           |
-| `apps/api/.env` | `STEAM_API_KEY`, `API_PUBLIC_URL`, `WEB_PUBLIC_URL`                    | Integração com plataformas (spec `integracao-plataformas`); **obrigatórias**: a API não sobe sem elas, cadastre no Render **antes** do deploy. `STEAM_API_KEY` só no backend, nunca no web nem em log. `API_PUBLIC_URL` e `WEB_PUBLIC_URL`: origens sem barra final (produção: o domínio da Vercel; §4.2)     |
-| `apps/api/.env` | `DIRECT_URL`                                                           | Só o Prisma CLI lê (via `schema.prisma`); necessária apenas se `DATABASE_URL` for uma conexão pooled (ex.: Supabase)                                                                                                                                                                                          |
-| `apps/api/.env` | `TRUST_PROXY_HOPS`                                                     | **Opcional**, inteiro de 0 a 10; ausente = 0 (dev, sem proxy). Quantos proxies confiáveis há entre o cliente e a API, para o limite por IP ver o cliente e não o proxy (§4.1). Em produção, o número **medido** (Vercel + Render); nunca um chute                                                             |
-| `apps/web/.env` | `VITE_API_URL`                                                         | Consumida em `src/shared/lib/env.ts`, `baseURL` do `apiClient`                                                                                                                                                                                                                                                |
+| Arquivo         | Variáveis                                                              | Para quê                                                                                                                                                                                                                                                                                                                          |
+| --------------- | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/api/.env` | `NODE_ENV`, `PORT`, `DATABASE_URL`, `CORS_ORIGIN`                      | Validadas em `src/config/env.validation.ts`; falta/erro derruba o boot                                                                                                                                                                                                                                                            |
+| `apps/api/.env` | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_STORAGE_BUCKET` | Storage das capas; validadas em `env.validation.ts` (obrigatórias). O valor da chave é a **secret key** (`sb_secret_…`) e só o backend a usa: nunca vai para o web nem para log                                                                                                                                                   |
+| `apps/api/.env` | `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `AUTH_REGISTRATION_OPEN`    | Autenticação; obrigatórias em `env.validation.ts`. Os dois segredos têm ≥ 32 caracteres e são **diferentes**; gere cada um localmente (`node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"`). Nunca vão para o web, spec, log ou PR. `AUTH_REGISTRATION_OPEN` é `true` ou `false`                     |
+| `apps/api/.env` | `AUTH_REGISTRATION_LIMIT_PER_HOUR`                                     | **Opcional**, só dev/teste: sobrescreve o limite de 3 registros por hora por IP. Em ambiente exposto, deixe ausente                                                                                                                                                                                                               |
+| `apps/api/.env` | `STEAM_API_KEY`, `API_PUBLIC_URL`, `WEB_PUBLIC_URL`                    | Integração com plataformas (spec `integracao-plataformas`); **obrigatórias**: a API não sobe sem elas, cadastre no Render **antes** do deploy. `STEAM_API_KEY` só no backend, nunca no web nem em log. `API_PUBLIC_URL` e `WEB_PUBLIC_URL`: origens sem barra final (produção: o domínio da Vercel; §4.2)                         |
+| `apps/api/.env` | `PSN_TOKEN_ENCRYPTION_KEY`                                             | **Opcional** (spec `integracao-playstation`): 64 hexadecimais, a chave do AES-256-GCM que cifra o refresh token da PlayStation. Ausente = PlayStation desligada (o resto do app sobe); malformada = o boot falha. **Só o backend**; nunca no web, em log ou commit. Perder ou trocar a chave manda todo mundo para `reautenticar` |
+| `apps/api/.env` | `DIRECT_URL`                                                           | Só o Prisma CLI lê (via `schema.prisma`); necessária apenas se `DATABASE_URL` for uma conexão pooled (ex.: Supabase)                                                                                                                                                                                                              |
+| `apps/api/.env` | `TRUST_PROXY_HOPS`                                                     | **Opcional**, inteiro de 0 a 10; ausente = 0 (dev, sem proxy). Quantos proxies confiáveis há entre o cliente e a API, para o limite por IP ver o cliente e não o proxy (§4.1). Em produção, o número **medido** (Vercel + Render); nunca um chute                                                                                 |
+| `apps/web/.env` | `VITE_API_URL`                                                         | Consumida em `src/shared/lib/env.ts`, `baseURL` do `apiClient`                                                                                                                                                                                                                                                                    |
 
 `CORS_ORIGIN` deixou de ter padrão e **recusa `*`** (cookie de sessão): liste as origens, ex.:
 `http://localhost:5173`. Cada arquivo tem um `.env.example` correspondente, versionado. Nunca commitar `.env` real nem
@@ -1166,16 +1246,23 @@ e bucket ficam no **Supabase**. As variáveis da API vivem no painel do Render; 
 
 **Variáveis da API em produção (painel do Render)**
 
-| Variável           | Valor                                    | Observação                                                                             |
-| ------------------ | ---------------------------------------- | -------------------------------------------------------------------------------------- |
-| `NODE_ENV`         | `production`                             | o cookie do vínculo passa a `Secure`                                                   |
-| `CORS_ORIGIN`      | `https://checkpoint-web-rust.vercel.app` | lista de origens; `*` é recusado no boot                                               |
-| `API_PUBLIC_URL`   | `https://checkpoint-web-rust.vercel.app` | sem barra final; é o `return_to` e o `realm` do OpenID da Steam                        |
-| `WEB_PUBLIC_URL`   | `https://checkpoint-web-rust.vercel.app` | sem barra final; para onde o retorno do vínculo redireciona                            |
-| `STEAM_API_KEY`    | 32 hexadecimais (segredo)                | gerada em `steamcommunity.com/dev/apikey`; "domínio": `checkpoint-web-rust.vercel.app` |
-| `TRUST_PROXY_HOPS` | o número **medido**                      | ver o passo 2; nunca um chute e nunca `true`                                           |
+| Variável                   | Valor                                    | Observação                                                                                                                              |
+| -------------------------- | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `NODE_ENV`                 | `production`                             | o cookie do vínculo passa a `Secure`                                                                                                    |
+| `CORS_ORIGIN`              | `https://checkpoint-web-rust.vercel.app` | lista de origens; `*` é recusado no boot                                                                                                |
+| `API_PUBLIC_URL`           | `https://checkpoint-web-rust.vercel.app` | sem barra final; é o `return_to` e o `realm` do OpenID da Steam                                                                         |
+| `WEB_PUBLIC_URL`           | `https://checkpoint-web-rust.vercel.app` | sem barra final; para onde o retorno do vínculo redireciona                                                                             |
+| `STEAM_API_KEY`            | 32 hexadecimais (segredo)                | gerada em `steamcommunity.com/dev/apikey`; "domínio": `checkpoint-web-rust.vercel.app`                                                  |
+| `TRUST_PROXY_HOPS`         | o número **medido**                      | ver o passo 2; nunca um chute e nunca `true`                                                                                            |
+| `PSN_TOKEN_ENCRYPTION_KEY` | 64 hexadecimais (segredo)                | **opcional**: sem ela a PlayStation fica desligada; gere com `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` |
 
 As demais (`DATABASE_URL`, `DIRECT_URL`, `SUPABASE_*`, `JWT_*`, `AUTH_REGISTRATION_OPEN`, `PORT`) já existem e não mudam.
+
+**PlayStation (spec `integracao-playstation`): ordem de deploy e quem aplica a migration.** A migration `integracao_playstation` é **aditiva** e o Render **não** roda
+`migrate deploy` no build/start (o `start` é `node dist/main.js`): quem a aplica é o humano, com `npm run db:deploy -w @checkpoint/api` (ou `npx prisma migrate deploy` em `apps/api`) contra o banco
+de produção (`DIRECT_URL`, porta 5432), depois de conferir o banco com `npx prisma migrate status`. Ordem: **1) migration → 2) `PSN_TOKEN_ENCRYPTION_KEY` no Render → 3) deploy do código**. O código
+**nunca** pode chegar antes da migration: o cliente Prisma novo conhece `reautenticarDesde` e o valor `PLAYSTATION`, e `GET /api/integracoes` lê `reautenticarDesde` (a coluna precisa existir). Com a chave opcional, o código sem a variável
+sobe, mas a PlayStation fica desligada (mesma mensagem 400 de provedor desconhecido).
 
 **Checklist, em ordem** (cada passo só depois do anterior):
 

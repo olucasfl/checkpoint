@@ -39,6 +39,9 @@ export const AUTH_MESSAGES: Record<ApiErrorCode, string> = {
   PLATAFORMA_VINCULO_NAO_ENCONTRADO: 'Este jogo não está ligado à plataforma.',
   PLATAFORMA_INDISPONIVEL: 'Não foi possível falar com a plataforma agora. Tente de novo.',
   PLATAFORMA_LIMITE: 'Muitas consultas à plataforma. Tente de novo em alguns minutos.',
+  PLATAFORMA_REAUTENTICAR: 'Sua conexão com a plataforma expirou. Vincule a conta de novo.',
+  PLATAFORMA_CREDENCIAL_INVALIDA:
+    'A plataforma recusou o código. Copie-o de novo e confira que entrou na sua conta.',
 };
 
 export const NO_CONNECTION_MESSAGE = 'Sem conexão. Tente de novo quando a conexão voltar.';
