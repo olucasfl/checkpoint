@@ -11,7 +11,7 @@ import { irPara } from '../lib/navegar';
 import { atualizadoHaTexto } from '../lib/tempo-relativo';
 import { urlDeVinculoSegura } from '../lib/vinculo-url';
 import { PlataformaDialog } from './PlataformaDialog';
-import { Esqueleto, Falha } from './ResumoSteam';
+import { Esqueleto, Falha } from './ResumoPlataforma';
 import { VincularCredencialDialog } from './VincularCredencialDialog';
 
 const LINHA = 'flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 text-left';

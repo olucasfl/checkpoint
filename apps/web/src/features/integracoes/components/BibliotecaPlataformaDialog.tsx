@@ -512,13 +512,15 @@ function Conteudo({
               </p>
             </div>
           )}
-          {(falha === 'erro' || falha === 'sem-conexao') && (
+          {(falha === 'erro' || falha === 'sem-conexao' || falha === 'reautenticar') && (
             <FieldError
               id="biblioteca-plataforma-falha"
               message={
                 falha === 'sem-conexao'
                   ? 'Sem conexão. Tente de novo quando a conexão voltar.'
-                  : `Não foi possível falar ${comPlataforma(plataforma)} agora.`
+                  : falha === 'reautenticar'
+                    ? `Sua conexão ${comPlataforma(plataforma)} expirou. Reconecte a conta no perfil.`
+                    : `Não foi possível falar ${comPlataforma(plataforma)} agora.`
               }
             />
           )}

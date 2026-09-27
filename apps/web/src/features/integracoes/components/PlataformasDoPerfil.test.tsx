@@ -2,12 +2,12 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { AxiosError } from 'axios';
-import { type ContaVinculada, type ResumoContaPlataforma } from '@checkpoint/shared';
+import { PLATAFORMAS, type ContaVinculada, type ResumoContaPlataforma } from '@checkpoint/shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { integracoesApi } from '../api/integracoes-api';
 import { irPara } from '../lib/navegar';
 import { PlataformasDoPerfil } from './PlataformasDoPerfil';
-import { PASSOS_DE_PRIVACIDADE } from './ResumoSteam';
+const PASSOS_DE_PRIVACIDADE = PLATAFORMAS.STEAM.privacidade?.passos ?? [];
 
 vi.mock('../api/integracoes-api', () => ({
   integracoesApi: {

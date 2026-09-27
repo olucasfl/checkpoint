@@ -1,17 +1,8 @@
-import { type ComponentType } from 'react';
 import { type ContaVinculada, type PlataformaInfo, type Provedor } from '@checkpoint/shared';
 import { Icon } from '@/shared/components/Icon';
 import { ModalDialog } from '@/shared/components/ModalDialog';
 import { PlataformaMarca } from '@/shared/components/PlataformaMarca';
-import { ResumoSteam } from './ResumoSteam';
-
-/**
- * O conteúdo do popup de cada plataforma. A PlayStation entra no cadastro desligada (`disponivel: false`) e ganha o seu
- * resumo na F4 da spec `integracao-playstation`; o popup nunca compara o provedor com um texto.
- */
-const RESUMO_DA_PLATAFORMA: Partial<Record<Provedor, ComponentType<{ conta: ContaVinculada }>>> = {
-  STEAM: ResumoSteam,
-};
+import { ResumoPlataforma } from './ResumoPlataforma';
 
 const TITULO_ID = 'plataforma-dialogo-titulo';
 
@@ -24,7 +15,6 @@ interface PlataformaDialogProps {
 
 /** O popup de uma plataforma vinculada (`<dialog>` nativo, como os outros): cabeçalho com a logo oficial e o resumo da conta. */
 export function PlataformaDialog({ open, plataforma, conta, onClose }: PlataformaDialogProps) {
-  const Resumo = RESUMO_DA_PLATAFORMA[plataforma.id as Provedor];
   return (
     <ModalDialog open={open} onClose={onClose} labelledBy={TITULO_ID}>
       <div className="sheet-pad flex max-h-[85dvh] flex-col gap-3 overflow-y-auto px-5 pt-4">
@@ -41,7 +31,7 @@ export function PlataformaDialog({ open, plataforma, conta, onClose }: Plataform
             <Icon name="close" size={22} />
           </button>
         </div>
-        {Resumo ? <Resumo conta={conta} /> : null}
+        <ResumoPlataforma conta={conta} />
       </div>
     </ModalDialog>
   );

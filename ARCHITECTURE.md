@@ -966,7 +966,7 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
   50; sem arquivo, ou se ele falhar, cai no marcador com o nome). A logo da Steam é o vetor extraído do PDF oficial da Valve, sem alteração
   (`docs/design/plataformas/steam/`, o inverso branco em `apps/web/public/plataformas/steam-logo.svg`; um teste compara os dois byte a byte). Nenhum arquivo do web (fora dos testes e do `shared`) escreve o código de um provedor à mão (`sem-provedor-solto.test.ts`, **sem exceção** desde a
   spec `integracao-playstation`, F2: `lib/provedores.ts` e `PROVEDOR_STEAM` acabaram; as telas recebem o provedor por prop ou pelo cadastro).
-- **Popup da Steam** (`ResumoSteam`, F4a): cabeçalho (avatar decorativo, nome, "Na Steam desde <ano>", status, "Abrir perfil na Steam" com `rel="noopener
+- **Popup da Steam** (`ResumoSteam`, F4a; hoje `ResumoPlataforma`, ver §5.13.1): cabeçalho (avatar decorativo, nome, "Na Steam desde <ano>", status, "Abrir perfil na Steam" com `rel="noopener
 noreferrer"`), números (jogos, horas, "já jogados"), mais jogados (5), backlog ("N nunca abertos · P%" e **Ver e importar**, que abre o
   `BibliotecaPlataformaDialog` só com os nunca abertos e, em "Criar jogo", o `GameForm` com `itemInicial`), "X dos seus Y jogos já estão no checkpoint",
   conquistas dos vinculados e as ações (**Atualizar** com "Atualizado há X", **Importar jogos**, **Desvincular** com confirmação), mais o rodapé com a
@@ -1044,15 +1044,6 @@ noreferrer"`), números (jogos, horas, "já jogados"), mais jogados (5), backlog
   criar e vale para a primeira plataforma cujas `plataformasCompativeis` não incluem a do jogo. O item traz `plataformaSugerida` (`PS5`, `PS4`, `PC` ou vazio);
   sem ela vale a `plataformaPadrao` do cadastro. A página do jogo tem um **Vincular {ligadoA}** por plataforma que o jogo ainda não tem. `PROVEDOR_STEAM` e
   `useTemContaSteam` acabaram.
-- **Página do jogo e tile** (F3): `BlocoPlataforma` virou **`BlocoPlataforma`** (um componente para todas; `SecoesDasPlataformas` monta uma seção por ligação, na ordem do
-  cadastro). Os textos saem do cadastro: `vocabulario` ("Conquistas · 12 de 40" / "Troféus · 3 de 6", "Conquista oculta" / "Troféu oculto"), `paginaDoJogo`
-  (o link "Abrir na Steam" vem de um modelo com `{id}`; a PlayStation não tem, então não há "Abrir na PlayStation") e `textoSemConquistas` (na PlayStation, "Os
-  troféus só aparecem depois que o console sincroniza com a PSN"). Na PlayStation a seção mostra a **contagem por tipo** (`porTipo`: "Platina 0 de 1 · Ouro 0 de 1…",
-  em texto), e cada troféu traz o **tipo** ("Ouro") e a **raridade** ("Raro · 4,8% dos jogadores") em texto, nunca só cor. O troféu oculto e bloqueado chega da
-  API **sem nome nem descrição** e a tela mostra "Troféu oculto". Aviso `REAUTENTICAR`: o gravado continua, com o Chek `confuso` e o botão **Reconectar** (o formulário
-  do NPSSO). Tile, destaque e linha do catálogo: `resumoDoCatalogo` e `chipsDoDestaque` usam o nome e o vocabulário da primeira plataforma ligada na ordem do cadastro
-  ("Tempo jogado na PlayStation: 10 horas, 12 de 40 troféus"); o selo (`selosDoJogo`) já era por cadastro (dois selos e "+N"). O marco de 100% ("100% dos troféus em «X»!")
-  concorda pelo `artigo` do vocabulário.
 - **Página do jogo e tile** (F3): `BlocoSteam` virou **`BlocoPlataforma`** (um componente para todas; `SecoesDasPlataformas` monta uma seção por ligação, na ordem do
   cadastro). Os textos saem do cadastro: `vocabulario` ("Conquistas · 12 de 40" / "Troféus · 3 de 6", "Conquista oculta" / "Troféu oculto"), `paginaDoJogo`
   (o link "Abrir na Steam" vem de um modelo com `{id}`; a PlayStation não tem, então não há "Abrir na PlayStation") e `textoSemConquistas` (na PlayStation, "Os
@@ -1062,6 +1053,13 @@ noreferrer"`), números (jogos, horas, "já jogados"), mais jogados (5), backlog
   do NPSSO). Tile, destaque e linha do catálogo: `resumoDoCatalogo` e `chipsDoDestaque` usam o nome e o vocabulário da primeira plataforma ligada na ordem do cadastro
   ("Tempo jogado na PlayStation: 10 horas, 12 de 40 troféus"); o selo (`selosDoJogo`) já era por cadastro (dois selos e "+N"). O marco de 100% ("100% dos troféus em «X»!")
   concorda pelo `artigo` do vocabulário.
+- **Popup da conta e linha do perfil** (F4): `ResumoSteam` virou **`ResumoPlataforma`** (um popup para todas, textos do cadastro). Steam continua igual. Na PlayStation o
+  popup mostra **Nível de troféu** ("Nível 312", "faixa 4 de 10", "42% até o próximo nível") e a contagem **por tipo** em texto (`resumo.nivel`/`resumo.trofeus`), e
+  **não** mostra "membro desde", status, "Abrir perfil" nem backlog (a PSN não dá; o backlog só aparece com a capacidade `backlog` do cadastro). O passo a passo de
+  privacidade, a atribuição legal e o "Não afiliado à …" saem do cadastro (`privacidade`, `rodapeLegal`); o da PlayStation é provisório, sem atribuição inventada e sem logo.
+  Em `reautenticar` (409 `PLATAFORMA_REAUTENTICAR`) o popup mostra o Chek `confuso`, "Sua conexão com a PlayStation expirou" e **Reconectar** (o formulário do NPSSO);
+  cabeçalho e Desvincular continuam. O Desvincular de plataforma por credencial avisa que a credencial guardada também é apagada. `textoDasConquistas(n, vocabulario)`
+  concorda em "12 troféus em 2 jogos vinculados".
 - **Testes** (F2): `PlataformasDoPerfil.playstation.test.tsx` (o diálogo, o campo, o valor só no corpo, nada em URL, armazenamento do navegador nem cache, os
   erros, `reautenticar`), `GameForm.plataformas.test.tsx` (dois botões, PS4 e PS5 como itens distintos, confirmação pelo cadastro), `lib/plataforma-texto.test.ts`,
   `lib/biblioteca.test.ts`, `shared/lib/plataformas.test.ts` (o cadastro) e `lib/sem-provedor-solto.test.ts` (sem exceção).
