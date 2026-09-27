@@ -16,11 +16,21 @@ export const ATUALIZACAO_AUTOMATICA_MS = 60 * 60 * 1000;
 /** Intervalo mínimo entre dois "Atualizar" manuais do mesmo jogo ou do mesmo perfil. */
 export const ATUALIZACAO_MANUAL_MIN_MS = 30 * 1000;
 
+/** `reautenticar`: a plataforma recusou a credencial guardada; o usuário precisa colar uma nova (PlayStation). */
+export type EstadoDaConta = 'ativa' | 'reautenticar';
+
 export interface ContaVinculada {
   provedor: Provedor;
   idExterno: string;
   nomeExibicao: string;
   vinculadaEm: string; // ISO 8601
+  /** A Steam é sempre `ativa`. */
+  estado: EstadoDaConta;
+}
+
+/** Corpo de `POST /api/integracoes/:provedor/vinculo/credencial` (plataformas sem redirecionamento). */
+export interface VincularComCredencialRequest {
+  credencial: string;
 }
 
 /** Resposta de `POST /api/integracoes/:provedor/vinculo`: para onde o navegador deve ir. */
@@ -40,6 +50,8 @@ export interface ItemBiblioteca {
   idExterno: string;
   titulo: string;
   capaUrl: string | null;
+  /** O texto de plataforma sugerido a um jogo novo criado a partir deste item (ex.: `PS5`); `null` = sem sugestão. */
+  plataformaSugerida?: string | null;
   minutosJogados: number;
   ultimaVezJogadoEm: string | null; // ISO 8601
   /** Jogos do catálogo com o mesmo título normalizado e ainda sem vínculo com o provedor (até 3). */
@@ -100,7 +112,26 @@ export interface ResumoContaPlataforma {
   /** `ligados` dos `naBiblioteca` jogos da biblioteca já estão ligados a um jogo do catálogo. */
   noCheckpoint: { ligados: number; naBiblioteca: number };
   conquistas: { desbloqueadas: number; total: number; jogosVinculados: number };
+  /** O nível da conta (troféus na PlayStation); `null` quando a plataforma não tem. */
+  nivel?: NivelDaConta | null;
+  /** Troféus da conta por tipo; `null` quando a plataforma não tem. */
+  trofeus?: TrofeusPorTipo | null;
   consultadoEm: string; // ISO 8601
+}
+
+export interface NivelDaConta {
+  valor: number;
+  /** % até o próximo nível. */
+  progressoPercentual: number | null;
+  /** A faixa (1 a 10) do nível de troféu. */
+  faixa: number | null;
+}
+
+export interface TrofeusPorTipo {
+  platina: number;
+  ouro: number;
+  prata: number;
+  bronze: number;
 }
 
 /** A camada da plataforma sobre um jogo do catálogo (o último valor gravado). */
@@ -126,15 +157,28 @@ export interface Conquista {
   iconeUrl: string | null;
   /** % dos jogadores que a têm, com 1 casa decimal; `null` quando indisponível. */
   raridadePercentual: number | null;
+  /** Só nos troféus da PlayStation. */
+  tipo?: TipoDeTrofeu | null;
+  raridadeNivel?: RaridadeDoTrofeu | null;
+}
+
+export type TipoDeTrofeu = 'platina' | 'ouro' | 'prata' | 'bronze';
+export type RaridadeDoTrofeu = 'ultrarraro' | 'muito-raro' | 'raro' | 'comum';
+
+export interface ContagemTrofeus {
+  total: number;
+  desbloqueados: number;
 }
 
 export type AvisoPlataforma =
-  'PERFIL_PRIVADO' | 'CONQUISTAS_PRIVADAS' | 'SEM_CONQUISTAS' | 'INDISPONIVEL';
+  'PERFIL_PRIVADO' | 'CONQUISTAS_PRIVADAS' | 'SEM_CONQUISTAS' | 'INDISPONIVEL' | 'REAUTENTICAR';
 
 export interface DetalheJogoPlataforma {
   dados: DadosJogoPlataforma;
   conquistas: Conquista[];
   aviso: AvisoPlataforma | null;
+  /** Total e desbloqueados por tipo de troféu, calculado na resposta (não gravado); `null` fora da PlayStation. */
+  porTipo?: Record<TipoDeTrofeu, ContagemTrofeus> | null;
 }
 
 /** Corpo de `PUT /api/integracoes/:provedor/jogos/:jogoId`. */

@@ -423,6 +423,7 @@ describe('GET /integracoes e o cartão do perfil (CA-16 a CA-21)', () => {
     const corpo = (await response.json()) as Record<string, unknown>[];
     expect(corpo).toHaveLength(1);
     expect(Object.keys(corpo[0] ?? {}).sort()).toEqual([
+      'estado',
       'idExterno',
       'nomeExibicao',
       'provedor',
@@ -701,6 +702,7 @@ describe('GET /integracoes/:provedor/biblioteca (CA-23 a CA-25, CA-34)', () => {
       'idExterno',
       'jogosParecidos',
       'minutosJogados',
+      'plataformaSugerida',
       'titulo',
       'ultimaVezJogadoEm',
       'vinculadoA',
@@ -1021,7 +1023,7 @@ describe('PUT e DELETE /integracoes/:provedor/jogos/:jogoId (CA-26 a CA-31, CA-6
     // O `SteamClient` de verdade valida o appid antes de chamar (steam.client.spec, CA-64); o falso faz o mesmo.
     ctx.client.listarJogos.mockImplementation((_steamId: string, opcoes?: { appId?: string }) => {
       if (opcoes?.appId !== undefined && !/^\d{1,10}$/.test(opcoes.appId)) {
-        return Promise.reject(new IdExternoInvalidoError('appId', 'appid inválido'));
+        return Promise.reject(new IdExternoInvalidoError('idItem', 'appid inválido'));
       }
       return Promise.resolve(biblioteca);
     });
@@ -1686,7 +1688,7 @@ describe('todas as rotas exigem token, menos o retorno (CA-57)', () => {
         'DELETE /integracoes/:provedor/jogos/:jogoId',
       ]),
     );
-    expect(moldes).toHaveLength(13);
+    expect(moldes).toHaveLength(14);
   });
 
   it('cada rota sem Authorization dá 401 AUTH_NAO_AUTENTICADO; só o retorno responde 302', async () => {
@@ -1859,6 +1861,7 @@ describe('GET /integracoes/:provedor/resumo e o backlog (spec plataformas-e-pagi
         'maisJogados',
         'membroDesde',
         'minutosTotais',
+        'nivel',
         'noCheckpoint',
         'nomeExibicao',
         'nuncaJogados',
@@ -1866,6 +1869,7 @@ describe('GET /integracoes/:provedor/resumo e o backlog (spec plataformas-e-pagi
         'provedor',
         'status',
         'totalJogos',
+        'trofeus',
       ].sort(),
     );
     expect((corpo?.jogosJogados as number) + (corpo?.nuncaJogados as number)).toBe(3);

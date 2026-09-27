@@ -8,6 +8,11 @@ export class ContaVinculadaDto {
   idExterno!: string;
   @ApiProperty() nomeExibicao!: string;
   @ApiProperty({ description: 'ISO 8601' }) vinculadaEm!: string;
+  @ApiProperty({
+    enum: ['ativa', 'reautenticar'],
+    description: '`reautenticar`: a plataforma recusou a credencial guardada; cole uma nova',
+  })
+  estado!: 'ativa' | 'reautenticar';
 }
 
 export class IniciarVinculoResponseDto {
@@ -67,6 +72,16 @@ export class ResumoContaPlataformaDto {
   maisJogados!: JogoMaisJogadoDto[];
   @ApiProperty({ type: NoCheckpointDto }) noCheckpoint!: NoCheckpointDto;
   @ApiProperty({ type: ConquistasDoPerfilDto }) conquistas!: ConquistasDoPerfilDto;
+  @ApiPropertyOptional({
+    nullable: true,
+    description: 'O nível de troféu da conta: { valor, progressoPercentual, faixa }',
+  })
+  nivel!: { valor: number; progressoPercentual: number | null; faixa: number | null } | null;
+  @ApiPropertyOptional({
+    nullable: true,
+    description: 'Troféus da conta por tipo: { platina, ouro, prata, bronze }',
+  })
+  trofeus!: { platina: number; ouro: number; prata: number; bronze: number } | null;
   @ApiProperty({ description: 'Quando a biblioteca foi consultada na plataforma (ISO 8601)' })
   consultadoEm!: string;
 }
@@ -82,6 +97,12 @@ export class ItemBibliotecaDto {
   idExterno!: string;
   @ApiProperty() titulo!: string;
   @ApiPropertyOptional({ nullable: true, type: String }) capaUrl!: string | null;
+  @ApiPropertyOptional({
+    nullable: true,
+    type: String,
+    description: 'A plataforma sugerida a um jogo novo criado a partir do item (ex.: PS5)',
+  })
+  plataformaSugerida!: string | null;
   @ApiProperty() minutosJogados!: number;
   @ApiPropertyOptional({ nullable: true, type: String, description: 'ISO 8601' })
   ultimaVezJogadoEm!: string | null;
@@ -137,6 +158,14 @@ export class ConquistaDto {
     description: '% dos jogadores que a têm, com 1 casa; null quando indisponível',
   })
   raridadePercentual!: number | null;
+  @ApiPropertyOptional({
+    nullable: true,
+    enum: ['platina', 'ouro', 'prata', 'bronze'],
+    description: 'Só troféus da PlayStation',
+  })
+  tipo?: string | null;
+  @ApiPropertyOptional({ nullable: true, enum: ['ultrarraro', 'muito-raro', 'raro', 'comum'] })
+  raridadeNivel?: string | null;
 }
 
 export class DetalheJogoPlataformaDto {
@@ -149,7 +178,19 @@ export class DetalheJogoPlataformaDto {
   @ApiPropertyOptional({
     nullable: true,
     type: String,
-    enum: ['PERFIL_PRIVADO', 'CONQUISTAS_PRIVADAS', 'SEM_CONQUISTAS', 'INDISPONIVEL'],
+    enum: [
+      'PERFIL_PRIVADO',
+      'CONQUISTAS_PRIVADAS',
+      'SEM_CONQUISTAS',
+      'INDISPONIVEL',
+      'REAUTENTICAR',
+    ],
   })
   aviso!: string | null;
+  @ApiPropertyOptional({
+    nullable: true,
+    description:
+      'Total e desbloqueados por tipo de troféu (platina, ouro, prata, bronze); só a PlayStation',
+  })
+  porTipo?: Record<string, { total: number; desbloqueados: number }> | null;
 }

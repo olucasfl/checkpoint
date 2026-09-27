@@ -14,6 +14,12 @@ const falsa = (id: string, nome: string, ligadoA: string): PlataformaInfo => ({
   logo: null,
   ligadoA,
   rotuloDaConta: nome,
+  vinculo: { tipo: 'credencial', rotuloDaCredencial: 'X' },
+  vocabulario: { conquista: 'conquista', conquistas: 'conquistas' },
+  plataformasCompativeis: [],
+  plataformaPadrao: null,
+  privacidade: null,
+  rodapeLegal: { atribuicao: null, naoAfiliado: '' },
 });
 const cadastro = [
   falsa('STEAM', 'Steam', 'à Steam'),

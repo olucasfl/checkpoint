@@ -2,12 +2,14 @@ import { ArgumentsHost, Catch, HttpException, type ExceptionFilter } from '@nest
 import { type Response } from 'express';
 import { apiError, badRequestError } from '../../common/errors/api-error';
 import {
+  CredencialInvalidaError,
   IdExternoInvalidoError,
   PerfilPrivadoError,
   PlataformaError,
   PlataformaIndisponivelError,
   PlataformaItemNaoEncontradoError,
   PlataformaLimiteError,
+  PlataformaReautenticarError,
   ProvedorNaoSuportadoError,
 } from './providers/plataforma-errors';
 
@@ -50,6 +52,23 @@ export const integracaoErrors = {
 export function plataformaHttpError(error: unknown): HttpException | null {
   if (error instanceof PerfilPrivadoError) {
     return apiError(409, 'PLATAFORMA_PERFIL_PRIVADO', 'O perfil na plataforma está privado.');
+  }
+  if (error instanceof PlataformaReautenticarError) {
+    return apiError(
+      409,
+      'PLATAFORMA_REAUTENTICAR',
+      'A conexão com a plataforma expirou. Vincule a conta de novo.',
+    );
+  }
+  if (error instanceof CredencialInvalidaError) {
+    return apiError(
+      400,
+      'PLATAFORMA_CREDENCIAL_INVALIDA',
+      'A plataforma recusou o código informado.',
+      {
+        credencial: 'A plataforma recusou o código informado.',
+      },
+    );
   }
   if (error instanceof PlataformaItemNaoEncontradoError) {
     return apiError(404, 'PLATAFORMA_ITEM_NAO_ENCONTRADO', 'Esse jogo não está na sua biblioteca.');

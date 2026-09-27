@@ -24,8 +24,8 @@ describe('cadastro de plataformas', () => {
     }
   });
   it('PROVEDORES e PROVEDOR_SLUG saem do cadastro', () => {
-    expect(PROVEDORES).toEqual(['STEAM']);
-    expect(PROVEDOR_SLUG).toEqual({ STEAM: 'steam' });
+    expect(PROVEDORES).toEqual(['STEAM', 'PLAYSTATION']);
+    expect(PROVEDOR_SLUG).toEqual({ STEAM: 'steam', PLAYSTATION: 'playstation' });
   });
   it('a Steam tem marcador neutro e a logo oficial existe em public/', () => {
     expect(PLATAFORMAS.STEAM.marcador.icone).toBeTruthy();

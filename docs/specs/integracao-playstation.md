@@ -1,6 +1,6 @@
 # Spec: integracao-playstation
 
-> Status: 📝 rascunho (2026-09-26). Estende `integracao-plataformas` e `plataformas-e-pagina-do-jogo` (não as substitui): usa o
+> Status: ✅ aprovada (2026-09-26); implementação em andamento. Estende `integracao-plataformas` e `plataformas-e-pagina-do-jogo` (não as substitui): usa o
 > mesmo `GameProvider`, o mesmo cadastro global (`PLATAFORMAS`), o mesmo `PlataformaMarca`, o mesmo `ModalDialog` e o Chek.
 > Branch `feat/playstation` (a partir da `develop`), quatro fases, **um commit por fase**. Sem push e sem PR.
 
@@ -387,7 +387,7 @@ humano confirma com conta real. Todo teste usa **NPSSO, tokens e chave sintétic
 - [ ] **CA-01** — **Dado** o repositório, **quando** rodo `git grep -n "from 'psn-api'" apps` e `git grep -n "require('psn-api')"`, **então** só `apps/api/src/modules/integrations/psn/psn.client.ts` aparece (e o teste de arquitetura falha se outro arquivo importar); **e** `apps/api/package.json` tem `"psn-api": "2.18.1"` **sem** `^` nem `~`, e nenhuma outra dependência nova entrou.
 - [ ] **CA-02** — **Dado** o `schema.prisma` e a migration `integracao_playstation`, **quando** leio os dois, **então** a migration só contém `ALTER TYPE "Provedor" ADD VALUE 'PLAYSTATION'`, `ALTER TABLE "ContaVinculada" ADD COLUMN "reautenticarDesde"` **nula** e `CREATE TABLE "CredencialPlataforma"` com FK `ON DELETE CASCADE`; nenhum `DROP`/`ALTER … TYPE`/`SET NOT NULL`; e `prisma migrate dev` não acusa _drift_.
 - [ ] **CA-03** — **Dado** `DATABASE_URL` apontando para um banco remoto, **quando** a F1 vai migrar, **então** o host/projeto foi **conferido (senha mascarada)** e `prisma migrate status` mostrou só a migration nova como pendente (senão a execução **parou e perguntou**).
-- [ ] **CA-04** — **Dado** a chave de cifra ausente, com menos/mais de 32 bytes ou fora do formato hexadecimal (64 caracteres), **quando** a API sobe, **então** o boot falha com a lista de erros **sem imprimir o valor**; com uma chave válida sintética, sobe. O `.env.example` documenta a variável **sem valor real**.
+- [ ] **CA-04** — **Dado** a chave de cifra **ausente**, **quando** a API sobe, **então** sobe normalmente, a PlayStation fica indisponível (`GET /api/integracoes` não a lista como disponível, `POST .../playstation/vinculo/credencial` responde 400 `VALIDACAO`) e o log avisa **uma vez**, sem valor; **dado** a chave com menos/mais de 32 bytes ou fora do formato hexadecimal (64 caracteres), **então** o boot falha com a lista de erros **sem imprimir o valor**; com uma chave válida sintética, sobe com a PlayStation ativa. O `.env.example` documenta a variável **sem valor real**.
 - [ ] **CA-05** — **Dado** um _refresh token_ sintético, **quando** cifro e decifro, **então** o resultado é idêntico; **e** dois cifrados do mesmo texto **diferem** (IV novo); **e** trocar **um byte** do texto, da _tag_, do IV ou usar **outro `contaId` (AAD)** faz a decifragem falhar; **e** com outra chave falha; **e** o texto cifrado **não contém** o token.
 - [ ] **CA-06** — **Dado** `IdExternoInvalidoError`, **então** o campo é `'idConta' | 'idItem'` (o `'steamId'`/`'appId'` deixa de existir) e os testes da Steam continuam verdes com o novo rótulo; a resposta HTTP segue 400 `VALIDACAO`.
 - [ ] **CA-07** — **Dado** o `PsnClient` com o pacote **mockado**, **quando** o pacote não responde em 8 s, **então** `PlataformaIndisponivelError` (nunca pendura); **e** `403`/resposta sem `access_token` no _refresh_ → `PlataformaReautenticarError`; **e** 429 → `PlataformaLimiteError`; **e** 5xx/JSON ilegível → `PlataformaIndisponivelError`; o **log tem só o nome da chamada e o status** e a mensagem de erro do pacote **nunca** é repassada. `[~]` (o formato exato das respostas de erro da Sony é suposição).
@@ -491,13 +491,13 @@ Loop por fase: `npm run typecheck` → `npm test` → `npm run lint` → `npm ru
 - **Verificação de conformidade jurídica** com os termos da Sony (registrada como risco R1, não resolvida aqui).
 - Trocar automaticamente `status`, notas ou `plataforma` a partir de dado da PSN.
 
-**Passo de processo (não é critério de aceite):** aplicar a migration no banco (após conferir qual é, R6), gerar a chave de cifra e cadastrá-la no Render e em `apps/api/.env`, atualizar `ARCHITECTURE.md`
+**Quem aplica a migration em produção:** ver "Notas de ambiente" (regra do `migrate deploy`). **Passo de processo (não é critério de aceite):** aplicar a migration no banco (após conferir qual é, R6), gerar a chave de cifra e cadastrá-la no Render e em `apps/api/.env`, atualizar `ARCHITECTURE.md`
 e `INDEX.md` no mesmo commit de cada fase, rodar o `/qa-verify` e o teste com conta real.
 
 ## Notas de ambiente
 
 - **Variável nova (única), validada em `env.validation.ts` e documentada no `.env.example` sem valor real: `PSN_TOKEN_ENCRYPTION_KEY`** — **64 caracteres hexadecimais (32 bytes)**, a chave do AES-256-GCM
-  que cifra o _refresh token_ da PSN. **Só o backend**; nunca no web, em log, teste, commit, spec ou chat. **Obrigatória no boot** (como `STEAM_API_KEY`); a ordem é: **1) migration → 2) variável no Render → 3) deploy**.
+  que cifra o _refresh token_ da PSN. **Só o backend**; nunca no web, em log, teste, commit, spec ou chat. **Opcional no boot**: ausente = PlayStation desligada (`disponivel: false` em tempo de execução, aviso único no log); malformada = falha no boot. A ordem de deploy continua: **1) migration → 2) variável no Render → 3) código** (com a chave opcional, o código sem a variável sobe, mas a PlayStation fica desligada).
   Gerar com `openssl rand -hex 32` (ou `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`). **Perder ou trocar a chave invalida as credenciais guardadas**: todo usuário cai em
   `reautenticar` e cola um NPSSO novo (sem perda de dado de jogo).
 - **Dependência nova:** `psn-api@2.18.1` (exata) em `apps/api`. Nenhuma outra.
@@ -516,7 +516,7 @@ Assumidas ao escrever a spec (o que não está aqui foi decidido pelo humano, D1
 - **S5** — A leitura da **própria** conta não depende da privacidade do perfil (hipótese `[~]`); por isso não existe "perfil privado" na PSN e os avisos são de sincronização.
 - **S6** — Timeout por **`Promise.race`** (o pacote não aceita cancelamento); a `fetch` pendente termina em segundo plano.
 - **S7** — `psn-api` carregada por **`import()` dinâmico** no `PsnClient`, para um erro de carga não derrubar o boot.
-- **S8** — A chave de cifra é **obrigatória** no boot e **sem rotação** (trocar a chave = reautenticar). Alternativa (opcional, com o provider desligado sem chave) fica fora.
+- **S8** — A chave de cifra é **opcional** no boot (decisão do humano, 2026-09-26): **ausente** → o provider PlayStation fica `disponivel: false` (a PSN some das telas e as rotas dela respondem 400 `VALIDACAO`), o resto do app sobe normal e o log avisa **uma vez**; **presente mas malformada** (não 64 hexadecimais) → o boot **falha**. **Sem rotação** (trocar a chave = reautenticar).
 - **S9** — A plataforma sugerida do jogo novo vem da `category` (`PS5`, `PS4`, `PC`, vazio) e é **editável**; a confirmação ao ligar usa `plataformasCompativeis` do cadastro.
 - **S10** — Sem logo oficial: marcador neutro `videogame_asset` e o nome em texto; rodapé provisório só com "Não afiliado à Sony Interactive Entertainment".
 - **S11** — O tamanho do NPSSO (64 caracteres) e a validade do _refresh_ (~60 dias) vêm do pedido e do pacote; a validação do DTO é **permissiva** (`[A-Za-z0-9_-]{32,128}`).

@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
@@ -8,6 +9,7 @@ import {
   type ContaVinculada,
   type DadosJogoPlataforma,
   type DetalheJogoPlataforma,
+  type EstadoDaConta,
   type IniciarVinculoResponse,
   type ItemBiblioteca,
   type JogoParecido,
@@ -18,6 +20,7 @@ import {
 } from '@checkpoint/shared';
 import { API_GLOBAL_PREFIX } from '../../config/app.config';
 import { type EnvironmentVariables } from '../../config/env.validation';
+import { badRequestError } from '../../common/errors/api-error';
 import { PrismaService } from '../../database/prisma.service';
 import { TtlCache } from './cache/ttl-cache';
 import {
@@ -34,14 +37,19 @@ import {
   type DadosJogoPlataformaRow,
 } from './lib/dados-plataforma';
 import { integracaoErrors } from './plataforma-http-errors';
+import { CifraDeCredencial } from './psn/cifra-de-credencial';
 import {
+  type ContextoDaConta,
   type DetalheDoJogo,
   type ItemDaBiblioteca,
   type PerfilBasico,
+  type SessaoDaPlataforma,
 } from './providers/game-provider';
 import {
   PerfilPrivadoError,
   PlataformaError,
+  PlataformaReautenticarError,
+  ProvedorNaoSuportadoError,
   VinculoCanceladoError,
   VinculoRecusadoError,
 } from './providers/plataforma-errors';
@@ -63,6 +71,14 @@ interface BibliotecaEmCache {
   consultadoEm: number;
 }
 
+/** O aviso de uma leitura que falhou (o detalhe devolve o gravado com ele, nunca um 502). */
+function avisoDoErro(error: PlataformaError): 'PERFIL_PRIVADO' | 'REAUTENTICAR' | 'INDISPONIVEL' {
+  if (error instanceof PerfilPrivadoError) {
+    return 'PERFIL_PRIVADO';
+  }
+  return error instanceof PlataformaReautenticarError ? 'REAUTENTICAR' : 'INDISPONIVEL';
+}
+
 /** A mesma mensagem do catálogo: jogo inexistente OU de outro usuário. */
 const JOGO_NAO_ENCONTRADO = 'Jogo não encontrado';
 
@@ -71,7 +87,21 @@ const CONTA_SELECT = {
   idExterno: true,
   nomeExibicao: true,
   vinculadaEm: true,
+  reautenticarDesde: true,
 } as const;
+
+/** A conta vinculada como as leituras a usam (o que `contaDe` seleciona). */
+interface ContaLida {
+  id: string;
+  idExterno: string;
+  nomeExibicao: string;
+  reautenticarDesde: Date | null;
+}
+
+/** `null` em `reautenticarDesde` = ativa. */
+function estadoDaConta(reautenticarDesde: Date | null): EstadoDaConta {
+  return reautenticarDesde ? 'reautenticar' : 'ativa';
+}
 
 /**
  * As integrações com plataformas de jogos (spec `integracao-plataformas`): vincular a conta, ler o perfil e
@@ -95,6 +125,7 @@ export class IntegrationsService {
     private readonly registry: ProviderRegistry,
     private readonly vinculoState: VinculoStateService,
     private readonly config: ConfigService<EnvironmentVariables, true>,
+    private readonly cifra: CifraDeCredencial,
   ) {}
 
   async listarContas(userId: string): Promise<ContaVinculada[]> {
@@ -108,6 +139,7 @@ export class IntegrationsService {
       idExterno: conta.idExterno,
       nomeExibicao: conta.nomeExibicao,
       vinculadaEm: conta.vinculadaEm.toISOString(),
+      estado: estadoDaConta(conta.reautenticarDesde),
     }));
   }
 
@@ -117,6 +149,10 @@ export class IntegrationsService {
     provedor: Provedor,
   ): Promise<{ resposta: IniciarVinculoResponse; nonce: string }> {
     const provider = this.registry.porProvedor(provedor);
+    // Plataforma por credencial não redireciona: o caminho dela é `vincularComCredencial`.
+    if (provider.modoDeVinculo !== 'redirecionamento') {
+      throw new ProvedorNaoSuportadoError(provedor);
+    }
     if (await this.contaDe(userId, provedor)) {
       throw integracaoErrors.jaVinculada();
     }
@@ -140,6 +176,9 @@ export class IntegrationsService {
     nonceDoCookie: string | undefined,
   ): Promise<ResultadoDoRetorno> {
     const provider = this.registry.porProvedor(provedor);
+    if (provider.modoDeVinculo !== 'redirecionamento') {
+      throw new ProvedorNaoSuportadoError(provedor);
+    }
 
     const state = query.state;
     if (typeof state !== 'string' || state === '') {
@@ -205,10 +244,7 @@ export class IntegrationsService {
     provedor: Provedor,
     opcoes: { atualizar?: boolean } = {},
   ): Promise<PerfilPlataforma> {
-    const conta = await this.contaDe(userId, provedor);
-    if (!conta) {
-      throw integracaoErrors.naoVinculada();
-    }
+    const conta = await this.contaAtiva(userId, provedor);
     const biblioteca = await this.obterBiblioteca(userId, provedor, conta, opcoes);
 
     return {
@@ -235,10 +271,7 @@ export class IntegrationsService {
     provedor: Provedor,
     opcoes: { atualizar?: boolean } = {},
   ): Promise<ResumoContaPlataforma> {
-    const conta = await this.contaDe(userId, provedor);
-    if (!conta) {
-      throw integracaoErrors.naoVinculada();
-    }
+    const conta = await this.contaAtiva(userId, provedor);
     const biblioteca = await this.obterBiblioteca(userId, provedor, conta, opcoes);
     const [conquistas, ligadosNoBanco] = await Promise.all([
       this.conquistasDosJogosVinculados(userId, provedor),
@@ -268,6 +301,8 @@ export class IntegrationsService {
         naBiblioteca: biblioteca.itens.length,
       },
       conquistas,
+      nivel: biblioteca.perfil.nivel ?? null,
+      trofeus: biblioteca.perfil.trofeus ?? null,
       consultadoEm: new Date(biblioteca.consultadoEm).toISOString(),
     };
   }
@@ -284,10 +319,7 @@ export class IntegrationsService {
     provedor: Provedor,
     query: { busca?: string; limite?: number; nuncaJogados?: boolean } = {},
   ): Promise<ItemBiblioteca[]> {
-    const conta = await this.contaDe(userId, provedor);
-    if (!conta) {
-      throw integracaoErrors.naoVinculada();
-    }
+    const conta = await this.contaAtiva(userId, provedor);
     const biblioteca = await this.obterBiblioteca(userId, provedor, conta);
 
     const buscada = chaveDeTitulo(query.busca ?? '');
@@ -343,6 +375,7 @@ export class IntegrationsService {
         idExterno: item.idExterno,
         titulo: item.titulo,
         capaUrl: item.capaUrl,
+        plataformaSugerida: item.plataformaSugerida ?? null,
         minutosJogados: item.minutosJogados,
         ultimaVezJogadoEm: item.ultimaVezJogadoEm?.toISOString() ?? null,
         // Um item já ligado não tem o que sugerir (é 1 para 1): "mover" é outro caminho.
@@ -362,7 +395,7 @@ export class IntegrationsService {
   private async obterBiblioteca(
     userId: string,
     provedor: Provedor,
-    conta: { idExterno: string; nomeExibicao: string },
+    conta: ContaLida,
     opcoes: { atualizar?: boolean } = {},
   ): Promise<BibliotecaEmCache> {
     const provider = this.registry.porProvedor(provedor);
@@ -375,7 +408,9 @@ export class IntegrationsService {
     ) {
       return emCache;
     }
-    const { itens, perfil } = await provider.listarBiblioteca(conta.idExterno);
+    const { itens, perfil } = await this.comMarcacao(userId, provedor, () =>
+      provider.listarBiblioteca(conta.idExterno, this.contexto(conta)),
+    );
     const entrada: BibliotecaEmCache = {
       itens,
       chaves: itens.map((item) => chaveDeTitulo(item.titulo)),
@@ -411,10 +446,7 @@ export class IntegrationsService {
     if (!jogo) {
       throw new NotFoundException(JOGO_NAO_ENCONTRADO);
     }
-    const conta = await this.contaDe(userId, provedor);
-    if (!conta) {
-      throw integracaoErrors.naoVinculada();
-    }
+    const conta = await this.contaAtiva(userId, provedor);
 
     const doJogo = await this.prisma.jogoPlataforma.findUnique({
       where: { gameId_provedor: { gameId: jogoId, provedor } },
@@ -438,7 +470,9 @@ export class IntegrationsService {
 
     // A plataforma: confere que o item é do usuário e traz o resumo. Falha (502, privado, item fora da biblioteca)
     // sobe aqui, ANTES de qualquer escrita.
-    const { dados } = await provider.obterJogo(conta.idExterno, corpo.idExterno);
+    const { dados } = await this.comMarcacao(userId, provedor, () =>
+      provider.obterJogo(conta.idExterno, corpo.idExterno, this.contexto(conta)),
+    );
     const data = {
       userId,
       gameId: jogoId,
@@ -526,21 +560,33 @@ export class IntegrationsService {
     if (!conta) {
       throw integracaoErrors.naoVinculada();
     }
+    if (conta.reautenticarDesde) {
+      // A conexão expirou: sem chamar a plataforma. A abertura devolve o gravado (nunca 409); o "Atualizar" é 409.
+      if (manual) {
+        throw new PlataformaReautenticarError();
+      }
+      return { dados: toDadosJogoPlataforma(gravado), conquistas: [], aviso: 'REAUTENTICAR' };
+    }
 
     const idade = Date.now() - gravado.atualizadoEm.getTime();
     const foraDaJanela = manual && idade >= ATUALIZACAO_MANUAL_MIN_MS;
     const comHoras = manual ? foraDaJanela : idade > ATUALIZACAO_AUTOMATICA_MS;
 
     try {
-      const detalhe = await provider.obterDetalhe(conta.idExterno, gravado.idExterno, {
-        comHoras,
-        ignorarCache: foraDaJanela,
-      });
+      const detalhe = await this.comMarcacao(userId, provedor, () =>
+        provider.obterDetalhe(
+          conta.idExterno,
+          gravado.idExterno,
+          { comHoras, ignorarCache: foraDaJanela },
+          this.contexto(conta),
+        ),
+      );
       const dados = await this.gravarDetalhe(jogoId, provedor, gravado, detalhe);
       return {
         dados: toDadosJogoPlataforma(dados),
         conquistas: detalhe.conquistas,
         aviso: detalhe.aviso,
+        porTipo: detalhe.porTipo ?? null,
       };
     } catch (error) {
       if (manual || !(error instanceof PlataformaError)) {
@@ -551,7 +597,7 @@ export class IntegrationsService {
       return {
         dados: toDadosJogoPlataforma(gravado),
         conquistas: [],
-        aviso: error instanceof PerfilPrivadoError ? 'PERFIL_PRIVADO' : 'INDISPONIVEL',
+        aviso: avisoDoErro(error),
       };
     }
   }
@@ -617,11 +663,170 @@ export class IntegrationsService {
       : `${base}?steam=erro&motivo=${resultado.motivo}`;
   }
 
-  private contaDe(userId: string, provedor: Provedor) {
+  private contaDe(userId: string, provedor: Provedor): Promise<ContaLida | null> {
     return this.prisma.contaVinculada.findUnique({
       where: { userId_provedor: { userId, provedor } },
-      select: { idExterno: true, nomeExibicao: true },
+      select: { id: true, idExterno: true, nomeExibicao: true, reautenticarDesde: true },
     });
+  }
+
+  /** A conta para uma leitura que precisa da plataforma: sem vínculo é 409; em `reautenticar` também, SEM chamar a plataforma. */
+  private async contaAtiva(userId: string, provedor: Provedor): Promise<ContaLida> {
+    const conta = await this.contaDe(userId, provedor);
+    if (!conta) {
+      throw integracaoErrors.naoVinculada();
+    }
+    if (conta.reautenticarDesde) {
+      throw new PlataformaReautenticarError();
+    }
+    return conta;
+  }
+
+  private contexto(conta: ContaLida): ContextoDaConta {
+    return { contaId: conta.id, nomeExibicao: conta.nomeExibicao };
+  }
+
+  /**
+   * Roda uma leitura da plataforma. Se ela recusa a credencial guardada, grava `reautenticarDesde` (uma vez) e
+   * repassa o erro: a UI pede um NPSSO novo. Falha de rede, 5xx e limite NÃO marcam nada.
+   */
+  private async comMarcacao<T>(
+    userId: string,
+    provedor: Provedor,
+    leitura: () => Promise<T>,
+  ): Promise<T> {
+    try {
+      return await leitura();
+    } catch (error) {
+      if (error instanceof PlataformaReautenticarError) {
+        await this.marcarReautenticar(userId, provedor);
+      }
+      throw error;
+    }
+  }
+
+  private async marcarReautenticar(userId: string, provedor: Provedor): Promise<void> {
+    try {
+      await this.prisma.contaVinculada.updateMany({
+        where: { userId, provedor, reautenticarDesde: null },
+        data: { reautenticarDesde: new Date(Date.now()) },
+      });
+    } catch {
+      // Só o estado: a próxima leitura tenta de novo.
+    }
+    this.logger.warn(`Conta (${provedor}) precisa reautenticar`);
+  }
+
+  /**
+   * Vincula por credencial (PlayStation): troca o NPSSO por uma sessão, grava a conta e a credencial CIFRADA numa
+   * transação e devolve a conta. O NPSSO nunca é guardado nem devolvido. Mesmo ID já vinculado renova a credencial
+   * (é como se sai de `reautenticar`); outro ID é 409.
+   */
+  async vincularComCredencial(
+    userId: string,
+    provedor: Provedor,
+    credencial: string,
+  ): Promise<ContaVinculada> {
+    const provider = this.registry.porProvedor(provedor);
+    if (provider.modoDeVinculo !== 'credencial' || !provider.vincularComCredencial) {
+      throw badRequestError('Esta plataforma não vincula por credencial', undefined, 'VALIDACAO');
+    }
+    const { idExterno, nomeExibicao, sessao } = await provider.vincularComCredencial(credencial);
+
+    for (let tentativa = 0; tentativa < 2; tentativa += 1) {
+      const existente = await this.contaDe(userId, provedor);
+      try {
+        if (existente) {
+          if (existente.idExterno !== idExterno) {
+            throw integracaoErrors.jaVinculada();
+          }
+          return await this.renovarCredencial(existente.id, nomeExibicao, sessao);
+        }
+        return await this.criarContaComCredencial(
+          userId,
+          provedor,
+          idExterno,
+          nomeExibicao,
+          sessao,
+        );
+      } catch (error) {
+        // Corrida: outra volta do mesmo usuário gravou primeiro; reavalia contra o que ficou.
+        if ((error as { code?: string }).code === 'P2002' && tentativa === 0) {
+          continue;
+        }
+        if ((error as { code?: string }).code === 'P2003') {
+          throw new NotFoundException('Usuário não encontrado');
+        }
+        throw error;
+      }
+    }
+    throw integracaoErrors.jaVinculada();
+  }
+
+  private async criarContaComCredencial(
+    userId: string,
+    provedor: Provedor,
+    idExterno: string,
+    nomeExibicao: string,
+    sessao: SessaoDaPlataforma,
+  ): Promise<ContaVinculada> {
+    // O id nasce aqui porque é o AAD da cifra: o texto cifrado só decifra para esta conta.
+    const id = randomUUID();
+    const conta = await this.prisma.contaVinculada.create({
+      data: {
+        id,
+        userId,
+        provedor,
+        idExterno,
+        nomeExibicao,
+        credencial: {
+          create: {
+            refreshCifrado: this.cifra.cifrar(sessao.refreshToken, id),
+            expiraEm: sessao.expiraEm,
+          },
+        },
+      },
+      select: CONTA_SELECT,
+    });
+    return this.paraContaVinculada(conta);
+  }
+
+  private async renovarCredencial(
+    contaId: string,
+    nomeExibicao: string,
+    sessao: SessaoDaPlataforma,
+  ): Promise<ContaVinculada> {
+    const refreshCifrado = this.cifra.cifrar(sessao.refreshToken, contaId);
+    const [, conta] = await this.prisma.$transaction([
+      this.prisma.credencialPlataforma.upsert({
+        where: { contaId },
+        create: { contaId, refreshCifrado, expiraEm: sessao.expiraEm },
+        update: { refreshCifrado, expiraEm: sessao.expiraEm },
+        select: { id: true },
+      }),
+      this.prisma.contaVinculada.update({
+        where: { id: contaId },
+        data: { reautenticarDesde: null, nomeExibicao },
+        select: CONTA_SELECT,
+      }),
+    ]);
+    return this.paraContaVinculada(conta);
+  }
+
+  private paraContaVinculada(conta: {
+    provedor: Provedor;
+    idExterno: string;
+    nomeExibicao: string;
+    vinculadaEm: Date;
+    reautenticarDesde: Date | null;
+  }): ContaVinculada {
+    return {
+      provedor: conta.provedor,
+      idExterno: conta.idExterno,
+      nomeExibicao: conta.nomeExibicao,
+      vinculadaEm: conta.vinculadaEm.toISOString(),
+      estado: estadoDaConta(conta.reautenticarDesde),
+    };
   }
 
   /** Mesmo SteamID → sucesso sem duplicar; outro SteamID → "ja-vinculada". A unicidade real é a do banco. */

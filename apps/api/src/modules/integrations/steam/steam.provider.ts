@@ -42,6 +42,7 @@ const NOME_MAX = 80;
 @Injectable()
 export class SteamProvider implements GameProvider {
   readonly id = 'STEAM' as const;
+  readonly modoDeVinculo = 'redirecionamento' as const;
 
   // Caches em memória (spec, "Custo e cache"): as conquistas do jogador por SteamID e appid (5 min) e o schema e os
   // percentuais por appid (24 h; dado público, dividido entre usuários). Chamadas simultâneas iguais viram uma só.

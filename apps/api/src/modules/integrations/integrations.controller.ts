@@ -50,6 +50,7 @@ import {
 import { ApiErrorResponseDto } from '../../common/errors/api-error-response.dto';
 import { type EnvironmentVariables } from '../../config/env.validation';
 import { BibliotecaQueryDto } from './dto/biblioteca-query.dto';
+import { VincularCredencialDto } from './dto/vincular-credencial.dto';
 import { VincularJogoDto } from './dto/vincular-jogo.dto';
 import {
   ContaVinculadaDto,
@@ -133,6 +134,41 @@ export class IntegrationsController {
     const { resposta, nonce } = await this.integrations.iniciarVinculo(user.id, provedor);
     setVinculoCookie(response, nonce, this.secureCookie());
     return resposta;
+  }
+
+  /**
+   * Vínculo por credencial (PlayStation): o usuário cola o NPSSO. O valor só existe no corpo deste `POST` (nunca em
+   * URL, log nem resposta) e é trocado por uma sessão e descartado; só o refresh token fica, cifrado.
+   */
+  @Post(':provedor/vinculo/credencial')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: INTEGRACOES_VINCULO_LIMIT })
+  @Header('cache-control', 'no-store')
+  @ApiOperation({
+    summary: 'Vincula por credencial (plataformas sem redirecionamento, como a PlayStation)',
+    description:
+      'O corpo traz a credencial (PlayStation: o NPSSO, que equivale a uma senha). Ela é usada uma vez e nunca ' +
+      'guardada nem devolvida. Já vinculada com o mesmo ID, renova a credencial (sai de `reautenticar`).',
+  })
+  @ApiParam(PROVEDOR_PARAM)
+  @ApiOkResponse({ type: ContaVinculadaDto })
+  @ApiBadRequestResponse({
+    type: ApiErrorResponseDto,
+    description:
+      '`VALIDACAO` (provedor por redirecionamento ou credencial fora do formato) ou `PLATAFORMA_CREDENCIAL_INVALIDA`',
+  })
+  @ApiConflictResponse({
+    type: ApiErrorResponseDto,
+    description: '`PLATAFORMA_JA_VINCULADA`: já há outra conta vinculada (desvincule antes)',
+  })
+  @ApiUnauthorizedResponse({ type: ApiErrorResponseDto })
+  @ApiTooManyRequestsResponse({ type: ApiErrorResponseDto, description: '`LIMITE_TENTATIVAS`' })
+  vincularComCredencial(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('provedor', ProvedorSlugPipe) provedor: Provedor,
+    @Body() corpo: VincularCredencialDto,
+  ): Promise<ContaVinculada> {
+    return this.integrations.vincularComCredencial(user.id, provedor, corpo.credencial);
   }
 
   /**

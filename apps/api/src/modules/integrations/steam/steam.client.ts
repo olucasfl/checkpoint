@@ -297,7 +297,7 @@ export class SteamClient {
   private validarSteamId(steamId: string): void {
     if (typeof steamId !== 'string' || !STEAM_ID_PATTERN.test(steamId)) {
       throw new IdExternoInvalidoError(
-        'steamId',
+        'idConta',
         'O SteamID deve ter 17 dígitos e começar com 7656',
       );
     }
@@ -305,7 +305,7 @@ export class SteamClient {
 
   private validarAppId(appId: string): void {
     if (typeof appId !== 'string' || !APP_ID_PATTERN.test(appId)) {
-      throw new IdExternoInvalidoError('appId', 'O appid deve ser um número de até 10 dígitos');
+      throw new IdExternoInvalidoError('idItem', 'O appid deve ser um número de até 10 dígitos');
     }
   }
 

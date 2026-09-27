@@ -416,6 +416,7 @@ describe('Vincular à Steam (spec integracao-plataformas, etapa 3)', () => {
     idExterno: 'STEAMID_SINTETICO',
     nomeExibicao: 'Jogador Sintetico',
     vinculadaEm: '2026-09-25T12:00:00.000Z',
+    estado: 'ativa' as const,
   };
   const dados = {
     provedor: 'STEAM' as const,
@@ -477,6 +478,7 @@ describe('bloco Steam na página do jogo (spec integracao-plataformas, etapa 4)'
     idExterno: 'STEAMID_SINTETICO',
     nomeExibicao: 'Jogador Sintetico',
     vinculadaEm: '2026-09-25T12:00:00.000Z',
+    estado: 'ativa' as const,
   };
 
   it('jogo ligado mostra o bloco Steam; jogo sem ligação não pede o detalhe', async () => {
@@ -555,6 +557,7 @@ describe('ações do jogo com a fonte mais larga (F1 da troca de design)', () =>
         idExterno: 'STEAMID_SINTETICO',
         nomeExibicao: 'Jogador Sintetico',
         vinculadaEm: '2026-09-25T12:00:00.000Z',
+        estado: 'ativa' as const,
       },
     ]);
     renderAt();

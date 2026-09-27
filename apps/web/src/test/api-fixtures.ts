@@ -198,6 +198,7 @@ export const conta: ContaVinculada = {
   idExterno: 'STEAMID_SINTETICO',
   nomeExibicao: 'Jogador Sintetico',
   vinculadaEm: '2026-09-25T12:00:00.000Z',
+  estado: 'ativa',
 };
 
 export const perfilSteam: PerfilPlataforma = {
@@ -219,6 +220,7 @@ export function biblioteca(): ItemBiblioteca[] {
       idExterno: '100',
       titulo: 'Jogo Sintetico da Biblioteca',
       capaUrl: null,
+      plataformaSugerida: null,
       minutosJogados: 90,
       ultimaVezJogadoEm: null,
       jogosParecidos: [],
@@ -228,6 +230,7 @@ export function biblioteca(): ItemBiblioteca[] {
       idExterno: '101',
       titulo: 'Outro item',
       capaUrl: null,
+      plataformaSugerida: null,
       minutosJogados: 0,
       ultimaVezJogadoEm: null,
       jogosParecidos: [parecido],
@@ -237,6 +240,7 @@ export function biblioteca(): ItemBiblioteca[] {
       idExterno: '102',
       titulo: 'Já ligado',
       capaUrl: null,
+      plataformaSugerida: null,
       minutosJogados: 10,
       ultimaVezJogadoEm: '2026-02-01T00:00:00.000Z',
       jogosParecidos: [],

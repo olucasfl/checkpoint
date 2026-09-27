@@ -16,6 +16,10 @@ import { IntegrationsController } from '../integrations.controller';
 import { IntegrationsService } from '../integrations.service';
 import { IntegrationsThrottlerGuard } from '../integrations-throttler.guard';
 import { GAME_PROVIDERS, ProviderRegistry } from '../providers/provider-registry';
+import { CifraDeCredencial } from '../psn/cifra-de-credencial';
+import { PsnSessao } from '../psn/psn-sessao';
+import { PsnClient } from '../psn/psn.client';
+import { PsnProvider } from '../psn/psn.provider';
 import { SteamOpenId } from '../steam/steam-open-id';
 import { SteamProvider } from '../steam/steam.provider';
 import { SteamClient } from '../steam/steam.client';
@@ -31,15 +35,25 @@ export const ENV = {
   API_PUBLIC_URL: 'http://localhost:3333',
   WEB_PUBLIC_URL: 'http://localhost:5173',
   STEAM_API_KEY: 'ABCDEF0123456789ABCDEF0123456789',
+  // A chave de cifra de teste: 64 hexadecimais sintéticos e óbvios (RULES.md §8).
+  PSN_TOKEN_ENCRYPTION_KEY: '0123456789abcdef'.repeat(4),
 };
 
 export interface ContaRow {
   id: string;
   userId: string;
-  provedor: 'STEAM';
+  provedor: 'STEAM' | 'PLAYSTATION';
   idExterno: string;
   nomeExibicao: string;
   vinculadaEm: Date;
+  reautenticarDesde?: Date | null;
+}
+
+export interface CredencialRow {
+  id: string;
+  contaId: string;
+  refreshCifrado: string;
+  expiraEm: Date;
 }
 
 export interface GameRow {
@@ -54,7 +68,7 @@ export interface JogoPlataformaRow {
   id: string;
   userId: string;
   gameId?: string;
-  provedor: 'STEAM';
+  provedor: 'STEAM' | 'PLAYSTATION';
   idExterno: string;
   minutosJogados?: number;
   ultimaVezJogadoEm?: Date | null;
@@ -70,6 +84,7 @@ export interface JogoPlataformaRow {
  */
 export class FakeIntegrationsPrisma {
   contas: ContaRow[] = [];
+  credenciais: CredencialRow[] = [];
   jogos: JogoPlataformaRow[] = [];
   games: GameRow[] = [];
   /** Um retrato de `jogos` ANTES de cada escrita: é o que a transação usa para desfazer (rollback). */
@@ -101,41 +116,114 @@ export class FakeIntegrationsPrisma {
     }) => {
       const { userId, provedor } = where.userId_provedor;
       const conta = this.contas.find((c) => c.userId === userId && c.provedor === provedor);
-      return Promise.resolve(conta ? { ...conta } : null);
+      return Promise.resolve(conta ? this.contaCompleta(conta) : null);
     },
     findMany: ({ where }: { where: { userId: string } }) =>
-      Promise.resolve(this.contas.filter((c) => c.userId === where.userId).map((c) => ({ ...c }))),
-    create: ({ data }: { data: Omit<ContaRow, 'id' | 'vinculadaEm'> }) => {
+      Promise.resolve(
+        this.contas.filter((c) => c.userId === where.userId).map((c) => this.contaCompleta(c)),
+      ),
+    create: ({
+      data,
+    }: {
+      data: Omit<ContaRow, 'id' | 'vinculadaEm'> & {
+        id?: string;
+        credencial?: { create: { refreshCifrado: string; expiraEm: Date } };
+      };
+    }) => {
       if (this.contas.some((c) => c.userId === data.userId && c.provedor === data.provedor)) {
         return Promise.reject(Object.assign(new Error('unique'), { code: 'P2002' }));
       }
-      const row: ContaRow = { ...data, id: randomUUID(), vinculadaEm: new Date() };
+      const { credencial, ...resto } = data;
+      const row: ContaRow = { ...resto, id: data.id ?? randomUUID(), vinculadaEm: new Date() };
       this.contas.push(row);
-      return Promise.resolve({ id: row.id });
+      if (credencial) {
+        this.credenciais.push({ id: randomUUID(), contaId: row.id, ...credencial.create });
+      }
+      return Promise.resolve(this.contaCompleta(row));
     },
     update: ({
       where,
       data,
     }: {
-      where: { userId_provedor: { userId: string; provedor: string } };
-      data: { nomeExibicao: string };
+      where: { userId_provedor?: { userId: string; provedor: string }; id?: string };
+      data: { nomeExibicao?: string; reautenticarDesde?: Date | null };
     }) => {
-      const { userId, provedor } = where.userId_provedor;
-      const conta = this.contas.find((c) => c.userId === userId && c.provedor === provedor);
+      const conta = where.id
+        ? this.contas.find((c) => c.id === where.id)
+        : this.contas.find(
+            (c) =>
+              c.userId === where.userId_provedor?.userId &&
+              c.provedor === where.userId_provedor.provedor,
+          );
       if (!conta) {
         return Promise.reject(Object.assign(new Error('missing'), { code: 'P2025' }));
       }
-      conta.nomeExibicao = data.nomeExibicao;
-      return Promise.resolve({ id: conta.id });
+      Object.assign(conta, data);
+      return Promise.resolve(this.contaCompleta(conta));
+    },
+    updateMany: ({
+      where,
+      data,
+    }: {
+      where: { userId: string; provedor: string; reautenticarDesde: null };
+      data: { reautenticarDesde: Date };
+    }) => {
+      const alvo = this.contas.filter(
+        (c) =>
+          c.userId === where.userId &&
+          c.provedor === where.provedor &&
+          (c.reautenticarDesde ?? null) === null,
+      );
+      alvo.forEach((c) => Object.assign(c, data));
+      return Promise.resolve({ count: alvo.length });
     },
     deleteMany: ({ where }: { where: { userId: string; provedor: string } }) => {
-      const antes = this.contas.length;
-      this.contas = this.contas.filter(
-        (c) => !(c.userId === where.userId && c.provedor === where.provedor),
+      const removidas = this.contas.filter(
+        (c) => c.userId === where.userId && c.provedor === where.provedor,
       );
-      return Promise.resolve({ count: antes - this.contas.length });
+      this.contas = this.contas.filter((c) => !removidas.includes(c));
+      // `onDelete: Cascade`: a credencial some junto com a conta.
+      this.credenciais = this.credenciais.filter((k) => !removidas.some((c) => c.id === k.contaId));
+      return Promise.resolve({ count: removidas.length });
     },
   };
+
+  credencialPlataforma = {
+    findUnique: ({ where }: { where: { contaId: string } }) => {
+      const achada = this.credenciais.find((k) => k.contaId === where.contaId);
+      return Promise.resolve(achada ? { ...achada } : null);
+    },
+    update: ({ where, data }: { where: { contaId: string }; data: Partial<CredencialRow> }) => {
+      const achada = this.credenciais.find((k) => k.contaId === where.contaId);
+      if (!achada) {
+        return Promise.reject(Object.assign(new Error('missing'), { code: 'P2025' }));
+      }
+      Object.assign(achada, data);
+      return Promise.resolve({ id: achada.id });
+    },
+    upsert: ({
+      where,
+      create,
+      update,
+    }: {
+      where: { contaId: string };
+      create: Omit<CredencialRow, 'id'>;
+      update: Partial<CredencialRow>;
+    }) => {
+      const achada = this.credenciais.find((k) => k.contaId === where.contaId);
+      if (achada) {
+        Object.assign(achada, update);
+        return Promise.resolve({ id: achada.id });
+      }
+      const row = { id: randomUUID(), ...create };
+      this.credenciais.push(row);
+      return Promise.resolve({ id: row.id });
+    },
+  };
+
+  private contaCompleta(c: ContaRow) {
+    return { ...c, reautenticarDesde: c.reautenticarDesde ?? null };
+  }
 
   game = {
     findFirst: ({ where }: { where: { id: string; userId: string } }) => {
@@ -313,6 +401,17 @@ export interface IntegrationsHttpApp {
     obterSchema: jest.Mock;
     obterPercentuaisGlobais: jest.Mock;
   };
+  /** O `PsnClient` de verdade, com as chamadas à Sony trocadas por mocks (o pacote nunca é carregado). */
+  psn: PsnClient & {
+    trocarNpsso: jest.Mock;
+    renovar: jest.Mock;
+    perfil: jest.Mock;
+    resumoDeTrofeus: jest.Mock;
+    jogados: jest.Mock;
+    conjuntoDeTrofeus: jest.Mock;
+    definicoesDeTrofeus: jest.Mock;
+    ganhosDeTrofeus: jest.Mock;
+  };
   /** O OpenID de verdade, com a chamada à Steam (`validarRetorno`) trocada por um mock. */
   openId: SteamOpenId & { validarRetorno: jest.Mock };
   logger: CollectingLogger;
@@ -340,6 +439,16 @@ export async function startIntegrationsApp(
     obterPercentuaisGlobais: jest.fn(),
   };
   const openId = Object.assign(new SteamOpenId(), { validarRetorno: jest.fn() });
+  const psn = Object.assign(new PsnClient(), {
+    trocarNpsso: jest.fn(),
+    renovar: jest.fn(),
+    perfil: jest.fn(),
+    resumoDeTrofeus: jest.fn(),
+    jogados: jest.fn(),
+    conjuntoDeTrofeus: jest.fn(),
+    definicoesDeTrofeus: jest.fn(),
+    ganhosDeTrofeus: jest.fn(),
+  });
 
   const moduleRef = await Test.createTestingModule({
     imports: [
@@ -354,12 +463,18 @@ export async function startIntegrationsApp(
       VinculoStateService,
       AuthTokensService,
       SteamProvider,
+      CifraDeCredencial,
+      PsnSessao,
+      PsnProvider,
+      { provide: PsnClient, useValue: psn },
       { provide: SteamOpenId, useValue: openId },
       { provide: SteamClient, useValue: client },
       {
         provide: GAME_PROVIDERS,
-        useFactory: (steam: SteamProvider) => [steam],
-        inject: [SteamProvider],
+        // Como o módulo de verdade: a PlayStation só entra com a chave de cifra.
+        useFactory: (steam: SteamProvider, playstation: PsnProvider, cifra: CifraDeCredencial) =>
+          cifra.disponivel ? [steam, playstation] : [steam],
+        inject: [SteamProvider, PsnProvider, CifraDeCredencial],
       },
       ProviderRegistry,
       { provide: PrismaService, useValue: db },
@@ -381,6 +496,7 @@ export async function startIntegrationsApp(
     baseUrl: `http://127.0.0.1:${port}/${API_GLOBAL_PREFIX}`,
     db,
     client,
+    psn: psn as IntegrationsHttpApp['psn'],
     openId: openId as IntegrationsHttpApp['openId'],
     logger,
     tokens,

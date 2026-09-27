@@ -427,7 +427,7 @@ describe('SteamClient', () => {
       for (const chamar of chamadas) {
         await expect(chamar()).rejects.toMatchObject({
           name: 'IdExternoInvalidoError',
-          campo: 'steamId',
+          campo: 'idConta',
         });
         await expect(chamar()).rejects.toBeInstanceOf(IdExternoInvalidoError);
       }
@@ -445,7 +445,7 @@ describe('SteamClient', () => {
       for (const chamar of chamadas) {
         await expect(chamar()).rejects.toMatchObject({
           name: 'IdExternoInvalidoError',
-          campo: 'appId',
+          campo: 'idItem',
         });
       }
       expect(fetchMock).not.toHaveBeenCalled();

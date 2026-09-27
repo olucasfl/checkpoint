@@ -191,7 +191,9 @@ implementado.
   `API_PUBLIC_URL` (o endereço em que o **navegador** alcança a API, usado no `return_to`/`realm` do OpenID: em
   produção o domínio da Vercel, por causa do rewrite de `/api`; em dev `http://localhost:3333`) e
   `WEB_PUBLIC_URL` (a origem do web, para onde o retorno do vínculo redireciona), as duas **sem barra final e
-  sem caminho**; falta ou valor inválido **derruba a aplicação** com a
+  sem caminho**; e, **opcional**, `PSN_TOKEN_ENCRYPTION_KEY` (spec `integracao-playstation`: 64 hexadecimais, a chave do AES-256-GCM que
+  cifra o refresh token da PlayStation; **ausente** = a PlayStation fica desligada e o resto do app sobe, com um aviso único no log;
+  **presente e malformada** = o boot falha; a mensagem não ecoa o valor); falta ou valor inválido **derruba a aplicação** com a
   lista de erros. `SUPABASE_SERVICE_ROLE_KEY` também recusa uma chave que comece com
   `sb_publishable_` (a chave pública, sujeita a RLS, com que todo upload falharia com 403). Variável de ambiente nova em `apps/api/.env` **precisa** ganhar um campo aqui, ou
   o `ConfigService` não a expõe (nem para leitura).
@@ -222,6 +224,11 @@ implementado.
   único e sempre normalizado, `senhaHash`) e `RefreshSession` (uma linha por dispositivo logado; o `id` é o
   `sid` dos tokens; guarda só o **SHA-256** do refresh token e o do anterior, mais um rótulo do dispositivo
   derivado do `User-Agent`, sem IP), com `onDelete: Cascade`.
+- **PlayStation** (spec `integracao-playstation`, F1, migration `integracao_playstation`, **só aditiva**): `Provedor` ganhou `PLAYSTATION`
+  (`ALTER TYPE … ADD VALUE`), `ContaVinculada.reautenticarDesde DateTime?` (coluna **nula**: `null` = ativa; preenchida quando a Sony recusa a
+  credencial guardada) e o model **`CredencialPlataforma`** (`contaId @unique` → `ContaVinculada`, `onDelete: Cascade`; `refreshCifrado`,
+  `expiraEm`, `atualizadoEm`), numa **tabela à parte** para que nenhum `select`/`include` de `ContaVinculada` vaze o segredo. O `refreshCifrado`
+  é `v1:<iv>:<tag>:<texto>` (AES-256-GCM, IV por gravação, a conta como AAD); o **NPSSO nunca é gravado**.
 - **`Provedor`, `ContaVinculada` e `JogoPlataforma`** (spec `integracao-plataformas`, etapa 1, migration
   `integracao_plataformas`, **só aditiva**: um enum e duas tabelas, nenhuma coluna existente tocada).
   `Provedor` é um enum do Postgres (`STEAM`; acrescentar um valor é `ALTER TYPE … ADD VALUE`). `ContaVinculada`
@@ -356,6 +363,24 @@ apps/api/src/modules/games/
     `VinculoRecusadoError`) **não** são `HttpException`: carregam o `code` estável (`ApiErrorCode`), e quem
     responde HTTP os mapeia (`plataforma-http-errors.ts`: `PlataformaExceptionFilter` no controller; falha da
     plataforma é **502**, nunca 500; perfil privado é 409; ID malformado e provedor desconhecido são 400).
+  - **PlayStation** (spec `integracao-playstation`, F1; `psn/`). A PSN **não tem API pública**: o app usa a **`psn-api` 2.18.1** (versão exata,
+    **API NÃO OFICIAL** da comunidade, que fala com os endpoints do app móvel da Sony e pode quebrar ou mudar sem aviso; a conformidade com
+    os termos da Sony **não foi verificada**, é risco aceito, ver a spec R1). Só o **`PsnClient`** (`psn/psn.client.ts`) a importa (teste
+    `sem-import-direto.spec.ts`), por `import()` dinâmico na primeira chamada (uma falha de carga não derruba o boot): timeout de 8 s por
+    `Promise.race` (o pacote não tem timeout), **nenhuma mensagem do pacote é repassada nem logada** (ela embute a resposta da Sony; o log tem só o
+    nome da chamada e o tipo do erro), tipos neutros e erros de domínio. **`PsnSessao`** guarda o access token **só em memória**, por conta,
+    junta refreshes simultâneos e, sem token, lê a credencial, decifra (`CifraDeCredencial`, AES-256-GCM) e renova, regravando o refresh se a
+    Sony devolver um novo; refresh vencido/recusado ou cifra que não decifra → `PlataformaReautenticarError`. **`PsnProvider`** implementa o
+    `GameProvider`: o item da biblioteca é o `titleId` (PS4 e PS5 são itens distintos; nada agrupa versões) e a conta é o `accountId`.
+    **Vínculo por credencial:** `POST :provedor/vinculo/credencial` (corpo `{ credencial }`, DTO permissivo `[A-Za-z0-9_-]{32,128}` lido cru e sem
+    ecoar o valor; 5/min por usuário; `no-store`) troca o NPSSO por uma sessão, grava a conta e a credencial cifrada **numa** operação e devolve a
+    `ContaVinculada` (sem segredo); o NPSSO nunca sai da função. Mesmo `accountId` já vinculado renova a credencial (e limpa `reautenticarDesde`);
+    outro é 409. `GameProvider` ganhou `modoDeVinculo` (`redirecionamento` | `credencial`; o service consulta isto, nunca o `id`),
+    `vincularComCredencial?` e um **contexto `{ contaId, nomeExibicao }`** nas leituras (a Steam o ignora). **Estado `reautenticar`:** quando a Sony
+    recusa a credencial, o service grava `reautenticarDesde` e responde **409 `PLATAFORMA_REAUTENTICAR`** sem chamar a Sony nas leituras seguintes;
+    o `GET .../jogos/:id` devolve o gravado com `aviso: 'REAUTENTICAR'` (nunca 409). Falha de rede, 5xx, limite e timeout **não** marcam
+    `reautenticar` (são 502). A PlayStation só é registrada em `GAME_PROVIDERS` com a `PSN_TOKEN_ENCRYPTION_KEY`; sem ela as rotas dela respondem
+    400 `VALIDACAO` (provedor desconhecido). `IdExternoInvalidoError.campo` virou `'idConta' | 'idItem'` (rótulo neutro).
   - **`SteamClient`** (`steam/steam.client.ts`) fala com a Steam Web API (`api.steampowered.com`) pelo `fetch`
     nativo, **sem SDK**, no padrão do `StorageService`: timeout de 8 s, sem _retry_, isolado atrás de métodos
     simples (`obterPerfil`, `listarJogos`, `obterConquistasDoJogador`, `obterSchema`,
@@ -1141,16 +1166,17 @@ mudanças de schema por um agente.
 
 ## 8. Variáveis de ambiente
 
-| Arquivo         | Variáveis                                                              | Para quê                                                                                                                                                                                                                                                                                                      |
-| --------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `apps/api/.env` | `NODE_ENV`, `PORT`, `DATABASE_URL`, `CORS_ORIGIN`                      | Validadas em `src/config/env.validation.ts`; falta/erro derruba o boot                                                                                                                                                                                                                                        |
-| `apps/api/.env` | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_STORAGE_BUCKET` | Storage das capas; validadas em `env.validation.ts` (obrigatórias). O valor da chave é a **secret key** (`sb_secret_…`) e só o backend a usa: nunca vai para o web nem para log                                                                                                                               |
-| `apps/api/.env` | `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `AUTH_REGISTRATION_OPEN`    | Autenticação; obrigatórias em `env.validation.ts`. Os dois segredos têm ≥ 32 caracteres e são **diferentes**; gere cada um localmente (`node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"`). Nunca vão para o web, spec, log ou PR. `AUTH_REGISTRATION_OPEN` é `true` ou `false` |
-| `apps/api/.env` | `AUTH_REGISTRATION_LIMIT_PER_HOUR`                                     | **Opcional**, só dev/teste: sobrescreve o limite de 3 registros por hora por IP. Em ambiente exposto, deixe ausente                                                                                                                                                                                           |
-| `apps/api/.env` | `STEAM_API_KEY`, `API_PUBLIC_URL`, `WEB_PUBLIC_URL`                    | Integração com plataformas (spec `integracao-plataformas`); **obrigatórias**: a API não sobe sem elas, cadastre no Render **antes** do deploy. `STEAM_API_KEY` só no backend, nunca no web nem em log. `API_PUBLIC_URL` e `WEB_PUBLIC_URL`: origens sem barra final (produção: o domínio da Vercel; §4.2)     |
-| `apps/api/.env` | `DIRECT_URL`                                                           | Só o Prisma CLI lê (via `schema.prisma`); necessária apenas se `DATABASE_URL` for uma conexão pooled (ex.: Supabase)                                                                                                                                                                                          |
-| `apps/api/.env` | `TRUST_PROXY_HOPS`                                                     | **Opcional**, inteiro de 0 a 10; ausente = 0 (dev, sem proxy). Quantos proxies confiáveis há entre o cliente e a API, para o limite por IP ver o cliente e não o proxy (§4.1). Em produção, o número **medido** (Vercel + Render); nunca um chute                                                             |
-| `apps/web/.env` | `VITE_API_URL`                                                         | Consumida em `src/shared/lib/env.ts`, `baseURL` do `apiClient`                                                                                                                                                                                                                                                |
+| Arquivo         | Variáveis                                                              | Para quê                                                                                                                                                                                                                                                                                                                          |
+| --------------- | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/api/.env` | `NODE_ENV`, `PORT`, `DATABASE_URL`, `CORS_ORIGIN`                      | Validadas em `src/config/env.validation.ts`; falta/erro derruba o boot                                                                                                                                                                                                                                                            |
+| `apps/api/.env` | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_STORAGE_BUCKET` | Storage das capas; validadas em `env.validation.ts` (obrigatórias). O valor da chave é a **secret key** (`sb_secret_…`) e só o backend a usa: nunca vai para o web nem para log                                                                                                                                                   |
+| `apps/api/.env` | `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `AUTH_REGISTRATION_OPEN`    | Autenticação; obrigatórias em `env.validation.ts`. Os dois segredos têm ≥ 32 caracteres e são **diferentes**; gere cada um localmente (`node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"`). Nunca vão para o web, spec, log ou PR. `AUTH_REGISTRATION_OPEN` é `true` ou `false`                     |
+| `apps/api/.env` | `AUTH_REGISTRATION_LIMIT_PER_HOUR`                                     | **Opcional**, só dev/teste: sobrescreve o limite de 3 registros por hora por IP. Em ambiente exposto, deixe ausente                                                                                                                                                                                                               |
+| `apps/api/.env` | `STEAM_API_KEY`, `API_PUBLIC_URL`, `WEB_PUBLIC_URL`                    | Integração com plataformas (spec `integracao-plataformas`); **obrigatórias**: a API não sobe sem elas, cadastre no Render **antes** do deploy. `STEAM_API_KEY` só no backend, nunca no web nem em log. `API_PUBLIC_URL` e `WEB_PUBLIC_URL`: origens sem barra final (produção: o domínio da Vercel; §4.2)                         |
+| `apps/api/.env` | `PSN_TOKEN_ENCRYPTION_KEY`                                             | **Opcional** (spec `integracao-playstation`): 64 hexadecimais, a chave do AES-256-GCM que cifra o refresh token da PlayStation. Ausente = PlayStation desligada (o resto do app sobe); malformada = o boot falha. **Só o backend**; nunca no web, em log ou commit. Perder ou trocar a chave manda todo mundo para `reautenticar` |
+| `apps/api/.env` | `DIRECT_URL`                                                           | Só o Prisma CLI lê (via `schema.prisma`); necessária apenas se `DATABASE_URL` for uma conexão pooled (ex.: Supabase)                                                                                                                                                                                                              |
+| `apps/api/.env` | `TRUST_PROXY_HOPS`                                                     | **Opcional**, inteiro de 0 a 10; ausente = 0 (dev, sem proxy). Quantos proxies confiáveis há entre o cliente e a API, para o limite por IP ver o cliente e não o proxy (§4.1). Em produção, o número **medido** (Vercel + Render); nunca um chute                                                                                 |
+| `apps/web/.env` | `VITE_API_URL`                                                         | Consumida em `src/shared/lib/env.ts`, `baseURL` do `apiClient`                                                                                                                                                                                                                                                                    |
 
 `CORS_ORIGIN` deixou de ter padrão e **recusa `*`** (cookie de sessão): liste as origens, ex.:
 `http://localhost:5173`. Cada arquivo tem um `.env.example` correspondente, versionado. Nunca commitar `.env` real nem
@@ -1166,16 +1192,23 @@ e bucket ficam no **Supabase**. As variáveis da API vivem no painel do Render; 
 
 **Variáveis da API em produção (painel do Render)**
 
-| Variável           | Valor                                    | Observação                                                                             |
-| ------------------ | ---------------------------------------- | -------------------------------------------------------------------------------------- |
-| `NODE_ENV`         | `production`                             | o cookie do vínculo passa a `Secure`                                                   |
-| `CORS_ORIGIN`      | `https://checkpoint-web-rust.vercel.app` | lista de origens; `*` é recusado no boot                                               |
-| `API_PUBLIC_URL`   | `https://checkpoint-web-rust.vercel.app` | sem barra final; é o `return_to` e o `realm` do OpenID da Steam                        |
-| `WEB_PUBLIC_URL`   | `https://checkpoint-web-rust.vercel.app` | sem barra final; para onde o retorno do vínculo redireciona                            |
-| `STEAM_API_KEY`    | 32 hexadecimais (segredo)                | gerada em `steamcommunity.com/dev/apikey`; "domínio": `checkpoint-web-rust.vercel.app` |
-| `TRUST_PROXY_HOPS` | o número **medido**                      | ver o passo 2; nunca um chute e nunca `true`                                           |
+| Variável                   | Valor                                    | Observação                                                                                                                              |
+| -------------------------- | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `NODE_ENV`                 | `production`                             | o cookie do vínculo passa a `Secure`                                                                                                    |
+| `CORS_ORIGIN`              | `https://checkpoint-web-rust.vercel.app` | lista de origens; `*` é recusado no boot                                                                                                |
+| `API_PUBLIC_URL`           | `https://checkpoint-web-rust.vercel.app` | sem barra final; é o `return_to` e o `realm` do OpenID da Steam                                                                         |
+| `WEB_PUBLIC_URL`           | `https://checkpoint-web-rust.vercel.app` | sem barra final; para onde o retorno do vínculo redireciona                                                                             |
+| `STEAM_API_KEY`            | 32 hexadecimais (segredo)                | gerada em `steamcommunity.com/dev/apikey`; "domínio": `checkpoint-web-rust.vercel.app`                                                  |
+| `TRUST_PROXY_HOPS`         | o número **medido**                      | ver o passo 2; nunca um chute e nunca `true`                                                                                            |
+| `PSN_TOKEN_ENCRYPTION_KEY` | 64 hexadecimais (segredo)                | **opcional**: sem ela a PlayStation fica desligada; gere com `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` |
 
 As demais (`DATABASE_URL`, `DIRECT_URL`, `SUPABASE_*`, `JWT_*`, `AUTH_REGISTRATION_OPEN`, `PORT`) já existem e não mudam.
+
+**PlayStation (spec `integracao-playstation`): ordem de deploy e quem aplica a migration.** A migration `integracao_playstation` é **aditiva** e o Render **não** roda
+`migrate deploy` no build/start (o `start` é `node dist/main.js`): quem a aplica é o humano, com `npm run db:deploy -w @checkpoint/api` (ou `npx prisma migrate deploy` em `apps/api`) contra o banco
+de produção (`DIRECT_URL`, porta 5432), depois de conferir o banco com `npx prisma migrate status`. Ordem: **1) migration → 2) `PSN_TOKEN_ENCRYPTION_KEY` no Render → 3) deploy do código**. O código
+**nunca** pode chegar antes da migration: o cliente Prisma novo conhece `reautenticarDesde` e o valor `PLAYSTATION`, e `GET /api/integracoes` lê `reautenticarDesde` (a coluna precisa existir). Com a chave opcional, o código sem a variável
+sobe, mas a PlayStation fica desligada (mesma mensagem 400 de provedor desconhecido).
 
 **Checklist, em ordem** (cada passo só depois do anterior):
 

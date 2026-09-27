@@ -145,5 +145,8 @@ export const API_ERROR_CODES = [
   'PLATAFORMA_VINCULO_NAO_ENCONTRADO',
   'PLATAFORMA_INDISPONIVEL',
   'PLATAFORMA_LIMITE',
+  // PlayStation: credencial colada pelo usuário (spec integracao-playstation).
+  'PLATAFORMA_REAUTENTICAR',
+  'PLATAFORMA_CREDENCIAL_INVALIDA',
 ] as const;
 export type ApiErrorCode = (typeof API_ERROR_CODES)[number];

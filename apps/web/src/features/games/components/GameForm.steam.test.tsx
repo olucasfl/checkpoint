@@ -31,6 +31,7 @@ const CONTA: ContaVinculada = {
   idExterno: 'STEAMID_SINTETICO',
   nomeExibicao: 'Jogador Sintetico',
   vinculadaEm: '2026-09-25T12:00:00.000Z',
+  estado: 'ativa',
 };
 
 const item = (over: Partial<ItemBiblioteca> = {}): ItemBiblioteca => ({

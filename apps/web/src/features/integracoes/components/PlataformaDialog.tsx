@@ -6,10 +6,10 @@ import { PlataformaMarca } from '@/shared/components/PlataformaMarca';
 import { ResumoSteam } from './ResumoSteam';
 
 /**
- * O conteúdo do popup de cada plataforma. É um `Record<Provedor, …>`: uma plataforma nova no cadastro não compila
- * enquanto não tiver o seu resumo aqui, e o popup nunca compara o provedor com um texto.
+ * O conteúdo do popup de cada plataforma. A PlayStation entra no cadastro desligada (`disponivel: false`) e ganha o seu
+ * resumo na F4 da spec `integracao-playstation`; o popup nunca compara o provedor com um texto.
  */
-const RESUMO_DA_PLATAFORMA: Record<Provedor, ComponentType<{ conta: ContaVinculada }>> = {
+const RESUMO_DA_PLATAFORMA: Partial<Record<Provedor, ComponentType<{ conta: ContaVinculada }>>> = {
   STEAM: ResumoSteam,
 };
 
@@ -41,7 +41,7 @@ export function PlataformaDialog({ open, plataforma, conta, onClose }: Plataform
             <Icon name="close" size={22} />
           </button>
         </div>
-        <Resumo conta={conta} />
+        {Resumo ? <Resumo conta={conta} /> : null}
       </div>
     </ModalDialog>
   );
