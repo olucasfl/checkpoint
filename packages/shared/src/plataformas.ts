@@ -16,7 +16,18 @@ export type CapacidadePlataforma =
  */
 export type VinculoDaPlataforma =
   | { tipo: 'redirecionamento'; hostDeLogin: string; caminhoDeLogin: string }
-  | { tipo: 'credencial'; rotuloDaCredencial: string };
+  | {
+      tipo: 'credencial';
+      /** Como a credencial se chama ("NPSSO"). */
+      rotuloDaCredencial: string;
+      /** O que ela é e por que o app a pede, em linguagem simples. */
+      explicacao: string;
+      /** Onde a pessoa a copia (uma página da própria plataforma, que ELA abre sozinha; nunca montada pelo app). */
+      enderecoDaCredencial: string;
+      passos: readonly string[];
+      /** O aviso final (ex.: como invalidar a credencial depois). */
+      observacao: string;
+    };
 
 export type VarianteDaMarca = 'marcador' | 'logo';
 
@@ -55,8 +66,13 @@ export interface PlataformaInfo {
   /** Como a conta é chamada na tela ("Conta Steam"). */
   rotuloDaConta: string;
   vinculo: VinculoDaPlataforma;
-  /** "conquista/conquistas" na Steam, "troféu/troféus" na PlayStation. */
-  vocabulario: { conquista: string; conquistas: string };
+  /**
+   * "conquista/conquistas" na Steam, "troféu/troféus" na PlayStation. `artigo` é o artigo do plural ("as conquistas",
+   * "os troféus"): os textos concordam com ele ("mostradas"/"mostrados").
+   */
+  vocabulario: { conquista: string; conquistas: string; artigo: 'as' | 'os' };
+  /** O formato da capa na busca da biblioteca: `paisagem` (Steam, 460x215) ou `quadrada` (o ícone do jogo na PlayStation). */
+  capaNaBusca: 'paisagem' | 'quadrada';
   /** Textos de plataforma do jogo que combinam com esta (para a confirmação ao ligar um jogo). */
   plataformasCompativeis: readonly string[];
   /** Plataforma sugerida a um jogo novo quando o item não traz uma (Steam: 'PC'; PlayStation: `null`). */
@@ -85,7 +101,8 @@ const CADASTRO = {
       hostDeLogin: 'steamcommunity.com',
       caminhoDeLogin: '/openid/login',
     },
-    vocabulario: { conquista: 'conquista', conquistas: 'conquistas' },
+    vocabulario: { conquista: 'conquista', conquistas: 'conquistas', artigo: 'as' },
+    capaNaBusca: 'paisagem',
     plataformasCompativeis: ['PC', 'Steam Deck'],
     plataformaPadrao: 'PC',
     privacidade: {
@@ -107,16 +124,30 @@ const CADASTRO = {
     slug: 'playstation',
     nome: 'PlayStation',
     nomeAcessivel: 'PlayStation',
-    // Vira `true` na F2, junto com a tela de vínculo.
-    disponivel: false,
+    // Só a interface: o provider da API depende da chave de cifra (sem ela as rotas respondem 400 `VALIDACAO`).
+    disponivel: true,
     capacidades: ['horas', 'conquistas', 'biblioteca', 'ultimaVezJogado', 'nivel'],
     // Marcador NEUTRO: a marca oficial só entra quando o pacote da Sony for entregue (spec, "Marca e logos").
     marcador: { icone: 'videogame_asset' },
     logo: null,
     ligadoA: 'à PlayStation',
     rotuloDaConta: 'Conta PlayStation',
-    vinculo: { tipo: 'credencial', rotuloDaCredencial: 'NPSSO' },
-    vocabulario: { conquista: 'troféu', conquistas: 'troféus' },
+    vinculo: {
+      tipo: 'credencial',
+      rotuloDaCredencial: 'NPSSO',
+      explicacao:
+        'É um código que a PlayStation dá ao navegador quando você entra na sua conta. Com ele, o checkpoint consegue ler os seus jogos, horas e troféus.',
+      enderecoDaCredencial: 'ca.account.sony.com/api/v1/ssocookie',
+      passos: [
+        'Entre na sua conta em playstation.com neste navegador.',
+        'Em outra aba, abra o endereço abaixo.',
+        'Copie o valor que aparece depois de "npsso": (são 64 letras e números, sem as aspas).',
+        'Volte aqui e cole no campo.',
+      ],
+      observacao: 'Você pode trocar sua senha da PSN depois para invalidar o código.',
+    },
+    vocabulario: { conquista: 'troféu', conquistas: 'troféus', artigo: 'os' },
+    capaNaBusca: 'quadrada',
     plataformasCompativeis: ['PS1', 'PS2', 'PS3', 'PS4', 'PS5', 'PSP'],
     plataformaPadrao: null,
     privacidade: null,

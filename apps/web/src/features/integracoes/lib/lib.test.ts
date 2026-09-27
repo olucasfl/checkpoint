@@ -1,4 +1,5 @@
 import { AxiosError } from 'axios';
+import { PLATAFORMAS } from '@checkpoint/shared';
 import { describe, expect, it } from 'vitest';
 import {
   avisoDoRetorno,
@@ -8,9 +9,17 @@ import {
 } from './avisos-steam';
 import { classificarFalhaDoCartao } from './estado-do-cartao';
 import { horasCurtas, textoDasConquistas } from './format';
-import { urlDaSteamSegura } from './steam-url';
+import { urlDeVinculoSegura } from './vinculo-url';
 
-describe('urlDaSteamSegura (CA-15)', () => {
+const urlDaSteamSegura = (url: unknown) => urlDeVinculoSegura(PLATAFORMAS.STEAM, url);
+
+describe('urlDeVinculoSegura (CA-15)', () => {
+  it('plataforma por credencial (PlayStation) nunca segue uma URL de vínculo', () => {
+    expect(
+      urlDeVinculoSegura(PLATAFORMAS.PLAYSTATION, 'https://steamcommunity.com/openid/login'),
+    ).toBe(false);
+  });
+
   it('aceita só a tela de login da Steam', () => {
     expect(
       urlDaSteamSegura('https://steamcommunity.com/openid/login?openid.mode=checkid_setup&x=1'),

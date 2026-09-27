@@ -6,7 +6,7 @@ import { type Game, type ItemBiblioteca } from '@checkpoint/shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { gamesApi } from '@/features/games/api/games-api';
 import { integracoesApi } from '../api/integracoes-api';
-import { BibliotecaSteamDialog, type ModoBiblioteca } from './BibliotecaSteamDialog';
+import { BibliotecaPlataformaDialog, type ModoBiblioteca } from './BibliotecaPlataformaDialog';
 
 vi.mock('../api/integracoes-api', () => ({
   integracoesApi: { biblioteca: vi.fn(), vincularJogo: vi.fn() },
@@ -60,7 +60,8 @@ function abrir(modo: ModoBiblioteca = { tipo: 'novo' }) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={client}>
-      <BibliotecaSteamDialog
+      <BibliotecaPlataformaDialog
+        provedor="STEAM"
         open
         modo={modo}
         onClose={onClose}
@@ -77,7 +78,7 @@ beforeEach(() => {
   games.list.mockResolvedValue([]);
 });
 
-describe('BibliotecaSteamDialog — modo novo', () => {
+describe('BibliotecaPlataformaDialog — modo novo', () => {
   it('lista a biblioteca e "Criar jogo" entrega o item, sem vincular nada sozinho', async () => {
     api.biblioteca.mockResolvedValue([item()]);
     const { user, onCriar } = abrir();
@@ -248,7 +249,7 @@ describe('BibliotecaSteamDialog — modo novo', () => {
   });
 });
 
-describe('BibliotecaSteamDialog — modo vincular', () => {
+describe('BibliotecaPlataformaDialog — modo vincular', () => {
   it('liga o jogo escolhido ao item (PC: sem confirmação)', async () => {
     api.biblioteca.mockResolvedValue([item()]);
     api.vincularJogo.mockResolvedValue({} as never);

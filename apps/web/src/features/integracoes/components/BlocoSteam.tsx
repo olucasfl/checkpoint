@@ -6,6 +6,7 @@ import {
   type DadosJogoPlataforma,
   type Game,
   PROVEDOR_SLUG,
+  type Provedor,
 } from '@checkpoint/shared';
 import { FieldError } from '@/shared/components/form-parts';
 import { Icon } from '@/shared/components/Icon';
@@ -26,9 +27,6 @@ import {
 import { atualizadoHaTexto } from '../lib/tempo-relativo';
 import { avisar } from '@/shared/lib/avisos';
 import { chegouAos100, textoDoMarco } from '@/features/games/lib/marcos';
-
-import { PROVEDOR_STEAM } from '../lib/provedores';
-const PROVEDOR = PROVEDOR_STEAM;
 
 const BOTAO =
   'min-h-11 min-w-11 rounded-full px-[18px] font-display text-[15px] disabled:cursor-wait disabled:opacity-60';
@@ -264,13 +262,13 @@ function DesvincularJogoDialog({
  * servidor devolve esse valor com um aviso discreto (nunca um erro). Sem animação nenhuma: nada aqui muda com
  * "efeitos reduzidos". Uma coluna no celular; a partir de 1024 px, data e raridade ficam à direita de cada linha.
  */
-export function BlocoSteam({ game }: { game: Game }) {
+export function BlocoSteam({ game, provedor }: { game: Game; provedor: Provedor }) {
   const gravado: DadosJogoPlataforma | undefined = game.dadosPlataforma.find(
-    (dados) => dados.provedor === PROVEDOR,
+    (dados) => dados.provedor === provedor,
   );
-  const detalhe = useDetalheJogo(PROVEDOR, game.id, gravado !== undefined);
-  const atualizar = useAtualizarJogo(PROVEDOR, game.id);
-  const desvincular = useDesvincularJogo(PROVEDOR);
+  const detalhe = useDetalheJogo(provedor, game.id, gravado !== undefined);
+  const atualizar = useAtualizarJogo(provedor, game.id);
+  const desvincular = useDesvincularJogo(provedor);
   const [confirmando, setConfirmando] = useState(false);
   const [erroAtualizar, setErroAtualizar] = useState('');
   const [erroDesvincular, setErroDesvincular] = useState('');
@@ -318,7 +316,7 @@ export function BlocoSteam({ game }: { game: Game }) {
   }
 
   const atualizadoEm = atualizadoHaTexto(dados.atualizadoEm);
-  const slug = PROVEDOR_SLUG[PROVEDOR];
+  const slug = PROVEDOR_SLUG[provedor];
   const resumo = resumoDaLinha(dados, mostrarBarra);
 
   return (
@@ -329,7 +327,7 @@ export function BlocoSteam({ game }: { game: Game }) {
       titulo={
         // A logo oficial fica SOZINHA no título (regra da Valve): o resumo vai ao lado, em texto separado.
         <h2 id="detalhe-steam" className="m-0">
-          <PlataformaMarca provedor={PROVEDOR} variante="logo" />
+          <PlataformaMarca provedor={provedor} variante="logo" />
         </h2>
       }
       resumo={resumo}

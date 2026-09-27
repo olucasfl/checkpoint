@@ -15,7 +15,6 @@ import { GameForm } from '@/features/games/components/GameForm';
 import { useAtualizarResumo, useDesvincular, useResumoPlataforma } from '../api/use-integracoes';
 import { classificarFalhaDoCartao } from '../lib/estado-do-cartao';
 import { horasCurtas, textoDasConquistas } from '../lib/format';
-import { PROVEDOR_STEAM } from '../lib/provedores';
 import {
   percentualDoBacklog,
   textoDoBacklog,
@@ -23,9 +22,7 @@ import {
   textoNoCheckpoint,
 } from '../lib/resumo';
 import { atualizadoHaTexto } from '../lib/tempo-relativo';
-import { BibliotecaSteamDialog } from './BibliotecaSteamDialog';
-
-const PROVEDOR = PROVEDOR_STEAM;
+import { BibliotecaPlataformaDialog } from './BibliotecaPlataformaDialog';
 
 const BOTAO =
   'min-h-11 min-w-11 rounded-full px-4 font-display text-[15px] disabled:cursor-wait disabled:opacity-60 font-bold';
@@ -302,9 +299,10 @@ function DesvincularDialog({
  * de novo"; falha da Steam e falta de conexão têm mensagem própria. O rodapé traz a atribuição legal da Valve.
  */
 export function ResumoSteam({ conta }: { conta: ContaVinculada }) {
-  const resumo = useResumoPlataforma(PROVEDOR, true);
-  const atualizar = useAtualizarResumo(PROVEDOR);
-  const desvincular = useDesvincular(PROVEDOR);
+  const provedor = conta.provedor;
+  const resumo = useResumoPlataforma(provedor, true);
+  const atualizar = useAtualizarResumo(provedor);
+  const desvincular = useDesvincular(provedor);
   const [confirmando, setConfirmando] = useState(false);
   const [erroAtualizar, setErroAtualizar] = useState('');
   const [erroDesvincular, setErroDesvincular] = useState('');
@@ -405,7 +403,8 @@ export function ResumoSteam({ conta }: { conta: ContaVinculada }) {
         desvinculando={desvincular.isPending}
         erro={erroDesvincular}
       />
-      <BibliotecaSteamDialog
+      <BibliotecaPlataformaDialog
+        provedor={provedor}
         open={importando !== null}
         modo={{ tipo: 'novo' }}
         soNuncaJogados={importando === 'backlog'}
@@ -424,6 +423,7 @@ export function ResumoSteam({ conta }: { conta: ContaVinculada }) {
         {criando && (
           <GameForm
             itemInicial={criando}
+            provedorInicial={provedor}
             onDone={() => setCriando(null)}
             onCancel={() => setCriando(null)}
             onLinkedExisting={() => setCriando(null)}

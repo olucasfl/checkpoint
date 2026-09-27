@@ -7,6 +7,7 @@ import {
   type ItemBiblioteca,
   type ResumoContaPlataforma,
   type Provedor,
+  type VincularComCredencialRequest,
   type VincularJogoRequest,
 } from '@checkpoint/shared';
 import { apiClient } from '@/shared/lib/api-client';
@@ -31,6 +32,21 @@ export const integracoesApi = {
       `${rota(provedor)}/vinculo`,
       undefined,
       { withCredentials: true },
+    );
+    return response.data;
+  },
+
+  /**
+   * `POST /api/integracoes/:provedor/vinculo/credencial` (PlayStation): a credencial (NPSSO, que equivale a uma senha) vai
+   * SÓ no corpo deste POST, nunca em URL nem em query. A resposta é a conta, sem segredo.
+   */
+  async vincularComCredencial(
+    provedor: Provedor,
+    corpo: VincularComCredencialRequest,
+  ): Promise<ContaVinculada> {
+    const response = await apiClient.post<ContaVinculada>(
+      `${rota(provedor)}/vinculo/credencial`,
+      corpo,
     );
     return response.data;
   },

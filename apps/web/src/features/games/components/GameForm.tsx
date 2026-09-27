@@ -3,26 +3,35 @@ import { useState, type FormEvent } from 'react';
 import { Link, useInRouterContext } from 'react-router-dom';
 import {
   GAME_RATING_KEYS,
+  PLATAFORMAS,
   statusAllowsRating,
   type Game,
   type GameRatingKey,
   type GameStatus,
   type ItemBiblioteca,
+  type Provedor,
 } from '@checkpoint/shared';
 import { Icon } from '@/shared/components/Icon';
 import { usePrefs } from '@/shared/hooks/use-prefs';
 import { describeAuthError } from '@/features/auth/lib/auth-errors';
-import { useTemContaSteam, useVincularJogo } from '@/features/integracoes/api/use-integracoes';
-import { PROVEDOR_STEAM } from '@/features/integracoes/lib/provedores';
+import {
+  usePlataformasComBiblioteca,
+  useVincularJogoEm,
+} from '@/features/integracoes/api/use-integracoes';
 import { PlataformaMarca } from '@/shared/components/PlataformaMarca';
-import { BibliotecaSteamDialog } from '@/features/integracoes/components/BibliotecaSteamDialog';
+import { BibliotecaPlataformaDialog } from '@/features/integracoes/components/BibliotecaPlataformaDialog';
 import { horasEMinutos } from '@/features/integracoes/lib/conquistas';
 import {
-  PLATAFORMA_PADRAO,
+  plataformaDoNovoJogo,
   precisaConfirmarPlataforma,
   statusSugerido,
   tituloDoItem,
 } from '@/features/integracoes/lib/biblioteca';
+import {
+  dePlataforma,
+  naPlataforma,
+  textoDaConfirmacaoDePlataforma,
+} from '@/features/integracoes/lib/plataforma-texto';
 import { useSaveGame } from '../api/use-games';
 import { describeError, forForm, type FormError } from '../lib/api-error';
 import {
@@ -54,13 +63,17 @@ interface GameFormProps {
   /** Salvou tudo (jogo e capa): o diálogo pode fechar. Traz o jogo como ficou e se o salvar o CRIOU. */
   onDone: (resultado?: ResultadoDoSalvar) => void;
   onCancel: () => void;
-  /** Jogo NOVO: a pessoa ligou um item da Steam a um jogo que já existia. Quem abriu leva ao jogo. */
+  /** Jogo NOVO: a pessoa ligou um item de uma plataforma (Steam, PlayStation…) a um jogo que já existia. Quem abriu leva ao jogo. */
   onLinkedExisting?: (jogoId: string) => void;
   /** Jogo novo aberto pelo "Adicionar" de uma prateleira: começa com o status dela. Sem isso, o padrão. */
   statusInicial?: GameStatus;
-  /** Jogo NOVO que já nasce ligado a um item da Steam ("Ver e importar" do popup): título, plataforma e status vêm dele. */
+  /** Jogo NOVO que já nasce ligado a um item da plataforma `provedorInicial` ("Ver e importar" do popup): título, plataforma e status vêm dele. */
   itemInicial?: ItemBiblioteca;
+  provedorInicial?: Provedor;
 }
+
+/** Os itens da biblioteca escolhidos em "Buscar na …" (no máximo um por plataforma). */
+type Ligacoes = Partial<Record<Provedor, ItemBiblioteca>>;
 
 const NO_ERROR: FormError = { message: '', fields: {} };
 
@@ -79,6 +92,7 @@ export function GameForm({
   onLinkedExisting,
   statusInicial,
   itemInicial,
+  provedorInicial,
 }: GameFormProps) {
   const [saved, setSaved] = useState<Game | undefined>(game);
   const [values, setValues] = useState<GameFormValues>(
@@ -88,7 +102,9 @@ export function GameForm({
         ? {
             ...EMPTY_FORM_VALUES,
             titulo: tituloDoItem(itemInicial.titulo),
-            plataforma: PLATAFORMA_PADRAO,
+            plataforma: provedorInicial
+              ? plataformaDoNovoJogo(itemInicial, PLATAFORMAS[provedorInicial])
+              : '',
             status: statusSugerido(itemInicial.minutosJogados),
           }
         : { ...EMPTY_FORM_VALUES, status: statusInicial ?? EMPTY_FORM_VALUES.status },
@@ -97,18 +113,24 @@ export function GameForm({
   const [removing, setRemoving] = useState(false);
   const [error, setError] = useState<FormError>(NO_ERROR);
   const mutation = useSaveGame();
-  const vincular = useVincularJogo(PROVEDOR_STEAM);
-  const temContaSteam = useTemContaSteam();
+  const vincular = useVincularJogoEm();
+  const plataformasDaBiblioteca = usePlataformasComBiblioteca();
   const noRouter = useInRouterContext();
-  // O item da Steam escolhido em "Buscar na Steam" (só jogo novo). O vínculo só é gravado DEPOIS de o jogo ser
-  // criado; a capa oficial dele é só prévia (o arquivo de capa continua sendo escolha da pessoa).
-  const [ligacao, setLigacao] = useState<ItemBiblioteca | null>(
-    game ? null : (itemInicial ?? null),
+  // Os itens escolhidos em "Buscar na …" (só jogo novo, um por plataforma). O vínculo só é gravado DEPOIS de o jogo ser
+  // criado; a capa oficial do primeiro que tiver é só prévia (o arquivo de capa continua sendo escolha da pessoa).
+  const [ligacoes, setLigacoes] = useState<Ligacoes>(
+    game || !itemInicial || !provedorInicial ? {} : { [provedorInicial]: itemInicial },
   );
-  const [ligado, setLigado] = useState(false);
+  const [ligados, setLigados] = useState<Provedor[]>([]);
   const [erroLigacao, setErroLigacao] = useState('');
-  const [buscando, setBuscando] = useState(false);
-  const [confirmandoPlataforma, setConfirmandoPlataforma] = useState(false);
+  const [buscando, setBuscando] = useState<Provedor | null>(null);
+  const [confirmandoPlataforma, setConfirmandoPlataforma] = useState<Provedor | null>(null);
+  const ligacoesEscolhidas = (Object.keys(ligacoes) as Provedor[]).filter(
+    (provedor) => ligacoes[provedor] !== undefined,
+  );
+  // A capa oficial de prévia é a da primeira plataforma escolhida que tiver uma.
+  const provedorDaCapa = ligacoesEscolhidas.find((provedor) => ligacoes[provedor]?.capaUrl);
+  const capaOficial = provedorDaCapa ? (ligacoes[provedorDaCapa]?.capaUrl ?? null) : null;
   const { plataformasFavoritas } = usePrefs();
 
   const editing = saved !== undefined;
@@ -150,19 +172,31 @@ export function GameForm({
     clearError('capa');
   }
 
-  function aplicarItem(item: ItemBiblioteca) {
-    setValues((current) => ({
-      ...current,
-      titulo: tituloDoItem(item.titulo),
-      plataforma: PLATAFORMA_PADRAO,
-      status: statusSugerido(item.minutosJogados),
-    }));
-    clearError('titulo');
-    clearError('plataforma');
-    setLigacao(item);
-    setLigado(false);
+  function aplicarItem(provedor: Provedor, item: ItemBiblioteca) {
+    // Com o item de OUTRA plataforma já escolhido, o título, a plataforma e o status ficam como estão (o primeiro manda).
+    const outraJaEscolhida = ligacoesEscolhidas.some((escolhida) => escolhida !== provedor);
+    if (!outraJaEscolhida) {
+      setValues((current) => ({
+        ...current,
+        titulo: tituloDoItem(item.titulo),
+        plataforma: plataformaDoNovoJogo(item, PLATAFORMAS[provedor]),
+        status: statusSugerido(item.minutosJogados),
+      }));
+      clearError('titulo');
+      clearError('plataforma');
+    }
+    setLigacoes((atuais) => ({ ...atuais, [provedor]: item }));
+    setLigados((atuais) => atuais.filter((ligado) => ligado !== provedor));
     setErroLigacao('');
-    setBuscando(false);
+    setBuscando(null);
+  }
+
+  function removerLigacao(provedor: Provedor) {
+    setLigacoes((atuais) => {
+      const { [provedor]: _removida, ...resto } = atuais;
+      return resto;
+    });
+    setErroLigacao('');
   }
 
   function submit(event: FormEvent) {
@@ -176,7 +210,7 @@ export function GameForm({
     }
     setError(NO_ERROR);
     setErroLigacao('');
-    setConfirmandoPlataforma(false);
+    setConfirmandoPlataforma(null);
 
     // Avisa antes de enviar o que a API rejeitaria de qualquer jeito (título vazio, nota fora de 0 a 10 ou
     // com casa demais): nenhuma request sai enquanto houver erro de digitação.
@@ -189,14 +223,12 @@ export function GameForm({
       return;
     }
 
-    // Ligar um jogo de outra plataforma a um item da Steam pede confirmação ANTES de criar qualquer coisa.
-    if (
-      ligacao &&
-      !saved &&
-      !plataformaConfirmada &&
-      precisaConfirmarPlataforma(values.plataforma)
-    ) {
-      setConfirmandoPlataforma(true);
+    // Ligar um jogo de outra plataforma a um item pede confirmação ANTES de criar qualquer coisa.
+    const aConfirmar = ligacoesEscolhidas.find((provedor) =>
+      precisaConfirmarPlataforma(values.plataforma, PLATAFORMAS[provedor]),
+    );
+    if (aConfirmar && !saved && !plataformaConfirmada) {
+      setConfirmandoPlataforma(aConfirmar);
       return;
     }
 
@@ -211,16 +243,25 @@ export function GameForm({
       // O jogo FOI salvo: dali em diante o formulário edita AQUELE jogo (o próximo Salvar é PATCH, sem 409).
       setSaved(result.game);
       let ligacaoOk = true;
-      if (ligacao && !ligado) {
+      for (const provedor of ligacoesEscolhidas) {
+        const item = ligacoes[provedor];
+        if (!item || ligados.includes(provedor)) {
+          continue;
+        }
         try {
-          await vincular.mutateAsync({ jogoId: result.game.id, idExterno: ligacao.idExterno });
-          setLigado(true);
+          await vincular.mutateAsync({
+            provedor,
+            jogoId: result.game.id,
+            idExterno: item.idExterno,
+          });
+          setLigados((atuais) => [...atuais, provedor]);
         } catch (failure) {
           // O PUT é idempotente para o mesmo item: o próximo Salvar reenvia a ligação sem dar 409.
           ligacaoOk = false;
           setErroLigacao(
-            `O jogo foi salvo, mas não foi ligado à Steam. ${describeAuthError(failure).message} Toque em Salvar para tentar de novo.`,
+            `O jogo foi salvo, mas não foi ligado ${PLATAFORMAS[provedor].ligadoA}. ${describeAuthError(failure).message} Toque em Salvar para tentar de novo.`,
           );
+          break;
         }
       }
       if (result.coverError) {
@@ -268,82 +309,88 @@ export function GameForm({
 
       {generalMessage && <FieldError id="form-error" message={generalMessage} />}
 
-      {!editing && temContaSteam === true && (
+      {!editing && plataformasDaBiblioteca !== undefined && plataformasDaBiblioteca.length > 0 && (
         <div className="flex flex-col gap-2">
-          {ligacao ? (
-            <div className="flex flex-wrap items-center gap-3 rounded-2xl bg-painel-2 p-3.5">
-              {ligacao.capaUrl && (
-                // Só prévia (decorativa, sem `Referer`): a capa oficial NÃO é salva com o jogo.
-                <img
-                  src={ligacao.capaUrl}
-                  alt=""
-                  width={44}
-                  height={58}
-                  referrerPolicy="no-referrer"
-                  className="h-[58px] w-11 shrink-0 rounded-lg bg-fundo object-cover"
-                />
-              )}
-              <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <span className="flex items-start gap-1.5 text-[15px] font-bold [overflow-wrap:anywhere]">
-                  <PlataformaMarca
-                    provedor={PROVEDOR_STEAM}
-                    variante="marcador"
-                    tamanho="m"
-                    decorativa
-                    className="mt-0.5 shrink-0"
+          {plataformasDaBiblioteca.map((plataforma) => {
+            const provedor = plataforma.id as Provedor;
+            const ligacao = ligacoes[provedor];
+            return ligacao ? (
+              <div
+                key={plataforma.id}
+                className="flex flex-wrap items-center gap-3 rounded-2xl bg-painel-2 p-3.5"
+              >
+                {ligacao.capaUrl && (
+                  // Só prévia (decorativa, sem `Referer`): a capa oficial NÃO é salva com o jogo.
+                  <img
+                    src={ligacao.capaUrl}
+                    alt=""
+                    width={44}
+                    height={plataforma.capaNaBusca === 'quadrada' ? 44 : 58}
+                    referrerPolicy="no-referrer"
+                    className={`${plataforma.capaNaBusca === 'quadrada' ? 'h-11' : 'h-[58px]'} w-11 shrink-0 rounded-lg bg-fundo object-cover`}
                   />
-                  Ligado à Steam: «{ligacao.titulo}»
-                </span>
-                <span className="text-[13px] font-medium text-texto-suave">
-                  {horasEMinutos(ligacao.minutosJogados)}. A capa oficial é só prévia.
-                </span>
+                )}
+                <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <span className="flex items-start gap-1.5 text-[15px] font-bold [overflow-wrap:anywhere]">
+                    <PlataformaMarca
+                      provedor={provedor}
+                      variante="marcador"
+                      tamanho="m"
+                      decorativa
+                      className="mt-0.5 shrink-0"
+                    />
+                    Ligado {plataforma.ligadoA}: «{ligacao.titulo}»
+                  </span>
+                  <span className="text-[13px] font-medium text-texto-suave">
+                    {horasEMinutos(ligacao.minutosJogados)}. A capa oficial é só prévia.
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setBuscando(provedor)}
+                    className={BOTAO_PEQUENO}
+                  >
+                    Trocar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => removerLigacao(provedor)}
+                    className={BOTAO_PEQUENO}
+                  >
+                    Remover ligação
+                  </button>
+                </div>
               </div>
-              <div className="flex flex-wrap gap-2">
-                <button type="button" onClick={() => setBuscando(true)} className={BOTAO_PEQUENO}>
-                  Trocar
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setLigacao(null);
-                    setErroLigacao('');
-                  }}
-                  className={BOTAO_PEQUENO}
-                >
-                  Remover ligação
-                </button>
-              </div>
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setBuscando(true)}
-              className="flex h-[52px] items-center justify-center gap-2 rounded-xl border-2 border-dashed border-destaque bg-destaque/10 px-4 font-display text-[15px] font-bold text-destaque transition-colors hover:bg-destaque/20"
-            >
-              <PlataformaMarca
-                provedor={PROVEDOR_STEAM}
-                variante="marcador"
-                tamanho="m"
-                decorativa
-              />
-              Buscar na Steam
-            </button>
-          )}
+            ) : (
+              <button
+                key={plataforma.id}
+                type="button"
+                onClick={() => setBuscando(provedor)}
+                className="flex h-[52px] items-center justify-center gap-2 rounded-xl border-2 border-dashed border-destaque bg-destaque/10 px-4 font-display text-[15px] font-bold text-destaque transition-colors hover:bg-destaque/20"
+              >
+                <PlataformaMarca provedor={provedor} variante="marcador" tamanho="m" decorativa />
+                Buscar {naPlataforma(plataforma)}
+              </button>
+            );
+          })}
           <FieldError id="f-ligacao-err" message={erroLigacao} />
         </div>
       )}
-      {!editing && temContaSteam === false && (
-        <p className="m-0 text-[16px] text-texto-suave">
-          {noRouter ? (
-            <Link to="/perfil" className="font-semibold text-destaque underline">
-              Vincule sua Steam no perfil
-            </Link>
-          ) : (
-            'Vincule sua Steam no perfil'
-          )}{' '}
-          para buscar jogos da sua biblioteca.
-        </p>
-      )}
+      {!editing &&
+        plataformasDaBiblioteca !== undefined &&
+        plataformasDaBiblioteca.length === 0 && (
+          <p className="m-0 text-[16px] text-texto-suave">
+            {noRouter ? (
+              <Link to="/perfil" className="font-semibold text-destaque underline">
+                Vincule sua conta no perfil
+              </Link>
+            ) : (
+              'Vincule sua conta no perfil'
+            )}{' '}
+            para buscar jogos da sua biblioteca.
+          </p>
+        )}
       {editing && erroLigacao && <FieldError id="f-ligacao-err" message={erroLigacao} />}
 
       <Field>
@@ -409,7 +456,8 @@ export function GameForm({
         currentUrl={saved?.capaUrl ?? null}
         file={file}
         removing={removing}
-        oficialUrl={ligacao?.capaUrl ?? null}
+        oficialUrl={capaOficial}
+        oficialDe={provedorDaCapa ? dePlataforma(PLATAFORMAS[provedorDaCapa]) : undefined}
         error={fields.capa}
         onPick={(picked) => {
           setFile(picked);
@@ -422,20 +470,22 @@ export function GameForm({
         onRemove={removeCover}
       />
 
-      {confirmandoPlataforma && (
+      {confirmandoPlataforma !== null && (
         <div
           role="group"
           aria-label="Confirmar a plataforma"
           className="flex flex-col gap-3 rounded-2xl bg-painel-2 p-4"
         >
           <p className="m-0 text-[17px]">
-            «{values.titulo.trim()}» é um jogo de {values.plataforma.trim()}. Ao ligá-lo à Steam, as
-            horas e as conquistas mostradas serão as da Steam. A plataforma do jogo não muda.
+            «{values.titulo.trim()}» é um jogo de {values.plataforma.trim()}. Ao ligá-lo{' '}
+            {PLATAFORMAS[confirmandoPlataforma].ligadoA},{' '}
+            {textoDaConfirmacaoDePlataforma(PLATAFORMAS[confirmandoPlataforma])}. A plataforma do
+            jogo não muda.
           </p>
           <div className="flex flex-wrap justify-end gap-2.5">
             <button
               type="button"
-              onClick={() => setConfirmandoPlataforma(false)}
+              onClick={() => setConfirmandoPlataforma(null)}
               className={BOTAO_PEQUENO}
             >
               Voltar
@@ -451,20 +501,24 @@ export function GameForm({
         </div>
       )}
 
-      <BibliotecaSteamDialog
-        open={buscando}
-        modo={{ tipo: 'novo' }}
-        onClose={() => setBuscando(false)}
-        onCriar={aplicarItem}
-        onVinculado={(jogoId) => {
-          setBuscando(false);
-          if (onLinkedExisting) {
-            onLinkedExisting(jogoId);
-          } else {
-            onDone();
-          }
-        }}
-      />
+      {(plataformasDaBiblioteca ?? []).map((plataforma) => (
+        <BibliotecaPlataformaDialog
+          key={plataforma.id}
+          provedor={plataforma.id as Provedor}
+          open={buscando === plataforma.id}
+          modo={{ tipo: 'novo' }}
+          onClose={() => setBuscando(null)}
+          onCriar={(item) => aplicarItem(plataforma.id as Provedor, item)}
+          onVinculado={(jogoId) => {
+            setBuscando(null);
+            if (onLinkedExisting) {
+              onLinkedExisting(jogoId);
+            } else {
+              onDone();
+            }
+          }}
+        />
+      ))}
 
       <div className="sheet-footer sticky bottom-0 -mx-6 -mb-6 flex justify-end gap-2.5 border-t border-borda bg-painel px-6 pt-4">
         <button

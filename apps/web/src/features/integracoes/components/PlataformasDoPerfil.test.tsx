@@ -512,13 +512,14 @@ describe('a aba Plataformas (spec plataformas-e-pagina-do-jogo, F3)', () => {
     expect(botao).toHaveClass('min-h-11');
   });
 
-  it('plataformas sem suporte não aparecem (nem "Em breve"): só a Steam tem linha', async () => {
+  it('só as plataformas com suporte aparecem (nem "Em breve"): Steam e PlayStation têm linha; Xbox e Epic não', async () => {
     const { container } = (renderCartao(), { container: document.body });
     await screen.findByRole('button', { name: 'Vincular conta Steam' });
 
-    expect(container.querySelectorAll('[data-plataforma-linha]')).toHaveLength(1);
+    expect(container.querySelectorAll('[data-plataforma-linha]')).toHaveLength(2);
+    expect(screen.getByRole('button', { name: 'Vincular conta PlayStation' })).toBeInTheDocument();
     expect(screen.queryByText(/Em breve/)).toBeNull();
-    for (const nome of ['PlayStation', 'Xbox', 'Epic']) {
+    for (const nome of ['Xbox', 'Epic']) {
       expect(screen.queryByText(new RegExp(nome))).toBeNull();
     }
   });

@@ -964,11 +964,11 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
   `PlataformaMarca` (`shared/components/`) é o único lugar que desenha plataforma: `marcador` (glifo NEUTRO, sem marca registrada, para selos e
   botões pequenos) e `logo` (a marca oficial, **sozinha**, com espaço livre ao redor e **nunca abaixo de 50 px de altura**: um valor menor sobe para
   50; sem arquivo, ou se ele falhar, cai no marcador com o nome). A logo da Steam é o vetor extraído do PDF oficial da Valve, sem alteração
-  (`docs/design/plataformas/steam/`, o inverso branco em `apps/web/public/plataformas/steam-logo.svg`; um teste compara os dois byte a byte). Só
-  `features/integracoes/lib/provedores.ts` escreve o código do provedor à mão (`sem-provedor-solto.test.ts`).
+  (`docs/design/plataformas/steam/`, o inverso branco em `apps/web/public/plataformas/steam-logo.svg`; um teste compara os dois byte a byte). Nenhum arquivo do web (fora dos testes e do `shared`) escreve o código de um provedor à mão (`sem-provedor-solto.test.ts`, **sem exceção** desde a
+  spec `integracao-playstation`, F2: `lib/provedores.ts` e `PROVEDOR_STEAM` acabaram; as telas recebem o provedor por prop ou pelo cadastro).
 - **Popup da Steam** (`ResumoSteam`, F4a): cabeçalho (avatar decorativo, nome, "Na Steam desde <ano>", status, "Abrir perfil na Steam" com `rel="noopener
 noreferrer"`), números (jogos, horas, "já jogados"), mais jogados (5), backlog ("N nunca abertos · P%" e **Ver e importar**, que abre o
-  `BibliotecaSteamDialog` só com os nunca abertos e, em "Criar jogo", o `GameForm` com `itemInicial`), "X dos seus Y jogos já estão no checkpoint",
+  `BibliotecaPlataformaDialog` só com os nunca abertos e, em "Criar jogo", o `GameForm` com `itemInicial`), "X dos seus Y jogos já estão no checkpoint",
   conquistas dos vinculados e as ações (**Atualizar** com "Atualizado há X", **Importar jogos**, **Desvincular** com confirmação), mais o rodapé com a
   **atribuição legal da Valve** e "Não afiliado à Valve". Perfil privado: o aviso e o passo a passo de sempre, mantendo o cabeçalho e as ações. Sem
   VAC, amigos, preço nem gênero. Nível/XP e atividade recente ficam para a F4b.
@@ -978,7 +978,7 @@ noreferrer"`), números (jogos, horas, "já jogados"), mais jogados (5), backlog
 - **Vincular**: `POST vinculo` com **`withCredentials: true` só nesta chamada** (em produção o `/api` é do mesmo
   site pelo rewrite da Vercel e não muda nada; em dev, localhost:5173 → :3333, o navegador só aceita o cookie
   `checkpoint_vinculo` com ele). O navegador só vai à URL devolvida se ela for a tela de login da Steam
-  (`lib/steam-url.ts`: `https`, `steamcommunity.com`, sem porta nem usuário, `/openid/login`); qualquer outra é
+  (`lib/vinculo-url.ts`, `urlDeVinculoSegura(plataforma, url)`, que lê `vinculo.hostDeLogin` e `caminhoDeLogin` do cadastro: `https`, o host, sem porta nem usuário, o caminho; a Steam usa `steamcommunity.com` e `/openid/login`); qualquer outra é
   recusada com uma mensagem. A navegação passa por `lib/navegar.ts` (`irPara`), que os testes mockam.
 - **Aviso do retorno**: a API redireciona para `/perfil?steam=vinculada` ou `?steam=erro&motivo=…` (um
   redirecionamento externo não carrega o `state` da navegação, então o aviso vem na query). A `PerfilPage` o lê
@@ -987,7 +987,7 @@ noreferrer"`), números (jogos, horas, "já jogados"), mais jogados (5), backlog
 - **Formatação** (`lib/format.ts`): `horasCurtas` ("45 min", "1,5 h", "42 h", "1.234 h", arredondando para baixo) e
   `textoDasConquistas` (singular e plural). `lib/estado-do-cartao.ts` classifica a falha (`privado`, `sem-conexao`,
   `erro`).
-- **Biblioteca e vínculo de jogo (etapa 3)**: `BibliotecaSteamDialog` (dois modos: `novo` e `vincular`, num `ModalDialog`;
+- **Biblioteca e vínculo de jogo (etapa 3)**: `BibliotecaPlataformaDialog` (dois modos: `novo` e `vincular`, num `ModalDialog`;
   busca com _debounce_ de 300 ms; estados carregando, vazia, privada e erro com **Tentar de novo**). No modo `novo`, cada item
   é **Criar jogo** (ou **Criar outro jogo**, quando há parecidos, que ganham **Vincular a este**), mais **Vincular a outro
   jogo que já tenho** (seletor só dos jogos sem `dadosPlataforma`); item já ligado mostra "Já ligado a «X»" e não cria. Nunca
@@ -997,7 +997,7 @@ noreferrer"`), números (jogos, horas, "já jogados"), mais jogados (5), backlog
   status sugerido (`lib/biblioteca.ts`: 0 min = Quero jogar, >0 = Jogando, **nunca** Zerado), a capa oficial é só **prévia**;
   ao salvar cria o jogo e **só depois** liga (falha da ligação: jogo salvo, formulário passa a editar, o próximo Salvar
   reenvia sem 409); a confirmação de plataforma vem **antes** de criar qualquer coisa. A página do jogo tem **Vincular à
-  Steam** (modo `vincular`). Ligar invalida `['games']` e o cartão do perfil. **Visual da lista (`BibliotecaSteamDialog`)**: cada item é um cartão com a
+  Steam** (modo `vincular`). Ligar invalida `['games']` e o cartão do perfil. **Visual da lista (`BibliotecaPlataformaDialog`)**: cada item é um cartão com a
   capa na proporção exata do cabeçalho da Steam (`aspect-[460/215]`, sem corte; 120 px no celular, 148 px a partir de `sm`), título em Outfit, as horas com
   ícone de relógio e entrada em cascata (`update-in` com `animation-delay` de 45 ms por item, até o 8º; só `opacity` e `transform`); o esqueleto de
   carregamento tem o mesmo desenho do cartão; a biblioteca vazia mostra o Chek `dormindo` e o perfil privado, o Chek `cadeado`. O cabeçalho do diálogo
@@ -1013,10 +1013,40 @@ noreferrer"`), números (jogos, horas, "já jogados"), mais jogados (5), backlog
 - **Precedência da capa** (`lib/capa.ts` + `GameCover`): a enviada, depois a oficial (`library_600x900.jpg`), depois o
   `header.jpg` do mesmo app (derivado da URL oficial, só na CDN conhecida) e por fim a gerada (cor e inicial). O `GameCover` tenta
   a próxima quando uma falha ao carregar (`onError`); nada é gravado, então remover a enviada faz a oficial reaparecer.
-- **Testes** (Vitest): `components/BlocoSteam.test.tsx`, `lib/capa.test.ts`, `lib/conquistas.test.ts`, `games/components/GameCover.test.tsx`, `components/BibliotecaSteamDialog.test.tsx`, `lib/biblioteca.test.ts`, `games/components/GameForm.steam.test.tsx`, `components/PlataformasDoPerfil.test.tsx` (as linhas, o popup e todos os estados, o desvio da URL fora da Steam, o
+- **Testes** (Vitest): `components/BlocoSteam.test.tsx`, `lib/capa.test.ts`, `lib/conquistas.test.ts`, `games/components/GameCover.test.tsx`, `components/BibliotecaPlataformaDialog.test.tsx`, `lib/biblioteca.test.ts`, `games/components/GameForm.steam.test.tsx`, `components/PlataformasDoPerfil.test.tsx` (as linhas, o popup e todos os estados, o desvio da URL fora da Steam, o
   diálogo, Atualizar, privacidade), `lib/lib.test.ts` (URL da Steam, avisos, horas, classificação),
   `pages/PerfilPage.test.tsx` (a seção entre Conta e Preferências e os avisos do retorno; a API de integrações é
   mockada).
+
+### 5.13.1 PlayStation no web (spec `docs/specs/integracao-playstation.md`, F2 a F4)
+
+- **O cadastro manda, não um `if`.** `PlataformaInfo` ganhou `vinculo` (`redirecionamento` com `hostDeLogin`/`caminhoDeLogin`, ou `credencial` com o rótulo
+  "NPSSO", a explicação, o endereço, os passos e a observação), `vocabulario` (`conquista`/`conquistas`/`artigo`: "as conquistas", "os troféus"),
+  `plataformasCompativeis` (para a confirmação ao ligar), `plataformaPadrao`, `privacidade` (o passo a passo da Steam; `null` na PlayStation), `rodapeLegal`
+  (`atribuicao` e `naoAfiliado`) e `capaNaBusca` (`paisagem` na Steam, `quadrada` na PlayStation). A PlayStation não tem logo (`logo: null`): o
+  `PlataformaMarca` cai no marcador neutro (`videogame_asset`) com o nome, até o pacote oficial da Sony chegar. Os textos concordam pelo cadastro
+  (`lib/plataforma-texto.ts`: `dePlataforma`, `naPlataforma`, `comPlataforma`, `textoDaConfirmacaoDePlataforma`), então "Buscar na PlayStation", "Ligado à
+  PlayStation" e "as horas e os troféus mostrados serão os da PlayStation" saem sem código próprio.
+- **Vincular por credencial** (F2): a linha "não vinculada" olha `plataforma.vinculo.tipo`. Por credencial, **Vincular** abre o `VincularCredencialDialog`
+  (um `ModalDialog`), que explica o que é o NPSSO, que **equivale a uma senha**, que o app o usa **uma única vez**, onde pegá-lo (o endereço é um link
+  `target="_blank" rel="noopener noreferrer"` que a pessoa abre sozinha; o app **nunca** monta uma URL com o valor nem o lê de `location`) e tem o campo
+  (`type="password"`, `autocomplete="off"`, `spellcheck={false}`). O valor vive **só no estado do componente** (some ao enviar, ao fechar e em erro), vai **só no
+  corpo do POST** `vinculo/credencial` (`integracoesApi.vincularComCredencial`), e a mutação (`useVincularComCredencial`, `gcTime: 0`, `reset()` logo depois) **não
+  fica com o valor** no cache do TanStack Query. Sucesso: o diálogo fecha, um aviso "Conta PlayStation vinculada." e a lista de contas é buscada de novo. Erro
+  (código recusado, conta já vinculada, plataforma fora do ar): o texto pelo `code`, **dentro** do diálogo, com o Chek `confuso`; o valor não é reenviado sozinho.
+- **Conta em `reautenticar`** (F2): `ContaVinculada.estado`. A linha mostra o selo **Reconectar**, **não** consulta o resumo (a API responderia 409) e, ao
+  tocar, abre o mesmo diálogo com "Sua conexão com a PlayStation expirou" e o Chek `confuso`; a conta e os jogos ligados continuam. Um código novo volta o
+  estado a `ativa`.
+- **Biblioteca e formulário genéricos** (F2): `BibliotecaPlataformaDialog` recebe `provedor` (textos, capa e privacidade do cadastro). O seletor de "Vincular a outro
+  jogo que já tenho" lista os jogos **sem vínculo COM ESSA plataforma** (o vínculo é 1 para 1 por plataforma). O `GameForm` mostra **um botão "Buscar na …" por
+  plataforma vinculada com biblioteca** (`usePlataformasComBiblioteca`, na ordem do cadastro), guarda **um item por plataforma** (o primeiro escolhido manda no
+  título, na plataforma e no status) e, ao salvar, cria o jogo e **só depois** liga cada item (`useVincularJogoEm`); a confirmação de plataforma sai **antes** de
+  criar e vale para a primeira plataforma cujas `plataformasCompativeis` não incluem a do jogo. O item traz `plataformaSugerida` (`PS5`, `PS4`, `PC` ou vazio);
+  sem ela vale a `plataformaPadrao` do cadastro. A página do jogo tem um **Vincular {ligadoA}** por plataforma que o jogo ainda não tem. `PROVEDOR_STEAM` e
+  `useTemContaSteam` acabaram.
+- **Testes** (F2): `PlataformasDoPerfil.playstation.test.tsx` (o diálogo, o campo, o valor só no corpo, nada em URL, armazenamento do navegador nem cache, os
+  erros, `reautenticar`), `GameForm.plataformas.test.tsx` (dois botões, PS4 e PS5 como itens distintos, confirmação pelo cadastro), `lib/plataforma-texto.test.ts`,
+  `lib/biblioteca.test.ts`, `shared/lib/plataformas.test.ts` (o cadastro) e `lib/sem-provedor-solto.test.ts` (sem exceção).
 
 ### 5.14 O Chek e o movimento (`shared/components/Chek/`, spec `docs/specs/personalizacao-chek-e-animacoes.md`)
 

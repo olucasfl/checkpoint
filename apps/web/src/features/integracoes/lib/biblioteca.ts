@@ -1,9 +1,12 @@
 import { isAxiosError } from 'axios';
-import { type GameStatus, type PlataformaItemJaVinculadoError } from '@checkpoint/shared';
+import {
+  type GameStatus,
+  type ItemBiblioteca,
+  type PlataformaInfo,
+  type PlataformaItemJaVinculadoError,
+} from '@checkpoint/shared';
 import { errorCode } from '@/features/auth/lib/auth-errors';
 
-/** Jogo novo criado da biblioteca da Steam começa em "PC" (spec `integracao-plataformas`, Q3). */
-export const PLATAFORMA_PADRAO = 'PC';
 /** O `titulo` do jogo aceita até 120 caracteres; o da Steam pode ser maior. */
 export const TITULO_MAX = 120;
 
@@ -20,12 +23,26 @@ export function tituloDoItem(titulo: string): string {
 }
 
 /**
- * Ligar a um jogo de OUTRA plataforma (PlayStation, Switch…) precisa de confirmação: as horas e as conquistas são
- * as da Steam, e a plataforma do jogo não muda. Vazio ou "PC" não precisa (é o caso comum).
+ * A plataforma de um jogo novo criado a partir de um item da biblioteca: a que o item sugere (`PS5`, `PS4`…) e, sem
+ * sugestão, a padrão do cadastro (Steam: `PC`; PlayStation: nenhuma). A pessoa edita no formulário.
  */
-export function precisaConfirmarPlataforma(plataforma: string | null | undefined): boolean {
-  const valor = (plataforma ?? '').trim();
-  return valor !== '' && valor.toLowerCase() !== PLATAFORMA_PADRAO.toLowerCase();
+export function plataformaDoNovoJogo(item: ItemBiblioteca, plataforma: PlataformaInfo): string {
+  return item.plataformaSugerida ?? plataforma.plataformaPadrao ?? '';
+}
+
+/**
+ * Ligar a um jogo de OUTRA plataforma precisa de confirmação: as horas e as conquistas mostradas são as da
+ * plataforma, e a plataforma do jogo não muda. Vazio ou uma das compatíveis do cadastro (Steam: `PC`, `Steam Deck`;
+ * PlayStation: `PS1` a `PS5`, `PSP`) não precisa.
+ */
+export function precisaConfirmarPlataforma(
+  doJogo: string | null | undefined,
+  plataforma: PlataformaInfo,
+): boolean {
+  const valor = (doJogo ?? '').trim().toLowerCase();
+  return (
+    valor !== '' && !plataforma.plataformasCompativeis.some((item) => item.toLowerCase() === valor)
+  );
 }
 
 /** O jogo que já tem o item, no 409 `PLATAFORMA_ITEM_JA_VINCULADO` (para oferecer "Mover o vínculo"). */

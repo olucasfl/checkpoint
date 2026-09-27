@@ -95,7 +95,7 @@ function abrir(game: Game = jogo()) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const view = render(
     <QueryClientProvider client={client}>
-      <BlocoSteam game={game} />
+      <BlocoSteam game={game} provedor="STEAM" />
     </QueryClientProvider>,
   );
   return { ...view, user: userEvent.setup({ applyAccept: false }) };

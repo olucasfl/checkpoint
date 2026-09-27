@@ -8,10 +8,11 @@ import { describeAuthError } from '@/features/auth/lib/auth-errors';
 import { useContas, useIniciarVinculo, useResumoPlataforma } from '../api/use-integracoes';
 import { dataCurta } from '../lib/conquistas';
 import { irPara } from '../lib/navegar';
-import { urlDaSteamSegura } from '../lib/steam-url';
 import { atualizadoHaTexto } from '../lib/tempo-relativo';
+import { urlDeVinculoSegura } from '../lib/vinculo-url';
 import { PlataformaDialog } from './PlataformaDialog';
 import { Esqueleto, Falha } from './ResumoSteam';
+import { VincularCredencialDialog } from './VincularCredencialDialog';
 
 const LINHA = 'flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 text-left';
 
@@ -30,8 +31,10 @@ function LinhaVinculada({
   onAbrir: () => void;
 }) {
   const provedor = plataforma.id as Provedor;
-  // O resumo entra no mesmo cache do popup (10 min no servidor): a linha mostra a foto e o "atualizado há X".
-  const cache = useResumoPlataforma(provedor, true);
+  const reautenticar = conta.estado === 'reautenticar';
+  // O resumo entra no mesmo cache do popup (10 min no servidor): a linha mostra a foto e o "atualizado há X". Com a
+  // conexão expirada a API responde 409 sem chamar a plataforma, então nem se pergunta.
+  const cache = useResumoPlataforma(provedor, !reautenticar);
   const atualizado = cache.data ? atualizadoHaTexto(cache.data.consultadoEm) : null;
   const detalhe = atualizado ?? `Vinculada em ${dataCurta(conta.vinculadaEm) ?? '—'}`;
   const avatarUrl = cache.data?.avatarUrl ?? null;
@@ -61,7 +64,14 @@ function LinhaVinculada({
           <span className="text-[17px] font-semibold [overflow-wrap:anywhere]">
             {conta.nomeExibicao}
           </span>
-          <span className="text-[13px] font-medium text-texto-suave">{detalhe}</span>
+          <span className="flex flex-wrap items-center gap-2 text-[13px] font-medium text-texto-suave">
+            {detalhe}
+            {reautenticar ? (
+              <span className="rounded-full bg-painel-3 px-2.5 py-0.5 font-display text-[12px] font-bold uppercase tracking-[0.08em] text-ouro">
+                Reconectar
+              </span>
+            ) : null}
+          </span>
         </span>
       </span>
       <Icon name="chevron_right" size={24} className="shrink-0 text-texto-suave" />
@@ -74,12 +84,19 @@ function LinhaNaoVinculada({ plataforma }: { plataforma: PlataformaInfo }) {
   const provedor = plataforma.id as Provedor;
   const iniciar = useIniciarVinculo(provedor);
   const [erro, setErro] = useState('');
+  const [colando, setColando] = useState(false);
+  // O fluxo vem do cadastro: por credencial a pessoa cola um código aqui mesmo; por redirecionamento vai à plataforma.
+  const porCredencial = plataforma.vinculo.tipo === 'credencial';
 
   async function onVincular() {
     setErro('');
+    if (porCredencial) {
+      setColando(true);
+      return;
+    }
     try {
       const { url } = await iniciar.mutateAsync();
-      if (!urlDaSteamSegura(url)) {
+      if (!urlDeVinculoSegura(plataforma, url)) {
         // A resposta não é a tela de login da plataforma: o navegador não vai para lugar nenhum.
         setErro('Não foi possível iniciar o vínculo. Tente de novo.');
         return;
@@ -97,7 +114,8 @@ function LinhaNaoVinculada({ plataforma }: { plataforma: PlataformaInfo }) {
         <div className="flex min-w-0 flex-col">
           <span className="text-[19px] font-semibold">{plataforma.nome}</span>
           <span className="text-[16px] text-texto-suave">
-            Veja as horas e as conquistas dos seus jogos.
+            Veja as horas e {plataforma.vocabulario.artigo} {plataforma.vocabulario.conquistas} dos
+            seus jogos.
           </span>
         </div>
       </div>
@@ -113,6 +131,13 @@ function LinhaNaoVinculada({ plataforma }: { plataforma: PlataformaInfo }) {
         <span aria-hidden="true">{iniciar.isPending ? 'Abrindo…' : 'Vincular'}</span>
       </button>
       <FieldError id={`${plataforma.slug}-vincular-erro`} message={erro} />
+      {porCredencial ? (
+        <VincularCredencialDialog
+          open={colando}
+          plataforma={plataforma}
+          onClose={() => setColando(false)}
+        />
+      ) : null}
     </div>
   );
 }
@@ -126,6 +151,7 @@ function LinhaNaoVinculada({ plataforma }: { plataforma: PlataformaInfo }) {
 export function PlataformasDoPerfil() {
   const contas = useContas();
   const [aberta, setAberta] = useState<Provedor | null>(null);
+  const [reconectando, setReconectando] = useState<Provedor | null>(null);
 
   let corpo;
   if (contas.isPending) {
@@ -149,7 +175,11 @@ export function PlataformasDoPerfil() {
               <LinhaVinculada
                 plataforma={plataforma}
                 conta={conta}
-                onAbrir={() => setAberta(plataforma.id as Provedor)}
+                onAbrir={() =>
+                  conta.estado === 'reautenticar'
+                    ? setReconectando(plataforma.id as Provedor)
+                    : setAberta(plataforma.id as Provedor)
+                }
               />
               <PlataformaDialog
                 open={aberta === plataforma.id}
@@ -157,6 +187,14 @@ export function PlataformasDoPerfil() {
                 conta={conta}
                 onClose={() => setAberta(null)}
               />
+              {plataforma.vinculo.tipo === 'credencial' ? (
+                <VincularCredencialDialog
+                  open={reconectando === plataforma.id}
+                  plataforma={plataforma}
+                  reautenticar
+                  onClose={() => setReconectando(null)}
+                />
+              ) : null}
             </>
           ) : (
             <LinhaNaoVinculada plataforma={plataforma} />

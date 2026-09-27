@@ -104,7 +104,7 @@ describe('GameForm — buscar na Steam (jogo novo)', () => {
     integ.listarContas.mockResolvedValue([]);
     renderForm();
 
-    expect(await screen.findByText(/Vincule sua Steam no perfil/)).toBeInTheDocument();
+    expect(await screen.findByText(/Vincule sua conta no perfil/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Buscar na Steam' })).toBeNull();
   });
 
@@ -271,7 +271,12 @@ describe('GameForm — jogo novo já ligado a um item (itemInicial, "Ver e impor
     });
     render(
       <QueryClientProvider client={client}>
-        <GameForm onDone={onDone} onCancel={vi.fn()} itemInicial={item(over)} />
+        <GameForm
+          onDone={onDone}
+          onCancel={vi.fn()}
+          itemInicial={item(over)}
+          provedorInicial="STEAM"
+        />
       </QueryClientProvider>,
     );
     return { onDone, user: userEvent.setup({ applyAccept: false }) };
