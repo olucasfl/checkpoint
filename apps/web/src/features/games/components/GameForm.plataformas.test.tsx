@@ -7,6 +7,12 @@ import { integracoesApi } from '@/features/integracoes/api/integracoes-api';
 import { gamesApi } from '../api/games-api';
 import { GameForm } from './GameForm';
 
+/** O botão único "Buscar em uma plataforma" abre a lista; a pessoa escolhe a plataforma. */
+async function buscarEm(user: ReturnType<typeof userEvent.setup>, nome: string) {
+  await user.click(await screen.findByRole('button', { name: 'Buscar em uma plataforma' }));
+  await user.click(await screen.findByRole('menuitem', { name: nome }));
+}
+
 vi.mock('../api/games-api', () => ({
   gamesApi: {
     list: vi.fn(),
@@ -102,23 +108,24 @@ beforeEach(() => {
 });
 
 describe('GameForm — Buscar na Steam e Buscar na PlayStation (CA-32 a CA-36)', () => {
-  it('com as duas contas: dois botões, na ordem do cadastro', async () => {
-    renderForm();
+  it('com as duas contas: UM botão que abre a lista, na ordem do cadastro', async () => {
+    const { user } = renderForm();
 
-    const steam = await screen.findByRole('button', { name: 'Buscar na Steam' });
-    const psn = await screen.findByRole('button', { name: 'Buscar na PlayStation' });
+    await user.click(await screen.findByRole('button', { name: 'Buscar em uma plataforma' }));
+    const itens = within(await screen.findByRole('menu')).getAllByRole('menuitem');
 
-    expect(steam.compareDocumentPosition(psn) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(itens.map((item) => item.textContent)).toEqual(['Steam', 'PlayStation']);
+    expect(screen.queryByRole('button', { name: /Buscar na / })).toBeNull();
   });
 
-  it('só a PlayStation vinculada: só o botão dela', async () => {
+  it('só a PlayStation vinculada: a lista tem só ela', async () => {
     integ.listarContas.mockResolvedValue([conta('PLAYSTATION')]);
-    renderForm();
+    const { user } = renderForm();
 
-    expect(
-      await screen.findByRole('button', { name: 'Buscar na PlayStation' }),
-    ).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Buscar na Steam' })).toBeNull();
+    await user.click(await screen.findByRole('button', { name: 'Buscar em uma plataforma' }));
+
+    const itens = within(await screen.findByRole('menu')).getAllByRole('menuitem');
+    expect(itens.map((item) => item.textContent)).toEqual(['PlayStation']);
   });
 
   it('nenhuma conta: o convite genérico a vincular no perfil', async () => {
@@ -131,7 +138,7 @@ describe('GameForm — Buscar na Steam e Buscar na PlayStation (CA-32 a CA-36)',
   it('PS4 e PS5 do mesmo jogo aparecem como DOIS itens, cada um com o seu "Criar jogo"; nada é escolhido por nome (CA-34)', async () => {
     const { user } = renderForm();
 
-    await user.click(await screen.findByRole('button', { name: 'Buscar na PlayStation' }));
+    await buscarEm(user, 'PlayStation');
     const lista = await screen.findByRole('list', { name: 'Jogos da PlayStation' });
 
     expect(within(lista).getAllByText('Jogo Exemplo')).toHaveLength(2);
@@ -144,7 +151,7 @@ describe('GameForm — Buscar na Steam e Buscar na PlayStation (CA-32 a CA-36)',
   it('"Criar jogo" de um item PS5 preenche a plataforma PS5 (editável), o status pelas horas, e o cartão "Ligado à PlayStation"', async () => {
     const { user } = renderForm();
 
-    await user.click(await screen.findByRole('button', { name: 'Buscar na PlayStation' }));
+    await buscarEm(user, 'PlayStation');
     await user.click(
       (await screen.findAllByRole('button', { name: /Criar jogo: Jogo Exemplo/ }))[0]!,
     );
@@ -160,7 +167,7 @@ describe('GameForm — Buscar na Steam e Buscar na PlayStation (CA-32 a CA-36)',
   it('Salvar cria o jogo e SÓ DEPOIS liga ao provedor certo (PlayStation), com o titleId', async () => {
     games.create.mockResolvedValue(criado());
     const { user, onDone } = renderForm();
-    await user.click(await screen.findByRole('button', { name: 'Buscar na PlayStation' }));
+    await buscarEm(user, 'PlayStation');
     await user.click(
       (await screen.findAllByRole('button', { name: /Criar jogo: Jogo Exemplo/ }))[0]!,
     );
@@ -183,11 +190,11 @@ describe('GameForm — Buscar na Steam e Buscar na PlayStation (CA-32 a CA-36)',
   it('as duas plataformas ao mesmo tempo: o primeiro item manda no título; as duas ligações saem no Salvar', async () => {
     games.create.mockResolvedValue(criado({ titulo: 'Jogo Exemplo' }));
     const { user, onDone } = renderForm();
-    await user.click(await screen.findByRole('button', { name: 'Buscar na PlayStation' }));
+    await buscarEm(user, 'PlayStation');
     await user.click(
       (await screen.findAllByRole('button', { name: /Criar jogo: Jogo Exemplo/ }))[0]!,
     );
-    await user.click(await screen.findByRole('button', { name: 'Buscar na Steam' }));
+    await buscarEm(user, 'Steam');
     await user.click(await screen.findByRole('button', { name: /Criar jogo: Jogo Steam/ }));
 
     expect(screen.getByLabelText('Título')).toHaveValue('Jogo Exemplo');
@@ -212,7 +219,7 @@ describe('GameForm — Buscar na Steam e Buscar na PlayStation (CA-32 a CA-36)',
   it('jogo de plataforma que não é da PlayStation (Xbox) pede a confirmação do cadastro; PS4 não pede (CA-36)', async () => {
     games.create.mockResolvedValue(criado({ plataforma: 'Xbox One' }));
     const { user, onDone } = renderForm();
-    await user.click(await screen.findByRole('button', { name: 'Buscar na PlayStation' }));
+    await buscarEm(user, 'PlayStation');
     await user.click(
       (await screen.findAllByRole('button', { name: /Criar jogo: Jogo Exemplo/ }))[0]!,
     );
@@ -225,7 +232,7 @@ describe('GameForm — Buscar na Steam e Buscar na PlayStation (CA-32 a CA-36)',
 
   it('a confirmação usa o texto do cadastro: "as horas e os troféus mostrados serão os da PlayStation"', async () => {
     const { user } = renderForm();
-    await user.click(await screen.findByRole('button', { name: 'Buscar na PlayStation' }));
+    await buscarEm(user, 'PlayStation');
     await user.click(
       (await screen.findAllByRole('button', { name: /Criar jogo: Jogo Exemplo/ }))[0]!,
     );

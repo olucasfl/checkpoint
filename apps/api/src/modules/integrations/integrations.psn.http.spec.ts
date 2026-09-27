@@ -588,8 +588,8 @@ describe('desvincular e chave ausente (CA-04, CA-22)', () => {
 
   it('sem PSN_TOKEN_ENCRYPTION_KEY a API sobe, a Steam funciona e a PlayStation some (400 VALIDACAO) (CA-04)', async () => {
     await app.close();
-    const { PSN_TOKEN_ENCRYPTION_KEY: _chave, ...semChave } = ENV;
-    ctx = await startIntegrationsApp(semChave);
+    // Vazia (e não só removida): um `.env` local com a chave não pode vazar para dentro do teste.
+    ctx = await startIntegrationsApp({ ...ENV, PSN_TOKEN_ENCRYPTION_KEY: '' });
     app = ctx.app;
     const token = await ctx.tokenFor(ANA_ID);
 

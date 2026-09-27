@@ -404,14 +404,14 @@ describe('BlocoPlataforma — Atualizar e Desvincular', () => {
 describe('BlocoPlataforma — seção recolhível (spec plataformas-e-pagina-do-jogo, F2)', () => {
   beforeEach(() => storage.raw.removeAllWithPrefix('checkpoint:'));
 
-  it('o título é a logo oficial sozinha (nome acessível "Steam", >= 50 px) e a linha fechada resume horas e conquistas', async () => {
+  it('o título é o símbolo com o nome em texto (sem imagem de marca) e a linha fechada resume horas e conquistas', async () => {
     api.detalheDoJogo.mockResolvedValue(detalhe());
     const { container } = abrir();
 
     const titulo = await screen.findByRole('heading', { level: 2, name: 'Steam' });
-    const logo = within(titulo).getByRole('img', { name: 'Steam' });
-    expect(Number(logo.getAttribute('height'))).toBeGreaterThanOrEqual(50);
-    expect(titulo).toHaveTextContent('');
+    expect(titulo.querySelector('[data-plataforma-marcador="STEAM"]')).not.toBeNull();
+    expect(titulo.querySelector('img')).toBeNull();
+    expect(titulo).toHaveTextContent('Steam');
     expect(
       within(container.querySelector('summary') as HTMLElement).getByText(
         '42 h 30 min · 12/40 conquistas',

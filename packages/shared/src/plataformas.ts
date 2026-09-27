@@ -37,6 +37,8 @@ export const ALTURA_MINIMA_DA_LOGO_PX = 50;
 /** O ícone NEUTRO de origem, sem marca registrada: o que vai nos selos pequenos. `icone` é um glifo do Material Symbols. */
 export interface MarcadorDaPlataforma {
   icone: string;
+  /** O símbolo da plataforma (SVG de uma cor em `apps/web/public/`), desenhado na cor do texto. Sem ele, vale o `icone`. */
+  simbolo?: string;
 }
 
 /** A marca OFICIAL (um arquivo em `apps/web/public/`), só para onde ela couber com `ALTURA_MINIMA_DA_LOGO_PX`. */
@@ -95,9 +97,9 @@ const CADASTRO = {
     nomeAcessivel: 'Steam',
     disponivel: true,
     capacidades: ['horas', 'conquistas', 'biblioteca', 'ultimaVezJogado', 'nivel', 'backlog'],
-    marcador: { icone: 'link' },
-    // Vetor extraído do PDF oficial da Valve, sem alteração (docs/design/plataformas/steam/); inverso (branco) para o tema escuro.
-    logo: { arquivo: '/plataformas/steam-logo.svg', largura: 214, altura: 65 },
+    // Só o símbolo, pequeno, com o nome em texto ao lado. O logo grande (`steam-logo.svg`, do PDF da Valve) não é mais usado.
+    marcador: { icone: 'link', simbolo: '/plataformas/steam.svg' },
+    logo: null,
     ligadoA: 'à Steam',
     rotuloDaConta: 'Conta Steam',
     vinculo: {
@@ -133,8 +135,8 @@ const CADASTRO = {
     // Só a interface: o provider da API depende da chave de cifra (sem ela as rotas respondem 400 `VALIDACAO`).
     disponivel: true,
     capacidades: ['horas', 'conquistas', 'biblioteca', 'ultimaVezJogado', 'nivel'],
-    // Marcador NEUTRO: a marca oficial só entra quando o pacote da Sony for entregue (spec, "Marca e logos").
-    marcador: { icone: 'videogame_asset' },
+    // Só o símbolo (SVG de uma cor); o pacote oficial da Sony ainda pode substituir o arquivo (spec, "Marca e logos").
+    marcador: { icone: 'videogame_asset', simbolo: '/plataformas/playstation.svg' },
     logo: null,
     ligadoA: 'à PlayStation',
     rotuloDaConta: 'Conta PlayStation',

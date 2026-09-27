@@ -1053,6 +1053,10 @@ noreferrer"`), números (jogos, horas, "já jogados"), mais jogados (5), backlog
   do NPSSO). Tile, destaque e linha do catálogo: `resumoDoCatalogo` e `chipsDoDestaque` usam o nome e o vocabulário da primeira plataforma ligada na ordem do cadastro
   ("Tempo jogado na PlayStation: 10 horas, 12 de 40 troféus"); o selo (`selosDoJogo`) já era por cadastro (dois selos e "+N"). O marco de 100% ("100% dos troféus em «X»!")
   concorda pelo `artigo` do vocabulário.
+- **Símbolos e busca única** (pós-F4): as plataformas usam só o **símbolo** (`marcador.simbolo`, SVG de uma cor em `apps/web/public/plataformas/steam.svg` e
+  `playstation.svg`), desenhado por `PlataformaMarca` como máscara na cor do texto, pequeno e com o nome em texto ao lado. `logo` é `null` nas duas (o
+  `steam-logo.svg` grande não é mais usado); onde este documento fala de "logo oficial >= 50 px", vale o símbolo. No `GameForm` os botões "Buscar na X" viraram **um só
+  botão, "Buscar em uma plataforma"**, que abre uma lista (`role="menu"`) com as plataformas ainda sem ligação; escolher uma abre a biblioteca dela.
 - **Popup da conta e linha do perfil** (F4): `ResumoSteam` virou **`ResumoPlataforma`** (um popup para todas, textos do cadastro). Steam continua igual. Na PlayStation o
   popup mostra **Nível de troféu** ("Nível 312", "faixa 4 de 10", "42% até o próximo nível") e a contagem **por tipo** em texto (`resumo.nivel`/`resumo.trofeus`), e
   **não** mostra "membro desde", status, "Abrir perfil" nem backlog (a PSN não dá; o backlog só aparece com a capacidade `backlog` do cadastro). O passo a passo de

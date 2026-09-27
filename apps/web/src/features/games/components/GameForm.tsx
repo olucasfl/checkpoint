@@ -29,7 +29,6 @@ import {
 } from '@/features/integracoes/lib/biblioteca';
 import {
   dePlataforma,
-  naPlataforma,
   textoDaConfirmacaoDePlataforma,
 } from '@/features/integracoes/lib/plataforma-texto';
 import { useSaveGame } from '../api/use-games';
@@ -124,6 +123,10 @@ export function GameForm({
   const [ligados, setLigados] = useState<Provedor[]>([]);
   const [erroLigacao, setErroLigacao] = useState('');
   const [buscando, setBuscando] = useState<Provedor | null>(null);
+  const [menuAberto, setMenuAberto] = useState(false);
+  const plataformasSemLigacao = (plataformasDaBiblioteca ?? []).filter(
+    (plataforma) => !ligacoes[plataforma.id as Provedor],
+  );
   const [confirmandoPlataforma, setConfirmandoPlataforma] = useState<Provedor | null>(null);
   const ligacoesEscolhidas = (Object.keys(ligacoes) as Provedor[]).filter(
     (provedor) => ligacoes[provedor] !== undefined,
@@ -362,18 +365,51 @@ export function GameForm({
                   </button>
                 </div>
               </div>
-            ) : (
-              <button
-                key={plataforma.id}
-                type="button"
-                onClick={() => setBuscando(provedor)}
-                className="flex h-[52px] items-center justify-center gap-2 rounded-xl border-2 border-dashed border-destaque bg-destaque/10 px-4 font-display text-[15px] font-bold text-destaque transition-colors hover:bg-destaque/20"
-              >
-                <PlataformaMarca provedor={provedor} variante="marcador" tamanho="m" decorativa />
-                Buscar {naPlataforma(plataforma)}
-              </button>
-            );
+            ) : null;
           })}
+          {plataformasSemLigacao.length > 0 && (
+            <div className="relative">
+              <button
+                type="button"
+                aria-haspopup="menu"
+                aria-expanded={menuAberto}
+                onClick={() => setMenuAberto((aberto) => !aberto)}
+                className="flex h-[52px] w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-destaque bg-destaque/10 px-4 font-display text-[15px] font-bold text-destaque transition-colors hover:bg-destaque/20"
+              >
+                <Icon name="search" size={20} />
+                Buscar em uma plataforma
+                <Icon name={menuAberto ? 'expand_less' : 'expand_more'} size={20} />
+              </button>
+              {menuAberto && (
+                <div
+                  role="menu"
+                  aria-label="Plataformas disponíveis"
+                  className="mt-2 flex flex-col gap-1 rounded-2xl border border-borda bg-painel-2 p-1.5"
+                >
+                  {plataformasSemLigacao.map((plataforma) => (
+                    <button
+                      key={plataforma.id}
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setMenuAberto(false);
+                        setBuscando(plataforma.id as Provedor);
+                      }}
+                      className="flex min-h-12 items-center gap-3 rounded-xl px-3 text-left font-display text-[15px] font-bold transition-colors hover:bg-painel-3"
+                    >
+                      <PlataformaMarca
+                        provedor={plataforma.id as Provedor}
+                        variante="marcador"
+                        tamanho="g"
+                        decorativa
+                      />
+                      {plataforma.nome}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
           <FieldError id="f-ligacao-err" message={erroLigacao} />
         </div>
       )}

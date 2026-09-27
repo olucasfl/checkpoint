@@ -74,7 +74,28 @@ export function PlataformaMarca({
   }
 
   const px = TAMANHO[tamanho];
-  const glifo = <Icon name={plataforma.marcador.icone} size={px} />;
+  const { simbolo, icone } = plataforma.marcador;
+  // O símbolo é uma máscara: pega a cor do texto e cai junto com o tema. Sem arquivo, o glifo neutro.
+  const glifo = simbolo ? (
+    <span
+      aria-hidden
+      className="inline-block shrink-0 bg-current"
+      style={{
+        width: px,
+        height: px,
+        maskImage: `url(${simbolo})`,
+        WebkitMaskImage: `url(${simbolo})`,
+        maskRepeat: 'no-repeat',
+        WebkitMaskRepeat: 'no-repeat',
+        maskPosition: 'center',
+        WebkitMaskPosition: 'center',
+        maskSize: 'contain',
+        WebkitMaskSize: 'contain',
+      }}
+    />
+  ) : (
+    <Icon name={icone} size={px} />
+  );
   if (variante === 'logo') {
     // Logo pedida, mas sem arquivo (ou falhou): o marcador com o nome em texto.
     return (
