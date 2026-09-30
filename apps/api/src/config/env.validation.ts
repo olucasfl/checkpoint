@@ -1,6 +1,7 @@
 import { plainToInstance, Transform, type TransformFnParams } from 'class-transformer';
 import {
   IsBoolean,
+  IsEmail,
   IsEnum,
   IsInt,
   IsNotEmpty,
@@ -26,6 +27,9 @@ export const JWT_SECRET_MIN_LENGTH = 32;
 
 /** Limite de registros por hora e por IP quando `AUTH_REGISTRATION_LIMIT_PER_HOUR` não está definida. */
 export const DEFAULT_REGISTRATION_LIMIT_PER_HOUR = 3;
+
+/** Nome do remetente dos e-mails quando `MAIL_FROM_NAME` não está definida. */
+export const DEFAULT_MAIL_FROM_NAME = 'Checkpoint';
 
 /** Só a origem: `http(s)://host[:porta]`, sem barra final, caminho, query nem espaço. */
 const ORIGIN_PATTERN = /^https?:\/\/[^\s/?#]+$/;
@@ -154,6 +158,26 @@ export class EnvironmentVariables {
   /** Origem do web, para onde o retorno do vínculo redireciona (`/perfil?steam=…`). Sem barra final. */
   @Matches(ORIGIN_PATTERN, { message: ORIGIN_MESSAGE('WEB_PUBLIC_URL') })
   WEB_PUBLIC_URL: string;
+
+  /**
+   * Chave da API do Brevo (e-mail transacional). SÓ o backend a usa e ela viaja no cabeçalho `api-key`,
+   * então nunca vai para o web nem para log. Sem checar o formato: o Brevo pode mudar o prefixo.
+   */
+  @IsString()
+  @IsNotEmpty({ message: 'BREVO_API_KEY é obrigatória (a chave da API do Brevo)' })
+  BREVO_API_KEY: string;
+
+  /** Remetente dos e-mails: precisa ser um remetente verificado no Brevo. */
+  @IsEmail(
+    {},
+    { message: 'MAIL_FROM_EMAIL deve ser um e-mail válido (o remetente verificado no Brevo)' },
+  )
+  MAIL_FROM_EMAIL: string;
+
+  /** Nome exibido do remetente. Ausente (ou vazio) = `DEFAULT_MAIL_FROM_NAME`. */
+  @IsOptional()
+  @IsString()
+  MAIL_FROM_NAME?: string;
 
   /**
    * Quantos proxies CONFIÁVEIS existem entre o cliente e a API (Vercel, Render…). Ausente = 0: o

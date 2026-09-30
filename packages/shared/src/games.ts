@@ -140,6 +140,8 @@ export type ApiErrorField =
   | 'senha'
   | 'senhaAtual'
   | 'novaSenha'
+  // Token de verificação de e-mail / redefinição de senha (spec verificacao-de-email-e-recuperacao-de-senha).
+  | 'token'
   // Query da biblioteca de uma plataforma (spec integracao-plataformas): sem formulário, mas o erro aponta o campo.
   | 'busca'
   | 'limite'

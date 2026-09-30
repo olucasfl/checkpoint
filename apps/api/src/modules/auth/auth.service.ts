@@ -6,20 +6,29 @@ import {
   normalizeEmail,
   type EncerrarOutrasSessoesResponse,
   type LoginRequest,
+  type RedefinirSenhaRequest,
+  type ReenviarVerificacaoRequest,
+  type ReenviarVerificacaoResponse,
   type RegistroRequest,
+  type RegistroResponse,
   type SessaoAtiva,
   type TrocarSenhaRequest,
   type Usuario,
+  type VerificarEmailResponse,
 } from '@checkpoint/shared';
 import { type AuthenticatedUser } from '../../common/decorators/current-user.decorator';
 import { PrismaService } from '../../database/prisma.service';
 import { type EnvironmentVariables } from '../../config/env.validation';
+import { MailIndisponivelError } from '../mail/mail.errors';
+import { MailService } from '../mail/mail.service';
 import { authErrors } from './auth-errors';
 import { AuthTokensService, type TokenClaims } from './auth-tokens.service';
 import {
   MAX_SESSIONS_PER_USER,
   REFRESH_GRACE_WINDOW_MS,
   REFRESH_TOKEN_TTL_SECONDS,
+  RESET_SENHA_TTL_MS,
+  VERIFICACAO_EMAIL_TTL_MS,
 } from './auth.constants';
 import { USUARIO_PUBLICO_SELECT, toUsuario, type UsuarioRow } from '../users/usuario-publico';
 import { PasswordHasher } from './password-hasher';
@@ -51,6 +60,7 @@ export class AuthService implements OnModuleInit {
     private readonly tokens: AuthTokensService,
     private readonly hasher: PasswordHasher,
     private readonly config: ConfigService<EnvironmentVariables, true>,
+    private readonly mail: MailService,
   ) {}
 
   /** Aquece o hash fixo: a primeira tentativa com e-mail inexistente não pode ser a mais lenta. */
@@ -58,7 +68,12 @@ export class AuthService implements OnModuleInit {
     await this.dummyHash();
   }
 
-  async register(dto: RegistroRequest, userAgent?: string): Promise<SessionResult> {
+  /**
+   * Cria a conta SEM abrir sessão: o login só libera depois de confirmar o e-mail. Se o envio falhar a conta
+   * continua criada (desfazer seria pior: a pessoa já gastou aquele e-mail e aquela senha) e a resposta avisa,
+   * para a tela oferecer "reenviar".
+   */
+  async register(dto: RegistroRequest): Promise<RegistroResponse> {
     // Antes de qualquer consulta: com o registro fechado, nem a existência do e-mail é revelada.
     if (!this.config.get('AUTH_REGISTRATION_OPEN', { infer: true })) {
       throw authErrors.registroFechado();
@@ -71,11 +86,11 @@ export class AuthService implements OnModuleInit {
     }
 
     const senhaHash = await this.hasher.hash(dto.senha);
-    let user: UsuarioRow;
+    let user: { id: string; nome: string; email: string };
     try {
       user = await this.prisma.user.create({
         data: { nome: dto.nome.trim(), email, senhaHash },
-        select: USUARIO_PUBLICO_SELECT,
+        select: { id: true, nome: true, email: true },
       });
     } catch (error) {
       // Duas requests com o mesmo e-mail passam juntas pela checagem acima: quem perde a corrida no
@@ -86,13 +101,14 @@ export class AuthService implements OnModuleInit {
       throw error;
     }
 
-    return this.openSession(user, userAgent);
+    const emailEnviado = await this.enviarVerificacao(user);
+    return { email: user.email, emailEnviado };
   }
 
   async login(dto: LoginRequest, userAgent?: string): Promise<SessionResult> {
     const user = await this.prisma.user.findUnique({
       where: { email: normalizeEmail(dto.email) },
-      select: { ...USUARIO_PUBLICO_SELECT, senhaHash: true },
+      select: { ...USUARIO_PUBLICO_SELECT, senhaHash: true, emailVerificadoEm: true },
     });
 
     // E-mail inexistente também paga o custo de um hash: o tempo de resposta não denuncia se a conta existe.
@@ -100,8 +116,123 @@ export class AuthService implements OnModuleInit {
     if (!user || !valid) {
       throw authErrors.credenciaisInvalidas();
     }
+    // Só depois de a senha conferir: quem aprende que falta verificar já provou ser o dono da conta.
+    if (!user.emailVerificadoEm) {
+      throw authErrors.emailNaoVerificado();
+    }
 
     return this.openSession(user, userAgent);
+  }
+
+  /**
+   * Confirma o e-mail. Idempotente: o link pode ser aberto duas vezes (ou pré-carregado pelo cliente de
+   * e-mail antes do clique real), então o token NÃO é consumido, só a conta é marcada.
+   */
+  async verificarEmail(token: string): Promise<VerificarEmailResponse> {
+    const row = await this.prisma.tokenDeUsoUnico.findFirst({
+      where: {
+        tokenHash: sha256(token),
+        tipo: 'VERIFICACAO_EMAIL',
+        expiraEm: { gt: new Date(Date.now()) },
+      },
+      select: { userId: true, user: { select: { emailVerificadoEm: true } } },
+    });
+    if (!row) {
+      throw authErrors.tokenInvalido();
+    }
+    if (row.user.emailVerificadoEm) {
+      return { jaEstavaVerificado: true };
+    }
+    // O `emailVerificadoEm: null` na condição: duas confirmações simultâneas não regravam a data.
+    await this.prisma.user.updateMany({
+      where: { id: row.userId, emailVerificadoEm: null },
+      data: { emailVerificadoEm: new Date(Date.now()) },
+    });
+    return { jaEstavaVerificado: false };
+  }
+
+  /**
+   * E-mail inexistente e existente-e-reenviado dão a MESMA resposta. Só a conta já verificada diz isso: nesse
+   * ponto não há mais segredo de existência a proteger. Cada chamada gera um token NOVO; os anteriores
+   * continuam valendo até serem usados ou vencerem.
+   */
+  async reenviarVerificacao(dto: ReenviarVerificacaoRequest): Promise<ReenviarVerificacaoResponse> {
+    const user = await this.prisma.user.findUnique({
+      where: { email: normalizeEmail(dto.email) },
+      select: { id: true, nome: true, email: true, emailVerificadoEm: true },
+    });
+    if (!user) {
+      return { estado: 'enviado' };
+    }
+    if (user.emailVerificadoEm) {
+      return { estado: 'ja-verificado' };
+    }
+    if (!(await this.enviarVerificacao(user))) {
+      throw authErrors.mailIndisponivel();
+    }
+    return { estado: 'enviado' };
+  }
+
+  /**
+   * Nunca diz se a conta existe: conta inexistente e falha do envio saem iguais (o mesmo princípio do
+   * login). A falha do envio só aparece no log do servidor.
+   */
+  async esqueciSenha(email: string): Promise<void> {
+    const user = await this.prisma.user.findUnique({
+      where: { email: normalizeEmail(email) },
+      select: { id: true, nome: true, email: true },
+    });
+    if (!user) {
+      return;
+    }
+    const token = await this.criarToken(user.id, 'RESET_SENHA', RESET_SENHA_TTL_MS);
+    try {
+      await this.mail.enviarRedefinicaoDeSenha({ email: user.email, nome: user.nome }, token);
+    } catch (error) {
+      if (!(error instanceof MailIndisponivelError)) {
+        throw error;
+      }
+      this.logger.warn('Redefinição de senha: o e-mail não foi enviado');
+    }
+  }
+
+  /**
+   * Troca a senha com o token do e-mail. Uso único (inexistente, vencido e já usado dão o mesmo erro) e
+   * apaga TODAS as sessões: um token ou uma sessão vazados não continuam valendo depois da troca. A senha
+   * nova já passou pela validação do DTO antes de chegar aqui, então uma senha fraca não gasta o link.
+   */
+  async redefinirSenha(dto: RedefinirSenhaRequest): Promise<void> {
+    const now = new Date(Date.now());
+    const row = await this.prisma.tokenDeUsoUnico.findFirst({
+      where: {
+        tokenHash: sha256(dto.token),
+        tipo: 'RESET_SENHA',
+        usadoEm: null,
+        expiraEm: { gt: now },
+      },
+      select: { id: true, userId: true },
+    });
+    if (!row) {
+      throw authErrors.tokenInvalido();
+    }
+
+    const senhaHash = await this.hasher.hash(dto.novaSenha);
+    await this.prisma.$transaction(async (tx) => {
+      // O `usadoEm: null` na condição: dois usos simultâneos do mesmo link, só um passa.
+      const consumed = await tx.tokenDeUsoUnico.updateMany({
+        where: { id: row.id, usadoEm: null },
+        data: { usadoEm: now },
+      });
+      if (consumed.count === 0) {
+        throw authErrors.tokenInvalido();
+      }
+      await tx.user.update({
+        where: { id: row.userId },
+        data: { senhaHash },
+        select: { id: true },
+      });
+      await tx.refreshSession.deleteMany({ where: { userId: row.userId } });
+    });
   }
 
   /**
@@ -286,6 +417,43 @@ export class AuthService implements OnModuleInit {
       },
     });
     return { encerradas: count };
+  }
+
+  /** Só o hash SHA-256 vai para o banco; o token em claro existe no e-mail e na URL. */
+  private async criarToken(
+    userId: string,
+    tipo: 'VERIFICACAO_EMAIL' | 'RESET_SENHA',
+    ttlMs: number,
+  ): Promise<string> {
+    const token = randomBytes(32).toString('hex');
+    await this.prisma.tokenDeUsoUnico.create({
+      data: {
+        userId,
+        tipo,
+        tokenHash: sha256(token),
+        expiraEm: new Date(Date.now() + ttlMs),
+      },
+    });
+    return token;
+  }
+
+  /** `false` = o token foi criado mas o e-mail não saiu (quem chama decide o que fazer). */
+  private async enviarVerificacao(user: {
+    id: string;
+    nome: string;
+    email: string;
+  }): Promise<boolean> {
+    const token = await this.criarToken(user.id, 'VERIFICACAO_EMAIL', VERIFICACAO_EMAIL_TTL_MS);
+    try {
+      await this.mail.enviarVerificacaoDeEmail({ email: user.email, nome: user.nome }, token);
+      return true;
+    } catch (error) {
+      if (!(error instanceof MailIndisponivelError)) {
+        throw error;
+      }
+      this.logger.warn('Verificação de e-mail: o e-mail não foi enviado');
+      return false;
+    }
   }
 
   /** Cria a sessão deste dispositivo, limpa as vencidas e respeita o teto de sessões. */

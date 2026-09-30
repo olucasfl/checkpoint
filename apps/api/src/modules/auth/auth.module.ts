@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { ThrottlerModule } from '@nestjs/throttler';
+import { MailModule } from '../mail/mail.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { AuthThrottlerGuard } from './auth-throttler.guard';
@@ -10,6 +11,7 @@ import { PasswordHasher, ScryptPasswordHasher } from './password-hasher';
 
 @Module({
   imports: [
+    MailModule,
     // Segredo e validade vão em cada chamada (`AuthTokensService`): o access e o refresh usam segredos diferentes.
     JwtModule.register({}),
     // Só o padrão do módulo; cada rota do `AuthController` define o próprio limite. Armazenamento em

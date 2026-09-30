@@ -5,6 +5,7 @@ import {
   normalizeEmail,
   passwordProblem,
   PASSWORD_MAX_BYTES,
+  TOKEN_DE_USO_UNICO_PATTERN,
   USER_EMAIL_MAX_LENGTH,
   USER_NAME_MAX_LENGTH,
   utf8ByteLength,
@@ -20,6 +21,7 @@ export const FIELD_MESSAGES = {
   senhaSoEspacos: 'A senha não pode ser só espaços',
   senhaLoginVazia: 'Informe a senha',
   senhaAtualVazia: 'Informe a senha atual',
+  token: 'O link está incompleto ou inválido',
 } as const;
 
 /** Cada regra devolve a mensagem do problema, ou `null` se o valor está ok. */
@@ -36,6 +38,10 @@ export const emailProblem: FieldProblem = (value) =>
   typeof value === 'string' && [...value].length <= USER_EMAIL_MAX_LENGTH && isEmail(value)
     ? null
     : FIELD_MESSAGES.email;
+
+/** Token de verificação/redefinição: 64 hexadecimais minúsculos. Formato errado nem chega ao banco. */
+export const tokenProblem: FieldProblem = (value) =>
+  typeof value === 'string' && TOKEN_DE_USO_UNICO_PATTERN.test(value) ? null : FIELD_MESSAGES.token;
 
 /** Senha NOVA (registro): mínimo, máximo em bytes e não só espaços. Nenhuma normalização. */
 export const novaSenhaProblem: FieldProblem = (value) => {

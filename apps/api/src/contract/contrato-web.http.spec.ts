@@ -18,6 +18,7 @@ import {
   type ItemBiblioteca,
   type JogoParecido,
   type PerfilPlataforma,
+  type RegistroResponse,
   type ResumoContaPlataforma,
   type SessaoAtiva,
   type Usuario,
@@ -28,6 +29,7 @@ import { PrismaService } from '../database/prisma.service';
 import { AccessTokenGuard } from '../modules/auth/access-token.guard';
 import { AuthController } from '../modules/auth/auth.controller';
 import { AuthService } from '../modules/auth/auth.service';
+import { MailService } from '../modules/mail/mail.service';
 import { AuthThrottlerGuard } from '../modules/auth/auth-throttler.guard';
 import { AuthTokensService } from '../modules/auth/auth-tokens.service';
 import { CsrfHeaderGuard } from '../modules/auth/csrf-header.guard';
@@ -158,6 +160,11 @@ const USUARIO: Record<keyof Usuario, Tipo> = {
   nome: 'string',
   email: 'string',
   criadoEm: 'iso',
+};
+
+const REGISTRO_RESPONSE: Record<keyof RegistroResponse, Tipo> = {
+  email: 'string',
+  emailEnviado: 'boolean',
 };
 
 const AUTH_RESPONSE: Record<keyof AuthResponse, Tipo> = {
@@ -376,8 +383,10 @@ describe('contrato: /integracoes (ContaVinculada, PerfilPlataforma, ItemBibliote
 describe('contrato: /auth e /users (AuthResponse, Usuario, SessaoAtiva)', () => {
   let app: INestApplication;
   let baseUrl: string;
+  let db: FakeAuthPrisma;
 
   beforeEach(async () => {
+    db = new FakeAuthPrisma();
     const env = {
       NODE_ENV: 'development',
       JWT_ACCESS_SECRET: 'segredo-de-acesso-sintetico-com-mais-de-32-caracteres',
@@ -400,8 +409,12 @@ describe('contrato: /auth e /users (AuthResponse, Usuario, SessaoAtiva)', () => 
         UsersService,
         GamesService,
         { provide: StorageService, useValue: storage },
+        {
+          provide: MailService,
+          useValue: { enviarVerificacaoDeEmail: jest.fn(), enviarRedefinicaoDeSenha: jest.fn() },
+        },
         { provide: PasswordHasher, useValue: fakeHasher },
-        { provide: PrismaService, useValue: new FakeAuthPrisma() },
+        { provide: PrismaService, useValue: db },
         { provide: APP_GUARD, useClass: AccessTokenGuard },
       ],
     }).compile();
@@ -445,7 +458,12 @@ describe('contrato: /auth e /users (AuthResponse, Usuario, SessaoAtiva)', () => 
       corpo: { nome: 'Ana Teste', email: 'ana@exemplo.com', senha: 'segredo-forte' },
     });
     expect(registro.status).toBe(201);
-    expect(conforme(registro.corpo, AUTH_RESPONSE)).toEqual([]);
+    expect(conforme(registro.corpo, REGISTRO_RESPONSE)).toEqual([]);
+    // O registro não abre sessão: confirma o e-mail direto no banco em memória antes de entrar.
+    const ana = db.users.find((user) => user.email === 'ana@exemplo.com');
+    if (ana) {
+      ana.emailVerificadoEm = new Date();
+    }
 
     const login = await pedir('POST', '/auth/login', {
       corpo: { email: 'ana@exemplo.com', senha: 'segredo-forte' },

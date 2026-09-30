@@ -7,6 +7,8 @@ import { DEFAULT_REGISTRATION_LIMIT_PER_HOUR } from '../../config/env.validation
 import { registrationLimitPerHour } from './auth-throttler.guard';
 import { AuthTokensService } from './auth-tokens.service';
 import { USUARIO_PUBLICO_SELECT } from '../users/usuario-publico';
+import { MailIndisponivelError } from '../mail/mail.errors';
+import { type MailService } from '../mail/mail.service';
 import { AuthService } from './auth.service';
 import { MAX_SESSIONS_PER_USER, REFRESH_GRACE_WINDOW_MS } from './auth.constants';
 import { type PasswordHasher } from './password-hasher';
@@ -21,9 +23,14 @@ let db: FakeAuthPrisma;
 let service: AuthService;
 let tokens: AuthTokensService;
 let registrationOpen: boolean;
+let mail: { enviarVerificacaoDeEmail: jest.Mock; enviarRedefinicaoDeSenha: jest.Mock };
 
 function makeService(): void {
   db = new FakeAuthPrisma();
+  mail = {
+    enviarVerificacaoDeEmail: jest.fn().mockResolvedValue(undefined),
+    enviarRedefinicaoDeSenha: jest.fn().mockResolvedValue(undefined),
+  };
   const config = {
     get: (key: string) =>
       ({
@@ -38,7 +45,18 @@ function makeService(): void {
     tokens,
     fakeHasher as unknown as PasswordHasher,
     config as never,
+    mail as unknown as MailService,
   );
+}
+
+/** Registra, confirma o e-mail e entra: o que os testes de sessão precisam (o registro não abre sessão). */
+async function sessaoDe(dto: { nome: string; email: string; senha: string }, userAgent?: string) {
+  await service.register(dto);
+  const user = db.users.find((row) => row.email === dto.email.trim().toLowerCase());
+  if (user) {
+    user.emailVerificadoEm = new Date(Date.now());
+  }
+  return service.login({ email: dto.email, senha: dto.senha }, userAgent);
 }
 
 async function errorOf(
@@ -75,34 +93,49 @@ afterEach(() => {
 });
 
 describe('register', () => {
-  it('normaliza nome e e-mail, grava o HASH (nunca a senha) e devolve a sessão (CA-01)', async () => {
-    const result = await service.register(ANA, CURL);
+  it('normaliza nome e e-mail, grava o HASH e NÃO abre sessão (CA-01)', async () => {
+    const result = await service.register(ANA);
 
-    expect(result.usuario).toMatchObject({ nome: 'Ana Teste', email: 'ana@exemplo.com' });
-    expect(result.usuario.id).toMatch(/^[0-9a-f-]{36}$/);
-    expect(result.accessToken).toEqual(expect.any(String));
-    expect(result.refreshToken).toEqual(expect.any(String));
+    expect(result).toEqual({ email: 'ana@exemplo.com', emailEnviado: true });
     expect(db.users).toHaveLength(1);
+    expect(db.users[0]).toMatchObject({ nome: 'Ana Teste', emailVerificadoEm: null });
     expect(db.users[0]?.senhaHash).toBe('fake$segredo-forte');
     expect(db.users[0]?.senhaHash).not.toBe('segredo-forte');
+    expect(db.sessions).toHaveLength(0);
   });
 
-  it('cria a sessão com o hash SHA-256 do refresh token (nunca o token) e o rótulo do dispositivo (CA-05)', async () => {
-    const { refreshToken } = await service.register(ANA, CURL);
+  it('cria um token de verificação de 24 h, só com o HASH (nunca o token) (CA-01)', async () => {
+    await service.register(ANA);
 
-    expect(db.sessions).toHaveLength(1);
-    const [session] = db.sessions;
-    expect(session?.tokenHash).toBe(sha256(refreshToken));
-    expect(session?.tokenHash).toMatch(/^[0-9a-f]{64}$/);
-    expect(session?.tokenHash).not.toBe(refreshToken);
-    expect(session?.dispositivo).toBe('Outro · Outro');
-    expect(session?.hashAnterior).toBeNull();
+    const [enviado] = mail.enviarVerificacaoDeEmail.mock.calls;
+    const token = enviado?.[1] as string;
+    expect(token).toMatch(/^[0-9a-f]{64}$/);
+    expect(db.tokens).toHaveLength(1);
+    const [row] = db.tokens;
+    expect(row).toMatchObject({
+      tipo: 'VERIFICACAO_EMAIL',
+      userId: db.users[0]?.id,
+      usadoEm: null,
+    });
+    expect(row?.tokenHash).toBe(sha256(token));
+    expect(row?.tokenHash).not.toBe(token);
+    expect(row?.expiraEm.getTime()).toBe(NOW + 24 * 60 * 60 * 1000);
+    expect(enviado?.[0]).toEqual({ email: 'ana@exemplo.com', nome: 'Ana Teste' });
+  });
+
+  it('o envio falhou → a conta continua criada e emailEnviado é false (CA-22a)', async () => {
+    mail.enviarVerificacaoDeEmail.mockRejectedValueOnce(new MailIndisponivelError());
+
+    const result = await service.register(ANA);
+
+    expect(result).toEqual({ email: 'ana@exemplo.com', emailEnviado: false });
+    expect(db.users).toHaveLength(1);
   });
 
   it('e-mail já usado (ignorando caixa e espaços) → 409 AUTH_EMAIL_EM_USO com fields.email (CA-02)', async () => {
-    await service.register(ANA, CURL);
+    await service.register(ANA);
 
-    const error = await errorOf(service.register({ ...ANA, email: 'ANA@exemplo.com ' }, CURL));
+    const error = await errorOf(service.register({ ...ANA, email: 'ANA@exemplo.com ' }));
 
     expect(error.status).toBe(409);
     expect(error.body).toMatchObject({ code: 'AUTH_EMAIL_EM_USO' });
@@ -112,10 +145,10 @@ describe('register', () => {
 
   it('corrida no @unique (P2002) vira o mesmo 409, nunca 500', async () => {
     db.user.findUnique.mockResolvedValueOnce(null); // a checagem prévia passa...
-    await service.register(ANA, CURL); // ...e o outro request já criou a conta
+    await service.register(ANA); // ...e o outro request já criou a conta
     db.user.findUnique.mockResolvedValueOnce(null);
 
-    const error = await errorOf(service.register(ANA, CURL));
+    const error = await errorOf(service.register(ANA));
 
     expect(error).toMatchObject({ status: 409, body: { code: 'AUTH_EMAIL_EM_USO' } });
   });
@@ -123,18 +156,19 @@ describe('register', () => {
   it('erro inesperado do banco sobe como está (não é engolido como 409)', async () => {
     db.user.create.mockRejectedValueOnce(new Error('banco caiu'));
 
-    await expect(service.register(ANA, CURL)).rejects.toThrow('banco caiu');
+    await expect(service.register(ANA)).rejects.toThrow('banco caiu');
   });
 
   it('registro fechado → 403 AUTH_REGISTRO_FECHADO ANTES de qualquer consulta; nenhum usuário (CA-04)', async () => {
     registrationOpen = false;
     makeService();
 
-    const error = await errorOf(service.register(ANA, CURL));
+    const error = await errorOf(service.register(ANA));
 
     expect(error).toMatchObject({ status: 403, body: { code: 'AUTH_REGISTRO_FECHADO' } });
     expect(db.user.findUnique).not.toHaveBeenCalled();
     expect(db.users).toHaveLength(0);
+    expect(mail.enviarVerificacaoDeEmail).not.toHaveBeenCalled();
   });
 
   it('a lista branca (select) nunca inclui senhaHash', () => {
@@ -142,15 +176,258 @@ describe('register', () => {
   });
 
   it('o e-mail é gravado normalizado (a chave de login)', async () => {
-    await service.register(ANA, CURL);
+    await service.register(ANA);
 
     expect(db.users[0]?.email).toBe('ana@exemplo.com');
   });
 });
 
+describe('login com e-mail não verificado (CA-02, CA-03)', () => {
+  beforeEach(async () => {
+    await service.register(ANA);
+  });
+
+  it('senha certa + e-mail não verificado → 401 AUTH_EMAIL_NAO_VERIFICADO, sem fields e sem sessão (CA-02)', async () => {
+    const error = await errorOf(
+      service.login({ email: 'ana@exemplo.com', senha: 'segredo-forte' }, CURL),
+    );
+
+    expect(error.status).toBe(401);
+    expect(error.body).toMatchObject({ code: 'AUTH_EMAIL_NAO_VERIFICADO' });
+    expect(error.body).not.toHaveProperty('fields');
+    expect(db.sessions).toHaveLength(0);
+  });
+
+  it('senha ERRADA → AUTH_CREDENCIAIS_INVALIDAS, não AUTH_EMAIL_NAO_VERIFICADO (CA-03)', async () => {
+    const error = await errorOf(
+      service.login({ email: 'ana@exemplo.com', senha: 'errada-mesmo' }, CURL),
+    );
+
+    expect(error).toMatchObject({ status: 401, body: { code: 'AUTH_CREDENCIAIS_INVALIDAS' } });
+  });
+});
+
+describe('verificarEmail (CA-04 a CA-08)', () => {
+  async function registrarEPegarToken(): Promise<string> {
+    await service.register(ANA);
+    return mail.enviarVerificacaoDeEmail.mock.calls[0]?.[1] as string;
+  }
+
+  it('confirma o e-mail, e o login passa a funcionar (CA-04)', async () => {
+    const token = await registrarEPegarToken();
+
+    await expect(service.verificarEmail(token)).resolves.toEqual({ jaEstavaVerificado: false });
+
+    expect(db.users[0]?.emailVerificadoEm).toEqual(new Date(NOW));
+    const session = await service.login({ email: 'ana@exemplo.com', senha: 'segredo-forte' }, CURL);
+    expect(session.usuario.email).toBe('ana@exemplo.com');
+  });
+
+  it('é idempotente: o mesmo link de novo não dá erro e não regrava a data (CA-05)', async () => {
+    const token = await registrarEPegarToken();
+    await service.verificarEmail(token);
+    at(60_000);
+
+    await expect(service.verificarEmail(token)).resolves.toEqual({ jaEstavaVerificado: true });
+
+    expect(db.users[0]?.emailVerificadoEm).toEqual(new Date(NOW));
+  });
+
+  it('token inexistente → 401 AUTH_TOKEN_INVALIDO (CA-07)', async () => {
+    await registrarEPegarToken();
+
+    const error = await errorOf(service.verificarEmail('0'.repeat(64)));
+
+    expect(error).toMatchObject({ status: 401, body: { code: 'AUTH_TOKEN_INVALIDO' } });
+    expect(db.users[0]?.emailVerificadoEm).toBeNull();
+  });
+
+  it('token vencido (24 h) → 401 AUTH_TOKEN_INVALIDO (CA-08)', async () => {
+    const token = await registrarEPegarToken();
+
+    at(24 * 60 * 60 * 1000 + 1);
+    const error = await errorOf(service.verificarEmail(token));
+
+    expect(error).toMatchObject({ status: 401, body: { code: 'AUTH_TOKEN_INVALIDO' } });
+    expect(db.users[0]?.emailVerificadoEm).toBeNull();
+  });
+
+  it('um token de REDEFINIÇÃO não confirma e-mail', async () => {
+    await service.register(ANA);
+    await service.esqueciSenha('ana@exemplo.com');
+    const resetToken = mail.enviarRedefinicaoDeSenha.mock.calls[0]?.[1] as string;
+
+    const error = await errorOf(service.verificarEmail(resetToken));
+
+    expect(error).toMatchObject({ status: 401, body: { code: 'AUTH_TOKEN_INVALIDO' } });
+  });
+});
+
+describe('reenviarVerificacao (CA-09 a CA-11, CA-22b)', () => {
+  it('conta não verificada → "enviado" e um SEGUNDO token; o primeiro continua válido (CA-09)', async () => {
+    await service.register(ANA);
+    const primeiro = mail.enviarVerificacaoDeEmail.mock.calls[0]?.[1] as string;
+
+    await expect(service.reenviarVerificacao({ email: 'ana@exemplo.com' })).resolves.toEqual({
+      estado: 'enviado',
+    });
+
+    expect(db.tokens).toHaveLength(2);
+    expect(mail.enviarVerificacaoDeEmail).toHaveBeenCalledTimes(2);
+    await expect(service.verificarEmail(primeiro)).resolves.toEqual({ jaEstavaVerificado: false });
+  });
+
+  it('conta já verificada → "ja-verificado" e nenhum e-mail (CA-10)', async () => {
+    await sessaoDe(ANA, CURL);
+    mail.enviarVerificacaoDeEmail.mockClear();
+
+    await expect(service.reenviarVerificacao({ email: 'ana@exemplo.com' })).resolves.toEqual({
+      estado: 'ja-verificado',
+    });
+
+    expect(mail.enviarVerificacaoDeEmail).not.toHaveBeenCalled();
+  });
+
+  it('e-mail inexistente → o MESMO corpo do reenvio real, e nada é criado (CA-11)', async () => {
+    const real = await (async () => {
+      await service.register(ANA);
+      return service.reenviarVerificacao({ email: 'ana@exemplo.com' });
+    })();
+    const tokensAntes = db.tokens.length;
+
+    const inexistente = await service.reenviarVerificacao({ email: 'naoexiste@exemplo.com' });
+
+    expect(inexistente).toEqual(real);
+    expect(db.tokens).toHaveLength(tokensAntes);
+  });
+
+  it('o envio falhou numa conta não verificada → 502 MAIL_INDISPONIVEL (CA-22b)', async () => {
+    await service.register(ANA);
+    mail.enviarVerificacaoDeEmail.mockRejectedValueOnce(new MailIndisponivelError());
+
+    const error = await errorOf(service.reenviarVerificacao({ email: 'ana@exemplo.com' }));
+
+    expect(error).toMatchObject({ status: 502, body: { code: 'MAIL_INDISPONIVEL' } });
+  });
+});
+
+describe('esqueciSenha (CA-13, CA-14, CA-22c)', () => {
+  it('conta existente → token de 30 min, só o hash no banco, e-mail enviado (CA-13)', async () => {
+    await service.register(ANA);
+
+    await expect(service.esqueciSenha(' ANA@exemplo.com ')).resolves.toBeUndefined();
+
+    const reset = db.tokens.find((t) => t.tipo === 'RESET_SENHA');
+    const token = mail.enviarRedefinicaoDeSenha.mock.calls[0]?.[1] as string;
+    expect(reset?.expiraEm.getTime()).toBe(NOW + 30 * 60 * 1000);
+    expect(reset?.tokenHash).toBe(sha256(token));
+  });
+
+  it('conta inexistente → não cria token e não chama o e-mail (CA-14)', async () => {
+    await expect(service.esqueciSenha('naoexiste@exemplo.com')).resolves.toBeUndefined();
+
+    expect(db.tokens).toHaveLength(0);
+    expect(mail.enviarRedefinicaoDeSenha).not.toHaveBeenCalled();
+  });
+
+  it('o envio falhou → não lança (a falha nunca aparece na resposta) (CA-22c)', async () => {
+    await service.register(ANA);
+    mail.enviarRedefinicaoDeSenha.mockRejectedValueOnce(new MailIndisponivelError());
+
+    await expect(service.esqueciSenha('ana@exemplo.com')).resolves.toBeUndefined();
+  });
+
+  it('um erro que NÃO é do e-mail sobe como está', async () => {
+    await service.register(ANA);
+    mail.enviarRedefinicaoDeSenha.mockRejectedValueOnce(new Error('bug'));
+
+    await expect(service.esqueciSenha('ana@exemplo.com')).rejects.toThrow('bug');
+  });
+});
+
+describe('redefinirSenha (CA-15 a CA-18)', () => {
+  async function pedirReset(): Promise<string> {
+    await sessaoDe(ANA, CURL);
+    await service.esqueciSenha('ana@exemplo.com');
+    return mail.enviarRedefinicaoDeSenha.mock.calls[0]?.[1] as string;
+  }
+
+  it('troca a senha, consome o token e apaga TODAS as sessões (CA-15)', async () => {
+    const token = await pedirReset();
+    expect(db.sessions).toHaveLength(1);
+
+    await expect(
+      service.redefinirSenha({ token, novaSenha: 'outra-senha-boa' }),
+    ).resolves.toBeUndefined();
+
+    expect(db.users[0]?.senhaHash).toBe('fake$outra-senha-boa');
+    expect(db.sessions).toHaveLength(0);
+    expect(db.tokens.find((t) => t.tipo === 'RESET_SENHA')?.usadoEm).toEqual(new Date(NOW));
+    const antiga = await errorOf(
+      service.login({ email: 'ana@exemplo.com', senha: 'segredo-forte' }, CURL),
+    );
+    expect(antiga.body).toMatchObject({ code: 'AUTH_CREDENCIAIS_INVALIDAS' });
+    await expect(
+      service.login({ email: 'ana@exemplo.com', senha: 'outra-senha-boa' }, CURL),
+    ).resolves.toBeDefined();
+  });
+
+  it('uso único: o MESMO token de novo → 401 AUTH_TOKEN_INVALIDO (CA-16)', async () => {
+    const token = await pedirReset();
+    await service.redefinirSenha({ token, novaSenha: 'outra-senha-boa' });
+
+    const error = await errorOf(service.redefinirSenha({ token, novaSenha: 'mais-uma-senha' }));
+
+    expect(error).toMatchObject({ status: 401, body: { code: 'AUTH_TOKEN_INVALIDO' } });
+    expect(db.users[0]?.senhaHash).toBe('fake$outra-senha-boa');
+  });
+
+  it('token vencido (30 min) → 401 AUTH_TOKEN_INVALIDO (CA-17)', async () => {
+    const token = await pedirReset();
+
+    at(30 * 60 * 1000 + 1);
+    const error = await errorOf(service.redefinirSenha({ token, novaSenha: 'outra-senha-boa' }));
+
+    expect(error).toMatchObject({ status: 401, body: { code: 'AUTH_TOKEN_INVALIDO' } });
+    expect(db.users[0]?.senhaHash).toBe('fake$segredo-forte');
+  });
+
+  it('token inexistente dá o mesmo erro do vencido e do usado', async () => {
+    await pedirReset();
+
+    const error = await errorOf(
+      service.redefinirSenha({ token: 'f'.repeat(64), novaSenha: 'outra-senha-boa' }),
+    );
+
+    expect(error).toMatchObject({ status: 401, body: { code: 'AUTH_TOKEN_INVALIDO' } });
+  });
+
+  it('um token de VERIFICAÇÃO não redefine senha', async () => {
+    await service.register(ANA);
+    const verificacao = mail.enviarVerificacaoDeEmail.mock.calls[0]?.[1] as string;
+
+    const error = await errorOf(
+      service.redefinirSenha({ token: verificacao, novaSenha: 'outra-senha-boa' }),
+    );
+
+    expect(error).toMatchObject({ status: 401, body: { code: 'AUTH_TOKEN_INVALIDO' } });
+  });
+
+  it('corrida: perdeu o consumo do token → 401 e a senha NÃO muda', async () => {
+    const token = await pedirReset();
+    db.tokenDeUsoUnico.updateMany.mockResolvedValueOnce({ count: 0 });
+
+    const error = await errorOf(service.redefinirSenha({ token, novaSenha: 'outra-senha-boa' }));
+
+    expect(error).toMatchObject({ status: 401, body: { code: 'AUTH_TOKEN_INVALIDO' } });
+    expect(db.users[0]?.senhaHash).toBe('fake$segredo-forte');
+    expect(db.sessions).toHaveLength(1);
+  });
+});
+
 describe('login', () => {
   beforeEach(async () => {
-    await service.register(ANA, CURL);
+    await sessaoDe(ANA, CURL);
     db.sessions = [];
     fakeHasher.verify.mockClear();
   });
@@ -241,10 +518,7 @@ describe('login', () => {
   });
 
   it('o teto vale por usuário: as sessões de OUTRA conta não contam nem são apagadas', async () => {
-    await service.register(
-      { nome: 'Bia', email: 'bia@exemplo.com', senha: 'outra-senha-boa' },
-      CURL,
-    );
+    await sessaoDe({ nome: 'Bia', email: 'bia@exemplo.com', senha: 'outra-senha-boa' }, CURL);
     const sessoesDaBia = db.sessions.filter((s) => s.userId !== db.users[0]?.id).length;
 
     for (let i = 0; i < MAX_SESSIONS_PER_USER + 2; i += 1) {
@@ -258,7 +532,7 @@ describe('login', () => {
 
 describe('refresh — rotação, janela de 30 s e reuso (CA-09 a CA-12)', () => {
   it('rotaciona na MESMA linha: hashAnterior ← tokenHash, tokenHash novo, expiraEm avança (CA-09)', async () => {
-    const primeiro = await service.register(ANA, CURL);
+    const primeiro = await sessaoDe(ANA, CURL);
     const antes = { ...db.sessions[0] };
 
     at(60_000);
@@ -278,7 +552,7 @@ describe('refresh — rotação, janela de 30 s e reuso (CA-09 a CA-12)', () => 
   });
 
   it('o token NOVO continua renovando (rotações em sequência)', async () => {
-    const a = await service.register(ANA, CURL);
+    const a = await sessaoDe(ANA, CURL);
     at(1000);
     const b = await service.refresh(a.refreshToken);
     at(2000);
@@ -289,7 +563,7 @@ describe('refresh — rotação, janela de 30 s e reuso (CA-09 a CA-12)', () => 
   });
 
   it('o token ANTERIOR em até 30 s → 409 AUTH_REFRESH_CONCORRENTE; nada muda e o novo ainda renova (CA-10)', async () => {
-    const a = await service.register(ANA, CURL);
+    const a = await sessaoDe(ANA, CURL);
     at(1000);
     const b = await service.refresh(a.refreshToken);
     const estado = JSON.stringify(db.sessions);
@@ -305,7 +579,7 @@ describe('refresh — rotação, janela de 30 s e reuso (CA-09 a CA-12)', () => 
 
   it('o token anterior depois de 30 s é REUSO: 401, a sessão é apagada e o token novo também morre (CA-11)', async () => {
     const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
-    const a = await service.register(ANA, CURL);
+    const a = await sessaoDe(ANA, CURL);
     const sessionId = db.sessions[0]?.id;
     at(1000);
     const b = await service.refresh(a.refreshToken);
@@ -325,7 +599,7 @@ describe('refresh — rotação, janela de 30 s e reuso (CA-09 a CA-12)', () => 
 
   it('um token que não bate com nenhum dos dois hashes também é reuso (sessão apagada)', async () => {
     jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
-    const a = await service.register(ANA, CURL);
+    const a = await sessaoDe(ANA, CURL);
     const sessao = db.sessions[0];
     if (sessao) {
       sessao.tokenHash = sha256('outro-token');
@@ -338,7 +612,7 @@ describe('refresh — rotação, janela de 30 s e reuso (CA-09 a CA-12)', () => 
   });
 
   it('updateMany com count 0 (outra request rotacionou no meio) → 409, e não uma segunda rotação', async () => {
-    const a = await service.register(ANA, CURL);
+    const a = await sessaoDe(ANA, CURL);
     db.refreshSession.updateMany.mockResolvedValueOnce({ count: 0 });
 
     const erro = await errorOf(service.refresh(a.refreshToken));
@@ -348,7 +622,7 @@ describe('refresh — rotação, janela de 30 s e reuso (CA-09 a CA-12)', () => 
   });
 
   it('a rotação é condicionada ao hash apresentado (updateMany com tokenHash no where)', async () => {
-    const a = await service.register(ANA, CURL);
+    const a = await sessaoDe(ANA, CURL);
 
     await service.refresh(a.refreshToken);
 
@@ -370,13 +644,13 @@ describe('refresh — rotação, janela de 30 s e reuso (CA-09 a CA-12)', () => 
   });
 
   it('um ACCESS token no lugar do refresh falha (segredos separados)', async () => {
-    const a = await service.register(ANA, CURL);
+    const a = await sessaoDe(ANA, CURL);
 
     await expect(errorOf(service.refresh(a.accessToken))).resolves.toMatchObject({ status: 401 });
   });
 
   it('sessão inexistente → 401', async () => {
-    const a = await service.register(ANA, CURL);
+    const a = await sessaoDe(ANA, CURL);
     db.sessions = [];
 
     await expect(errorOf(service.refresh(a.refreshToken))).resolves.toMatchObject({
@@ -386,7 +660,7 @@ describe('refresh — rotação, janela de 30 s e reuso (CA-09 a CA-12)', () => 
   });
 
   it('sessão vencida (30 dias sem uso) → 401', async () => {
-    const a = await service.register(ANA, CURL);
+    const a = await sessaoDe(ANA, CURL);
 
     at(31 * 24 * 60 * 60 * 1000);
 
@@ -394,7 +668,7 @@ describe('refresh — rotação, janela de 30 s e reuso (CA-09 a CA-12)', () => 
   });
 
   it('a renovação empurra o vencimento para 30 dias a partir do uso', async () => {
-    const a = await service.register(ANA, CURL);
+    const a = await sessaoDe(ANA, CURL);
     const dia = 24 * 60 * 60 * 1000;
 
     at(20 * dia);
@@ -406,7 +680,7 @@ describe('refresh — rotação, janela de 30 s e reuso (CA-09 a CA-12)', () => 
 
 describe('logout (CA-13, CA-14)', () => {
   it('apaga a sessão do cookie e mantém as outras', async () => {
-    const a = await service.register(ANA, CURL);
+    const a = await sessaoDe(ANA, CURL);
     const b = await service.login({ email: 'ana@exemplo.com', senha: 'segredo-forte' }, CURL);
     expect(db.sessions).toHaveLength(2);
 
@@ -417,7 +691,7 @@ describe('logout (CA-13, CA-14)', () => {
   });
 
   it('é idempotente: repetir, sem cookie ou com token inválido não lança', async () => {
-    const a = await service.register(ANA, CURL);
+    const a = await sessaoDe(ANA, CURL);
 
     await service.logout(a.refreshToken);
     await expect(service.logout(a.refreshToken)).resolves.toBeUndefined();
@@ -426,7 +700,7 @@ describe('logout (CA-13, CA-14)', () => {
   });
 
   it('funciona com o refresh token já vencido', async () => {
-    const a = await service.register(ANA, CURL);
+    const a = await sessaoDe(ANA, CURL);
 
     at(40 * 24 * 60 * 60 * 1000);
     await service.logout(a.refreshToken);
@@ -435,7 +709,7 @@ describe('logout (CA-13, CA-14)', () => {
   });
 
   it('um access token no cookie não encerra nada', async () => {
-    const a = await service.register(ANA, CURL);
+    const a = await sessaoDe(ANA, CURL);
 
     await service.logout(a.accessToken);
 
@@ -445,7 +719,7 @@ describe('logout (CA-13, CA-14)', () => {
 
 describe('me', () => {
   it('devolve o Usuario sem nenhum campo sensível (CA-07, CA-20)', async () => {
-    const a = await service.register(ANA, CURL);
+    const a = await sessaoDe(ANA, CURL);
 
     const usuario = await service.me(a.usuario.id);
 
@@ -483,7 +757,7 @@ describe('limite de registros por hora (CA-16)', () => {
 describe('trocarSenha (CA-51 a CA-53)', () => {
   /** Ana com três sessões (três dispositivos); a troca é feita pela primeira. */
   async function anaComTresSessoes() {
-    const a = await service.register(ANA, CURL);
+    const a = await sessaoDe(ANA, CURL);
     await service.login({ email: ANA.email, senha: ANA.senha }, CURL);
     await service.login({ email: ANA.email, senha: ANA.senha }, CURL);
     const [atual, ...outras] = db.sessions.map((s) => s.id);
@@ -507,10 +781,7 @@ describe('trocarSenha (CA-51 a CA-53)', () => {
 
   it('não toca nas sessões de OUTRA conta', async () => {
     const { user } = await anaComTresSessoes();
-    await service.register(
-      { nome: 'Bia', email: 'bia@exemplo.com', senha: 'segredo-da-bia' },
-      CURL,
-    );
+    await sessaoDe({ nome: 'Bia', email: 'bia@exemplo.com', senha: 'segredo-da-bia' }, CURL);
 
     await service.trocarSenha(user, { senhaAtual: ANA.senha, novaSenha: 'outra-senha-boa' });
 
@@ -597,7 +868,7 @@ describe('sessões ativas (perfil CA-08 a CA-11)', () => {
    */
   async function cenario() {
     at(0);
-    const a = await service.register(ANA, CURL);
+    const a = await sessaoDe(ANA, CURL);
     const [sA] = db.sessions.map((s) => s.id);
     at(60_000);
     await service.login(
@@ -608,10 +879,7 @@ describe('sessões ativas (perfil CA-08 a CA-11)', () => {
     await service.login({ email: ANA.email, senha: ANA.senha }, CURL);
     const [, sB, sC] = db.sessions.map((s) => s.id);
     at(180_000);
-    await service.register(
-      { nome: 'Bia', email: 'bia@exemplo.com', senha: 'segredo-da-bia' },
-      CURL,
-    );
+    await sessaoDe({ nome: 'Bia', email: 'bia@exemplo.com', senha: 'segredo-da-bia' }, CURL);
     const sBia = db.sessions.find((s) => s.userId !== a.usuario.id)?.id as string;
     const ana = (sessionId: string) => ({ id: a.usuario.id, sessionId });
     return { ana, sA: sA as string, sB: sB as string, sC: sC as string, sBia };

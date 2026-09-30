@@ -74,6 +74,9 @@ model User {
   email     String @unique @db.VarChar(254)
   // Hash no formato autodescritivo do algoritmo (`scrypt$N$r$p$sal$hash`), nunca a senha.
   senhaHash String @db.VarChar(255)
+  // null = nao verificado. Contas de ANTES da spec verificacao-de-email-e-recuperacao-de-senha sao marcadas
+  // na propria migration (emailVerificadoEm = criadoEm), para nao ficarem trancadas por uma regra nova.
+  emailVerificadoEm DateTime?
 
   criadoEm     DateTime @default(now())
   atualizadoEm DateTime @updatedAt
@@ -82,6 +85,30 @@ model User {
   games            Game[]
   contasVinculadas ContaVinculada[]
   jogosPlataforma  JogoPlataforma[]
+  tokensDeUsoUnico TokenDeUsoUnico[]
+}
+
+enum TipoDeToken {
+  VERIFICACAO_EMAIL
+  RESET_SENHA
+}
+
+// Prova posse do e-mail (verificacao) ou autoriza trocar a senha (reset). O token em claro NUNCA e
+// gravado: so o hash SHA-256, como em RefreshSession.tokenHash.
+model TokenDeUsoUnico {
+  id        String      @id @default(uuid())
+  userId    String
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tipo      TipoDeToken
+  tokenHash String      @db.Char(64)
+  criadoEm  DateTime    @default(now())
+  expiraEm  DateTime
+  // null = ainda nao usado. So RESET_SENHA grava isto: a verificacao e idempotente de proposito (o
+  // cliente de e-mail pode pre-carregar o link antes do clique real).
+  usadoEm   DateTime?
+
+  @@index([userId, tipo])
+  @@index([tokenHash])
 }
 
 // Plataformas de jogos que a API sabe integrar (spec integracao-plataformas). Codigos sem acento; o texto

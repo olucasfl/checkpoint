@@ -2,7 +2,7 @@ import { Prisma } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 
 /**
- * Prisma falso, em memória, só com o que o módulo `auth` usa (`user` e `refreshSession`). Existe para
+ * Prisma falso, em memória, só com o que o módulo `auth` usa (`user`, `refreshSession` e `tokenDeUsoUnico`). Existe para
  * testar o fluxo ponta a ponta (registro → login → refresh → logout) sem tocar o Postgres real
  * (RULES.md §5). Implementa só as formas de `where`/`select` que o código de produção usa.
  */
@@ -12,8 +12,19 @@ export interface UserRow {
   nome: string;
   email: string;
   senhaHash: string;
+  emailVerificadoEm: Date | null;
   criadoEm: Date;
   atualizadoEm: Date;
+}
+
+export interface TokenRow {
+  id: string;
+  userId: string;
+  tipo: 'VERIFICACAO_EMAIL' | 'RESET_SENHA';
+  tokenHash: string;
+  criadoEm: Date;
+  expiraEm: Date;
+  usadoEm: Date | null;
 }
 
 export interface SessionRow {
@@ -33,6 +44,9 @@ type Where = {
   email?: string;
   userId?: string;
   tokenHash?: string;
+  tipo?: string;
+  usadoEm?: Date | null;
+  emailVerificadoEm?: Date | null;
   expiraEm?: { lt: Date } | { gt: Date };
 };
 
@@ -93,14 +107,20 @@ export interface DonoRow {
 export class FakeAuthPrisma {
   users: UserRow[] = [];
   sessions: SessionRow[] = [];
+  tokens: TokenRow[] = [];
   games: GameCapaRow[] = [];
   /** `ContaVinculada` e `JogoPlataforma` (spec `integracao-plataformas`): vão junto com o usuário, por cascade. */
   contasVinculadas: DonoRow[] = [];
   jogosPlataforma: DonoRow[] = [];
 
-  /** Forma de array: as operações já foram disparadas; basta esperar todas (sem rollback, como teste). */
-  $transaction = jest.fn(async (operations: Promise<unknown>[]): Promise<unknown[]> =>
-    Promise.all(operations),
+  /**
+   * Duas formas, como o Prisma: array (as operações já foram disparadas; basta esperar todas) e callback
+   * (recebe este mesmo objeto como `tx`). Nenhuma tem rollback: é teste.
+   */
+  $transaction = jest.fn(
+    async (
+      arg: Promise<unknown>[] | ((tx: FakeAuthPrisma) => Promise<unknown>),
+    ): Promise<unknown> => (typeof arg === 'function' ? arg(this) : Promise.all(arg)),
   );
 
   user = {
@@ -119,7 +139,13 @@ export class FakeAuthPrisma {
           throw uniqueViolation();
         }
         const now = new Date();
-        const row: UserRow = { id: randomUUID(), criadoEm: now, atualizadoEm: now, ...args.data };
+        const row: UserRow = {
+          id: randomUUID(),
+          emailVerificadoEm: null,
+          criadoEm: now,
+          atualizadoEm: now,
+          ...args.data,
+        };
         this.users.push(row);
         return project(row, args.select);
       },
@@ -141,6 +167,13 @@ export class FakeAuthPrisma {
         return project(row, args.select);
       },
     ),
+    updateMany: jest.fn(
+      async (args: { where: Where; data: Partial<UserRow> }): Promise<{ count: number }> => {
+        const rows = this.users.filter((user) => matches({ ...user }, args.where));
+        rows.forEach((row) => Object.assign(row, args.data, { atualizadoEm: new Date() }));
+        return { count: rows.length };
+      },
+    ),
     /**
      * Com o `onDelete: Cascade` do schema: as sessões, os jogos e a camada das plataformas (`ContaVinculada` e
      * `JogoPlataforma`) do usuário vão junto.
@@ -158,11 +191,58 @@ export class FakeAuthPrisma {
           });
         }
         this.users = this.users.filter((user) => user !== row);
+        this.tokens = this.tokens.filter((token) => token.userId !== row.id);
         this.sessions = this.sessions.filter((session) => session.userId !== row.id);
         this.games = this.games.filter((game) => game.userId !== row.id);
         this.contasVinculadas = this.contasVinculadas.filter((conta) => conta.userId !== row.id);
         this.jogosPlataforma = this.jogosPlataforma.filter((jogo) => jogo.userId !== row.id);
         return project(row, args.select);
+      },
+    ),
+  };
+
+  tokenDeUsoUnico = {
+    create: jest.fn(
+      async (args: {
+        data: Pick<TokenRow, 'userId' | 'tipo' | 'tokenHash' | 'expiraEm'>;
+      }): Promise<TokenRow> => {
+        const row: TokenRow = {
+          id: randomUUID(),
+          criadoEm: new Date(),
+          usadoEm: null,
+          ...args.data,
+        };
+        this.tokens.push(row);
+        return row;
+      },
+    ),
+    /** `select: { user: { select } }` é a única relação que o código de produção pede. */
+    findFirst: jest.fn(
+      async (args: {
+        where: Where;
+        select?: Record<string, boolean | { select: Record<string, boolean> }>;
+      }): Promise<unknown> => {
+        const row = this.tokens.find((token) => matches({ ...token }, args.where));
+        if (!row) {
+          return null;
+        }
+        const out: Record<string, unknown> = {};
+        for (const [key, wanted] of Object.entries(args.select ?? { id: true })) {
+          if (key === 'user' && typeof wanted === 'object') {
+            const owner = this.users.find((user) => user.id === row.userId);
+            out.user = owner ? project(owner, wanted.select) : null;
+          } else if (wanted) {
+            out[key] = (row as unknown as Record<string, unknown>)[key];
+          }
+        }
+        return out;
+      },
+    ),
+    updateMany: jest.fn(
+      async (args: { where: Where; data: Partial<TokenRow> }): Promise<{ count: number }> => {
+        const rows = this.tokens.filter((token) => matches({ ...token }, args.where));
+        rows.forEach((row) => Object.assign(row, args.data));
+        return { count: rows.length };
       },
     ),
   };
