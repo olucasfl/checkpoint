@@ -8,7 +8,7 @@ import { NomeEditavel } from './NomeEditavel';
 
 /**
  * Cabeçalho do perfil: avatar de iniciais (a mesma regra da capa gerada dos jogos, aplicada ao nome),
- * nome, e-mail marcado como não verificado, "Membro desde" e o resumo do catálogo, calculado da
+ * nome, e-mail, "Membro desde" e o resumo do catálogo, calculado da
  * mesma query `['games']` do catálogo (sem endpoint novo; "—" enquanto carrega).
  */
 export function PerfilCabecalho() {
@@ -33,7 +33,6 @@ export function PerfilCabecalho() {
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <NomeEditavel />
         <p className="m-0 text-[16px] [overflow-wrap:anywhere]">{usuario?.email}</p>
-        <p className="m-0 text-[15px] text-texto-suave">(não verificado — usado só para entrar)</p>
         {desde && <p className="m-0 text-[15px] text-texto-suave">{desde}</p>}
         <p data-resumo className="m-0 text-[15px] font-semibold text-destaque">
           {resumoDoCatalogo(counts)}

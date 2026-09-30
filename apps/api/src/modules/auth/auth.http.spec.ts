@@ -15,6 +15,8 @@ import { GamesController } from '../games/games.controller';
 import { HealthController } from '../health/health.controller';
 import { AccessTokenGuard } from './access-token.guard';
 import { AuthController } from './auth.controller';
+import { MailIndisponivelError } from '../mail/mail.errors';
+import { MailService } from '../mail/mail.service';
 import { AuthService } from './auth.service';
 import { AuthThrottlerGuard } from './auth-throttler.guard';
 import { AuthTokensService } from './auth-tokens.service';
@@ -86,6 +88,8 @@ let app: INestApplication;
 let baseUrl: string;
 let db: FakeAuthPrisma;
 let logger: CollectingLogger;
+/** O Brevo, mockado: nenhum teste fala com a rede. Guarda o token em claro de cada e-mail para o teste "clicar no link". */
+let mail: { enviarVerificacaoDeEmail: jest.Mock; enviarRedefinicaoDeSenha: jest.Mock };
 /** Todo corpo de resposta recebido, para a busca de dados sensíveis (CA-20). */
 let bodies: string[];
 
@@ -93,6 +97,10 @@ async function start(env: Record<string, unknown> = ENV): Promise<void> {
   db = new FakeAuthPrisma();
   logger = new CollectingLogger();
   bodies = [];
+  mail = {
+    enviarVerificacaoDeEmail: jest.fn().mockResolvedValue(undefined),
+    enviarRedefinicaoDeSenha: jest.fn().mockResolvedValue(undefined),
+  };
   const moduleRef = await Test.createTestingModule({
     imports: [
       ConfigModule.forRoot({ isGlobal: true, ignoreEnvFile: true, load: [() => env] }),
@@ -105,6 +113,7 @@ async function start(env: Record<string, unknown> = ENV): Promise<void> {
       AuthTokensService,
       AuthThrottlerGuard,
       CsrfHeaderGuard,
+      { provide: MailService, useValue: mail },
       { provide: PasswordHasher, useValue: fakeHasher },
       { provide: PrismaService, useValue: db },
       { provide: APP_GUARD, useClass: AccessTokenGuard },
@@ -165,8 +174,16 @@ const cookieValue = (reply: Reply): string =>
 
 const ANA = { nome: ' Ana Teste ', email: '  Ana@Exemplo.COM ', senha: 'segredo-forte' };
 
+/** O registro não abre sessão: registra, confirma o e-mail no banco em memória e entra. */
 async function registerAna(): Promise<{ reply: Reply; refresh: string; access: string }> {
-  const reply = await call('POST', '/auth/registro', { body: ANA });
+  await call('POST', '/auth/registro', { body: ANA });
+  const ana = db.users.find((user) => user.email === 'ana@exemplo.com');
+  if (ana) {
+    ana.emailVerificadoEm = new Date();
+  }
+  const reply = await call('POST', '/auth/login', {
+    body: { email: 'ana@exemplo.com', senha: ANA.senha },
+  });
   return {
     reply,
     refresh: cookieValue(reply),
@@ -187,43 +204,34 @@ afterEach(async () => {
 });
 
 describe('POST /auth/registro', () => {
-  it('201 com accessToken e usuario, e o cookie do refresh com os atributos da spec (CA-01)', async () => {
-    const { reply } = await registerAna();
+  it('201 com { email, emailEnviado } e SEM cookie nem accessToken (CA-01)', async () => {
+    const reply = await call('POST', '/auth/registro', { body: ANA });
 
     expect(reply.status).toBe(201);
-    expect(reply.json).toEqual({
-      accessToken: expect.any(String),
-      usuario: {
-        id: expect.stringMatching(/^[0-9a-f]{8}-[0-9a-f]{4}-/),
-        nome: 'Ana Teste',
-        email: 'ana@exemplo.com',
-        criadoEm: expect.any(String),
-      },
-    });
-    const [cookie] = reply.setCookies;
-    expect(cookie).toMatch(/^checkpoint_refresh=[^;]+;/);
-    expect(cookie).toContain('Max-Age=2592000');
-    expect(cookie).toContain('Path=/api/auth');
-    expect(cookie).toContain('HttpOnly');
-    expect(cookie).toContain('SameSite=Lax');
-    expect(cookie).not.toContain('Secure');
+    expect(reply.json).toEqual({ email: 'ana@exemplo.com', emailEnviado: true });
+    expect(reply.setCookies).toEqual([]);
+    expect(db.sessions).toHaveLength(0);
+    expect(db.users[0]?.emailVerificadoEm).toBeNull();
+    expect(mail.enviarVerificacaoDeEmail).toHaveBeenCalledTimes(1);
   });
 
-  it('em produção o cookie ganha Secure', async () => {
+  it('o envio falhou → 201 com emailEnviado false, e a conta existe (CA-22a)', async () => {
+    mail.enviarVerificacaoDeEmail.mockRejectedValueOnce(new MailIndisponivelError());
+
+    const reply = await call('POST', '/auth/registro', { body: ANA });
+
+    expect(reply.status).toBe(201);
+    expect(reply.json).toEqual({ email: 'ana@exemplo.com', emailEnviado: false });
+    expect(db.users).toHaveLength(1);
+  });
+
+  it('em produção o registro também não põe cookie', async () => {
     await app.close();
     await start({ ...ENV, NODE_ENV: 'production' });
 
     const reply = await call('POST', '/auth/registro', { body: ANA });
 
-    expect(reply.setCookies[0]).toContain('Secure');
-  });
-
-  it('o refresh token NÃO vem no corpo, só no cookie (CA-20)', async () => {
-    const { reply, refresh } = await registerAna();
-
-    expect(refresh.length).toBeGreaterThan(20);
-    expect(reply.text).not.toContain(refresh);
-    expect(Object.keys(reply.json ?? {}).sort()).toEqual(['accessToken', 'usuario']);
+    expect(reply.setCookies).toEqual([]);
   });
 
   it('e-mail repetido → 409 AUTH_EMAIL_EM_USO com fields.email (CA-02)', async () => {
@@ -550,7 +558,11 @@ describe('POST /auth/logout (CA-13, CA-14)', () => {
 
 describe('limite de tentativas (CA-16)', () => {
   it('o 6º login em menos de 1 minuto → 429 LIMITE_TENTATIVAS com Retry-After', async () => {
-    await registerAna();
+    // Sem entrar: o login do `registerAna` gastaria uma das 5 tentativas do minuto.
+    await call('POST', '/auth/registro', { body: ANA });
+    db.users.forEach((user) => {
+      user.emailVerificadoEm = new Date();
+    });
     const replies: Reply[] = [];
     for (let i = 0; i < 6; i += 1) {
       replies.push(
@@ -842,8 +854,15 @@ describe('sessões ativas: GET/DELETE /auth/sessoes (perfil CA-08 a CA-11)', () 
     };
     const b = await login();
     const c = await login();
-    const bia = await call('POST', '/auth/registro', {
+    await call('POST', '/auth/registro', {
       body: { nome: 'Bia', email: 'bia@exemplo.com', senha: 'segredo-da-bia' },
+    });
+    const biaRow = db.users.find((user) => user.email === 'bia@exemplo.com');
+    if (biaRow) {
+      biaRow.emailVerificadoEm = new Date();
+    }
+    const bia = await call('POST', '/auth/login', {
+      body: { email: 'bia@exemplo.com', senha: 'segredo-da-bia' },
     });
     return {
       a: { access: a.access, refresh: a.refresh },
@@ -961,6 +980,298 @@ describe('sessões ativas: GET/DELETE /auth/sessoes (perfil CA-08 a CA-11)', () 
     const logs = logger.lines.join('\n');
     for (const segredo of [a.access, a.refresh, b.access, b.refresh, ANA.senha]) {
       expect(logs).not.toContain(segredo);
+    }
+  });
+});
+
+/** O token em claro que o "e-mail" recebeu: só existe no mock, nunca no banco. */
+const tokenEnviado = (fn: jest.Mock): string => fn.mock.calls.at(-1)?.[1] as string;
+
+describe('verificação de e-mail ponta a ponta (CA-01 a CA-05)', () => {
+  it('registro → login bloqueado → verificar → login ok (CA-01, CA-02, CA-04)', async () => {
+    await call('POST', '/auth/registro', { body: ANA });
+
+    const bloqueado = await call('POST', '/auth/login', {
+      body: { email: 'ana@exemplo.com', senha: 'segredo-forte' },
+    });
+    expect(bloqueado.status).toBe(401);
+    expect(bloqueado.json).toMatchObject({ code: 'AUTH_EMAIL_NAO_VERIFICADO' });
+    expect(bloqueado.json).not.toHaveProperty('fields');
+    expect(bloqueado.setCookies).toEqual([]);
+    expect(db.sessions).toHaveLength(0);
+
+    const token = tokenEnviado(mail.enviarVerificacaoDeEmail);
+    const verificado = await call('POST', '/auth/verificar-email', { body: { token } });
+    expect(verificado.status).toBe(200);
+    expect(verificado.json).toEqual({ jaEstavaVerificado: false });
+
+    const login = await call('POST', '/auth/login', {
+      body: { email: 'ana@exemplo.com', senha: 'segredo-forte' },
+    });
+    expect(login.status).toBe(200);
+    expect(login.json).toMatchObject({ accessToken: expect.any(String) });
+    expect(login.setCookies[0]).toMatch(/^checkpoint_refresh=/);
+  });
+
+  it('o mesmo link de novo → 200 jaEstavaVerificado true (CA-05)', async () => {
+    await call('POST', '/auth/registro', { body: ANA });
+    const token = tokenEnviado(mail.enviarVerificacaoDeEmail);
+    await call('POST', '/auth/verificar-email', { body: { token } });
+
+    const denovo = await call('POST', '/auth/verificar-email', { body: { token } });
+
+    expect(denovo.status).toBe(200);
+    expect(denovo.json).toEqual({ jaEstavaVerificado: true });
+  });
+
+  it('senha ERRADA numa conta não verificada → AUTH_CREDENCIAIS_INVALIDAS (CA-03)', async () => {
+    await call('POST', '/auth/registro', { body: ANA });
+
+    const reply = await call('POST', '/auth/login', {
+      body: { email: 'ana@exemplo.com', senha: 'errada-mesmo' },
+    });
+
+    expect(reply.json).toMatchObject({ code: 'AUTH_CREDENCIAIS_INVALIDAS' });
+  });
+
+  it.each([
+    ['vazio', ''],
+    ['10 caracteres', 'abcdef0123'],
+    ['64 com maiúscula', `A${'a'.repeat(63)}`],
+    ['64 não hexadecimais', 'g'.repeat(64)],
+  ])('token %s → 400 VALIDACAO com fields.token (CA-06)', async (_nome, token) => {
+    const reply = await call('POST', '/auth/verificar-email', { body: { token } });
+
+    expect(reply.status).toBe(400);
+    expect(reply.json).toMatchObject({ code: 'VALIDACAO', fields: { token: expect.any(String) } });
+  });
+
+  it('token de 64 hex que não existe → 401 AUTH_TOKEN_INVALIDO (CA-07)', async () => {
+    const reply = await call('POST', '/auth/verificar-email', { body: { token: 'a'.repeat(64) } });
+
+    expect(reply.status).toBe(401);
+    expect(reply.json).toMatchObject({ code: 'AUTH_TOKEN_INVALIDO' });
+  });
+});
+
+describe('POST /auth/reenviar-verificacao (CA-09 a CA-12, CA-22b)', () => {
+  it('conta não verificada → 200 enviado e um SEGUNDO token (CA-09)', async () => {
+    await call('POST', '/auth/registro', { body: ANA });
+
+    const reply = await call('POST', '/auth/reenviar-verificacao', {
+      body: { email: 'ana@exemplo.com' },
+    });
+
+    expect(reply.status).toBe(200);
+    expect(reply.json).toEqual({ estado: 'enviado' });
+    expect(db.tokens).toHaveLength(2);
+  });
+
+  it('conta verificada → ja-verificado e nenhum e-mail novo (CA-10)', async () => {
+    await registerAna();
+    mail.enviarVerificacaoDeEmail.mockClear();
+
+    const reply = await call('POST', '/auth/reenviar-verificacao', {
+      body: { email: 'ana@exemplo.com' },
+    });
+
+    expect(reply.json).toEqual({ estado: 'ja-verificado' });
+    expect(mail.enviarVerificacaoDeEmail).not.toHaveBeenCalled();
+  });
+
+  it('e-mail inexistente → o MESMO corpo de "enviado", sem criar nada (CA-11)', async () => {
+    const reply = await call('POST', '/auth/reenviar-verificacao', {
+      body: { email: 'naoexiste@exemplo.com' },
+    });
+
+    expect(reply.status).toBe(200);
+    expect(reply.json).toEqual({ estado: 'enviado' });
+    expect(db.tokens).toHaveLength(0);
+  });
+
+  it('o Brevo falhou numa conta não verificada → 502 MAIL_INDISPONIVEL (CA-22b)', async () => {
+    await call('POST', '/auth/registro', { body: ANA });
+    mail.enviarVerificacaoDeEmail.mockRejectedValueOnce(new MailIndisponivelError());
+
+    const reply = await call('POST', '/auth/reenviar-verificacao', {
+      body: { email: 'ana@exemplo.com' },
+    });
+
+    expect(reply.status).toBe(502);
+    expect(reply.json).toMatchObject({ code: 'MAIL_INDISPONIVEL' });
+  });
+
+  it('a 6ª chamada em menos de 1 minuto → 429 LIMITE_TENTATIVAS (CA-12)', async () => {
+    for (let i = 0; i < 5; i += 1) {
+      const reply = await call('POST', '/auth/reenviar-verificacao', {
+        body: { email: 'naoexiste@exemplo.com' },
+      });
+      expect(reply.status).toBe(200);
+    }
+
+    const sexta = await call('POST', '/auth/reenviar-verificacao', {
+      body: { email: 'naoexiste@exemplo.com' },
+    });
+
+    expect(sexta.status).toBe(429);
+    expect(sexta.json).toMatchObject({ code: 'LIMITE_TENTATIVAS' });
+  });
+});
+
+describe('esqueci-senha e redefinir-senha ponta a ponta (CA-13 a CA-18, CA-22c)', () => {
+  const MENSAGEM = { mensagem: 'Se esse e-mail existir, você vai receber um link.' };
+
+  it('o mesmo corpo para e-mail existente e inexistente; só o existente gera token (CA-13, CA-14)', async () => {
+    await registerAna();
+
+    const existe = await call('POST', '/auth/esqueci-senha', {
+      body: { email: 'ana@exemplo.com' },
+    });
+    const naoExiste = await call('POST', '/auth/esqueci-senha', {
+      body: { email: 'naoexiste@exemplo.com' },
+    });
+
+    expect(existe.status).toBe(200);
+    expect(existe.json).toEqual(MENSAGEM);
+    expect(naoExiste.json).toEqual(MENSAGEM);
+    expect(db.tokens.filter((t) => t.tipo === 'RESET_SENHA')).toHaveLength(1);
+    expect(mail.enviarRedefinicaoDeSenha).toHaveBeenCalledTimes(1);
+  });
+
+  it('o Brevo fora do ar não muda a resposta (CA-22c)', async () => {
+    await registerAna();
+    mail.enviarRedefinicaoDeSenha.mockRejectedValueOnce(new MailIndisponivelError());
+
+    const reply = await call('POST', '/auth/esqueci-senha', { body: { email: 'ana@exemplo.com' } });
+
+    expect(reply.status).toBe(200);
+    expect(reply.json).toEqual(MENSAGEM);
+  });
+
+  it('redefinir: 204, senha antiga morre, nova entra, sessão anterior cai; o token é de uso único (CA-15, CA-16)', async () => {
+    const { access, refresh } = await registerAna();
+    await call('POST', '/auth/esqueci-senha', { body: { email: 'ana@exemplo.com' } });
+    const token = tokenEnviado(mail.enviarRedefinicaoDeSenha);
+
+    const reply = await call('POST', '/auth/redefinir-senha', {
+      body: { token, novaSenha: 'outra-senha-boa' },
+    });
+    expect(reply.status).toBe(204);
+    expect(reply.text).toBe('');
+
+    const antiga = await call('POST', '/auth/login', {
+      body: { email: 'ana@exemplo.com', senha: 'segredo-forte' },
+    });
+    const nova = await call('POST', '/auth/login', {
+      body: { email: 'ana@exemplo.com', senha: 'outra-senha-boa' },
+    });
+    expect(antiga.status).toBe(401);
+    expect(nova.status).toBe(200);
+
+    const me = await call('GET', '/auth/me', { bearer: access });
+    const renovar = await call('POST', '/auth/refresh', {
+      cookie: `checkpoint_refresh=${refresh}`,
+      csrf: true,
+    });
+    expect(me.status).toBe(401);
+    expect(renovar.status).toBe(401);
+
+    const denovo = await call('POST', '/auth/redefinir-senha', {
+      body: { token, novaSenha: 'mais-uma-senha-boa' },
+    });
+    expect(denovo.status).toBe(401);
+    expect(denovo.json).toMatchObject({ code: 'AUTH_TOKEN_INVALIDO' });
+  });
+
+  it('senha nova fraca → 400 fields.novaSenha e o token continua válido (CA-18)', async () => {
+    await registerAna();
+    await call('POST', '/auth/esqueci-senha', { body: { email: 'ana@exemplo.com' } });
+    const token = tokenEnviado(mail.enviarRedefinicaoDeSenha);
+
+    const curta = await call('POST', '/auth/redefinir-senha', {
+      body: { token, novaSenha: '1234567' },
+    });
+    const longa = await call('POST', '/auth/redefinir-senha', {
+      body: { token, novaSenha: `${'á'.repeat(36)}x` },
+    });
+    expect(curta.status).toBe(400);
+    expect(curta.json).toMatchObject({
+      code: 'VALIDACAO',
+      fields: { novaSenha: expect.any(String) },
+    });
+    expect(longa.status).toBe(400);
+
+    const ok = await call('POST', '/auth/redefinir-senha', {
+      body: { token, novaSenha: 'outra-senha-boa' },
+    });
+    expect(ok.status).toBe(204);
+  });
+
+  it('token vencido → 401 AUTH_TOKEN_INVALIDO (CA-17)', async () => {
+    await registerAna();
+    await call('POST', '/auth/esqueci-senha', { body: { email: 'ana@exemplo.com' } });
+    const token = tokenEnviado(mail.enviarRedefinicaoDeSenha);
+    const reset = db.tokens.find((t) => t.tipo === 'RESET_SENHA');
+    if (reset) {
+      reset.expiraEm = new Date(Date.now() - 1);
+    }
+
+    const reply = await call('POST', '/auth/redefinir-senha', {
+      body: { token, novaSenha: 'outra-senha-boa' },
+    });
+
+    expect(reply.status).toBe(401);
+    expect(reply.json).toMatchObject({ code: 'AUTH_TOKEN_INVALIDO' });
+  });
+
+  it('esqueci-senha: a 6ª em 1 minuto → 429; redefinir: a 11ª → 429', async () => {
+    for (let i = 0; i < 5; i += 1) {
+      await call('POST', '/auth/esqueci-senha', { body: { email: 'naoexiste@exemplo.com' } });
+    }
+    const sexta = await call('POST', '/auth/esqueci-senha', {
+      body: { email: 'naoexiste@exemplo.com' },
+    });
+    expect(sexta.status).toBe(429);
+
+    for (let i = 0; i < 10; i += 1) {
+      await call('POST', '/auth/redefinir-senha', {
+        body: { token: 'a'.repeat(64), novaSenha: 'outra-senha-boa' },
+      });
+    }
+    const onze = await call('POST', '/auth/redefinir-senha', {
+      body: { token: 'a'.repeat(64), novaSenha: 'outra-senha-boa' },
+    });
+    expect(onze.status).toBe(429);
+  });
+});
+
+describe('nada sensível nas respostas nem nos logs do fluxo de e-mail (CA-23)', () => {
+  it('tokenHash, o token em claro, senhaHash e as senhas não aparecem', async () => {
+    await call('POST', '/auth/registro', { body: ANA });
+    const verificacao = tokenEnviado(mail.enviarVerificacaoDeEmail);
+    const respostas = [
+      await call('POST', '/auth/reenviar-verificacao', { body: { email: 'ana@exemplo.com' } }),
+      await call('POST', '/auth/verificar-email', { body: { token: verificacao } }),
+      await call('POST', '/auth/esqueci-senha', { body: { email: 'ana@exemplo.com' } }),
+    ];
+    const reset = tokenEnviado(mail.enviarRedefinicaoDeSenha);
+    respostas.push(
+      await call('POST', '/auth/redefinir-senha', {
+        body: { token: reset, novaSenha: 'outra-senha-boa' },
+      }),
+      await call('POST', '/auth/verificar-email', { body: { token: 'a'.repeat(64) } }),
+    );
+
+    const tudo = [...respostas.map((r) => r.text), ...logger.lines].join('\n');
+    for (const segredo of [
+      verificacao,
+      reset,
+      ...db.tokens.map((t) => t.tokenHash),
+      ...db.users.map((u) => u.senhaHash),
+      'segredo-forte',
+      'outra-senha-boa',
+    ]) {
+      expect(tudo).not.toContain(segredo);
     }
   });
 });

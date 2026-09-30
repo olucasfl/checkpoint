@@ -1,6 +1,6 @@
 # Spec: verificação de e-mail e recuperação de senha
 
-> Status: aprovada (2026-09-27)
+> Status: em andamento (aprovada em 2026-09-27; etapas 1 e 2 implementadas, falta o `/qa-verify` com o Brevo real)
 
 Esta spec é exatamente o que `docs/specs/autenticacao.md` já previu como aditivo e deixou para depois
 (seção "Fora de escopo" dela): "**verificação de e-mail** — campo opcional `User.emailVerificadoEm` e

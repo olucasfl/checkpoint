@@ -1,6 +1,6 @@
 import { RotuloPendente } from '@/shared/components/RotuloPendente';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { FieldError } from '@/shared/components/form-parts';
 import { authApi } from '../api/auth-api';
 import { describeAuthError, type AuthFormError } from '../lib/auth-errors';
@@ -17,6 +17,7 @@ import { TextField } from './TextField';
  */
 export function LoginForm() {
   const { entrar } = useAuth();
+  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
   const [error, setError] = useState<AuthFormError | null>(null);
@@ -88,10 +89,22 @@ export function LoginForm() {
       />
 
       {error?.message && <FieldError id="login-error" message={error.message} />}
+      {error?.code === 'AUTH_EMAIL_NAO_VERIFICADO' && (
+        <button
+          type="button"
+          onClick={() => navigate(`/confirme-seu-email?email=${encodeURIComponent(email.trim())}`)}
+          className={SECONDARY_LINK}
+        >
+          Reenviar e-mail de confirmação
+        </button>
+      )}
 
       <button type="submit" disabled={pending} className={PRIMARY_BUTTON}>
         <RotuloPendente pendente={pending} normal="Entrar" ocupado="Entrando…" />
       </button>
+      <Link to="/esqueci-senha" className={SECONDARY_LINK}>
+        Esqueci minha senha
+      </Link>
       <Link to="/registro" className={SECONDARY_LINK}>
         Criar conta
       </Link>

@@ -25,6 +25,10 @@ export const AUTH_MESSAGES: Record<ApiErrorCode, string> = {
   AUTH_SENHA_ATUAL_INCORRETA: 'Senha atual incorreta.',
   AUTH_SENHA_IGUAL_ATUAL: 'A nova senha precisa ser diferente da atual.',
   AUTH_ORIGEM_INVALIDA: 'Não foi possível completar a requisição.',
+  // Verificação de e-mail e recuperação de senha (spec verificacao-de-email-e-recuperacao-de-senha).
+  AUTH_EMAIL_NAO_VERIFICADO: 'Confirme seu e-mail para entrar.',
+  AUTH_TOKEN_INVALIDO: 'Esse link não é mais válido.',
+  MAIL_INDISPONIVEL: 'Não conseguimos enviar o e-mail agora. Tente de novo em instantes.',
   LIMITE_TENTATIVAS: 'Muitas tentativas. Aguarde um pouco e tente de novo.',
   // Sessões ativas do /perfil (spec perfil, etapa 2).
   SESSAO_ATUAL: 'Para encerrar esta sessão, use Sair.',

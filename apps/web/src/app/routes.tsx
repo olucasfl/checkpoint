@@ -2,20 +2,24 @@ import { type RouteObject } from 'react-router-dom';
 import { AppLayout } from '@/app/layout/AppLayout';
 import { AuthLayout } from '@/app/layout/AuthLayout';
 import { RequireAuth } from '@/app/layout/RequireAuth';
+import { ConfirmeSeuEmailPage } from '@/pages/ConfirmeSeuEmailPage';
+import { EsqueciSenhaPage } from '@/pages/EsqueciSenhaPage';
 import { GameDetailPage } from '@/pages/GameDetailPage';
 import { GamesPage } from '@/pages/GamesPage';
 import { LoginPage } from '@/pages/LoginPage';
 import { NaoEncontradaPage } from '@/pages/NaoEncontradaPage';
 import { PerfilPage } from '@/pages/PerfilPage';
+import { RedefinirSenhaPage } from '@/pages/RedefinirSenhaPage';
 import { RegistroPage } from '@/pages/RegistroPage';
 import { StatusPage } from '@/pages/StatusPage';
 import { TrocarSenhaPage } from '@/pages/TrocarSenhaPage';
+import { VerificarEmailPage } from '@/pages/VerificarEmailPage';
 
 /**
  * As rotas do app, à parte do roteador do navegador para os testes usarem um roteador em memória.
  * Registre aqui as rotas de cada feature conforme elas forem criadas. As telas logadas ficam dentro do
  * `RequireAuth` e do `AppLayout` (fundo, navegação do topo e barra inferior); `/status` é público
- * (diagnóstico); `/login` e `/registro` ficam no `AuthLayout` (sem barra).
+ * (diagnóstico); `/login`, `/registro` e as telas do e-mail (`/confirme-seu-email`, `/verificar-email`, `/esqueci-senha`, `/redefinir-senha`) ficam no `AuthLayout` (sem barra).
  */
 export const routes: RouteObject[] = [
   {
@@ -42,6 +46,10 @@ export const routes: RouteObject[] = [
     children: [
       { path: '/login', element: <LoginPage /> },
       { path: '/registro', element: <RegistroPage /> },
+      { path: '/confirme-seu-email', element: <ConfirmeSeuEmailPage /> },
+      { path: '/verificar-email', element: <VerificarEmailPage /> },
+      { path: '/esqueci-senha', element: <EsqueciSenhaPage /> },
+      { path: '/redefinir-senha', element: <RedefinirSenhaPage /> },
     ],
   },
 ];

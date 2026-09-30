@@ -18,6 +18,7 @@ const FIELDS: readonly ApiErrorField[] = [
   'senha',
   'senhaAtual',
   'novaSenha',
+  'token',
   'busca',
   'limite',
   'nuncaJogados',

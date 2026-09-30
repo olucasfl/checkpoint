@@ -193,7 +193,10 @@ implementado.
   `WEB_PUBLIC_URL` (a origem do web, para onde o retorno do vínculo redireciona), as duas **sem barra final e
   sem caminho**; e, **opcional**, `PSN_TOKEN_ENCRYPTION_KEY` (spec `integracao-playstation`: 64 hexadecimais, a chave do AES-256-GCM que
   cifra o refresh token da PlayStation; **ausente** = a PlayStation fica desligada e o resto do app sobe, com um aviso único no log;
-  **presente e malformada** = o boot falha; a mensagem não ecoa o valor); falta ou valor inválido **derruba a aplicação** com a
+  **presente e malformada** = o boot falha; a mensagem não ecoa o valor); as do e-mail transacional pelo Brevo (spec
+  `verificacao-de-email-e-recuperacao-de-senha`): `BREVO_API_KEY` (obrigatória, string não vazia, **só o backend**: viaja no
+  cabeçalho `api-key`, nunca vai para o web nem para log; o formato não é checado, o Brevo pode mudar o prefixo) e `MAIL_FROM_EMAIL`
+  (obrigatória, um e-mail, o remetente **já verificado no Brevo**), mais `MAIL_FROM_NAME` **opcional** (ausente = `Checkpoint`); falta ou valor inválido **derruba a aplicação** com a
   lista de erros. `SUPABASE_SERVICE_ROLE_KEY` também recusa uma chave que comece com
   `sb_publishable_` (a chave pública, sujeita a RLS, com que todo upload falharia com 403). Variável de ambiente nova em `apps/api/.env` **precisa** ganhar um campo aqui, ou
   o `ConfigService` não a expõe (nem para leitura).
@@ -224,6 +227,12 @@ implementado.
   único e sempre normalizado, `senhaHash`) e `RefreshSession` (uma linha por dispositivo logado; o `id` é o
   `sid` dos tokens; guarda só o **SHA-256** do refresh token e o do anterior, mais um rótulo do dispositivo
   derivado do `User-Agent`, sem IP), com `onDelete: Cascade`.
+- **Verificação de e-mail e recuperação de senha** (spec `verificacao-de-email-e-recuperacao-de-senha`, migration
+  `verificacao_email_e_tokens`, **só aditiva**): `User.emailVerificadoEm DateTime?` (`null` = não verificado; a **própria migration** marca as
+  contas anteriores com `emailVerificadoEm = criadoEm`, para nenhuma ficar trancada por uma regra que não existia), o enum `TipoDeToken`
+  (`VERIFICACAO_EMAIL`, `RESET_SENHA`) e o model `TokenDeUsoUnico` (`userId` com `onDelete: Cascade`, `tipo`, **`tokenHash` `CHAR(64)`**,
+  `expiraEm`, `usadoEm?`; índices em `[userId, tipo]` e `[tokenHash]`). Como em `RefreshSession`, **só o SHA-256 do token vai para o banco**;
+  o token em claro existe apenas no e-mail e na URL.
 - **PlayStation** (spec `integracao-playstation`, F1, migration `integracao_playstation`, **só aditiva**): `Provedor` ganhou `PLAYSTATION`
   (`ALTER TYPE … ADD VALUE`), `ContaVinculada.reautenticarDesde DateTime?` (coluna **nula**: `null` = ativa; preenchida quando a Sony recusa a
   credencial guardada) e o model **`CredencialPlataforma`** (`contaId @unique` → `ContaVinculada`, `onDelete: Cascade`; `refreshCifrado`,
@@ -254,8 +263,16 @@ Cascade` a partir de `User` (e `JogoPlataforma` também de `Game`): excluir a co
 ### 4.4 Módulo por domínio (`src/modules/`)
 
 Convenção NestJS padrão, um módulo por domínio, cada um com `*.module.ts` + `*.controller.ts` +
-`*.service.ts` (+ `dto/` quando a rota aceitar body). Hoje há cinco (`health/`, `games/`, `auth/`, §4.5 —
-que também guarda as **sessões ativas** do perfil —, `users/` e `integrations/`):
+`*.service.ts` (+ `dto/` quando a rota aceitar body). Hoje há seis (`health/`, `games/`, `auth/`, §4.5 —
+que também guarda as **sessões ativas** do perfil —, `users/`, `integrations/` e `mail/`):
+
+- `mail/` — o envio de e-mail transacional (spec `verificacao-de-email-e-recuperacao-de-senha`); só `auth/` o usa. `MailService`
+  (`enviarVerificacaoDeEmail`, `enviarRedefinicaoDeSenha`) chama `POST https://api.brevo.com/v3/smtp/email` com o **`fetch` nativo** (o mesmo
+  mecanismo do `SteamClient`: **nenhuma dependência nova**), com timeout de 10 s (`AbortSignal.timeout`). Qualquer falha (rede, timeout,
+  resposta não-2xx) vira **`MailIndisponivelError`** (erro tipado, não `true`/`false`; o mesmo idioma de `PsnClient`), e quem chama decide o que fazer. O
+  log tem só o tipo do erro e o status HTTP: **nunca** a chave, o token, o e-mail de destino nem o corpo da resposta. Os links usam
+  `WEB_PUBLIC_URL` e apontam para o **web** (`/verificar-email?token=…`, `/redefinir-senha?token=…`), nunca para a API: o web confirma por `fetch`
+  depois de montar a página, e um pré-carregamento do link (Mail/Safari, scanners) não consome o token. O nome do usuário é escapado no HTML.
 
 - `health/` — `GET /api/health`, sem domínio; serve de modelo de forma.
 - `games/` — o catálogo de jogos (spec `docs/specs/catalogo-jogos.md`, etapas 1 e 2; o web está em §5.5):
@@ -496,9 +513,29 @@ Registre o módulo novo em `app.module.ts` (`imports: [...]`).
 
 ### 4.5 Autenticação (`modules/auth/`, spec `docs/specs/autenticacao.md`, etapas 1 e 5; sessões: spec `perfil`, etapa 2)
 
-- **Rotas** (`/api/auth`, tag Swagger `auth`): `POST registro`, `POST login`, `POST refresh`, `POST logout` (as
-  quatro `@Public()`), `GET me`, `PUT senha`, `GET sessoes`, `DELETE sessoes` e `DELETE sessoes/:id`
-  (protegidas). Erros com `code` estável (`ApiErrorCode` do shared), nunca comparando a `message`.
+- **Rotas** (`/api/auth`, tag Swagger `auth`): `POST registro`, `POST login`, `POST refresh`, `POST logout`,
+  `POST verificar-email`, `POST reenviar-verificacao`, `POST esqueci-senha` e `POST redefinir-senha` (as oito `@Public()`),
+  `GET me`, `PUT senha`, `GET sessoes`, `DELETE sessoes` e `DELETE sessoes/:id` (protegidas). Erros com `code` estável (`ApiErrorCode` do shared), nunca comparando a `message`.
+- **Verificação de e-mail e recuperação de senha** (spec `verificacao-de-email-e-recuperacao-de-senha`, etapa 1):
+  - **`registro` não abre sessão**: cria a conta com `emailVerificadoEm: null`, gera um token de 24 h, manda o e-mail e responde 201
+    `{ email, emailEnviado }` **sem cookie e sem `accessToken`**. Se o envio falhar a conta **continua criada** e `emailEnviado` vem `false`
+    (a tela oferece "reenviar").
+  - **`login` bloqueia até verificar**, mas só **depois** de a senha conferir: e-mail inexistente e senha errada continuam indistinguíveis
+    (`AUTH_CREDENCIAIS_INVALIDAS`); só quem digitou a senha certa recebe 401 `AUTH_EMAIL_NAO_VERIFICADO`.
+  - **`verificar-email`** (`{ token }`) é **idempotente**: o token de verificação **não é consumido** (`usadoEm` fica nulo), só a conta é marcada,
+    com o `emailVerificadoEm: null` na condição do `updateMany`; o mesmo link de novo devolve `jaEstavaVerificado: true`.
+  - **`reenviar-verificacao`** (`{ email }`): e-mail inexistente e existente-e-reenviado dão a **mesma** resposta (`estado: 'enviado'`); só a conta já
+    verificada diz `'ja-verificado'`. Cada chamada gera um token **novo**; os anteriores valem até usar ou vencer. Falha do Brevo numa conta que
+    existe e não está verificada → 502 `MAIL_INDISPONIVEL`.
+  - **`esqueci-senha`** (`{ email }`) **sempre** responde 200 com o mesmo corpo (`{ mensagem }`), exista a conta ou não e tenha o envio
+    dado certo ou não (a falha só vai para o log do servidor). Token de 30 min, só se a conta existir.
+  - **`redefinir-senha`** (`{ token, novaSenha }`): **204**; o token é de **uso único** (`usadoEm`, consumido por `updateMany` condicionado a
+    `usadoEm: null` dentro de **uma transação interativa** com o hash novo e a **remoção de todas as `RefreshSession`** do usuário). Token inexistente,
+    vencido ou já usado → o **mesmo** 401 `AUTH_TOKEN_INVALIDO`. A senha nova passa pelo DTO **antes**: uma senha fraca dá 400 e o link continua válido.
+    Um token de verificação não serve para redefinir, nem o contrário (a busca filtra por `tipo`).
+  - **Token**: 32 bytes aleatórios em hexadecimal (64 caracteres minúsculos, `TOKEN_DE_USO_UNICO_PATTERN` do shared); o DTO rejeita outro formato com
+    `fields.token` antes de chegar ao banco. Só `sha256(token)` é gravado. Limites por IP: `verificar-email` 20/min, `reenviar-verificacao` 5/min,
+    `esqueci-senha` 5/min, `redefinir-senha` 10/min. O campo `'token'` também entra na lista do `app-validation.pipe.ts`, senão o erro perde o `fields`.
 - **Sessões ativas** (spec `perfil`, etapa 2; `AuthService.listarSessoes/encerrarSessao/encerrarOutrasSessoes`):
   - `GET /api/auth/sessoes` → 200 `SessaoAtiva[]`: só as **vivas** (`expiraEm > agora`), a da própria request
     primeiro (`atual: true`), as outras por `ultimoUsoEm` decrescente. O `select` é lista branca: cada item tem
@@ -819,9 +856,10 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
 - **Rotas** (`app/routes.tsx`): `RequireAuth` segura as telas logadas: `carregando` mostra só o logo (**nenhuma
   query sai antes do boot**), `visitante` vai para `/login?voltar=…` (com `motivo=sessao` só se tinha sessão e a
   perdeu; quem acabou de sair vai para `/login` limpo), `desconectado` mostra a moldura do app com "Sem conexão.
-  Seu catálogo aparece quando a conexão voltar." e **não** redireciona. O `AuthLayout` (`/login`, `/registro`)
-  manda quem já tem sessão para `safeRedirect(voltar)` (login) ou `/` (registro): é ele quem redireciona depois
-  de um login bem-sucedido.
+  Seu catálogo aparece quando a conexão voltar." e **não** redireciona. O `AuthLayout` (`/login`, `/registro` e as
+  telas do e-mail, §5.10.1) manda quem já tem sessão para `safeRedirect(voltar)` (login) ou `/` (as demais): é ele quem
+  redireciona depois de um login bem-sucedido. **Exceção:** `/verificar-email` e `/redefinir-senha` (`ROTAS_ABERTAS_COM_SESSAO`) não
+  redirecionam, porque o link do e-mail precisa funcionar também para quem já está logado.
 - **`safeRedirect`** (`lib/safe-redirect.ts`): aceita só caminho interno (nada de `//`, `/\`, esquema, controle,
   > 512 caracteres, `/login`, `/registro`); confere o valor cru **e** o decodificado.
 - **Mensagens só pelo `code`** (`lib/auth-errors.ts`): `Record<ApiErrorCode, string>` (um código novo no shared
@@ -830,7 +868,7 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
   `instalacao:*` (escopo `dispositivo`) ficam. **Sair** chama `POST /auth/logout`; **sem conexão não sai** ("Sem
   conexão. Para sair, conecte-se."), porque o cookie `HttpOnly` só o servidor apaga. Depois de sair, o
   `BroadcastChannel` avisa as outras abas, que fazem o logout local na hora.
-- **Telas:** `LoginForm` e `RegistroForm` (validação local com as regras da API; "Confirmar senha" só no registro;
+- **Telas:** `LoginForm` e `RegistroForm` (validação local com as regras da API; "Confirmar senha" só no registro, para evitar um erro de digitação que só apareceria no primeiro login;
   `CampoSenha` com "mostrar senha" de 44 × 44 e `aria-pressed`) e o Sair do `/perfil` (a página está em §5.11). Reusam `shared/components/form-parts` (movido de `features/games`)
   e o tema do app.
 - **`/perfil/senha`** (etapa 5, `TrocarSenhaPage` + `TrocarSenhaForm`): Senha atual (`current-password`), Nova senha
@@ -839,6 +877,27 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
   e renovação pelo interceptor). Sucesso navega para `/perfil` com o aviso no `state` da navegação
   (`lib/perfil-avisos.ts`: só um aviso conhecido é mostrado, em `role="status"`). As outras sessões caem no
   servidor; o outro navegador descobre na próxima request (401 → `/login?motivo=sessao`).
+
+### 5.10.1 Verificação de e-mail e recuperação de senha no web (`features/auth/`, spec `docs/specs/verificacao-de-email-e-recuperacao-de-senha.md`, etapa 2)
+
+- **O registro não abre sessão.** `authApi.registro` devolve `RegistroResponse` (`{ email, emailEnviado }`) e o `RegistroForm` navega para
+  `/confirme-seu-email?email=…`, levando `emailEnviado` no `state` da navegação (`false` = "sua conta foi criada, mas não conseguimos enviar o e-mail", com o
+  botão de reenviar). O aviso antigo do formulário ("não é verificado, nenhum e-mail é enviado, sem recuperação") saiu.
+- **Quatro telas novas**, no `AuthLayout` (cartão de entrada, sem a barra do app), cada uma um componente em `features/auth/components/` com uma página fina em `pages/`:
+  - `/confirme-seu-email` (`ConfirmeSeuEmail`): mostra o e-mail de `?email=` (sem ele, pede o e-mail) e o **Reenviar e-mail**; "Já confirmei, entrar" → `/login`.
+  - `/verificar-email?token=…` (`VerificarEmail`): chama `POST /auth/verificar-email` **ao montar**, por `fetch` (nunca por navegação a uma rota da API: o pré-carregamento do link não
+    consome o token). `jaEstavaVerificado` `true` ou `false` mostram a mesma tela ("E-mail confirmado!" + **Entrar**). `AUTH_TOKEN_INVALIDO` (e `VALIDACAO`, link cortado) mostra
+    "Esse link não é mais válido." com o campo de e-mail e o **Reenviar** (o token não revela o e-mail); uma falha passageira (sem conexão, limite) **não** é tratada como link inválido: mostra o erro e "Tentar de novo".
+  - `/esqueci-senha` (`EsqueciSenhaForm`): só o e-mail; o sucesso é **sempre o mesmo texto fixo** (`ESQUECI_SENHA_SUCESSO`), sem "e-mail não encontrado".
+  - `/redefinir-senha?token=…` (`RedefinirSenhaForm`): Nova senha + Confirmar (mesmas regras da troca de senha); senhas diferentes → "As senhas não coincidem" **sem request**; sucesso → `/login?motivo=senha-redefinida`
+    (aviso no topo do cartão, em `LoginPage`); `AUTH_TOKEN_INVALIDO`, `fields.token` ou token ausente → "Esse link não é mais válido." + **Pedir um link novo** → `/esqueci-senha`. Um `fields.novaSenha` da API fica junto do campo e o link segue válido.
+- **`ReenviarVerificacao`** (usado por `/confirme-seu-email` e pelo link inválido): depois de um envio o botão fica **desabilitado por 30 s** (`REENVIO_ESPERA_SEGUNDOS`, com a contagem no rótulo) para não ajudar a
+  estourar o limite de 5/min do servidor; a resposta `ja-verificado` não entra em espera. `MAIL_INDISPONIVEL` (502) e `LIMITE_TENTATIVAS` mostram o texto do código.
+- **`LoginForm`**: ganha o link **Esqueci minha senha** (`/esqueci-senha`) e, no erro `AUTH_EMAIL_NAO_VERIFICADO`, a mensagem do código mais o botão **Reenviar e-mail de confirmação**, que navega
+  para `/confirme-seu-email?email=<o digitado>`.
+- **Chamadas**: as quatro novas (`verificarEmail`, `reenviarVerificacao`, `esqueciSenha`, `redefinirSenha`) passam pelo `apiClient` com `isAuthCall` (sem Bearer, sem renovação de sessão).
+  `lib/auth-errors.ts` ganhou os textos dos três códigos novos.
+- **`/perfil`** perdeu a legenda "(não verificado — usado só para entrar)": toda sessão ativa implica conta verificada (quem já tinha conta foi marcado pela migration).
 
 ### 5.11 Perfil (`features/perfil/`, `pages/PerfilPage.tsx`, spec `docs/specs/perfil.md`, etapas 1 a 5)
 
@@ -1163,8 +1222,10 @@ antes de `api`/`web` (§2). Hoje tem:
   `descricao`. O `shared` não tem runner: as funções são testadas no Jest da API e no Vitest do web.
   A capa entra como `Game.capaUrl` (URL pública ou `null`), `GAME_COVER_MAX_BYTES` (2 MB),
   `GAME_COVER_MIME_TYPES`, `GAME_COVER_FIELD` (`arquivo`) e o campo `arquivo` em `ApiErrorField`.
-- `auth.ts` — contrato da autenticação e da conta: `Usuario`, `RegistroRequest`, `LoginRequest`,
-  `AuthResponse`, `TrocarSenhaRequest`, **`AtualizarPerfilRequest`** (`{ nome }`, de `PATCH /api/users/me`),
+- `auth.ts` — contrato da autenticação e da conta: `Usuario`, `RegistroRequest`, **`RegistroResponse`** (`{ email, emailEnviado }`: o registro não abre
+  sessão), `LoginRequest`, `AuthResponse`, **`VerificarEmailRequest/Response`**, **`ReenviarVerificacaoRequest/Response`**, **`EsqueciSenhaRequest`**,
+  **`RedefinirSenhaRequest`**, `TOKEN_DE_USO_UNICO_PATTERN` (64 hexadecimais minúsculos), os códigos `AUTH_EMAIL_NAO_VERIFICADO`,
+  `AUTH_TOKEN_INVALIDO` e `MAIL_INDISPONIVEL`, `TrocarSenhaRequest`, **`AtualizarPerfilRequest`** (`{ nome }`, de `PATCH /api/users/me`),
   **`ExcluirContaRequest`** (`{ senha }`, de `POST /api/users/me/exclusao`),
   **`SessaoAtiva`** (`{ id, dispositivo, criadoEm, ultimoUsoEm, atual }`, de `GET /api/auth/sessoes`),
   **`EncerrarOutrasSessoesResponse`** (`{ encerradas }`), os limites (`USER_NAME_MAX_LENGTH` etc.), as regras
@@ -1220,17 +1281,18 @@ mudanças de schema por um agente.
 
 ## 8. Variáveis de ambiente
 
-| Arquivo         | Variáveis                                                              | Para quê                                                                                                                                                                                                                                                                                                                          |
-| --------------- | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `apps/api/.env` | `NODE_ENV`, `PORT`, `DATABASE_URL`, `CORS_ORIGIN`                      | Validadas em `src/config/env.validation.ts`; falta/erro derruba o boot                                                                                                                                                                                                                                                            |
-| `apps/api/.env` | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_STORAGE_BUCKET` | Storage das capas; validadas em `env.validation.ts` (obrigatórias). O valor da chave é a **secret key** (`sb_secret_…`) e só o backend a usa: nunca vai para o web nem para log                                                                                                                                                   |
-| `apps/api/.env` | `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `AUTH_REGISTRATION_OPEN`    | Autenticação; obrigatórias em `env.validation.ts`. Os dois segredos têm ≥ 32 caracteres e são **diferentes**; gere cada um localmente (`node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"`). Nunca vão para o web, spec, log ou PR. `AUTH_REGISTRATION_OPEN` é `true` ou `false`                     |
-| `apps/api/.env` | `AUTH_REGISTRATION_LIMIT_PER_HOUR`                                     | **Opcional**, só dev/teste: sobrescreve o limite de 3 registros por hora por IP. Em ambiente exposto, deixe ausente                                                                                                                                                                                                               |
-| `apps/api/.env` | `STEAM_API_KEY`, `API_PUBLIC_URL`, `WEB_PUBLIC_URL`                    | Integração com plataformas (spec `integracao-plataformas`); **obrigatórias**: a API não sobe sem elas, cadastre no Render **antes** do deploy. `STEAM_API_KEY` só no backend, nunca no web nem em log. `API_PUBLIC_URL` e `WEB_PUBLIC_URL`: origens sem barra final (produção: o domínio da Vercel; §4.2)                         |
-| `apps/api/.env` | `PSN_TOKEN_ENCRYPTION_KEY`                                             | **Opcional** (spec `integracao-playstation`): 64 hexadecimais, a chave do AES-256-GCM que cifra o refresh token da PlayStation. Ausente = PlayStation desligada (o resto do app sobe); malformada = o boot falha. **Só o backend**; nunca no web, em log ou commit. Perder ou trocar a chave manda todo mundo para `reautenticar` |
-| `apps/api/.env` | `DIRECT_URL`                                                           | Só o Prisma CLI lê (via `schema.prisma`); necessária apenas se `DATABASE_URL` for uma conexão pooled (ex.: Supabase)                                                                                                                                                                                                              |
-| `apps/api/.env` | `TRUST_PROXY_HOPS`                                                     | **Opcional**, inteiro de 0 a 10; ausente = 0 (dev, sem proxy). Quantos proxies confiáveis há entre o cliente e a API, para o limite por IP ver o cliente e não o proxy (§4.1). Em produção, o número **medido** (Vercel + Render); nunca um chute                                                                                 |
-| `apps/web/.env` | `VITE_API_URL`                                                         | Consumida em `src/shared/lib/env.ts`, `baseURL` do `apiClient`                                                                                                                                                                                                                                                                    |
+| Arquivo         | Variáveis                                                              | Para quê                                                                                                                                                                                                                                                                                                                                                                  |
+| --------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/api/.env` | `NODE_ENV`, `PORT`, `DATABASE_URL`, `CORS_ORIGIN`                      | Validadas em `src/config/env.validation.ts`; falta/erro derruba o boot                                                                                                                                                                                                                                                                                                    |
+| `apps/api/.env` | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_STORAGE_BUCKET` | Storage das capas; validadas em `env.validation.ts` (obrigatórias). O valor da chave é a **secret key** (`sb_secret_…`) e só o backend a usa: nunca vai para o web nem para log                                                                                                                                                                                           |
+| `apps/api/.env` | `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `AUTH_REGISTRATION_OPEN`    | Autenticação; obrigatórias em `env.validation.ts`. Os dois segredos têm ≥ 32 caracteres e são **diferentes**; gere cada um localmente (`node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"`). Nunca vão para o web, spec, log ou PR. `AUTH_REGISTRATION_OPEN` é `true` ou `false`                                                             |
+| `apps/api/.env` | `AUTH_REGISTRATION_LIMIT_PER_HOUR`                                     | **Opcional**, só dev/teste: sobrescreve o limite de 3 registros por hora por IP. Em ambiente exposto, deixe ausente                                                                                                                                                                                                                                                       |
+| `apps/api/.env` | `STEAM_API_KEY`, `API_PUBLIC_URL`, `WEB_PUBLIC_URL`                    | Integração com plataformas (spec `integracao-plataformas`); **obrigatórias**: a API não sobe sem elas, cadastre no Render **antes** do deploy. `STEAM_API_KEY` só no backend, nunca no web nem em log. `API_PUBLIC_URL` e `WEB_PUBLIC_URL`: origens sem barra final (produção: o domínio da Vercel; §4.2)                                                                 |
+| `apps/api/.env` | `BREVO_API_KEY`, `MAIL_FROM_EMAIL`, `MAIL_FROM_NAME`                   | E-mail transacional pelo Brevo (spec `verificacao-de-email-e-recuperacao-de-senha`); as duas primeiras **obrigatórias** (a API não sobe sem elas: cadastre no Render **antes** do deploy), `MAIL_FROM_NAME` opcional (ausente = `Checkpoint`). `MAIL_FROM_EMAIL` é um remetente **já verificado no Brevo**. `BREVO_API_KEY` só no backend, nunca no web, em log ou commit |
+| `apps/api/.env` | `PSN_TOKEN_ENCRYPTION_KEY`                                             | **Opcional** (spec `integracao-playstation`): 64 hexadecimais, a chave do AES-256-GCM que cifra o refresh token da PlayStation. Ausente = PlayStation desligada (o resto do app sobe); malformada = o boot falha. **Só o backend**; nunca no web, em log ou commit. Perder ou trocar a chave manda todo mundo para `reautenticar`                                         |
+| `apps/api/.env` | `DIRECT_URL`                                                           | Só o Prisma CLI lê (via `schema.prisma`); necessária apenas se `DATABASE_URL` for uma conexão pooled (ex.: Supabase)                                                                                                                                                                                                                                                      |
+| `apps/api/.env` | `TRUST_PROXY_HOPS`                                                     | **Opcional**, inteiro de 0 a 10; ausente = 0 (dev, sem proxy). Quantos proxies confiáveis há entre o cliente e a API, para o limite por IP ver o cliente e não o proxy (§4.1). Em produção, o número **medido** (Vercel + Render); nunca um chute                                                                                                                         |
+| `apps/web/.env` | `VITE_API_URL`                                                         | Consumida em `src/shared/lib/env.ts`, `baseURL` do `apiClient`                                                                                                                                                                                                                                                                                                            |
 
 `CORS_ORIGIN` deixou de ter padrão e **recusa `*`** (cookie de sessão): liste as origens, ex.:
 `http://localhost:5173`. Cada arquivo tem um `.env.example` correspondente, versionado. Nunca commitar `.env` real nem
@@ -1257,6 +1319,11 @@ e bucket ficam no **Supabase**. As variáveis da API vivem no painel do Render; 
 | `PSN_TOKEN_ENCRYPTION_KEY` | 64 hexadecimais (segredo)                | **opcional**: sem ela a PlayStation fica desligada; gere com `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` |
 
 As demais (`DATABASE_URL`, `DIRECT_URL`, `SUPABASE_*`, `JWT_*`, `AUTH_REGISTRATION_OPEN`, `PORT`) já existem e não mudam.
+
+**E-mail (spec `verificacao-de-email-e-recuperacao-de-senha`): ordem de deploy.** A migration `verificacao_email_e_tokens` é **aditiva** e já traz o `UPDATE` que marca as contas existentes como
+verificadas; o Render não a aplica. Ordem: **1) migration (`npm run db:deploy -w @checkpoint/api`) → 2) `BREVO_API_KEY` e `MAIL_FROM_EMAIL` no Render → 3) deploy do código**. O código não pode chegar antes da
+migration (o cliente Prisma novo lê `emailVerificadoEm`), e sem as duas variáveis a API **não sobe** (diferente da PlayStation: aqui a feature é o núcleo do registro e do login). Com o remetente
+`MAIL_FROM_EMAIL` não verificado no Brevo, a API sobe mas o Brevo recusa todo envio (o registro devolve `emailEnviado: false`).
 
 **PlayStation (spec `integracao-playstation`): ordem de deploy e quem aplica a migration.** A migration `integracao_playstation` é **aditiva** e o Render **não** roda
 `migrate deploy` no build/start (o `start` é `node dist/main.js`): quem a aplica é o humano, com `npm run db:deploy -w @checkpoint/api` (ou `npx prisma migrate deploy` em `apps/api`) contra o banco

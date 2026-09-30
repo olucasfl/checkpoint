@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 import {
+  DEFAULT_MAIL_FROM_NAME,
   DEFAULT_REGISTRATION_LIMIT_PER_HOUR,
   DEFAULT_TRUST_PROXY_HOPS,
   validateEnv,
@@ -19,6 +20,9 @@ const valid = {
   STEAM_API_KEY: '0123456789ABCDEF0123456789ABCDEF',
   API_PUBLIC_URL: 'http://localhost:3333',
   WEB_PUBLIC_URL: 'http://localhost:5173',
+  // Sintéticos: nunca a chave nem o remetente reais do Brevo.
+  BREVO_API_KEY: 'chave-brevo-sintetica-de-teste',
+  MAIL_FROM_EMAIL: 'remetente@exemplo.com',
 };
 
 function messageOf(env: Record<string, unknown>): string {
@@ -290,5 +294,51 @@ describe('validateEnv — PSN_TOKEN_ENCRYPTION_KEY (spec integracao-playstation,
 
     expect(mensagem).toContain('PSN_TOKEN_ENCRYPTION_KEY');
     expect(mensagem).not.toContain(chave.trim());
+  });
+});
+
+describe('validateEnv — e-mail pelo Brevo (spec verificacao-de-email-e-recuperacao-de-senha, CA-20, CA-21)', () => {
+  it.each(['BREVO_API_KEY', 'MAIL_FROM_EMAIL'])(
+    'falha listando %s quando ela está ausente (CA-20)',
+    (name) => {
+      const { [name]: _removida, ...env } = valid as Record<string, string>;
+
+      expect(messageOf(env)).toContain(name);
+    },
+  );
+
+  it.each(['BREVO_API_KEY', 'MAIL_FROM_EMAIL'])('falha quando %s está vazia (CA-20)', (name) => {
+    expect(messageOf({ ...valid, [name]: '' })).toContain(name);
+  });
+
+  it.each(['sem-arroba', 'a@', '@exemplo.com', 'dois@@exemplo.com'])(
+    'MAIL_FROM_EMAIL=%j (formato inválido) falha (CA-20)',
+    (value) => {
+      expect(messageOf({ ...valid, MAIL_FROM_EMAIL: value })).toContain('MAIL_FROM_EMAIL');
+    },
+  );
+
+  it('MAIL_FROM_NAME é opcional: ausente, a API sobe (o serviço usa o nome padrão) (CA-21)', () => {
+    const config = validateEnv(valid);
+
+    expect(config.MAIL_FROM_NAME).toBeUndefined();
+    expect(DEFAULT_MAIL_FROM_NAME).toBe('Checkpoint');
+  });
+
+  it('MAIL_FROM_NAME definida é lida como está', () => {
+    expect(validateEnv({ ...valid, MAIL_FROM_NAME: 'Outro Nome' }).MAIL_FROM_NAME).toBe(
+      'Outro Nome',
+    );
+  });
+
+  it('a mensagem de erro nunca ecoa o valor da chave', () => {
+    const message = messageOf({
+      ...valid,
+      BREVO_API_KEY: '',
+      MAIL_FROM_EMAIL: 'CHAVE-SINTETICA-X',
+    });
+
+    expect(message).toContain('BREVO_API_KEY');
+    expect(message).not.toContain('CHAVE-SINTETICA-X');
   });
 });

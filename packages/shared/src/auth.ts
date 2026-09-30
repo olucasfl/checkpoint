@@ -118,6 +118,41 @@ export interface EncerrarOutrasSessoesResponse {
   encerradas: number;
 }
 
+/** Resposta do registro: NÃO abre sessão, só confirma para onde o link de verificação foi. */
+export interface RegistroResponse {
+  email: string;
+  /** false = a conta foi criada, mas o e-mail de verificação pode não ter chegado (o envio falhou). */
+  emailEnviado: boolean;
+}
+
+export interface VerificarEmailRequest {
+  token: string;
+}
+
+export interface VerificarEmailResponse {
+  jaEstavaVerificado: boolean;
+}
+
+export interface ReenviarVerificacaoRequest {
+  email: string;
+}
+
+export interface ReenviarVerificacaoResponse {
+  estado: 'enviado' | 'ja-verificado';
+}
+
+export interface EsqueciSenhaRequest {
+  email: string;
+}
+
+export interface RedefinirSenhaRequest {
+  token: string;
+  novaSenha: string;
+}
+
+/** Token de uso único do e-mail: 32 bytes aleatórios em hexadecimal minúsculo. */
+export const TOKEN_DE_USO_UNICO_PATTERN = /^[0-9a-f]{64}$/;
+
 /** Códigos estáveis dos erros: o web mostra o texto pelo `code`, nunca comparando a `message`. */
 export const API_ERROR_CODES = [
   'VALIDACAO',
@@ -131,6 +166,10 @@ export const API_ERROR_CODES = [
   'AUTH_SENHA_ATUAL_INCORRETA',
   'AUTH_SENHA_IGUAL_ATUAL',
   'AUTH_ORIGEM_INVALIDA',
+  // Verificação de e-mail e recuperação de senha (spec verificacao-de-email-e-recuperacao-de-senha).
+  'AUTH_EMAIL_NAO_VERIFICADO',
+  'AUTH_TOKEN_INVALIDO',
+  'MAIL_INDISPONIVEL',
   'LIMITE_TENTATIVAS',
   // Sessões ativas (spec perfil, etapa 2).
   'SESSAO_ATUAL',

@@ -7,9 +7,10 @@ import { AUTH_MESSAGES } from '@/features/auth/lib/auth-errors';
 const AVISOS: Record<string, string> = {
   sessao: AUTH_MESSAGES.AUTH_SESSAO_ENCERRADA,
   'conta-excluida': 'Sua conta foi excluída.',
+  'senha-redefinida': 'Senha redefinida. Entre com a nova senha.',
 };
 
-/** `/login`. `?motivo=` (a sessão terminou, ou a conta foi excluída) mostra o aviso no topo do cartão. */
+/** `/login`. `?motivo=` (a sessão terminou, a conta foi excluída ou a senha foi redefinida) mostra o aviso no topo do cartão. */
 export function LoginPage() {
   const [params] = useSearchParams();
   const motivo = params.get('motivo');

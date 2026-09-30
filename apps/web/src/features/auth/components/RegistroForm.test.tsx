@@ -1,8 +1,8 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { AxiosError } from 'axios';
-import { MemoryRouter } from 'react-router-dom';
-import { type AuthResponse } from '@checkpoint/shared';
+import { MemoryRouter, useLocation } from 'react-router-dom';
+import { type RegistroResponse } from '@checkpoint/shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { storage } from '@/shared/lib/storage/storage';
 import { authApi } from '../api/auth-api';
@@ -14,13 +14,7 @@ vi.mock('../api/auth-api', () => ({
 }));
 const api = vi.mocked(authApi);
 
-const usuario = {
-  id: 'u1',
-  nome: 'Ana Teste',
-  email: 'ana@exemplo.com',
-  criadoEm: '2026-09-24T12:00:00.000Z',
-};
-const auth: AuthResponse = { accessToken: 'token', usuario };
+const registro: RegistroResponse = { email: 'ana@exemplo.com', emailEnviado: true };
 
 function httpError(status: number, code: string, fields?: Record<string, string>): AxiosError {
   return new AxiosError('falhou', 'ERR_BAD_REQUEST', undefined, undefined, {
@@ -32,10 +26,17 @@ function httpError(status: number, code: string, fields?: Record<string, string>
   });
 }
 
+/** Mostra para onde a navegação foi (o destino e o estado que ela levou). */
+function Destino() {
+  const { pathname, search, state } = useLocation();
+  return <output data-testid="destino">{`${pathname}${search} ${JSON.stringify(state)}`}</output>;
+}
+
 function renderForm() {
   render(
     <MemoryRouter>
       <RegistroForm />
+      <Destino />
     </MemoryRouter>,
   );
   return userEvent.setup();
@@ -70,11 +71,9 @@ describe('RegistroForm — tela (CA-24, CA-37)', () => {
     expect(email()).toBeInTheDocument();
     expect(senha()).toBeInTheDocument();
     expect(confirmacao()).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        'Seu e-mail serve só para entrar: ele não é verificado e nenhum e-mail é enviado. Ainda não existe recuperação de senha — guarde a sua.',
-      ),
-    ).toBeInTheDocument();
+    // O aviso antigo ("não verificado, nenhum e-mail é enviado, sem recuperação") deixou de ser verdade (CA-24).
+    expect(screen.queryByText(/não é verificado/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/recuperação de senha/)).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Já tenho conta' })).toHaveAttribute('href', '/login');
     expect(screen.getByRole('button', { name: 'Criar conta' })).toBeInTheDocument();
   });
@@ -104,7 +103,7 @@ describe('RegistroForm — tela (CA-24, CA-37)', () => {
   });
 
   it('Enter no último campo envia', async () => {
-    api.registro.mockResolvedValue(auth);
+    api.registro.mockResolvedValue(registro);
     const user = renderForm();
 
     await user.type(nome(), 'Ana Teste');
@@ -150,7 +149,7 @@ describe('RegistroForm — validação local', () => {
   });
 
   it('a mensagem de "não coincidem" some quando a pessoa corrige e reenvia', async () => {
-    api.registro.mockResolvedValue(auth);
+    api.registro.mockResolvedValue(registro);
     const user = renderForm();
     await preencher(user, { confirmacao: 'diferente-mesmo' });
     await user.click(screen.getByRole('button', { name: 'Criar conta' }));
@@ -166,19 +165,36 @@ describe('RegistroForm — validação local', () => {
 });
 
 describe('RegistroForm — envio', () => {
-  it('sucesso: envia nome e e-mail aparados e entra direto (sessão autenticada) (CA-24)', async () => {
-    api.registro.mockResolvedValue(auth);
+  it('sucesso: envia nome e e-mail aparados e vai para /confirme-seu-email, SEM abrir sessão (CA-24)', async () => {
+    api.registro.mockResolvedValue(registro);
     const user = renderForm();
 
     await preencher(user, { nome: '  Ana Teste ', email: ' ana@exemplo.com ' });
     await user.click(screen.getByRole('button', { name: 'Criar conta' }));
 
-    await waitFor(() => expect(getSession().status).toBe('autenticado'));
+    await waitFor(() =>
+      expect(screen.getByTestId('destino')).toHaveTextContent(
+        '/confirme-seu-email?email=ana%40exemplo.com {"emailEnviado":true}',
+      ),
+    );
     expect(api.registro).toHaveBeenCalledWith({
       nome: 'Ana Teste',
       email: 'ana@exemplo.com',
       senha: 'segredo-forte',
     });
+    expect(getSession().status).not.toBe('autenticado');
+  });
+
+  it('o envio do e-mail falhou: a conta existe e o destino leva emailEnviado false (CA-22a)', async () => {
+    api.registro.mockResolvedValue({ email: 'ana@exemplo.com', emailEnviado: false });
+    const user = renderForm();
+
+    await preencher(user);
+    await user.click(screen.getByRole('button', { name: 'Criar conta' }));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('destino')).toHaveTextContent('{"emailEnviado":false}'),
+    );
   });
 
   it('409: a mensagem aparece junto do campo E-mail (pelo fields)', async () => {

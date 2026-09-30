@@ -38,6 +38,17 @@ export const authErrors = {
     apiError(400, 'AUTH_SENHA_IGUAL_ATUAL', 'A nova senha precisa ser diferente da atual.', {
       novaSenha: 'A nova senha precisa ser diferente da atual.',
     }),
+  // Só depois de a senha conferir: quem chega aqui já provou ser o dono da conta (não é sonda de existência).
+  emailNaoVerificado: () =>
+    apiError(401, 'AUTH_EMAIL_NAO_VERIFICADO', 'Confirme seu e-mail para entrar.'),
+  // Inexistente, vencido ou (só reset) já usado: a mesma resposta, sem dizer qual dos três.
+  tokenInvalido: () => apiError(401, 'AUTH_TOKEN_INVALIDO', 'Esse link não é mais válido.'),
+  mailIndisponivel: () =>
+    apiError(
+      502,
+      'MAIL_INDISPONIVEL',
+      'Não conseguimos enviar o e-mail agora. Tente de novo em instantes.',
+    ),
   limiteTentativas: () =>
     apiError(429, 'LIMITE_TENTATIVAS', 'Muitas tentativas. Aguarde um pouco e tente de novo.'),
   // Sessões ativas (spec perfil, etapa 2).

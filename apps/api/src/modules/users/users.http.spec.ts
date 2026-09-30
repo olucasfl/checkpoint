@@ -12,6 +12,7 @@ import { PrismaService } from '../../database/prisma.service';
 import { AccessTokenGuard } from '../auth/access-token.guard';
 import { AuthController } from '../auth/auth.controller';
 import { AuthService } from '../auth/auth.service';
+import { MailService } from '../mail/mail.service';
 import { AuthThrottlerGuard } from '../auth/auth-throttler.guard';
 import { AuthTokensService } from '../auth/auth-tokens.service';
 import { CsrfHeaderGuard } from '../auth/csrf-header.guard';
@@ -72,9 +73,16 @@ async function call(
   };
 }
 
+/** O registro não abre sessão: confirma o e-mail direto no banco em memória e entra. */
 async function registerAna(): Promise<string> {
-  const reply = await call('POST', '/auth/registro', {
-    body: { nome: 'Ana Teste', email: 'ana@exemplo.com', senha: 'segredo-forte' },
+  const body = { nome: 'Ana Teste', email: 'ana@exemplo.com', senha: 'segredo-forte' };
+  await call('POST', '/auth/registro', { body });
+  const ana = db.users.find((user) => user.email === body.email);
+  if (ana) {
+    ana.emailVerificadoEm = new Date();
+  }
+  const reply = await call('POST', '/auth/login', {
+    body: { email: body.email, senha: body.senha },
   });
   return (reply.json as { accessToken: string }).accessToken;
 }
@@ -98,6 +106,10 @@ beforeEach(async () => {
       UsersService,
       GamesService,
       { provide: StorageService, useValue: storage },
+      {
+        provide: MailService,
+        useValue: { enviarVerificacaoDeEmail: jest.fn(), enviarRedefinicaoDeSenha: jest.fn() },
+      },
       { provide: PasswordHasher, useValue: fakeHasher },
       { provide: PrismaService, useValue: db },
       { provide: APP_GUARD, useClass: AccessTokenGuard },

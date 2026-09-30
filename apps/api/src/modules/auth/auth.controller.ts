@@ -25,6 +25,7 @@ import {
   ApiNoContentResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
+  ApiBadGatewayResponse,
   ApiOperation,
   ApiTags,
   ApiTooManyRequestsResponse,
@@ -35,8 +36,11 @@ import { type Request, type Response } from 'express';
 import {
   CSRF_HEADER,
   type EncerrarOutrasSessoesResponse,
+  type ReenviarVerificacaoResponse,
+  type RegistroResponse,
   type SessaoAtiva,
   type Usuario,
+  type VerificarEmailResponse,
 } from '@checkpoint/shared';
 import {
   CurrentUser,
@@ -50,11 +54,16 @@ import { errorCode } from './auth-errors';
 import { AuthThrottlerGuard, registrationLimitPerHour } from './auth-throttler.guard';
 import { AuthService, type SessionResult } from './auth.service';
 import {
+  ESQUECI_SENHA_LIMIT,
+  ESQUECI_SENHA_MENSAGEM,
   LOGIN_LIMIT,
   PASSWORD_CHANGE_LIMIT,
+  REDEFINIR_SENHA_LIMIT,
+  REENVIAR_VERIFICACAO_LIMIT,
   REFRESH_COOKIE_NAME,
   REFRESH_LIMIT,
   REGISTRATION_WINDOW_MS,
+  VERIFICAR_EMAIL_LIMIT,
 } from './auth.constants';
 import { CsrfHeaderGuard } from './csrf-header.guard';
 import { sessaoIdPipe } from './sessao-id.pipe';
@@ -63,6 +72,16 @@ import { LoginDto } from './dto/login.dto';
 import { RegistroDto } from './dto/registro.dto';
 import { EncerrarOutrasSessoesResponseDto, SessaoAtivaDto } from './dto/sessoes.dto';
 import { TrocarSenhaDto } from './dto/trocar-senha.dto';
+import {
+  EsqueciSenhaDto,
+  MensagemResponseDto,
+  RedefinirSenhaDto,
+  ReenviarVerificacaoDto,
+  ReenviarVerificacaoResponseDto,
+  RegistroResponseDto,
+  VerificarEmailDto,
+  VerificarEmailResponseDto,
+} from './dto/verificacao-email.dto';
 
 const CSRF_DOC = {
   name: CSRF_HEADER,
@@ -87,23 +106,19 @@ export class AuthController {
     default: { limit: () => registrationLimitPerHour(), ttl: REGISTRATION_WINDOW_MS },
   })
   @ApiOperation({
-    summary: 'Cria a conta e já entra nela',
+    summary: 'Cria a conta e manda o e-mail de verificação',
     description:
-      'Devolve o access token no corpo e o refresh token no cookie `checkpoint_refresh` ' +
-      '(HttpOnly). O e-mail é só o identificador de login: não é verificado e nenhum e-mail é enviado. ' +
+      'NÃO abre sessão (sem cookie e sem access token): o login só libera depois de confirmar o e-mail. ' +
+      'Se o envio falhar, a conta continua criada e `emailEnviado` vem `false`. ' +
       'Limite: 3 por hora por IP (padrão).',
   })
-  @ApiCreatedResponse({ type: AuthResponseDto })
+  @ApiCreatedResponse({ type: RegistroResponseDto })
   @ApiBadRequestResponse({ type: ApiErrorResponseDto, description: '`VALIDACAO`, com `fields`' })
   @ApiConflictResponse({ type: ApiErrorResponseDto, description: '`AUTH_EMAIL_EM_USO`' })
   @ApiForbiddenResponse({ type: ApiErrorResponseDto, description: '`AUTH_REGISTRO_FECHADO`' })
   @ApiTooManyRequestsResponse({ type: ApiErrorResponseDto, description: '`LIMITE_TENTATIVAS`' })
-  async register(
-    @Body() dto: RegistroDto,
-    @Headers('user-agent') userAgent: string | undefined,
-    @Res({ passthrough: true }) response: Response,
-  ): Promise<AuthResponseDto> {
-    return this.respondWithSession(response, await this.authService.register(dto, userAgent));
+  register(@Body() dto: RegistroDto): Promise<RegistroResponse> {
+    return this.authService.register(dto);
   }
 
   @Post('login')
@@ -118,7 +133,9 @@ export class AuthController {
   @ApiBadRequestResponse({ type: ApiErrorResponseDto, description: '`VALIDACAO`' })
   @ApiUnauthorizedResponse({
     type: ApiErrorResponseDto,
-    description: '`AUTH_CREDENCIAIS_INVALIDAS` (igual para e-mail inexistente e senha errada)',
+    description:
+      '`AUTH_CREDENCIAIS_INVALIDAS` (igual para e-mail inexistente e senha errada) ou ' +
+      '`AUTH_EMAIL_NAO_VERIFICADO` (senha certa, e-mail ainda não confirmado)',
   })
   @ApiTooManyRequestsResponse({ type: ApiErrorResponseDto, description: '`LIMITE_TENTATIVAS`' })
   async login(
@@ -127,6 +144,84 @@ export class AuthController {
     @Res({ passthrough: true }) response: Response,
   ): Promise<AuthResponseDto> {
     return this.respondWithSession(response, await this.authService.login(dto, userAgent));
+  }
+
+  @Post('verificar-email')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: VERIFICAR_EMAIL_LIMIT })
+  @ApiOperation({
+    summary: 'Confirma o e-mail com o token do link',
+    description:
+      'Idempotente: o mesmo link de novo devolve `jaEstavaVerificado: true`. O link do e-mail aponta para o ' +
+      'web, que chama esta rota ao montar a página. Limite: 20 por minuto por IP.',
+  })
+  @ApiOkResponse({ type: VerificarEmailResponseDto })
+  @ApiBadRequestResponse({ type: ApiErrorResponseDto, description: '`VALIDACAO` (`fields.token`)' })
+  @ApiUnauthorizedResponse({ type: ApiErrorResponseDto, description: '`AUTH_TOKEN_INVALIDO`' })
+  @ApiTooManyRequestsResponse({ type: ApiErrorResponseDto, description: '`LIMITE_TENTATIVAS`' })
+  verificarEmail(@Body() dto: VerificarEmailDto): Promise<VerificarEmailResponse> {
+    return this.authService.verificarEmail(dto.token);
+  }
+
+  @Post('reenviar-verificacao')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: REENVIAR_VERIFICACAO_LIMIT })
+  @ApiOperation({
+    summary: 'Reenvia o e-mail de verificação',
+    description:
+      'Não revela se a conta existe: e-mail inexistente e reenviado dão a mesma resposta. Só a conta já ' +
+      'verificada diz `ja-verificado`. Limite: 5 por minuto por IP.',
+  })
+  @ApiOkResponse({ type: ReenviarVerificacaoResponseDto })
+  @ApiBadRequestResponse({ type: ApiErrorResponseDto, description: '`VALIDACAO`' })
+  @ApiBadGatewayResponse({
+    type: ApiErrorResponseDto,
+    description: '`MAIL_INDISPONIVEL`: a conta existe, não está verificada e o envio falhou',
+  })
+  @ApiTooManyRequestsResponse({ type: ApiErrorResponseDto, description: '`LIMITE_TENTATIVAS`' })
+  reenviarVerificacao(@Body() dto: ReenviarVerificacaoDto): Promise<ReenviarVerificacaoResponse> {
+    return this.authService.reenviarVerificacao(dto);
+  }
+
+  @Post('esqueci-senha')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: ESQUECI_SENHA_LIMIT })
+  @ApiOperation({
+    summary: 'Pede o link de redefinição de senha',
+    description:
+      'Responde SEMPRE o mesmo corpo: a conta existir, estar verificada ou o envio falhar não muda nada. ' +
+      'O link vale por 30 minutos. Limite: 5 por minuto por IP.',
+  })
+  @ApiOkResponse({ type: MensagemResponseDto })
+  @ApiBadRequestResponse({ type: ApiErrorResponseDto, description: '`VALIDACAO`' })
+  @ApiTooManyRequestsResponse({ type: ApiErrorResponseDto, description: '`LIMITE_TENTATIVAS`' })
+  async esqueciSenha(@Body() dto: EsqueciSenhaDto): Promise<{ mensagem: string }> {
+    await this.authService.esqueciSenha(dto.email);
+    return { mensagem: ESQUECI_SENHA_MENSAGEM };
+  }
+
+  @Post('redefinir-senha')
+  @Public()
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Throttle({ default: REDEFINIR_SENHA_LIMIT })
+  @ApiOperation({
+    summary: 'Troca a senha com o token do e-mail',
+    description:
+      'Uso único. Encerra TODAS as sessões da conta. Token inexistente, vencido ou já usado dão o mesmo ' +
+      'erro. Limite: 10 por minuto por IP.',
+  })
+  @ApiNoContentResponse({ description: 'Senha trocada; todas as sessões foram encerradas' })
+  @ApiBadRequestResponse({
+    type: ApiErrorResponseDto,
+    description: '`VALIDACAO` (`fields.token` ou `fields.novaSenha`)',
+  })
+  @ApiUnauthorizedResponse({ type: ApiErrorResponseDto, description: '`AUTH_TOKEN_INVALIDO`' })
+  @ApiTooManyRequestsResponse({ type: ApiErrorResponseDto, description: '`LIMITE_TENTATIVAS`' })
+  redefinirSenha(@Body() dto: RedefinirSenhaDto): Promise<void> {
+    return this.authService.redefinirSenha(dto);
   }
 
   @Post('refresh')
