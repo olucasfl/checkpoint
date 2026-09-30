@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { AxiosError } from 'axios';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import { type AuthResponse } from '@checkpoint/shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { storage } from '@/shared/lib/storage/storage';
@@ -205,5 +205,61 @@ describe('LoginForm — envio', () => {
 
     expect(api.login).toHaveBeenCalledTimes(1);
     responder(auth);
+  });
+});
+
+describe('LoginForm — e-mail e senha esquecidos (spec verificacao-de-email, CA-27, CA-28)', () => {
+  function Destino() {
+    const { pathname, search } = useLocation();
+    return <output data-testid="destino">{`${pathname}${search}`}</output>;
+  }
+
+  function renderComDestino() {
+    render(
+      <MemoryRouter>
+        <LoginForm />
+        <Destino />
+      </MemoryRouter>,
+    );
+    return userEvent.setup();
+  }
+
+  it('o link "Esqueci minha senha" aponta para /esqueci-senha, com alvo de 44 px (CA-28)', () => {
+    renderForm();
+
+    const link = screen.getByRole('link', { name: 'Esqueci minha senha' });
+    expect(link).toHaveAttribute('href', '/esqueci-senha');
+    expect(link).toHaveClass('min-h-11');
+  });
+
+  it('AUTH_EMAIL_NAO_VERIFICADO: a mensagem do código e o botão que leva a /confirme-seu-email com o e-mail (CA-27)', async () => {
+    api.login.mockRejectedValue(httpError(401, 'AUTH_EMAIL_NAO_VERIFICADO'));
+    const user = renderComDestino();
+
+    await user.type(email(), ' ana@exemplo.com ');
+    await user.type(senha(), 'segredo-forte');
+    await user.click(screen.getByRole('button', { name: 'Entrar' }));
+
+    expect(await screen.findByText('Confirme seu e-mail para entrar.')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Reenviar e-mail de confirmação' }));
+
+    expect(screen.getByTestId('destino')).toHaveTextContent(
+      '/confirme-seu-email?email=ana%40exemplo.com',
+    );
+    expect(getSession().status).not.toBe('autenticado');
+  });
+
+  it('o botão de reenvio só aparece nesse erro (não em credenciais erradas)', async () => {
+    api.login.mockRejectedValue(httpError(401, 'AUTH_CREDENCIAIS_INVALIDAS'));
+    const user = renderComDestino();
+
+    await user.type(email(), 'ana@exemplo.com');
+    await user.type(senha(), 'errada-mesmo');
+    await user.click(screen.getByRole('button', { name: 'Entrar' }));
+
+    expect(await screen.findByText('E-mail ou senha incorretos.')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Reenviar e-mail de confirmação' }),
+    ).not.toBeInTheDocument();
   });
 });

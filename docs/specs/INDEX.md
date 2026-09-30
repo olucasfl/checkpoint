@@ -16,7 +16,7 @@ commit — `/docs-sync` confere se ela bate com a realidade.
 | Plataformas e página do jogo                 | [plataformas-e-pagina-do-jogo.md](plataformas-e-pagina-do-jogo.md)                               | 🚧 em andamento |
 | Personalização com o Chek e animações        | [personalizacao-chek-e-animacoes.md](personalizacao-chek-e-animacoes.md)                         | 🚧 em andamento |
 | Integração com a PlayStation (PSN)           | [integracao-playstation.md](integracao-playstation.md)                                           | 🚧 em andamento |
-| Verificação de e-mail e recuperação de senha | [verificacao-de-email-e-recuperacao-de-senha.md](verificacao-de-email-e-recuperacao-de-senha.md) | ✅ aprovada     |
+| Verificação de e-mail e recuperação de senha | [verificacao-de-email-e-recuperacao-de-senha.md](verificacao-de-email-e-recuperacao-de-senha.md) | 🚧 em andamento |
 
 ## Legenda de status
 

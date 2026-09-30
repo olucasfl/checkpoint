@@ -44,6 +44,12 @@ describe('AUTH_MESSAGES (CA-38)', () => {
     expect(AUTH_MESSAGES.LIMITE_TENTATIVAS).toBe(
       'Muitas tentativas. Aguarde um pouco e tente de novo.',
     );
+    // Verificação de e-mail e recuperação de senha (CA-33).
+    expect(AUTH_MESSAGES.AUTH_EMAIL_NAO_VERIFICADO).toBe('Confirme seu e-mail para entrar.');
+    expect(AUTH_MESSAGES.AUTH_TOKEN_INVALIDO).toBe('Esse link não é mais válido.');
+    expect(AUTH_MESSAGES.MAIL_INDISPONIVEL).toBe(
+      'Não conseguimos enviar o e-mail agora. Tente de novo em instantes.',
+    );
     // Sessões ativas (spec perfil, etapa 2).
     expect(AUTH_MESSAGES.SESSAO_ATUAL).toBe('Para encerrar esta sessão, use Sair.');
     expect(AUTH_MESSAGES.SESSAO_NAO_ENCONTRADA).toBe('Essa sessão já foi encerrada.');

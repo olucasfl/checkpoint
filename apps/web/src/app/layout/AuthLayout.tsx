@@ -7,8 +7,11 @@ import { UpdatePrompt } from '@/shared/components/UpdatePrompt';
 import { Backdrop } from './Backdrop';
 import { LoadingScreen } from './LoadingScreen';
 
+/** Os links do e-mail funcionam com ou sem sessão (quem já está logado também pode abri-los). */
+const ROTAS_ABERTAS_COM_SESSAO = ['/verificar-email', '/redefinir-senha'];
+
 /**
- * Moldura de `/login` e `/registro`: só o fundo Neon e o cartão central (sem barra de navegação).
+ * Moldura de `/login`, `/registro` e das telas do e-mail: só o fundo Neon e o cartão central (sem barra de navegação).
  * Quem já tem sessão não vê estas telas: vai para o `?voltar=` (só no login, e só um caminho interno)
  * ou para `/`. É aqui que o login bem-sucedido redireciona: a sessão muda e este guard reage.
  */
@@ -21,7 +24,7 @@ export function AuthLayout() {
     return <LoadingScreen />;
   }
 
-  if (status === 'autenticado') {
+  if (status === 'autenticado' && !ROTAS_ABERTAS_COM_SESSAO.includes(pathname)) {
     const isLogin = pathname.startsWith('/login');
     return <Navigate to={isLogin ? safeRedirect(params.get('voltar')) : '/'} replace />;
   }

@@ -1,10 +1,17 @@
 import {
   CSRF_HEADER,
   type AuthResponse,
+  type EsqueciSenhaRequest,
   type LoginRequest,
+  type RedefinirSenhaRequest,
+  type ReenviarVerificacaoRequest,
+  type ReenviarVerificacaoResponse,
   type RegistroRequest,
+  type RegistroResponse,
   type TrocarSenhaRequest,
   type Usuario,
+  type VerificarEmailRequest,
+  type VerificarEmailResponse,
 } from '@checkpoint/shared';
 import { apiClient, type ApiRequestConfig } from '@/shared/lib/api-client';
 
@@ -18,8 +25,9 @@ const AUTH_CALL: ApiRequestConfig = { isAuthCall: true, withCredentials: true };
 const WITH_CSRF: ApiRequestConfig = { ...AUTH_CALL, headers: { [CSRF_HEADER]: '1' } };
 
 export const authApi = {
-  async registro(body: RegistroRequest): Promise<AuthResponse> {
-    const response = await apiClient.post<AuthResponse>('/auth/registro', body, AUTH_CALL);
+  /** NÃO abre sessão: o e-mail de verificação sai e a conta só entra depois de confirmá-lo. */
+  async registro(body: RegistroRequest): Promise<RegistroResponse> {
+    const response = await apiClient.post<RegistroResponse>('/auth/registro', body, AUTH_CALL);
     return response.data;
   },
 
@@ -41,6 +49,37 @@ export const authApi = {
   async me(): Promise<Usuario> {
     const response = await apiClient.get<Usuario>('/auth/me');
     return response.data;
+  },
+
+  /** Confirma o e-mail com o token do link. Idempotente: o mesmo link de novo não dá erro. */
+  async verificarEmail(body: VerificarEmailRequest): Promise<VerificarEmailResponse> {
+    const response = await apiClient.post<VerificarEmailResponse>(
+      '/auth/verificar-email',
+      body,
+      AUTH_CALL,
+    );
+    return response.data;
+  },
+
+  async reenviarVerificacao(
+    body: ReenviarVerificacaoRequest,
+  ): Promise<ReenviarVerificacaoResponse> {
+    const response = await apiClient.post<ReenviarVerificacaoResponse>(
+      '/auth/reenviar-verificacao',
+      body,
+      AUTH_CALL,
+    );
+    return response.data;
+  },
+
+  /** A resposta é sempre a mesma, exista a conta ou não: a tela mostra um texto fixo. */
+  async esqueciSenha(body: EsqueciSenhaRequest): Promise<void> {
+    await apiClient.post('/auth/esqueci-senha', body, AUTH_CALL);
+  },
+
+  /** `isAuthCall`: o 401 `AUTH_TOKEN_INVALIDO` é do link, não uma sessão perdida (não dispara renovação). */
+  async redefinirSenha(body: RedefinirSenhaRequest): Promise<void> {
+    await apiClient.post('/auth/redefinir-senha', body, AUTH_CALL);
   },
 
   /** Rota protegida comum (Bearer e renovação): a senha errada volta 400, nunca 401. */

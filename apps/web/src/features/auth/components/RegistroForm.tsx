@@ -1,21 +1,21 @@
 import { RotuloPendente } from '@/shared/components/RotuloPendente';
 import { useState, type FormEvent } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { FieldError } from '@/shared/components/form-parts';
 import { authApi } from '../api/auth-api';
 import { describeAuthError, type AuthFormError } from '../lib/auth-errors';
 import { confirmacaoError, emailError, nomeError, novaSenhaError } from '../lib/field-rules';
-import { useAuth } from '../session/use-auth';
 import { PRIMARY_BUTTON, SECONDARY_LINK } from './AuthCard';
 import { CampoSenha } from './CampoSenha';
 import { TextField } from './TextField';
 
 /**
- * Criação de conta. "Confirmar senha" existe SÓ aqui (não há recuperação de senha: um erro de digitação
- * deixaria a conta inacessível) e, se as senhas diferem, nenhuma request sai.
+ * Criação de conta. "Confirmar senha" existe SÓ aqui (evita um erro de digitação que só apareceria no primeiro
+ * login) e, se as senhas diferem, nenhuma request sai. O registro NÃO abre sessão: o sucesso leva a
+ * `/confirme-seu-email`, e se o envio do e-mail falhou a tela avisa e oferece reenviar.
  */
 export function RegistroForm() {
-  const { entrar } = useAuth();
+  const navigate = useNavigate();
   const [nome, setNome] = useState('');
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
@@ -55,7 +55,14 @@ export function RegistroForm() {
     setPending(true);
     setError(null);
     try {
-      entrar(await authApi.registro({ nome: nome.trim(), email: email.trim(), senha }));
+      const { email: enviadoPara, emailEnviado } = await authApi.registro({
+        nome: nome.trim(),
+        email: email.trim(),
+        senha,
+      });
+      navigate(`/confirme-seu-email?email=${encodeURIComponent(enviadoPara)}`, {
+        state: { emailEnviado },
+      });
     } catch (failure) {
       setError(describeAuthError(failure));
     } finally {
@@ -101,11 +108,6 @@ export function RegistroForm() {
         autoComplete="new-password"
         error={confirmationError}
       />
-
-      <p className="m-0 text-[15px] leading-snug text-texto-suave">
-        Seu e-mail serve só para entrar: ele não é verificado e nenhum e-mail é enviado. Ainda não
-        existe recuperação de senha — guarde a sua.
-      </p>
 
       {error?.message && <FieldError id="registro-error" message={error.message} />}
 

@@ -19,7 +19,17 @@ vi.mock('@/features/integracoes/api/integracoes-api', () => ({
   integracoesApi: { listarContas: vi.fn().mockResolvedValue([]) },
 }));
 vi.mock('@/features/auth/api/auth-api', () => ({
-  authApi: { refresh: vi.fn(), logout: vi.fn(), login: vi.fn(), registro: vi.fn(), me: vi.fn() },
+  authApi: {
+    refresh: vi.fn(),
+    logout: vi.fn(),
+    login: vi.fn(),
+    registro: vi.fn(),
+    me: vi.fn(),
+    verificarEmail: vi.fn(),
+    reenviarVerificacao: vi.fn(),
+    esqueciSenha: vi.fn(),
+    redefinirSenha: vi.fn(),
+  },
 }));
 vi.mock('@/features/games/api/games-api', () => ({
   gamesApi: {
@@ -292,14 +302,15 @@ describe('/jogos/:id (avaliacao-de-jogos CA-28, CA-29)', () => {
 });
 
 describe('/perfil (CA-33, CA-34, CA-36)', () => {
-  it('nome, e-mail com a legenda e Sair; a barra inferior tem o item Perfil (CA-36)', async () => {
+  it('nome, e-mail e Sair; a barra inferior tem o item Perfil (CA-36)', async () => {
     entrar(auth);
 
     renderAt('/perfil');
 
     expect(await screen.findByText('Ana Teste')).toBeInTheDocument();
     expect(screen.getByText('ana@exemplo.com')).toBeInTheDocument();
-    expect(screen.getByText('(não verificado — usado só para entrar)')).toBeInTheDocument();
+    // Toda sessão ativa já implica e-mail verificado: a legenda antiga não existe mais (CA-32).
+    expect(screen.queryByText(/não verificado/)).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Sair' })).toBeInTheDocument();
     const bottom = document.querySelector<HTMLElement>('nav.bottom-nav') as HTMLElement;
     expect(within(bottom).getByRole('link', { name: 'Perfil' })).toHaveAttribute(
@@ -375,5 +386,65 @@ describe('rota inexistente (CA-37)', () => {
 
     expect(await screen.findByRole('button', { name: 'Criar conta' })).toBeInTheDocument();
     expect(screen.queryByText('Página não encontrada')).not.toBeInTheDocument();
+  });
+});
+
+describe('telas do e-mail (spec verificacao-de-email-e-recuperacao-de-senha)', () => {
+  it.each([
+    ['/confirme-seu-email?email=ana%40exemplo.com', 'Confirme seu e-mail'],
+    ['/esqueci-senha', 'Esqueci minha senha'],
+    ['/redefinir-senha?token=' + 'ab'.repeat(32), 'Redefinir senha'],
+  ])('um visitante abre %s no cartão de entrada, sem a barra do app', async (url, titulo) => {
+    await asVisitor();
+
+    renderAt(url);
+
+    expect(await screen.findByRole('heading', { name: titulo })).toBeInTheDocument();
+    expect(
+      screen.queryByRole('navigation', { name: 'Navegação principal' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('/verificar-email confirma ao abrir (visitante)', async () => {
+    await asVisitor();
+    api.verificarEmail.mockResolvedValue({ jaEstavaVerificado: false });
+
+    renderAt('/verificar-email?token=' + 'ab'.repeat(32));
+
+    expect(await screen.findByText('E-mail confirmado!')).toBeInTheDocument();
+  });
+
+  it.each(['/confirme-seu-email', '/esqueci-senha'])(
+    'logado em %s vai para "/" (mesma regra do login e do registro)',
+    async (path) => {
+      entrar(auth);
+
+      const { where } = renderAt(path);
+
+      await waitFor(() => expect(where()).toBe('/'));
+    },
+  );
+
+  it.each([
+    '/verificar-email?token=' + 'ab'.repeat(32),
+    '/redefinir-senha?token=' + 'ab'.repeat(32),
+  ])('logado em %s NÃO redireciona: o link do e-mail funciona com sessão aberta', async (url) => {
+    entrar(auth);
+    api.verificarEmail.mockResolvedValue({ jaEstavaVerificado: true });
+
+    const { where } = renderAt(url);
+
+    await waitFor(() => expect(where()).toBe(url));
+    expect(screen.queryByText('Nenhum jogo cadastrado')).not.toBeInTheDocument();
+  });
+
+  it('/login?motivo=senha-redefinida mostra o aviso da senha nova', async () => {
+    await asVisitor();
+
+    renderAt('/login?motivo=senha-redefinida');
+
+    expect(
+      await screen.findByText('Senha redefinida. Entre com a nova senha.'),
+    ).toBeInTheDocument();
   });
 });

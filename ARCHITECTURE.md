@@ -856,9 +856,10 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
 - **Rotas** (`app/routes.tsx`): `RequireAuth` segura as telas logadas: `carregando` mostra só o logo (**nenhuma
   query sai antes do boot**), `visitante` vai para `/login?voltar=…` (com `motivo=sessao` só se tinha sessão e a
   perdeu; quem acabou de sair vai para `/login` limpo), `desconectado` mostra a moldura do app com "Sem conexão.
-  Seu catálogo aparece quando a conexão voltar." e **não** redireciona. O `AuthLayout` (`/login`, `/registro`)
-  manda quem já tem sessão para `safeRedirect(voltar)` (login) ou `/` (registro): é ele quem redireciona depois
-  de um login bem-sucedido.
+  Seu catálogo aparece quando a conexão voltar." e **não** redireciona. O `AuthLayout` (`/login`, `/registro` e as
+  telas do e-mail, §5.10.1) manda quem já tem sessão para `safeRedirect(voltar)` (login) ou `/` (as demais): é ele quem
+  redireciona depois de um login bem-sucedido. **Exceção:** `/verificar-email` e `/redefinir-senha` (`ROTAS_ABERTAS_COM_SESSAO`) não
+  redirecionam, porque o link do e-mail precisa funcionar também para quem já está logado.
 - **`safeRedirect`** (`lib/safe-redirect.ts`): aceita só caminho interno (nada de `//`, `/\`, esquema, controle,
   > 512 caracteres, `/login`, `/registro`); confere o valor cru **e** o decodificado.
 - **Mensagens só pelo `code`** (`lib/auth-errors.ts`): `Record<ApiErrorCode, string>` (um código novo no shared
@@ -867,7 +868,7 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
   `instalacao:*` (escopo `dispositivo`) ficam. **Sair** chama `POST /auth/logout`; **sem conexão não sai** ("Sem
   conexão. Para sair, conecte-se."), porque o cookie `HttpOnly` só o servidor apaga. Depois de sair, o
   `BroadcastChannel` avisa as outras abas, que fazem o logout local na hora.
-- **Telas:** `LoginForm` e `RegistroForm` (validação local com as regras da API; "Confirmar senha" só no registro;
+- **Telas:** `LoginForm` e `RegistroForm` (validação local com as regras da API; "Confirmar senha" só no registro, para evitar um erro de digitação que só apareceria no primeiro login;
   `CampoSenha` com "mostrar senha" de 44 × 44 e `aria-pressed`) e o Sair do `/perfil` (a página está em §5.11). Reusam `shared/components/form-parts` (movido de `features/games`)
   e o tema do app.
 - **`/perfil/senha`** (etapa 5, `TrocarSenhaPage` + `TrocarSenhaForm`): Senha atual (`current-password`), Nova senha
@@ -876,6 +877,27 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
   e renovação pelo interceptor). Sucesso navega para `/perfil` com o aviso no `state` da navegação
   (`lib/perfil-avisos.ts`: só um aviso conhecido é mostrado, em `role="status"`). As outras sessões caem no
   servidor; o outro navegador descobre na próxima request (401 → `/login?motivo=sessao`).
+
+### 5.10.1 Verificação de e-mail e recuperação de senha no web (`features/auth/`, spec `docs/specs/verificacao-de-email-e-recuperacao-de-senha.md`, etapa 2)
+
+- **O registro não abre sessão.** `authApi.registro` devolve `RegistroResponse` (`{ email, emailEnviado }`) e o `RegistroForm` navega para
+  `/confirme-seu-email?email=…`, levando `emailEnviado` no `state` da navegação (`false` = "sua conta foi criada, mas não conseguimos enviar o e-mail", com o
+  botão de reenviar). O aviso antigo do formulário ("não é verificado, nenhum e-mail é enviado, sem recuperação") saiu.
+- **Quatro telas novas**, no `AuthLayout` (cartão de entrada, sem a barra do app), cada uma um componente em `features/auth/components/` com uma página fina em `pages/`:
+  - `/confirme-seu-email` (`ConfirmeSeuEmail`): mostra o e-mail de `?email=` (sem ele, pede o e-mail) e o **Reenviar e-mail**; "Já confirmei, entrar" → `/login`.
+  - `/verificar-email?token=…` (`VerificarEmail`): chama `POST /auth/verificar-email` **ao montar**, por `fetch` (nunca por navegação a uma rota da API: o pré-carregamento do link não
+    consome o token). `jaEstavaVerificado` `true` ou `false` mostram a mesma tela ("E-mail confirmado!" + **Entrar**). `AUTH_TOKEN_INVALIDO` (e `VALIDACAO`, link cortado) mostra
+    "Esse link não é mais válido." com o campo de e-mail e o **Reenviar** (o token não revela o e-mail); uma falha passageira (sem conexão, limite) **não** é tratada como link inválido: mostra o erro e "Tentar de novo".
+  - `/esqueci-senha` (`EsqueciSenhaForm`): só o e-mail; o sucesso é **sempre o mesmo texto fixo** (`ESQUECI_SENHA_SUCESSO`), sem "e-mail não encontrado".
+  - `/redefinir-senha?token=…` (`RedefinirSenhaForm`): Nova senha + Confirmar (mesmas regras da troca de senha); senhas diferentes → "As senhas não coincidem" **sem request**; sucesso → `/login?motivo=senha-redefinida`
+    (aviso no topo do cartão, em `LoginPage`); `AUTH_TOKEN_INVALIDO`, `fields.token` ou token ausente → "Esse link não é mais válido." + **Pedir um link novo** → `/esqueci-senha`. Um `fields.novaSenha` da API fica junto do campo e o link segue válido.
+- **`ReenviarVerificacao`** (usado por `/confirme-seu-email` e pelo link inválido): depois de um envio o botão fica **desabilitado por 30 s** (`REENVIO_ESPERA_SEGUNDOS`, com a contagem no rótulo) para não ajudar a
+  estourar o limite de 5/min do servidor; a resposta `ja-verificado` não entra em espera. `MAIL_INDISPONIVEL` (502) e `LIMITE_TENTATIVAS` mostram o texto do código.
+- **`LoginForm`**: ganha o link **Esqueci minha senha** (`/esqueci-senha`) e, no erro `AUTH_EMAIL_NAO_VERIFICADO`, a mensagem do código mais o botão **Reenviar e-mail de confirmação**, que navega
+  para `/confirme-seu-email?email=<o digitado>`.
+- **Chamadas**: as quatro novas (`verificarEmail`, `reenviarVerificacao`, `esqueciSenha`, `redefinirSenha`) passam pelo `apiClient` com `isAuthCall` (sem Bearer, sem renovação de sessão).
+  `lib/auth-errors.ts` ganhou os textos dos três códigos novos.
+- **`/perfil`** perdeu a legenda "(não verificado — usado só para entrar)": toda sessão ativa implica conta verificada (quem já tinha conta foi marcado pela migration).
 
 ### 5.11 Perfil (`features/perfil/`, `pages/PerfilPage.tsx`, spec `docs/specs/perfil.md`, etapas 1 a 5)
 

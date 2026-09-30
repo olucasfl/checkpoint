@@ -118,7 +118,7 @@ beforeEach(() => {
 });
 
 describe('cabeçalho (CA-01)', () => {
-  it('avatar de iniciais, nome, e-mail com a legenda, "Membro desde" e o resumo do catálogo', async () => {
+  it('avatar de iniciais, nome, e-mail, "Membro desde" e o resumo do catálogo', async () => {
     renderPerfil();
 
     const header = cabecalho();
@@ -128,7 +128,7 @@ describe('cabeçalho (CA-01)', () => {
     expect(avatar).toHaveAttribute('aria-hidden', 'true');
     expect(within(header).getByRole('heading', { name: 'Ana Teste' })).toBeInTheDocument();
     expect(within(header).getByText('ana@exemplo.com')).toBeInTheDocument();
-    expect(within(header).getByText('(não verificado — usado só para entrar)')).toBeInTheDocument();
+    expect(within(header).queryByText(/não verificado/)).not.toBeInTheDocument();
     expect(within(header).getByText('Membro desde setembro de 2026')).toBeInTheDocument();
     expect(
       await within(header).findByText('3 jogos · 1 zerado · 2 jogando · 0 quero jogar'),
