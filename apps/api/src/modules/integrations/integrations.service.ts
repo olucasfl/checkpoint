@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { type Prisma } from '@prisma/client';
 import { ConfigService } from '@nestjs/config';
 import {
   ATUALIZACAO_AUTOMATICA_MS,
@@ -16,6 +17,7 @@ import {
   type PerfilPlataforma,
   type ResumoContaPlataforma,
   type Provedor,
+  type SincronizacaoResponse,
   type VincularJogoRequest,
 } from '@checkpoint/shared';
 import { API_GLOBAL_PREFIX } from '../../config/app.config';
@@ -517,6 +519,67 @@ export class IntegrationsService {
     jogoId: string,
   ): Promise<DetalheJogoPlataforma> {
     return this.detalhar(userId, provedor, jogoId, false);
+  }
+
+  /**
+   * `POST :provedor/sincronizacao`: o que o web dispara SOZINHO ao entrar. Uma consulta à biblioteca (ignora o cache de
+   * 10 min, mas no máximo uma a cada 30 s, o mesmo piso do "Atualizar") e as horas de TODOS os jogos ligados da pessoa
+   * são atualizadas de uma vez, em vez de uma chamada por jogo. Só horas e última vez jogado: as conquistas continuam
+   * sendo buscadas ao abrir a página de cada jogo (custam uma chamada por jogo). Os ligados cujo valor não mudou só
+   * ganham o `atualizadoEm` novo ("atualizado há …" fica certo) numa escrita só. A falha (privado, 502, conexão
+   * expirada) sobe: o web a engole e continua mostrando o último valor gravado.
+   */
+  async sincronizar(userId: string, provedor: Provedor): Promise<SincronizacaoResponse> {
+    const conta = await this.contaAtiva(userId, provedor);
+    const biblioteca = await this.obterBiblioteca(userId, provedor, conta, { atualizar: true });
+    const vinculos = await this.prisma.jogoPlataforma.findMany({
+      where: { userId, provedor },
+      select: { gameId: true, idExterno: true, minutosJogados: true, ultimaVezJogadoEm: true },
+    });
+    const itens = new Map(biblioteca.itens.map((item) => [item.idExterno, item]));
+    const agora = new Date(Date.now());
+
+    const escritas: Prisma.PrismaPromise<unknown>[] = [];
+    const iguais: string[] = [];
+    let atualizados = 0;
+    for (const vinculo of vinculos) {
+      const item = itens.get(vinculo.idExterno);
+      if (!item) {
+        continue;
+      }
+      const mudou =
+        item.minutosJogados !== vinculo.minutosJogados ||
+        (item.ultimaVezJogadoEm?.getTime() ?? null) !==
+          (vinculo.ultimaVezJogadoEm?.getTime() ?? null);
+      if (!mudou) {
+        iguais.push(vinculo.gameId);
+        continue;
+      }
+      atualizados += 1;
+      escritas.push(
+        this.prisma.jogoPlataforma.update({
+          where: { gameId_provedor: { gameId: vinculo.gameId, provedor } },
+          data: {
+            minutosJogados: item.minutosJogados,
+            ultimaVezJogadoEm: item.ultimaVezJogadoEm,
+            atualizadoEm: agora,
+          },
+          select: { gameId: true },
+        }),
+      );
+    }
+    if (iguais.length > 0) {
+      escritas.push(
+        this.prisma.jogoPlataforma.updateMany({
+          where: { userId, provedor, gameId: { in: iguais } },
+          data: { atualizadoEm: agora },
+        }),
+      );
+    }
+    if (escritas.length > 0) {
+      await this.prisma.$transaction(escritas);
+    }
+    return { atualizados };
   }
 
   /**

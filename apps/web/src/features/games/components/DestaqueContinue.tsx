@@ -5,6 +5,8 @@ import { type Game } from '@checkpoint/shared';
 import { Icon } from '@/shared/components/Icon';
 import { capasDoJogo } from '@/features/integracoes/lib/capa';
 import { coverBackground, coverInitials } from '@/shared/lib/game-cover';
+import { useSincronizando } from '@/features/integracoes/api/use-sincronizacao';
+import { HorasCarregando } from '@/features/integracoes/components/HorasCarregando';
 import { chipsDoDestaque } from '../lib/estante';
 import { platformIcon } from '../lib/status-meta';
 
@@ -23,6 +25,8 @@ export function DestaqueContinue({ game }: { game: Game }) {
   const [falharam, setFalharam] = useState<readonly string[]>([]);
   const imagem = capasDoJogo(game).find((url) => !falharam.includes(url)) ?? null;
   const chips = chipsDoDestaque(game);
+  // As horas são atualizadas na plataforma ao entrar no app: o destaque carrega normal e só elas esperam.
+  const sincronizando = useSincronizando(game.dadosPlataforma.map((dados) => dados.provedor));
   const rotuloId = `destaque-rotulo-${game.id}`;
 
   return (
@@ -76,8 +80,14 @@ export function DestaqueContinue({ game }: { game: Game }) {
           {chips.horas && (
             <span className={CHIP}>
               <Icon name="schedule" size={16} />
-              <span className="max-md:hidden">{chips.horas}</span>
-              <span className="md:hidden">{chips.horasCurtas}</span>
+              {sincronizando ? (
+                <HorasCarregando largura="w-14" />
+              ) : (
+                <>
+                  <span className="max-md:hidden">{chips.horas}</span>
+                  <span className="md:hidden">{chips.horasCurtas}</span>
+                </>
+              )}
             </span>
           )}
           {chips.conquistas && (

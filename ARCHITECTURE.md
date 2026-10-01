@@ -367,7 +367,7 @@ apps/api/src/modules/games/
 - `integrations/` — integrações com plataformas de jogos (spec `docs/specs/integracao-plataformas.md`, **etapas 1 a 4**: a base, o **vínculo da conta com o cartão do perfil**, a **biblioteca**, o **vínculo de jogo** e o **detalhe do jogo** com horas e a lista de conquistas). Prefixo `/api/integracoes`, tag Swagger `integracoes`. Rotas (todas protegidas
   pelo guard global, **exceto o retorno**): `GET /` (contas vinculadas), `POST :provedor/vinculo`,
   `GET :provedor/retorno` (`@Public()`), `DELETE :provedor`, `GET :provedor/perfil` e
-  `POST :provedor/perfil/atualizacao`, **`GET :provedor/resumo` e `POST :provedor/resumo/atualizacao`** (o popup da conta), `GET :provedor/biblioteca` (com `?nuncaJogados=true|false`, o backlog), `PUT :provedor/jogos/:jogoId` (200), `GET :provedor/jogos/:jogoId` (o detalhe), `POST :provedor/jogos/:jogoId/atualizacao` e `DELETE :provedor/jogos/:jogoId` (204). O `:provedor` é o _slug_ minúsculo (`steam`), validado pelo
+  `POST :provedor/perfil/atualizacao`, **`GET :provedor/resumo` e `POST :provedor/resumo/atualizacao`** (o popup da conta), `GET :provedor/biblioteca` (com `?nuncaJogados=true|false`, o backlog), `PUT :provedor/jogos/:jogoId` (200), `GET :provedor/jogos/:jogoId` (o detalhe), `POST :provedor/jogos/:jogoId/atualizacao`, **`POST :provedor/sincronizacao`** (as horas de todos os jogos ligados, ver abaixo) e `DELETE :provedor/jogos/:jogoId` (204). O `:provedor` é o _slug_ minúsculo (`steam`), validado pelo
   `ProvedorSlugPipe` (400 `VALIDACAO`).
   - **`GameProvider`** (`providers/game-provider.ts`) é a interface que cada plataforma implementa
     (`iniciarVinculo`, `concluirVinculo`, `listarBiblioteca` — que devolve também o perfil, porque o cartão do
@@ -1008,6 +1008,18 @@ Regra prática: se o código só faz sentido dentro de uma feature, ele mora em
   acréscimos em `styles/tokens.test.ts` e `pages/GamesPage.test.tsx`.
 
 ### 5.13 Integrações no web (`features/integracoes/`, spec `docs/specs/integracao-plataformas.md`, etapas 2 a 4)
+
+- **Sincronização automática das horas** (sem spec; pedido direto): as horas de um jogo ligado (`DadosJogoPlataforma.minutosJogados`) só eram reconsultadas ao abrir a página do jogo com o dado
+  gravado há mais de 1 h (`ATUALIZACAO_AUTOMATICA_MS`) ou no "Atualizar"; o catálogo nunca as atualizava. Agora, **ao entrar no app**, o web dispara sozinho `POST /api/integracoes/:provedor/sincronizacao`
+  (`IntegrationsService.sincronizar`) **uma vez por conta `ativa`** (`reautenticar` é pulada): **uma só consulta à biblioteca** (ignora o cache de 10 min, mas no máximo uma a cada 30 s, o mesmo piso do
+  "Atualizar") e as horas e a última vez jogado de **todos** os jogos ligados da pessoa são gravadas de uma vez (`update` só dos que mudaram + um `updateMany` do `atualizadoEm` dos que não mudaram,
+  numa transação), em vez de uma chamada por jogo. Resposta `{ atualizados }`. **Só horas**: as conquistas continuam por jogo, ao abrir a página dele (custam uma chamada cada). A biblioteca e o detalhe
+  vêm do mesmo `minutosJogados` do provedor, então o valor não oscila entre as duas telas.
+  - No web, `SincronizadorDePlataformas` (`AppLayout`, só com sessão) monta `useSincronizacaoAutomatica`: um `useQueries` com a chave `[integracoes,sincronizacao,provedor]`, `staleTime` de 10 min e `refetchOnWindowFocus`
+    (voltar ao app depois de 10 min sincroniza de novo). Com `atualizados > 0` invalida o catálogo, os detalhes e o resumo daquela plataforma; com 0, nada (uma request a menos). **A falha é engolida**: o
+    último valor gravado continua na tela, e o "Atualizar" manual segue mostrando o erro.
+  - **Carregando só o que espera:** o catálogo, o destaque e a página do jogo abrem normais; enquanto a sincronização daquela plataforma está em andamento (`useSincronizando`, via `useIsFetching`), as **horas**
+    (chip do "Continue de onde parou", resumo e "Tempo jogado"/"Último jogo em" do bloco da plataforma) viram um esqueleto (`HorasCarregando`, `role="status"`, parado com "efeitos reduzidos"). As conquistas não mudam.
 
 - **`/perfil`** ganha a seção **Plataformas** (`PlataformasDoPerfil`, entre "Conta" e "Preferências"; antes, "Contas vinculadas" com o cartão
   Steam): uma linha por plataforma **com suporte** (`plataformasDisponiveis()` do cadastro; as outras não aparecem, nem "Em breve"). Vinculada:

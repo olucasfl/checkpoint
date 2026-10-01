@@ -125,6 +125,7 @@ describe('autenticação das rotas (CA-57)', () => {
     ['GET', '/integracoes/steam/perfil'],
     ['GET', '/integracoes/steam/resumo'],
     ['POST', '/integracoes/steam/resumo/atualizacao'],
+    ['POST', '/integracoes/steam/sincronizacao'],
     ['GET', '/integracoes/steam/biblioteca'],
     ['PUT', '/integracoes/steam/jogos/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'],
     ['DELETE', '/integracoes/steam/jogos/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'],
@@ -1681,6 +1682,7 @@ describe('todas as rotas exigem token, menos o retorno (CA-57)', () => {
         'POST /integracoes/:provedor/perfil/atualizacao',
         'GET /integracoes/:provedor/resumo',
         'POST /integracoes/:provedor/resumo/atualizacao',
+        'POST /integracoes/:provedor/sincronizacao',
         'GET /integracoes/:provedor/biblioteca',
         'PUT /integracoes/:provedor/jogos/:jogoId',
         'GET /integracoes/:provedor/jogos/:jogoId',
@@ -1688,7 +1690,7 @@ describe('todas as rotas exigem token, menos o retorno (CA-57)', () => {
         'DELETE /integracoes/:provedor/jogos/:jogoId',
       ]),
     );
-    expect(moldes).toHaveLength(14);
+    expect(moldes).toHaveLength(15);
   });
 
   it('cada rota sem Authorization dá 401 AUTH_NAO_AUTENTICADO; só o retorno responde 302', async () => {
@@ -1926,5 +1928,87 @@ describe('GET /integracoes/:provedor/resumo e o backlog (spec plataformas-e-pagi
     const ruim = await pedir('GET', '/integracoes/steam/biblioteca?nuncaJogados=talvez', token);
     expect(ruim.status).toBe(400);
     expect(await json(ruim)).toMatchObject({ code: 'VALIDACAO' });
+  });
+});
+
+describe('POST /integracoes/:provedor/sincronizacao (horas atualizadas ao entrar no app)', () => {
+  async function vincular(userId: string): Promise<string> {
+    const token = await ctx.tokenFor(userId);
+    const ida = await iniciar(token);
+    await retornar(ida.state, ida.nonce);
+    return token;
+  }
+
+  it('sem vínculo → 409 PLATAFORMA_NAO_VINCULADA, sem chamar a Steam', async () => {
+    const token = await ctx.tokenFor(ANA_ID);
+    const antes = ctx.client.listarJogos.mock.calls.length;
+
+    const resposta = await pedir('POST', '/integracoes/steam/sincronizacao', token);
+
+    expect(resposta.status).toBe(409);
+    expect(await json(resposta)).toMatchObject({ code: 'PLATAFORMA_NAO_VINCULADA' });
+    expect(ctx.client.listarJogos.mock.calls.length).toBe(antes);
+  });
+
+  it('as horas gravadas (8 h) viram as da Steam (10 h); o corpo é só { atualizados }; nunca em cache', async () => {
+    const token = await vincular(ANA_ID);
+    ctx.db.games.push({ id: 'g1', userId: ANA_ID, titulo: 'Alfa', plataforma: 'PC' });
+    ctx.db.jogos.push({
+      id: 'j1',
+      userId: ANA_ID,
+      gameId: 'g1',
+      provedor: 'STEAM',
+      idExterno: '1',
+      minutosJogados: 480,
+      conquistasTotal: null,
+      conquistasDesbloqueadas: null,
+    });
+
+    const resposta = await pedir('POST', '/integracoes/steam/sincronizacao', token);
+
+    expect(resposta.status).toBe(200);
+    expect(resposta.headers.get('cache-control')).toBe('no-store');
+    expect(await json(resposta)).toEqual({ atualizados: 1 });
+    expect(ctx.db.jogos[0]).toMatchObject({ minutosJogados: 600 });
+  });
+
+  it('só mexe nos jogos de QUEM pediu: o de outra pessoa na mesma Steam não muda', async () => {
+    const token = await vincular(ANA_ID);
+    ctx.db.jogos.push({
+      id: 'j-bia',
+      userId: BIA_ID,
+      gameId: 'g-bia',
+      provedor: 'STEAM',
+      idExterno: '1',
+      minutosJogados: 480,
+      conquistasTotal: null,
+      conquistasDesbloqueadas: null,
+    });
+
+    const resposta = await pedir('POST', '/integracoes/steam/sincronizacao', token);
+
+    expect(await json(resposta)).toEqual({ atualizados: 0 });
+    expect(ctx.db.jogos[0]).toMatchObject({ minutosJogados: 480 });
+  });
+
+  it('Steam fora do ar → 502 PLATAFORMA_INDISPONIVEL e nada é gravado', async () => {
+    const token = await vincular(ANA_ID);
+    ctx.db.jogos.push({
+      id: 'j1',
+      userId: ANA_ID,
+      gameId: 'g1',
+      provedor: 'STEAM',
+      idExterno: '1',
+      minutosJogados: 480,
+      conquistasTotal: null,
+      conquistasDesbloqueadas: null,
+    });
+    ctx.client.listarJogos.mockRejectedValue(new PlataformaIndisponivelError());
+
+    const resposta = await pedir('POST', '/integracoes/steam/sincronizacao', token);
+
+    expect(resposta.status).toBe(502);
+    expect(await json(resposta)).toMatchObject({ code: 'PLATAFORMA_INDISPONIVEL' });
+    expect(ctx.db.jogos[0]).toMatchObject({ minutosJogados: 480 });
   });
 });
