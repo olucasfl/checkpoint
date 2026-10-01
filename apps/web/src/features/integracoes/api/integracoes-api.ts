@@ -7,6 +7,7 @@ import {
   type ItemBiblioteca,
   type ResumoContaPlataforma,
   type Provedor,
+  type SincronizacaoResponse,
   type VincularComCredencialRequest,
   type VincularJogoRequest,
 } from '@checkpoint/shared';
@@ -65,6 +66,12 @@ export const integracoesApi = {
     const response = await apiClient.post<ResumoContaPlataforma>(
       `${rota(provedor)}/resumo/atualizacao`,
     );
+    return response.data;
+  },
+
+  /** `POST /api/integracoes/:provedor/sincronizacao`: as horas de TODOS os jogos ligados, numa consulta só (no máximo uma a cada 30 s). */
+  async sincronizar(provedor: Provedor): Promise<SincronizacaoResponse> {
+    const response = await apiClient.post<SincronizacaoResponse>(`${rota(provedor)}/sincronizacao`);
     return response.data;
   },
 

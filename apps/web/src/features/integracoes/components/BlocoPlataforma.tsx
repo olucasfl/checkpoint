@@ -1,5 +1,5 @@
 import { RotuloPendente } from '@/shared/components/RotuloPendente';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import {
   PLATAFORMAS,
   PROVEDOR_SLUG,
@@ -21,6 +21,8 @@ import { useSecaoAberta } from '@/shared/hooks/use-secao-aberta';
 import { ModalDialog } from '@/shared/components/ModalDialog';
 import { describeAuthError } from '@/features/auth/lib/auth-errors';
 import { useAtualizarJogo, useDesvincularJogo, useDetalheJogo } from '../api/use-integracoes';
+import { useSincronizando } from '../api/use-sincronizacao';
+import { HorasCarregando } from './HorasCarregando';
 import {
   TIPO_DE_TROFEU_TEXTO,
   capitalizada,
@@ -78,7 +80,7 @@ function Aviso({ texto }: { texto: string }) {
   );
 }
 
-function Estatistica({ rotulo, valor }: { rotulo: string; valor: string }) {
+function Estatistica({ rotulo, valor }: { rotulo: string; valor: ReactNode }) {
   return (
     <div className="flex min-w-0 flex-col gap-1 rounded-2xl bg-painel-2 px-[18px] py-4">
       <dt className="text-[13px] font-semibold text-texto-suave">{rotulo}</dt>
@@ -352,6 +354,8 @@ export function BlocoPlataforma({ game, provedor }: { game: Game; provedor: Prov
   );
   const detalhe = useDetalheJogo(provedor, game.id, gravado !== undefined);
   const atualizar = useAtualizarJogo(provedor, game.id);
+  // As horas são trazidas da plataforma ao entrar no app: a página abre normal e só elas esperam.
+  const sincronizando = useSincronizando([provedor]);
   const desvincular = useDesvincularJogo(provedor);
   const [confirmando, setConfirmando] = useState(false);
   const [erroAtualizar, setErroAtualizar] = useState('');
@@ -423,7 +427,7 @@ export function BlocoPlataforma({ game, provedor }: { game: Game; provedor: Prov
           <PlataformaMarca provedor={provedor} variante="logo" />
         </h2>
       }
-      resumo={resumo}
+      resumo={sincronizando ? <HorasCarregando /> : resumo}
     >
       <div className="flex flex-wrap items-center justify-between gap-4">
         {atualizadoEm && (
@@ -495,11 +499,17 @@ export function BlocoPlataforma({ game, provedor }: { game: Game; provedor: Prov
       <dl className="m-0 grid grid-cols-1 gap-3 md:grid-cols-3">
         <Estatistica
           rotulo={`Tempo jogado ${naPlataforma(plataforma)}`}
-          valor={horasEMinutos(dados.minutosJogados)}
+          valor={sincronizando ? <HorasCarregando /> : horasEMinutos(dados.minutosJogados)}
         />
         <Estatistica
           rotulo="Último jogo em"
-          valor={dataCurta(dados.ultimaVezJogadoEm) ?? 'Nunca jogado'}
+          valor={
+            sincronizando ? (
+              <HorasCarregando largura="w-24" />
+            ) : (
+              (dataCurta(dados.ultimaVezJogadoEm) ?? 'Nunca jogado')
+            )
+          }
         />
         {mostrarBarra &&
           dados.conquistasTotal !== null &&

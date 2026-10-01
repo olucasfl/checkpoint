@@ -41,6 +41,7 @@ import {
   type PerfilPlataforma,
   type ResumoContaPlataforma,
   type Provedor,
+  type SincronizacaoResponse,
 } from '@checkpoint/shared';
 import { Public } from '../../common/decorators/public.decorator';
 import {
@@ -60,6 +61,7 @@ import {
   ItemBibliotecaDto,
   PerfilPlataformaDto,
   ResumoContaPlataformaDto,
+  SincronizacaoResponseDto,
 } from './dto/integracao-response.dto';
 import {
   INTEGRACOES_LIMIT,
@@ -401,6 +403,34 @@ export class IntegrationsController {
     @Param('jogoId', jogoIdPipe()) jogoId: string,
   ): Promise<DetalheJogoPlataforma> {
     return this.integrations.detalheDoJogo(user.id, provedor, jogoId);
+  }
+
+  @Post(':provedor/sincronizacao')
+  @HttpCode(HttpStatus.OK)
+  @Header('cache-control', 'no-store')
+  @ApiOperation({
+    summary: 'Sincroniza as horas de todos os jogos ligados (o web chama ao entrar)',
+    description:
+      'Uma consulta à biblioteca (ignora o cache, no máximo uma a cada 30 s) e as horas de TODOS os jogos ligados são ' +
+      'gravadas de uma vez. Só horas e última vez jogado; as conquistas continuam por jogo. `atualizados` é quantos ' +
+      'jogos tiveram o valor alterado.',
+  })
+  @ApiParam(PROVEDOR_PARAM)
+  @ApiOkResponse({ type: SincronizacaoResponseDto })
+  @ApiBadRequestResponse({ type: ApiErrorResponseDto, description: '`VALIDACAO`' })
+  @ApiConflictResponse({
+    type: ApiErrorResponseDto,
+    description:
+      '`PLATAFORMA_NAO_VINCULADA`, `PLATAFORMA_PERFIL_PRIVADO` ou `PLATAFORMA_REAUTENTICAR`',
+  })
+  @ApiUnauthorizedResponse({ type: ApiErrorResponseDto })
+  @ApiTooManyRequestsResponse({ type: ApiErrorResponseDto, description: '`LIMITE_TENTATIVAS`' })
+  @ApiResponse502()
+  sincronizar(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('provedor', ProvedorSlugPipe) provedor: Provedor,
+  ): Promise<SincronizacaoResponse> {
+    return this.integrations.sincronizar(user.id, provedor);
   }
 
   @Post(':provedor/jogos/:jogoId/atualizacao')

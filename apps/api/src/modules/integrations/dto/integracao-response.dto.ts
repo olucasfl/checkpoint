@@ -194,3 +194,8 @@ export class DetalheJogoPlataformaDto {
   })
   porTipo?: Record<string, { total: number; desbloqueados: number }> | null;
 }
+
+export class SincronizacaoResponseDto {
+  @ApiProperty({ description: 'Quantos jogos ligados tiveram as horas alteradas' })
+  atualizados!: number;
+}

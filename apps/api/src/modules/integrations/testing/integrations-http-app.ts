@@ -290,6 +290,24 @@ export class FakeIntegrationsPrisma {
       Object.assign(achada, data);
       return Promise.resolve(this.completa(achada));
     },
+    /** Só o filtro que a sincronização usa: o dono, a plataforma e uma lista de `gameId`. */
+    updateMany: ({
+      where,
+      data,
+    }: {
+      where: { userId: string; provedor: string; gameId: { in: string[] } };
+      data: Partial<JogoPlataformaRow>;
+    }) => {
+      this.registrar();
+      const alvos = this.jogos.filter(
+        (j) =>
+          j.userId === where.userId &&
+          j.provedor === where.provedor &&
+          where.gameId.in.includes(j.gameId ?? ''),
+      );
+      alvos.forEach((j) => Object.assign(j, data));
+      return Promise.resolve({ count: alvos.length });
+    },
     /** As duas unicidades da migration: `(gameId, provedor)` e `(userId, provedor, idExterno)`. */
     create: ({ data }: { data: Omit<JogoPlataformaRow, 'id'> }) => {
       this.registrar();

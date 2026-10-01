@@ -135,6 +135,11 @@ export interface TrofeusPorTipo {
 }
 
 /** A camada da plataforma sobre um jogo do catálogo (o último valor gravado). */
+/** Resposta de `POST /api/integracoes/:provedor/sincronizacao`: quantos jogos ligados tiveram as horas alteradas. */
+export interface SincronizacaoResponse {
+  atualizados: number;
+}
+
 export interface DadosJogoPlataforma {
   provedor: Provedor;
   idExterno: string;

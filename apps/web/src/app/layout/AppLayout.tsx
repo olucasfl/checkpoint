@@ -1,5 +1,7 @@
 import { type ReactNode } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
+import { useAuth } from '@/features/auth/session/use-auth';
+import { SincronizadorDePlataformas } from '@/features/integracoes/components/SincronizadorDePlataformas';
 import { Avisos } from '@/shared/components/Avisos';
 import { ConnectionBanner } from '@/shared/components/ConnectionBanner';
 import { ErrorBoundary } from '@/shared/components/ErrorBoundary';
@@ -37,8 +39,11 @@ export function AppFrame({ children }: { children: ReactNode }) {
 
 /** Layout de todas as telas logadas e do `/status`. Nenhuma página importa a navegação à mão. */
 export function AppLayout() {
+  const { status } = useAuth();
   return (
     <AppFrame>
+      {/* Só com sessão: o /status é público e não tem o que sincronizar. */}
+      {status === 'autenticado' && <SincronizadorDePlataformas />}
       <Outlet />
     </AppFrame>
   );

@@ -69,6 +69,7 @@ function montar() {
       findUnique: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
+      updateMany: jest.fn(),
       deleteMany: jest.fn(),
     },
     $transaction: jest.fn((operacoes: Promise<unknown>[]) => Promise.all(operacoes)),
@@ -1710,5 +1711,134 @@ describe('IntegrationsService.biblioteca com nuncaJogados (backlog)', () => {
     expect(backlog.map((i) => i.titulo)).toEqual(['Nunca']);
     const todos = await ctx.service.biblioteca(ANA, 'STEAM', { nuncaJogados: false });
     expect(todos.map((i) => i.titulo)).toEqual(['Jogado', 'Nunca']);
+  });
+});
+
+describe('IntegrationsService.sincronizar (horas de todos os jogos ligados, ao entrar no app)', () => {
+  const perfil = { nomeExibicao: 'Jogador', avatarUrl: null, perfilUrl: null, publico: true };
+  const ULTIMA = new Date(Date.UTC(2026, 8, 20, 12, 0, 0));
+
+  function comVinculos(itens: ItemDaBiblioteca[], vinculos: Record<string, unknown>[]) {
+    const ctx = montar();
+    ctx.prisma.contaVinculada.findUnique.mockResolvedValue({
+      idExterno: STEAM_ID,
+      nomeExibicao: 'Jogador',
+    });
+    ctx.provider.listarBiblioteca.mockResolvedValue({ itens, perfil });
+    ctx.prisma.jogoPlataforma.findMany.mockResolvedValue(vinculos);
+    ctx.prisma.jogoPlataforma.update.mockResolvedValue({ gameId: 'x' });
+    ctx.prisma.jogoPlataforma.updateMany.mockResolvedValue({ count: 0 });
+    return ctx;
+  }
+
+  const vinculo = (gameId: string, idExterno: string, minutosJogados: number) => ({
+    gameId,
+    idExterno,
+    minutosJogados,
+    ultimaVezJogadoEm: null,
+  });
+
+  it('8 h viram 11 h: grava só o jogo que mudou e devolve quantos mudaram', async () => {
+    const ctx = comVinculos(
+      [item('1', 'Jogo A', 660), item('2', 'Jogo B', 100)],
+      [vinculo('g1', '1', 480), vinculo('g2', '2', 100)],
+    );
+
+    await expect(ctx.service.sincronizar(ANA, 'STEAM')).resolves.toEqual({ atualizados: 1 });
+
+    expect(ctx.prisma.jogoPlataforma.update).toHaveBeenCalledTimes(1);
+    expect(ctx.prisma.jogoPlataforma.update).toHaveBeenCalledWith({
+      where: { gameId_provedor: { gameId: 'g1', provedor: 'STEAM' } },
+      data: {
+        minutosJogados: 660,
+        ultimaVezJogadoEm: null,
+        atualizadoEm: new Date(NOW),
+      },
+      select: { gameId: true },
+    });
+  });
+
+  it('os que não mudaram só ganham o atualizadoEm, numa escrita só', async () => {
+    const ctx = comVinculos(
+      [item('1', 'Jogo A', 660), item('2', 'Jogo B', 100), item('3', 'Jogo C', 5)],
+      [vinculo('g1', '1', 480), vinculo('g2', '2', 100), vinculo('g3', '3', 5)],
+    );
+
+    await ctx.service.sincronizar(ANA, 'STEAM');
+
+    expect(ctx.prisma.jogoPlataforma.updateMany).toHaveBeenCalledTimes(1);
+    expect(ctx.prisma.jogoPlataforma.updateMany).toHaveBeenCalledWith({
+      where: { userId: ANA, provedor: 'STEAM', gameId: { in: ['g2', 'g3'] } },
+      data: { atualizadoEm: new Date(NOW) },
+    });
+  });
+
+  it('a última vez jogada mudando também conta, mesmo com as mesmas horas', async () => {
+    const ctx = comVinculos(
+      [{ ...item('1', 'Jogo A', 480), ultimaVezJogadoEm: ULTIMA }],
+      [vinculo('g1', '1', 480)],
+    );
+
+    await expect(ctx.service.sincronizar(ANA, 'STEAM')).resolves.toEqual({ atualizados: 1 });
+    expect(ctx.prisma.jogoPlataforma.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ ultimaVezJogadoEm: ULTIMA }) }),
+    );
+  });
+
+  it('um jogo ligado que saiu da biblioteca fica como está (nem conta nem escreve)', async () => {
+    const ctx = comVinculos([item('1', 'Jogo A', 660)], [vinculo('g99', '99', 480)]);
+
+    await expect(ctx.service.sincronizar(ANA, 'STEAM')).resolves.toEqual({ atualizados: 0 });
+
+    expect(ctx.prisma.jogoPlataforma.update).not.toHaveBeenCalled();
+    expect(ctx.prisma.jogoPlataforma.updateMany).not.toHaveBeenCalled();
+    expect(ctx.prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('só lê e grava os vínculos DESTE usuário e DESTA plataforma', async () => {
+    const ctx = comVinculos([item('1', 'Jogo A', 660)], [vinculo('g1', '1', 480)]);
+
+    await ctx.service.sincronizar(ANA, 'STEAM');
+
+    expect(ctx.prisma.jogoPlataforma.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { userId: ANA, provedor: 'STEAM' } }),
+    );
+  });
+
+  it('ignora o cache de 10 min da biblioteca, mas não consulta duas vezes em menos de 30 s', async () => {
+    const ctx = comVinculos([item('1', 'Jogo A', 660)], [vinculo('g1', '1', 480)]);
+    // O cartão do perfil já tinha a biblioteca em cache (consulta de 5 min atrás).
+    await ctx.service.resumo(ANA, 'STEAM');
+    ctx.provider.listarBiblioteca.mockClear();
+    jest.spyOn(Date, 'now').mockReturnValue(NOW + 5 * 60_000);
+
+    await ctx.service.sincronizar(ANA, 'STEAM');
+    expect(ctx.provider.listarBiblioteca).toHaveBeenCalledTimes(1);
+
+    jest.spyOn(Date, 'now').mockReturnValue(NOW + 5 * 60_000 + 10_000);
+    await ctx.service.sincronizar(ANA, 'STEAM');
+    expect(ctx.provider.listarBiblioteca).toHaveBeenCalledTimes(1);
+  });
+
+  it('sem conta vinculada → 409 PLATAFORMA_NAO_VINCULADA, sem chamar a plataforma', async () => {
+    const ctx = montar();
+
+    await expect(statusEcodeDe(ctx.service.sincronizar(ANA, 'STEAM'))).resolves.toEqual({
+      status: 409,
+      code: 'PLATAFORMA_NAO_VINCULADA',
+    });
+    expect(ctx.provider.listarBiblioteca).not.toHaveBeenCalled();
+  });
+
+  it('a plataforma falhou: o erro sobe e NADA é gravado (o web mantém o último valor)', async () => {
+    const ctx = comVinculos([item('1', 'Jogo A', 660)], [vinculo('g1', '1', 480)]);
+    ctx.provider.listarBiblioteca.mockRejectedValue(new PlataformaIndisponivelError());
+
+    await expect(ctx.service.sincronizar(ANA, 'STEAM')).rejects.toBeInstanceOf(
+      PlataformaIndisponivelError,
+    );
+
+    expect(ctx.prisma.jogoPlataforma.update).not.toHaveBeenCalled();
+    expect(ctx.prisma.$transaction).not.toHaveBeenCalled();
   });
 });

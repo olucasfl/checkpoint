@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
@@ -36,7 +37,13 @@ const steam: DadosJogoPlataforma = {
   atualizadoEm: '2026-09-25T12:00:00.000Z',
 };
 
-const noRouter = (ui: React.ReactNode) => render(<MemoryRouter>{ui}</MemoryRouter>);
+/** O destaque pergunta ao cache se há sincronização de plataforma em andamento: precisa de um `QueryClientProvider`. */
+const noRouter = (ui: React.ReactNode, client = new QueryClient()) =>
+  render(
+    <QueryClientProvider client={client}>
+      <MemoryRouter>{ui}</MemoryRouter>
+    </QueryClientProvider>,
+  );
 
 describe('GameTile (CA-15 a CA-19)', () => {
   const acoes = { onEdit: vi.fn(), onRemove: vi.fn() };
@@ -162,6 +169,46 @@ describe('DestaqueContinue (CA-22 a CA-26)', () => {
     expect(screen.getByText('Continue de onde parou')).toBeInTheDocument();
     expect(screen.getByText('12/40 conquistas')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Ver detalhes' })).toHaveAttribute('href', '/jogos/a');
+  });
+
+  it('enquanto as horas são sincronizadas ao entrar, o destaque carrega normal e só o chip de horas espera', () => {
+    const client = new QueryClient();
+    // Uma sincronização da Steam em andamento (a promessa nunca resolve neste teste).
+    void client.prefetchQuery({
+      queryKey: ['integracoes', 'sincronizacao', 'STEAM'],
+      queryFn: () => new Promise(() => undefined),
+    });
+    noRouter(
+      <DestaqueContinue game={jogo('a', { titulo: 'Hollow', dadosPlataforma: [steam] })} />,
+      client,
+    );
+
+    expect(screen.getByRole('heading', { name: 'Hollow' })).toBeInTheDocument();
+    expect(screen.getByText('12/40 conquistas')).toBeInTheDocument();
+    expect(screen.getByRole('status', { name: 'Atualizando' })).toBeInTheDocument();
+    expect(screen.queryByText(/42 h 30 min/)).toBeNull();
+  });
+
+  it('sem sincronização em andamento mostra as horas gravadas (e nenhum esqueleto)', () => {
+    noRouter(<DestaqueContinue game={jogo('a', { titulo: 'Hollow', dadosPlataforma: [steam] })} />);
+
+    expect(screen.getAllByText(/42 h 30 min/).length).toBeGreaterThan(0);
+    expect(screen.queryByRole('status', { name: 'Atualizando' })).toBeNull();
+  });
+
+  it('a sincronização de OUTRA plataforma não esconde as horas deste jogo', () => {
+    const client = new QueryClient();
+    void client.prefetchQuery({
+      queryKey: ['integracoes', 'sincronizacao', 'PLAYSTATION'],
+      queryFn: () => new Promise(() => undefined),
+    });
+    noRouter(
+      <DestaqueContinue game={jogo('a', { titulo: 'Hollow', dadosPlataforma: [steam] })} />,
+      client,
+    );
+
+    expect(screen.getAllByText(/42 h 30 min/).length).toBeGreaterThan(0);
+    expect(screen.queryByRole('status', { name: 'Atualizando' })).toBeNull();
   });
 
   it('sem imagem: fundo gerado com as iniciais; sem vínculo, sem chips de horas e conquistas', () => {
